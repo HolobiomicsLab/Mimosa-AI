@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>digest.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/evaluators/hybrid_verifier > digest.py">
+<div class="wrap">
+
+<h1 class="hud">digest.py</h1>
+<p class="intro">This file takes deterministic head/middle/tail samples of a workspace's deliverable files and asks one judge call for a short format digest per file. It runs once per task, from <code>ClaimsEvidenceLayer._ensure_digests</code> (<a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a>), and the result is cached so every later scorer prompt sees real column names and log grammar. The <a href="mod_evaluators_hybrid_verifier.html">hybrid_verifier page</a> places it in the pre-policy stage.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; the file's job: rank files, slice bytes, one judge call, parse digests</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 470" role="img" aria-label="digest.py pipeline from inventory to digests block">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="gIn">
+    <title>What the evidence layer passes in</title>
+    <rect x="20" y="40" width="190" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="115" y="64" text-anchor="middle">in: workspace + rows</text>
+    <text class="box-sub" x="115" y="82" text-anchor="middle">workspace Path (117)</text>
+    <text class="box-sub" x="115" y="98" text-anchor="middle">inventory dict (118)</text>
+    <text class="box-sub" x="115" y="114" text-anchor="middle">cached digests (119)</text>
+    <text class="box-sub" x="115" y="130" text-anchor="middle">llm_text callable (120)</text>
+    <text class="box-sub" x="115" y="146" text-anchor="middle">uuid, max_files, logger</text>
+  </g>
+
+  <a class="box" id="gPick" href="../../sources/evaluators/hybrid_verifier/digest.py">
+    <title>Candidate ranking inside ensure_digests</title>
+    <rect x="250" y="30" width="220" height="130" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="360" y="54" text-anchor="middle">pick candidate files</text>
+    <text class="box-sub" x="360" y="72" text-anchor="middle">_deliverable_rank &lt; 9 (147)</text>
+    <text class="box-sub" x="360" y="88" text-anchor="middle">sort: rank, then bytes down (149)</text>
+    <text class="box-sub" x="360" y="104" text-anchor="middle">cap max(1, max_files) (153)</text>
+    <text class="box-sub" x="360" y="120" text-anchor="middle">inventory.py:149 supplies rank</text>
+    <text class="box-sub" x="360" y="136" text-anchor="middle">signal kept when present (160-161)</text>
+  </a>
+
+  <a class="box" id="gSample" href="../../sources/evaluators/hybrid_verifier/digest.py">
+    <title>Deterministic slices, offsets from file size only</title>
+    <rect x="510" y="30" width="220" height="130" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="620" y="54" text-anchor="middle">sample_sections (32)</text>
+    <text class="box-sub" x="620" y="72" text-anchor="middle">head at offset 0 (41)</text>
+    <text class="box-sub" x="620" y="88" text-anchor="middle">middle (size - slice)//2 (42)</text>
+    <text class="box-sub" x="620" y="104" text-anchor="middle">tail at size - slice (45)</text>
+    <text class="box-sub" x="620" y="120" text-anchor="middle">1200 bytes per slice (28)</text>
+    <text class="box-sub" x="620" y="136" text-anchor="middle">OSError returns "" (47-48)</text>
+  </a>
+
+  <a class="box" id="gPrompt" href="../../sources/evaluators/hybrid_verifier/digest.py">
+    <title>One prompt block per sampled file</title>
+    <rect x="770" y="30" width="190" height="130" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="865" y="54" text-anchor="middle">digest_prompt (58)</text>
+    <text class="box-sub" x="865" y="72" text-anchor="middle">"### path (signal)" (66)</text>
+    <text class="box-sub" x="865" y="88" text-anchor="middle">CSV, log, JSON rules (71-75)</text>
+    <text class="box-sub" x="865" y="104" text-anchor="middle">digest &lt;= 40 words (78)</text>
+    <text class="box-sub" x="865" y="120" text-anchor="middle">strict JSON only (79)</text>
+    <text class="box-sub" x="865" y="136" text-anchor="middle">sections joined (81)</text>
+  </a>
+
+  <g class="box" id="gLlm">
+    <title>One judge round-trip, done by the caller's llm_text callable</title>
+    <rect x="770" y="210" width="190" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="865" y="234" text-anchor="middle">judge call</text>
+    <text class="box-sub" x="865" y="252" text-anchor="middle">agent "hybrid_format_digest"</text>
+    <text class="box-sub" x="865" y="268" text-anchor="middle">line 165</text>
+    <text class="box-sub" x="865" y="284" text-anchor="middle">raises: warn, return {} (166-169)</text>
+  </g>
+
+  <a class="box" id="gParse" href="../../sources/evaluators/hybrid_verifier/digest.py">
+    <title>parse_digests: JSON payload, path to digest map</title>
+    <rect x="510" y="210" width="220" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="620" y="234" text-anchor="middle">parse_digests (84)</text>
+    <text class="box-sub" x="620" y="252" text-anchor="middle">extract_json_payload (88)</text>
+    <text class="box-sub" x="620" y="268" text-anchor="middle">json.loads, else {} (92-94)</text>
+    <text class="box-sub" x="620" y="284" text-anchor="middle">path + digest non-empty (103)</text>
+    <text class="box-sub" x="620" y="300" text-anchor="middle">digest capped at 400 chars (104)</text>
+  </a>
+
+  <a class="box" id="gRender" href="../../sources/evaluators/hybrid_verifier/digest.py">
+    <title>render_digests: the block pasted into scorer prompts</title>
+    <rect x="250" y="210" width="220" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="360" y="234" text-anchor="middle">render_digests (108)</text>
+    <text class="box-sub" x="360" y="252" text-anchor="middle">"- path: digest" per line (112)</text>
+    <text class="box-sub" x="360" y="268" text-anchor="middle">sorted by path (112)</text>
+    <text class="box-sub" x="360" y="284" text-anchor="middle">empty: "(no format digests ...)"</text>
+    <text class="box-sub" x="360" y="300" text-anchor="middle">line 111</text>
+  </a>
+
+  <g class="box" id="gOut">
+    <title>The returned map and where the caller stores it</title>
+    <rect x="20" y="210" width="190" height="110" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="115" y="234" text-anchor="middle">out: dict[path, digest]</text>
+    <text class="box-sub" x="115" y="252" text-anchor="middle">registry.digests (layers.py:314)</text>
+    <text class="box-sub" x="115" y="268" text-anchor="middle">JSON key "digests"</text>
+    <text class="box-sub" x="115" y="284" text-anchor="middle">read back at layers.py:301</text>
+    <text class="box-sub" x="115" y="300" text-anchor="middle">into scorer prompt (327, 336)</text>
+  </g>
+
+  <g class="box" id="gGuard">
+    <title>Every failing path returns an empty map</title>
+    <rect x="250" y="370" width="710" height="60" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="605" y="394" text-anchor="middle">soft-fail paths</text>
+    <text class="box-sub" x="605" y="412" text-anchor="middle">cache hit returns the cache (141-142); no sample text returns {} (162-163); judge error returns {} (169); unparsable reply returns {} (171-174)</text>
+  </g>
+
+  <path class="edge" data-from="gIn" data-to="gPick" d="M210,100 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="230" y="92" text-anchor="middle">args</text>
+  <path class="edge" data-from="gPick" data-to="gSample" d="M470,95 H510" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="490" y="87" text-anchor="middle">top files</text>
+  <path class="edge" data-from="gSample" data-to="gPrompt" d="M730,95 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="750" y="87" text-anchor="middle">samples</text>
+  <path class="edge" data-from="gPrompt" data-to="gLlm" d="M865,160 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="875" y="190" text-anchor="start">prompt str</text>
+  <path class="edge" data-from="gLlm" data-to="gParse" d="M770,265 H730" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="750" y="257" text-anchor="middle">raw text</text>
+  <path class="edge" data-from="gParse" data-to="gRender" d="M510,265 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="490" y="257" text-anchor="middle">digest map</text>
+  <path class="edge" data-from="gRender" data-to="gOut" d="M250,265 H210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="230" y="257" text-anchor="middle">block str</text>
+  <path class="edge dashed-edge" data-from="gOut" data-to="gIn" d="M115,210 V160" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="125" y="190" text-anchor="start">cached next task round</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. The pipeline runs inside <code>ensure_digests</code> (lines 116-175); it calls <code>sample_sections</code> (157), <code>digest_prompt</code> (165), then <code>parse_digests</code> (170). <code>render_digests</code> is not called from <code>ensure_digests</code>: the caller calls it (<code>layers.py:302</code>, <code>315</code>, <code>327</code>). The judge HTTP call sits behind the <code>llm_text</code> callable, so this file makes no network call.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: files read, values returned, nothing written</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 330" role="img" aria-label="data flow of digest.py">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="fCfg">
+    <title>The one config field that reaches this file, via the evaluator</title>
+    <rect x="20" y="30" width="220" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130" y="54" text-anchor="middle">config field</text>
+    <text class="box-sub" x="130" y="72" text-anchor="middle">hybrid_verifier_digest_max_files</text>
+    <text class="box-sub" x="130" y="88" text-anchor="middle">default 8 (config.py:88)</text>
+    <text class="box-sub" x="130" y="104" text-anchor="middle">read at evaluator.py:208</text>
+  </g>
+
+  <a class="box" id="fFn" href="../../sources/evaluators/hybrid_verifier/digest.py">
+    <title>ensure_digests and its three helpers</title>
+    <rect x="380" y="20" width="240" height="110" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="500" y="46" text-anchor="middle">ensure_digests (116)</text>
+    <text class="box-sub" x="500" y="64" text-anchor="middle">max_files argument (122)</text>
+    <text class="box-sub" x="500" y="80" text-anchor="middle">returns dict[str, str] (175)</text>
+    <text class="box-sub" x="500" y="96" text-anchor="middle">returns {} on every soft fail</text>
+    <text class="box-sub" x="500" y="112" text-anchor="middle">no writes in this file</text>
+  </a>
+
+  <g class="box" id="fRead">
+    <title>Bytes read from each candidate file</title>
+    <rect x="760" y="20" width="200" height="110" rx="2" fill="none" stroke="#4D9FFF" stroke-dasharray="5 4"/>
+    <text class="box-label" x="860" y="44" text-anchor="middle">reads workspace files</text>
+    <text class="box-sub" x="860" y="62" text-anchor="middle">workspace / rel (157)</text>
+    <text class="box-sub" x="860" y="78" text-anchor="middle">open "rb" (40)</text>
+    <text class="box-sub" x="860" y="94" text-anchor="middle">3 slices x 1200 bytes</text>
+    <text class="box-sub" x="860" y="110" text-anchor="middle">utf-8, errors replace (49)</text>
+  </g>
+
+  <g class="box" id="fReg">
+    <title>The cache this map lands in</title>
+    <rect x="760" y="180" width="200" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="860" y="204" text-anchor="middle">registry.digests</text>
+    <text class="box-sub" x="860" y="222" text-anchor="middle">written by layers.py:314</text>
+    <text class="box-sub" x="860" y="238" text-anchor="middle">JSON key "digests" (registry.py:130)</text>
+    <text class="box-sub" x="860" y="254" text-anchor="middle">loaded at registry.py:92</text>
+    <text class="box-sub" x="860" y="270" text-anchor="middle">one judge call per task</text>
+  </g>
+
+  <g class="box" id="fUse">
+    <title>Consumers of the rendered block</title>
+    <rect x="380" y="180" width="240" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="500" y="204" text-anchor="middle">scorer prompt</text>
+    <text class="box-sub" x="500" y="222" text-anchor="middle">digests_block argument (layers.py:327)</text>
+    <text class="box-sub" x="500" y="238" text-anchor="middle">scorers.scorer_prompt (336)</text>
+    <text class="box-sub" x="500" y="254" text-anchor="middle">harness consumer: digest block (e19c_ratchet.py:567)</text>
+    <text class="box-sub" x="500" y="270" text-anchor="middle">empty cache: renders the "no digests" line</text>
+  </g>
+
+  <g class="box" id="fNo">
+    <title>What this file does not touch</title>
+    <rect x="20" y="180" width="220" height="110" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="130" y="204" text-anchor="middle">not read, not written</text>
+    <text class="box-sub" x="130" y="222" text-anchor="middle">no evaluation.txt</text>
+    <text class="box-sub" x="130" y="238" text-anchor="middle">no textual_gradient.txt</text>
+    <text class="box-sub" x="130" y="254" text-anchor="middle">no Config object (grep 2026-10-02)</text>
+    <text class="box-sub" x="130" y="270" text-anchor="middle">paths arrive as arguments</text>
+  </g>
+
+  <path class="edge" data-from="fCfg" data-to="fFn" d="M240,75 H380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="310" y="67" text-anchor="middle">max_files</text>
+  <path class="edge dashed-edge" data-from="fRead" data-to="fFn" d="M760,75 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="690" y="67" text-anchor="middle">samples</text>
+  <path class="edge dashed-edge" data-from="fFn" data-to="fUse" d="M560,130 V180" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="568" y="158" text-anchor="start">rendered block</text>
+  <path class="edge dashed-edge" data-from="fFn" data-to="fReg" d="M620,110 H700 V200 H760" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="706" y="150" text-anchor="start">cached map</text>
+  <path class="edge dashed-edge" data-from="fReg" data-to="fFn" d="M860,180 V160 H640 V130" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="172" text-anchor="middle">cache hit</text>
+  <text class="box-sub" x="20" y="318">Config fields: one (hybrid_verifier_digest_max_files). Files written: none.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. The only config field is <code>hybrid_verifier_digest_max_files</code> (<a href="../../config.py">config.py</a>:88, default 8); it is read by the evaluator (<code>evaluator.py:208</code>) and passed to the layer as <code>max_files</code>. This file writes nothing: the caller stores the returned map in the registry JSON.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control logic: four bail-out guards</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 430" role="img" aria-label="decision tree of ensure_digests and parse_digests guards">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="q0">
+    <title>Cache check, line 141</title>
+    <rect x="20" y="30" width="230" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="52" text-anchor="middle">cached digests non-empty ?</text>
+    <text class="box-sub" x="135" y="70" text-anchor="middle">line 141</text>
+  </g>
+
+  <g class="box" id="q1">
+    <title>Candidate filter and cap</title>
+    <rect x="20" y="120" width="230" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="142" text-anchor="middle">rank below 9, then cap</text>
+    <text class="box-sub" x="135" y="160" text-anchor="middle">lines 143-153</text>
+    <text class="box-sub" x="135" y="176" text-anchor="middle">at most max(1, max_files) files</text>
+  </g>
+
+  <g class="box" id="q2">
+    <title>Sample text check, line 162</title>
+    <rect x="20" y="225" width="230" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="247" text-anchor="middle">any slice text ?</text>
+    <text class="box-sub" x="135" y="265" text-anchor="middle">line 162</text>
+  </g>
+
+  <g class="box" id="q3">
+    <title>Judge call wrapped in a broad except</title>
+    <rect x="20" y="315" width="230" height="70" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="135" y="337" text-anchor="middle">llm_text raised ?</text>
+    <text class="box-sub" x="135" y="355" text-anchor="middle">lines 164-169</text>
+    <text class="box-sub" x="135" y="371" text-anchor="middle">except Exception, comment: accelerator</text>
+  </g>
+
+  <a class="box" id="q5" href="../../sources/evaluators/hybrid_verifier/digest.py">
+    <title>parse_digests internal guards</title>
+    <rect x="340" y="120" width="250" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="465" y="144" text-anchor="middle">parse_digests guards (84)</text>
+    <text class="box-sub" x="465" y="162" text-anchor="middle">no JSON payload: {} (89-90)</text>
+    <text class="box-sub" x="465" y="178" text-anchor="middle">bad JSON: {} (93-94)</text>
+    <text class="box-sub" x="465" y="194" text-anchor="middle">no "digests" list: {} (95-96)</text>
+    <text class="box-sub" x="465" y="210" text-anchor="middle">entry not a dict: skipped (99-100)</text>
+  </a>
+
+  <g class="box" id="q6">
+    <title>Three empty-map returns and one cached return</title>
+    <rect x="340" y="260" width="250" height="90" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="465" y="284" text-anchor="middle">return {}</text>
+    <text class="box-sub" x="465" y="302" text-anchor="middle">no samples (163)</text>
+    <text class="box-sub" x="465" y="318" text-anchor="middle">judge error (169)</text>
+    <text class="box-sub" x="465" y="334" text-anchor="middle">unparsable reply (171-174)</text>
+  </g>
+
+  <g class="box" id="q7">
+    <title>Success path</title>
+    <rect x="660" y="120" width="300" height="70" rx="2" fill="rgba(57,255,136,0.07)" stroke="#39FF88"/>
+    <text class="box-label" x="810" y="146" text-anchor="middle">return digests (175)</text>
+    <text class="box-sub" x="810" y="164" text-anchor="middle">each digest capped at 400 chars</text>
+    <text class="box-sub" x="810" y="180" text-anchor="middle">caller stores it in registry.digests</text>
+  </g>
+
+  <g class="box" id="q8">
+    <title>The cached path</title>
+    <rect x="660" y="240" width="300" height="70" rx="2" fill="rgba(57,255,136,0.07)" stroke="#39FF88"/>
+    <text class="box-label" x="810" y="266" text-anchor="middle">return cached unchanged (142)</text>
+    <text class="box-sub" x="810" y="284" text-anchor="middle">no file read, no judge call</text>
+    <text class="box-sub" x="810" y="300" text-anchor="middle">covered by test at test line 1154</text>
+  </g>
+
+  <path class="edge" data-from="q0" data-to="q1" d="M135,86 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="145" y="108" text-anchor="start">no</text>
+  <path class="edge" data-from="q0" data-to="q8" d="M250,58 H600 V275 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="430" y="50" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q1" data-to="q2" d="M135,190 V225" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="145" y="212" text-anchor="start">sample each</text>
+  <path class="edge" data-from="q2" data-to="q6" d="M250,247 H300 V300 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="270" y="290" text-anchor="middle">no</text>
+  <path class="edge" data-from="q2" data-to="q3" d="M135,281 V315" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="145" y="303" text-anchor="start">yes</text>
+  <path class="edge" data-from="q3" data-to="q6" d="M250,350 H300 V330 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="270" y="342" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q3" data-to="q5" d="M250,368 H320 V230 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="290" text-anchor="middle">raw text</text>
+  <path class="edge" data-from="q5" data-to="q6" d="M465,230 V260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="475" y="248" text-anchor="start">empty map</text>
+  <path class="edge" data-from="q5" data-to="q7" d="M590,150 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="625" y="142" text-anchor="middle">non-empty</text>
+
+  <text class="box-sub" x="20" y="420">Left column: the four ensure_digests guards. Middle: parse_digests guards. Right: the two success returns.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>8 boxes</code>. The digest step is optional by design: line 166 carries the comment <code># noqa: BLE001 - digest is an accelerator, not a dependency</code>, so a failed call logs a warning and the scorer prompt falls back to the union inventory alone.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_digest_max_files</td><td>config.py:88, read at evaluator.py:208</td><td>cap on sampled files, default 8</td></tr>
+<tr><td class="sym">argument</td><td class="sym">workspace, inventory, cached</td><td>lines 117-119</td><td>root, file rows, cache to honour</td></tr>
+<tr><td class="sym">argument</td><td class="sym">llm_text</td><td>line 120, called at 165</td><td>one judge round-trip, injected by the caller</td></tr>
+<tr><td class="sym">argument</td><td class="sym">uuid, max_files, logger</td><td>lines 121-123</td><td>memory scoping, cap, warning sink</td></tr>
+<tr><td class="sym">inventory key</td><td class="sym">info["bytes"]</td><td>line 151</td><td>larger file first inside the same rank</td></tr>
+<tr><td class="sym">inventory key</td><td class="sym">info["signal"]</td><td>lines 160-161</td><td>short shape hint printed in the prompt</td></tr>
+<tr><td class="sym">file read</td><td class="sym">workspace / rel</td><td>line 157, open at 40</td><td>head, middle, tail byte slices</td></tr>
+<tr><td class="sym">state read</td><td class="sym">registry.digests</td><td>passed in as cached (layers.py:307)</td><td>skip the call when the task already has digests</td></tr>
+<tr><td class="sym">state written</td><td class="sym">registry.digests</td><td>layers.py:314 (this file does not write)</td><td>cache for every later generation</td></tr>
+<tr><td class="sym">constant</td><td class="sym">SLICE_BYTES</td><td>line 28 = 1200</td><td>bytes per head, middle and tail slice</td></tr>
+<tr><td class="sym">constant</td><td class="sym">MAX_FILES_DEFAULT</td><td>line 29 = 8</td><td>default for the max_files argument</td></tr>
+<tr><td class="sym">constant</td><td class="sym">digest cap</td><td>line 104, text[:400]</td><td>longest digest kept per file</td></tr>
+<tr><td class="sym">returns</td><td class="sym">dict[str, str]</td><td>lines 142, 163, 169, 175</td><td>path to digest map, empty on any failure</td></tr>
+<tr><td class="sym">returns</td><td class="sym">str</td><td>lines 55, 81, 113</td><td>sample text, prompt text, rendered block</td></tr>
+<tr><td class="sym">file written</td><td class="sym">none</td><td>&mdash;</td><td>no write call in this file</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<p class="sub">5 top-level functions, no class, 2 module constants. 175 lines (<code>wc -l</code>).</p>
+<details><summary>every def and constant in sources/evaluators/hybrid_verifier/digest.py</summary><div class="dbody">
+<pre>SLICE_BYTES = 1200                    # L28 - bytes per head / middle / tail slice
+MAX_FILES_DEFAULT = 8                 # L29 - default cap on sampled files
+
+sample_sections(path: Path, slice_bytes: int = SLICE_BYTES) -&gt; str     # L32  - deterministic head/middle/tail text
+digest_prompt(samples: dict[str, str], signals: dict[str, str]) -&gt; str # L58  - one-shot format-digest prompt
+parse_digests(raw: str) -&gt; dict[str, str]                              # L84  - reply text to path/digest map
+render_digests(digests: dict[str, str]) -&gt; str                          # L108 - block pasted into scorer prompts
+ensure_digests(workspace: Path, inventory: dict[str, dict],
+    cached: dict[str, str], llm_text: Callable[[str, str], str], uuid: str,
+    max_files: int = MAX_FILES_DEFAULT,
+    logger: logging.Logger | None = None) -&gt; dict[str, str]             # L116 - compute once, else return cache
+
+imports: from sources.evaluators.base import extract_json_payload       # L23
+    from . import inventory as inv_mod (for _deliverable_rank)          # L25
+inventory functions called: inv_mod._deliverable_rank                   # L147, L150
+judge agent name used: "hybrid_format_digest"                           # L165</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>ClaimsEvidenceLayer._ensure_digests</code> and <code>_build_scorer</code></td><td class="sym">import L25; calls 302, 304, 315, 327</td></tr>
+<tr><td class="sym">ClaimsEvidenceLayer._ensure_digests</td><td><code>render_digests</code> on the cache hit path, else <code>ensure_digests</code> with <code>max_files=self.digest_max_files</code></td><td class="sym">layers.py 294-315</td></tr>
+<tr><td class="sym">ClaimsEvidenceLayer.collect</td><td>calls <code>_ensure_digests</code> once per generation, before scoring</td><td class="sym">layers.py 468</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td><code>ensure_digests</code> with <code>MAX_FILES_DEFAULT</code>, and <code>render_digests</code> for the prompt</td><td class="sym">import L47; 367-371, 567</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_digest_sampling_deterministic_and_bounded</code>: same text twice, byte bound, JSON parsing</td><td class="sym">lines 1160-1178</td></tr>
+<tr><td class="sym">test_format_digest_cached_once_per_task</td><td>runs <code>layer._ensure_digests</code> twice; asserts one LLM call and <code>registry.digests</code> filled</td><td class="sym">lines 1120-1157</td></tr>
+<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>checks the rendered digest text reaches <code>scorers.scorer_prompt</code></td><td class="sym">lines 1181-1191</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a></td><td><code>extract_json_payload</code>, the tolerant JSON fence stripper</td><td class="sym">import L23; definition base.py:21</td></tr>
+<tr><td class="sym">digest_prompt / render_digests</td><td>no direct unit test; both run through the layer tests above</td><td class="sym">grep tests/</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the code-writing judge sees real column names and log grammar, so a scorer regexes the file that exists instead of a guessed one, and one call per task keeps that cheap.</p>
+</div>
+
+<footer>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/digest.py">sources/evaluators/hybrid_verifier/digest.py</a> (all 175 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L25 import, L294-L315 digest helper, L327-L336 scorer prompt, L468 collect), <a href="../../sources/evaluators/hybrid_verifier/inventory.py">inventory.py</a> (<code>_deliverable_rank</code> L149, <code>scan_workspace</code> L95), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L63, L92, L130 for the <code>digests</code> key), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L204-L211 <code>digest_max_files</code>), <a href="../../config.py">config.py</a> (L88), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L1120-L1191), <a href="../../sources/evaluators/base.py">base.py</a> (L21), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the full prompt prose of <code>digest_prompt</code> (summarised as four rules with line numbers); the internals of <code>inventory._deliverable_rank</code> (private to <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>); the binary-content handling of files that are not UTF-8 (line 49 uses <code>errors="replace"</code>, not read further); <code>docs/concepts/evaluation-pipeline.md</code> (doc claims were not used as evidence on this page). No pytest run and no application run, by the build rules.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git ls-files sources/evaluators/hybrid_verifier</code> returns 0 files (checked 2026-10-02), so this page describes the working tree, not the committed tree.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

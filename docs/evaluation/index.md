@@ -6,7 +6,7 @@
 
     | System | Where it runs | What it scores against | What it produces |
     | ------ | ------------- | ---------------------- | ---------------- |
-    | **Judge / verifier** ([Evaluation pipeline](../concepts/evaluation-pipeline.md)) | Every workflow execution, inside the evolutionary loop | Deterministic Python programs that recompute claims from the workspace, plus literature grounding for soft claims | A reward and a *prompt gradient* — the **pressure signal** that drives workflow evolution |
+    | **Judge / verifier** ([Evaluation pipeline](../concepts/evaluation-pipeline.md)) | Every workflow execution, inside the evolutionary loop | Deterministic Python policy scorers against a temporal claim ladder (code → logs → deliverables) | A pairwise win-rate reward and an elimination-point *textual gradient* — the **pressure signal** that drives workflow evolution |
     | **External benchmark graders** (this section) | After Mimosa produces a candidate output, against a fixed dataset | **Ground-truth files provided by the benchmark authors** | Benchmark metrics: SR / VER / CBS for ScienceAgentBench, judge grades for PaperBench |
 
     The two systems are independent. The verifier runs whether or not

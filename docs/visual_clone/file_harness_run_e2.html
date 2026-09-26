@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>run_e2.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; run_e2.py">
+<div class="wrap">
+
+<h1 class="hud">run_e2.py</h1>
+<p class="intro">This is the E2 static-grounding harness: it scores every frozen workspace of the manifest under two check sets (<code>strict6</code> and <code>extended</code>), measures them with <a href="file_harness_metrics.html">metrics.py</a>, runs a sabotage control on copies, and writes one dated JSON. It runs on demand through <code>uv run python experiments_verifiers/harness/run_e2.py</code> (L9). The <code>DATE</code> constant is pinned to 20260921 (L33), so a rerun overwrites the same file.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; score the frozen workspaces, measure, sabotage, write</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 470" role="img" aria-label="run_e2.py: manifest rows and goals feed the static scorer, the per-example records feed metrics, checks, an env-sensitivity pass and a sabotage control, and one JSON is written">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="s1">
+    <title>manifest.json rows, ablation note files and frozen snapshot workspaces</title>
+    <rect x="20" y="30" width="210" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="58" text-anchor="middle">manifest + goals</text>
+    <text class="box-sub" x="125" y="76" text-anchor="middle">manifest.json L37</text>
+    <text class="box-sub" x="125" y="94" text-anchor="middle">note_file goal L47</text>
+  </g>
+
+  <a class="box" id="s2" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>load_population L36: keep rows with a snapshot and pred_results, collect one goal per campaign and task</title>
+    <rect x="270" y="30" width="210" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="58" text-anchor="middle">load_population</text>
+    <text class="box-sub" x="375" y="76" text-anchor="middle">row filter L38&#8211;L42</text>
+    <text class="box-sub" x="375" y="94" text-anchor="middle">goals dict L43&#8211;L47</text>
+  </a>
+
+  <a class="box" id="s3" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>run_scorer L51: two scorer calls per workspace row</title>
+    <rect x="520" y="30" width="220" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="630" y="58" text-anchor="middle">run_scorer</text>
+    <text class="box-sub" x="630" y="76" text-anchor="middle">extended + strict6 L56 L59</text>
+    <text class="box-sub" x="630" y="94" text-anchor="middle">one record per row L60</text>
+  </a>
+
+  <g class="box" id="s4">
+    <title>scorers/static_grounding.py: score_with_features L56, score L59, declared_outputs L106</title>
+    <rect x="780" y="30" width="240" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="900" y="58" text-anchor="middle">static_grounding (sg)</text>
+    <text class="box-sub" x="900" y="76" text-anchor="middle">imported L29 &#183; other file</text>
+    <text class="box-sub" x="900" y="94" text-anchor="middle">goal-derived checks</text>
+  </g>
+
+  <a class="box" id="s5" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>metrics_block L156: section-0 metrics for one score column</title>
+    <rect x="20" y="165" width="220" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="193" text-anchor="middle">metrics_block</text>
+    <text class="box-sub" x="130" y="211" text-anchor="middle">AUC, tau, WTR, CI L162</text>
+    <text class="box-sub" x="130" y="229" text-anchor="middle">called twice L214&#8211;L215</text>
+  </a>
+
+  <a class="box" id="s6" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>check_stats L176: per-check pass counts and single-check AUC</title>
+    <rect x="280" y="165" width="220" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="193" text-anchor="middle">check_stats</text>
+    <text class="box-sub" x="390" y="211" text-anchor="middle">7 check names L177</text>
+    <text class="box-sub" x="390" y="229" text-anchor="middle">single-check AUC L199</text>
+  </a>
+
+  <a class="box" id="s7" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>Env-sensitivity pass L220: the same extended scorer with pkl_env_lenient</title>
+    <rect x="540" y="165" width="220" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="650" y="193" text-anchor="middle">env-sensitivity pass</text>
+    <text class="box-sub" x="650" y="211" text-anchor="middle">rescore, pkl lenient L225</text>
+    <text class="box-sub" x="650" y="229" text-anchor="middle">loop over rows L221</text>
+  </a>
+
+  <a class="box" id="s8" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>sabotage L88: corrupt declared outputs on copies, then rescore</title>
+    <rect x="800" y="165" width="220" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="910" y="193" text-anchor="middle">sabotage</text>
+    <text class="box-sub" x="910" y="211" text-anchor="middle">copies in temp dir L112</text>
+    <text class="box-sub" x="910" y="229" text-anchor="middle">3 corruption modes L125</text>
+  </a>
+
+  <a class="box" id="s9" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>Baselines L238 and paired AUC bootstrap L253</title>
+    <rect x="20" y="310" width="240" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="338" text-anchor="middle">baselines + paired diff</text>
+    <text class="box-sub" x="140" y="356" text-anchor="middle">reward, constant, ver bit L238</text>
+    <text class="box-sub" x="140" y="374" text-anchor="middle">paired bootstrap L253</text>
+  </a>
+
+  <a class="box" id="s10" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>VER-failure attribution L269 and the McNemar split L290</title>
+    <rect x="300" y="310" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="425" y="338" text-anchor="middle">attribution + McNemar</text>
+    <text class="box-sub" x="425" y="356" text-anchor="middle">caught vs uncaught L270</text>
+    <text class="box-sub" x="425" y="374" text-anchor="middle">median split L290&#8211;L294</text>
+  </a>
+
+  <g class="box" id="s11">
+    <title>writes results/E2_static-grounding_20260921.json</title>
+    <rect x="590" y="310" width="430" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="805" y="338" text-anchor="middle">results/E2_static-grounding_20260921.json</text>
+    <text class="box-sub" x="805" y="356" text-anchor="middle">write_text, indent 1 &#183; L362&#8211;L363</text>
+    <text class="box-sub" x="805" y="374" text-anchor="middle">summary printed L394</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="s1" data-to="s2" d="M230,68 H270" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="250" y="60" text-anchor="middle">reads</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M480,68 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="60" text-anchor="middle">rows, goals</text>
+  <path class="edge" data-from="s3" data-to="s4" d="M740,68 H780" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="60" text-anchor="middle">score calls</text>
+  <path class="edge" data-from="s3" data-to="s5" d="M630,106 C630,140 130,140 130,165" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="132" text-anchor="middle">per-example records L207</text>
+  <path class="edge" data-from="s3" data-to="s6" d="M640,106 C640,148 390,146 390,165" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="150" text-anchor="middle">same records L207</text>
+  <path class="edge" data-from="s3" data-to="s7" d="M650,106 V165" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="678" y="140" text-anchor="middle">rescore</text>
+  <path class="edge" data-from="s3" data-to="s8" d="M680,106 C700,142 910,130 910,165" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="132" text-anchor="middle">eligible rows L260</text>
+  <path class="edge" data-from="s5" data-to="s9" d="M130,241 V310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="160" y="280" text-anchor="middle">m_ext, m_str</text>
+  <path class="edge" data-from="s7" data-to="s9" d="M650,241 C650,288 300,280 260,330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="430" y="282" text-anchor="middle">env pass L236</text>
+  <path class="edge" data-from="s8" data-to="s10" d="M880,241 C850,290 550,290 550,310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="288" text-anchor="middle">sabotage result L262</text>
+  <path class="edge dashed-edge" data-from="s6" data-to="s11" d="M500,222 C560,240 700,250 805,310" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="700" y="248" text-anchor="middle">check_stats</text>
+  <path class="edge dashed-edge" data-from="s9" data-to="s11" d="M260,350 C400,352 470,350 590,350" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dashed-edge" data-from="s10" data-to="s11" d="M550,350 H590" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="s2" data-to="s4" d="M480,45 C600,20 900,20 900,30" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="18" text-anchor="middle">shared row fields</text>
+
+  <text class="box-sub" x="20" y="445">solid = call  |  dashed = reads / writes  |  dotted = import only  |  max 12 boxes per diagram</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; order of work in <code>main()</code> L205: population L206, records L207, metrics L214&#8211;L215, env pass L220, baselines and paired diff L238&#8211;L258, sabotage L260&#8211;L261, attribution L269, McNemar L290, write L362.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: manifest and snapshots in, one JSON plus temp copies out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 330" role="img" aria-label="run_e2.py data flow: reads manifest.json, ablation notes and snapshot workspaces, writes one dated JSON and transient copies in a temp dir">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="g1">
+    <title>manifest.json: the row list, read at L37</title>
+    <rect x="20" y="24" width="230" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="50" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="135" y="68" text-anchor="middle">read L37</text>
+  </g>
+
+  <g class="box" id="g2">
+    <title>Ablation note files named by row key note_file, read at L47</title>
+    <rect x="20" y="132" width="230" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="158" text-anchor="middle">r["note_file"] notes</text>
+    <text class="box-sub" x="135" y="176" text-anchor="middle">goal only &#183; read L47</text>
+  </g>
+
+  <g class="box" id="g3">
+    <title>Frozen snapshot workspaces under workspace_artefacts, path from row key snapshot</title>
+    <rect x="20" y="240" width="230" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="266" text-anchor="middle">snapshot workspaces</text>
+    <text class="box-sub" x="135" y="284" text-anchor="middle">scored, never changed L54</text>
+  </g>
+
+  <a class="box" id="gmid" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>main L205: no config, DATE 20260921, seed 13 in sabotage</title>
+    <rect x="330" y="110" width="280" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470" y="142" text-anchor="middle">main() L205</text>
+    <text class="box-sub" x="470" y="162" text-anchor="middle">DATE pinned 20260921 L33</text>
+    <text class="box-sub" x="470" y="180" text-anchor="middle">sabotage seed 13 L88</text>
+    <text class="box-sub" x="470" y="198" text-anchor="middle">no config field read</text>
+  </a>
+
+  <g class="box" id="g4">
+    <title>results/E2_static-grounding_20260921.json, one dated JSON</title>
+    <rect x="690" y="24" width="330" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="855" y="50" text-anchor="middle">results/E2_static-grounding_20260921.json</text>
+    <text class="box-sub" x="855" y="68" text-anchor="middle">write_text L362&#8211;L363</text>
+  </g>
+
+  <g class="box" id="g5">
+    <title>Temp copies prefix e2_sabotage_, removed in a finally block</title>
+    <rect x="690" y="132" width="330" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="855" y="158" text-anchor="middle">tmp/e2_sabotage_* copies</text>
+    <text class="box-sub" x="855" y="176" text-anchor="middle">copytree L122, removed L146</text>
+  </g>
+
+  <g class="box" id="g6">
+    <title>Console summary of both variants, sabotage and baselines</title>
+    <rect x="690" y="240" width="330" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="855" y="266" text-anchor="middle">stdout digest</text>
+    <text class="box-sub" x="855" y="284" text-anchor="middle">print L394</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="g1" data-to="gmid" d="M250,58 H290 V130 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="272" y="110" text-anchor="middle">rows</text>
+  <path class="edge dashed-edge" data-from="g2" data-to="gmid" d="M250,163 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="290" y="154" text-anchor="middle">goals</text>
+  <path class="edge dashed-edge" data-from="g3" data-to="gmid" d="M250,268 H290 V200 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="272" y="228" text-anchor="middle">score</text>
+  <path class="edge dashed-edge" data-from="gmid" data-to="g4" d="M610,140 C660,140 660,58 690,58" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="655" y="122" text-anchor="middle">record</text>
+  <path class="edge dashed-edge" data-from="gmid" data-to="g5" d="M610,163 H690" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="650" y="154" text-anchor="middle">copies</text>
+  <path class="edge dashed-edge" data-from="gmid" data-to="g6" d="M610,185 C660,185 660,268 690,268" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="650" y="232" text-anchor="middle">print</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the frozen snapshots are read in place; only copies under <code class="path">/tmp/e2_sabotage_*</code> are modified, and those are deleted in the <code>finally</code> block L145&#8211;L146. Config keys read: none. State keys read: none.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; decision rules: who enters, which corruption, when the control passes</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 420" role="img" aria-label="run_e2.py rules: population filter, sabotage eligibility, corruption mode cycle, pass rule, and the VER attribution split">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="p1">
+    <title>Population filter L38-L42</title>
+    <rect x="20" y="26" width="240" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="54" text-anchor="middle">snapshot and pred_results?</text>
+    <text class="box-sub" x="140" y="72" text-anchor="middle">row filter L41</text>
+  </g>
+  <g class="box" id="p1n">
+    <title>Rows without a snapshot are counted, not scored</title>
+    <rect x="330" y="26" width="250" height="64" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="455" y="54" text-anchor="middle">row stays in all_rows only</text>
+    <text class="box-sub" x="455" y="72" text-anchor="middle">returned first L48</text>
+  </g>
+  <path class="edge" data-from="p1" data-to="p1n" d="M260,58 H330" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="295" y="50" text-anchor="middle">no</text>
+
+  <g class="box" id="p2">
+    <title>Sabotage eligibility L104-L110</title>
+    <rect x="20" y="140" width="240" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="168" text-anchor="middle">declared output present?</text>
+    <text class="box-sub" x="140" y="186" text-anchor="middle">eligibility L107</text>
+  </g>
+  <g class="box" id="p2n">
+    <title>Missing declared output cannot be corrupted per spec, so the sampler skips it</title>
+    <rect x="330" y="140" width="250" height="64" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="455" y="168" text-anchor="middle">skip, not in eligible</text>
+    <text class="box-sub" x="455" y="186" text-anchor="middle">comment L108</text>
+  </g>
+  <path class="edge" data-from="p2" data-to="p2n" d="M260,172 H330" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="295" y="164" text-anchor="middle">no</text>
+
+  <g class="box" id="p3">
+    <title>Mode cycle L125: index modulo 3</title>
+    <rect x="20" y="254" width="240" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="282" text-anchor="middle">mode = i mod 3</text>
+    <text class="box-sub" x="140" y="300" text-anchor="middle">list of three modes L125</text>
+  </g>
+  <g class="box" id="p3a">
+    <title>Mode 0 deletes the file, mode 1 writes zero bytes, mode 2 writes empty text</title>
+    <rect x="330" y="230" width="250" height="112" rx="2" fill="none" stroke="#39FF88"/>
+    <text class="box-label" x="455" y="256" text-anchor="middle">delete L127</text>
+    <text class="box-sub" x="455" y="274" text-anchor="middle">unlink the declared output</text>
+    <text class="box-label" x="455" y="300" text-anchor="middle">truncate0 L129</text>
+    <text class="box-sub" x="455" y="318" text-anchor="middle">write_bytes b""</text>
+    <text class="box-sub" x="455" y="336" text-anchor="middle">else write_text "" L131</text>
+  </g>
+  <path class="edge" data-from="p3" data-to="p3a" d="M260,286 H330" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="295" y="278" text-anchor="middle">each pick</text>
+
+  <g class="box" id="p4">
+    <title>Pass rule L151</title>
+    <rect x="660" y="26" width="240" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="780" y="54" text-anchor="middle">n_ok &#8805; n - 1?</text>
+    <text class="box-sub" x="780" y="72" text-anchor="middle">one miss tolerated L151</text>
+  </g>
+  <g class="box" id="p4y">
+    <title>Records sabotage pass true when all but one corruption lowers the score</title>
+    <rect x="660" y="130" width="240" height="64" rx="2" fill="none" stroke="#39FF88"/>
+    <text class="box-label" x="780" y="158" text-anchor="middle">pass true</text>
+    <text class="box-sub" x="780" y="176" text-anchor="middle">a miss makes it false</text>
+  </g>
+  <path class="edge" data-from="p4" data-to="p4y" d="M780,90 V130" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="805" y="112" text-anchor="middle">yes</text>
+
+  <g class="box" id="p5">
+    <title>VER attribution split L270-L272</title>
+    <rect x="660" y="240" width="240" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="780" y="268" text-anchor="middle">VER false with score &lt; 1.0?</text>
+    <text class="box-sub" x="780" y="286" text-anchor="middle">split L270</text>
+  </g>
+  <g class="box" id="p5y">
+    <title>Caught statically; the rest stay uncaught and move to the attributable subset</title>
+    <rect x="660" y="340" width="240" height="64" rx="2" fill="none" stroke="#39FF88"/>
+    <text class="box-label" x="780" y="368" text-anchor="middle">caught list</text>
+    <text class="box-sub" x="780" y="386" text-anchor="middle">else uncaught L271</text>
+  </g>
+  <path class="edge" data-from="p5" data-to="p5y" d="M780,304 V340" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="805" y="328" text-anchor="middle">yes</text>
+
+  <text class="box-sub" x="20" y="404">green = the path that continues, red = the row leaves the sample. Sabotage uses seed 13 and k 10 L88, so the ten picks are reproducible.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the five rules that decide the result. The inner <code>snapshot_path</code> helper L97 is used for the eligibility test only; the copy step repeats the same lookup inline at L116&#8211;L120.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">manifest.json</td><td>file, <code>experiments_verifiers/</code></td><td>row list, labels, reward, CBS, cost</td><td class="size">L37</td></tr>
+<tr><td>reads</td><td class="sym">snapshot, snapshot_has_pred_results</td><td>manifest row keys</td><td>keep only scorable rows</td><td class="size">L41</td></tr>
+<tr><td>reads</td><td class="sym">note_file</td><td>manifest row key</td><td>the task <code>goal</code> string</td><td class="size">L47</td></tr>
+<tr><td>reads</td><td class="sym">snapshot workspace</td><td>directory per row</td><td>scored twice, never written</td><td class="size">L54 L222</td></tr>
+<tr><td>reads</td><td class="sym">declared outputs</td><td>via <code>sg.declared_outputs</code></td><td>the sabotage target file</td><td class="size">L106 L123</td></tr>
+<tr><td>reads</td><td class="sym">checks, check_values, features</td><td>returned by the scorer</td><td>check stats and hazard findings</td><td class="size">L73 L77 L81</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no Config object, no env var</td><td><code>DATE</code>, seed 13 and k 10 are constants</td><td class="size">L33 L88</td></tr>
+<tr><td>writes</td><td class="sym">E2_static-grounding_20260921.json</td><td><code>experiments_verifiers/results/</code></td><td>the full record, indent 1</td><td class="size">L360&#8211;L363</td></tr>
+<tr><td>writes</td><td class="sym">tmp/e2_sabotage_*</td><td>system temp dir</td><td>copies corrupted then rescored</td><td class="size">L112 L122 L146</td></tr>
+<tr><td>writes</td><td class="sym">stdout digest</td><td>console</td><td>both variants, sabotage, baselines</td><td class="size">L394</td></tr>
+</tbody>
+</table>
+<p class="note flag">Mismatch: the docstring says the run writes <code>results/E2_static-grounding_&lt;date&gt;.json + .md</code> (L10), but <code>main()</code> writes the JSON only (L362&#8211;L363). The on-disk <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.md</code> exists, yet grep over <code>experiments_verifiers/*.py</code> finds no writer for that path in this commit.</p>
+<p class="note">Stale reference: the docstring cites <code class="path">EXPERIMENTS_PLAN.md</code> (L5). That file is not on disk; the package holds <code>EXPERIMENTS.md</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>6 functions, no class &mdash; signatures and roles</summary><div class="dbody">
+<pre>load_population()                                        L36   rows, goals, all rows
+run_scorer(rows, goals)                                  L51   two variant scores per row
+sabotage(all_rows, per, goals, variant, k=10, seed=13)   L88   corrupt copies, rescore
+metrics_block(per, key)                                  L156  section-0 block for one column
+check_stats(per)                                         L176  per-check pass counts and AUC
+main()                                                   L205  the run: score, measure, write</pre>
+<p>Inner helpers: <code>snapshot_path(p)</code> inside <code>sabotage</code> L97 (used at L109 only). Module constants: <code>EV</code> L25 (package dir, also inserted twice on <code>sys.path</code> L26&#8211;L27), <code>DATE = "20260921"</code> L33. Imports: <code>json</code>, <code>random</code>, <code>shutil</code>, <code>sys</code>, <code>tempfile</code>, <code>pathlib.Path</code> L16&#8211;L21; <code>numpy</code> L23; <code>scorers.static_grounding as sg</code> L29; <code>harness.metrics as M</code> L31.</p>
+<p>Score keys written per example: <code>score</code> (extended) L66, <code>score_strict6</code> L67, plus <code>VER</code>, <code>SR</code>, <code>reward</code>, <code>CBS</code>, <code>cost</code> L68&#8211;L72, <code>checks</code> L73, <code>check_values</code> L77, <code>check_evidence</code> L80, <code>hazard_findings</code> L81, <code>features</code> L82. Check names counted by <code>check_stats</code>: <code>script_parses</code>, <code>imports_consistent</code>, <code>goal_output_present</code>, <code>artifact_sane</code>, <code>no_placeholder_outputs</code>, <code>logs_coherent</code>, <code>rerun_static_hazards</code> L177&#8211;L185.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">nothing</td><td>no importer found; grep finds only its own docstring</td><td class="sym">L9</td></tr>
+<tr><td class="sym"><a href="exp_run_e2.html">exp_run_e2.html</a></td><td>the E2 experiment page; it cites the recorded JSON</td><td class="sym">page scope</td></tr>
+<tr><td class="sym"><a href="file_harness_metrics.html">metrics.py</a></td><td>called as <code>M.*</code> from <code>metrics_block</code> L162&#8211;L172 and from <code>main</code> L240&#8211;L294</td><td class="sym">L31</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/scorers/static_grounding.py">scorers/static_grounding.py</a></td><td>called as <code>sg.score</code>, <code>sg.score_with_features</code>, <code>sg.declared_outputs</code></td><td class="sym">L29 L56 L59 L134</td></tr>
+</tbody>
+</table>
+<p>Reached from the command line as <code>python experiments_verifiers/harness/run_e2.py</code> through the guard at L397&#8211;L398. Inside <code>main</code>: <code>load_population</code> L206, <code>run_scorer</code> L207, <code>metrics_block</code> L214&#8211;L215, <code>sabotage</code> L260&#8211;L261, <code>check_stats</code> L321, and the paired bootstrap L253&#8211;L258.</p>
+<p>Tests: <code>no test found</code>. A grep of <code>tests/</code> for <code>run_e2</code>, <code>harness.metrics</code>, <code>sabotage</code> and <code>static_grounding</code> returns nothing. The sabotage control itself is a self-check inside the run, not a test file.</p>
+</div>
+
+<footer>
+<p>See also: the <a href="file_index.html">file digest index</a>, <a href="exp_run_e2.html">exp_run_e2.html</a>, the <a href="exp_index.html">harness experiment index</a>, and <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/run_e2.py</code> (398 lines, whole file), <code class="path">experiments_verifiers/harness/metrics.py</code> (177 lines, call sites only), <code class="path">experiments_verifiers/scorers/static_grounding.py</code> (import line and the three called names only), <code class="path">experiments_verifiers/manifest.json</code> (key names only), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>, <code class="path">docs/visual_clone/exp_run_e2.html</code> (house style and prior counts), plus greps for importers, for <code class="path">tests/</code> coverage and for <code class="path">.md</code> writers.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> and repo <code class="path">.env</code> (never opened, secrets); <code class="path">scorers/static_grounding.py</code> bodies (a different file, and the check names are quoted from run_e2 L177&#8211;L185); the 135 snapshot workspaces and the 148 entries under <code class="path">experiments_verifiers/workspace_artefacts/snapshots/</code> (the run already records their check evidence); <code class="path">results/E2_static-grounding_20260921.json</code> and <code class="path">.md</code> values (recorded numbers belong to the E2 experiment page); the remaining 49 <code class="path">experiments_verifiers/harness/*.py</code> scripts (grep shows no import edge); <code class="path">sources/**</code> and <code class="path">datasets/**</code> (grep shows no importer, and the static checks are grader-free by design, L301); <code class="path">EXPERIMENTS_PLAN.md</code> (cited by L5, absent from disk); compiled <code class="path">__pycache__</code>. The harness and its sabotage control were not rerun, and no pytest ran.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -30,8 +30,9 @@ Two components live here:
   workflow. Tools have no tags — every discovered tool is made
   available to every agent in the generated workflow.
 - **Perspicacité client** ([`perspicacite_client.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/utils/perspicacite_client.py))
-  fetches literature snippets that ground both workflow synthesis and the
-  judge's soft-claim verdicts. See [Scientific grounding](grounding.md).
+  fetches literature snippets that ground workflow synthesis (and, under
+  the deprecated legacy verifier, soft-claim verdicts). See
+  [Scientific grounding](grounding.md).
 
 ### Layer 2 — Meta-orchestration
 
@@ -81,14 +82,18 @@ Once execution finishes, the **WorkflowEvaluator** facade
 ([`evaluators/evaluator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/evaluator.py))
 routes to one of:
 
-- **VerifierEvaluator** (default) — the multi-source per-claim verifier
+- **HybridVerifierEvaluator** (default) — the hybrid temporal-ladder
+  verifier: key claims (`script` → `log` → `result`), deterministic
+  Python policy scorers, pairwise win-rate reward
   ([Evaluation pipeline](evaluation-pipeline.md)).
+- **VerifierEvaluator** — deprecated multi-source per-claim verifier
+  (`verifier_kind="legacy"`).
 - **GenericEvaluator** — legacy 4-criterion LLM judge.
 - **ScenarioEvaluator** — rubric/assertion-based scoring for benchmarks.
 
 The evaluator returns `(overall_score, overall_score_uncapped,
-abstracted_prompt_gradient)`. Only the prompt gradient feeds back into the
-mutator — the raw rubric never does.
+abstracted_textual_gradient)`. Only the textual gradient feeds back into
+the mutator — the raw scorer scripts stay inside the verifier.
 
 ## Persistent storage
 

@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>genotype_embedding.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/core > genotype_embedding.py">
+<div class="wrap">
+
+<h1 class="hud">genotype_embedding.py</h1>
+<p class="intro">Turns one generated workflow source text into one unit-norm vector, so the QD novelty axis can measure how different two genotypes are. The default backend is the local <code>all-MiniLM-L6-v2</code> model, loaded from the Hugging Face cache with no network call; an OpenAI backend is optional. The <a href="mod_core_selection.html">selection layer</a> consumes the vector through <code>code_features.py</code>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what this file does: code text in, unit vector out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 420" role="img" aria-label="genotype embedding entry, backend choice and helper stages">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="geIn">
+    <title>workflow source text, argument of embed_genotype</title>
+    <rect x="20" y="40" width="150" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="95" y="64" text-anchor="middle">genotype</text>
+    <text class="box-sub" x="95" y="80" text-anchor="middle">workflow code str</text>
+  </g>
+
+  <a class="box" id="geWrapper" href="../../sources/core/genotype_embedding.py">
+    <title>module-level convenience wrapper, line 297</title>
+    <rect x="200" y="40" width="160" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="280" y="64" text-anchor="middle">embed_genotype</text>
+    <text class="box-sub" x="280" y="80" text-anchor="middle">delegates to singleton</text>
+  </a>
+
+  <a class="box" id="geSingle" href="../../sources/core/genotype_embedding.py">
+    <title>lazy module singleton, line 289</title>
+    <rect x="390" y="40" width="170" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="475" y="62" text-anchor="middle">get_default_embedder</text>
+    <text class="box-sub" x="475" y="78" text-anchor="middle">reset_default_embedder (302)</text>
+  </a>
+
+  <a class="box" id="geEmbed" href="../../sources/core/genotype_embedding.py">
+    <title>GenotypeEmbedder.embed: cache lookup, encode, cache store</title>
+    <rect x="590" y="30" width="190" height="76" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="58" text-anchor="middle">GenotypeEmbedder.embed</text>
+    <text class="box-sub" x="685" y="74" text-anchor="middle">sha1 key on the code</text>
+    <text class="box-sub" x="685" y="90" text-anchor="middle">process-local cache</text>
+  </a>
+
+  <g class="box" id="geOut">
+    <title>returned vector, or None for a degenerate input</title>
+    <rect x="820" y="40" width="160" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="900" y="62" text-anchor="middle">embedding</text>
+    <text class="box-sub" x="900" y="78" text-anchor="middle">unit norm (d,) or None</text>
+  </g>
+
+  <a class="box" id="geEnsure" href="../../sources/core/genotype_embedding.py">
+    <title>GenotypeEmbedder._ensure_backend, line 237</title>
+    <rect x="390" y="150" width="170" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="475" y="174" text-anchor="middle">_ensure_backend</text>
+    <text class="box-sub" x="475" y="190" text-anchor="middle">first call only</text>
+  </a>
+
+  <a class="box" id="geSelect" href="../../sources/core/genotype_embedding.py">
+    <title>_select_default_backend reads two environment variables</title>
+    <rect x="600" y="150" width="200" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700" y="172" text-anchor="middle">_select_default_backend</text>
+    <text class="box-sub" x="700" y="188" text-anchor="middle">env: backend + OpenAI key</text>
+  </a>
+
+  <a class="box" id="geLocal" href="../../sources/core/genotype_embedding.py">
+    <title>default local MiniLM backend</title>
+    <rect x="20" y="270" width="230" height="80" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="294" text-anchor="middle">_LocalMiniLMEmbedder.encode</text>
+    <text class="box-sub" x="135" y="312" text-anchor="middle">chunk, embed, mean-pool</text>
+    <text class="box-sub" x="135" y="328" text-anchor="middle">then L2-normalise (196-204)</text>
+  </a>
+
+  <a class="box" id="geLoad" href="../../sources/core/genotype_embedding.py">
+    <title>model loading from the local HF cache</title>
+    <rect x="280" y="270" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405" y="292" text-anchor="middle">load_sentence_transformer</text>
+    <text class="box-sub" x="405" y="308" text-anchor="middle">_cached_snapshot_path (44)</text>
+    <text class="box-sub" x="405" y="324" text-anchor="middle">_hub_model_id (39), local_files_only</text>
+  </a>
+
+  <a class="box" id="geHelpers" href="../../sources/core/genotype_embedding.py">
+    <title>text preparation and vector helpers</title>
+    <rect x="560" y="270" width="260" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="690" y="290" text-anchor="middle">_canonicalise_for_embedding (95)</text>
+    <text class="box-sub" x="690" y="306" text-anchor="middle">_split_top_level_blocks (151)</text>
+    <text class="box-sub" x="690" y="322" text-anchor="middle">_split_oversized (110), _l2_normalize (77)</text>
+  </a>
+
+  <a class="box" id="geOpen" href="../../sources/core/genotype_embedding.py">
+    <title>optional OpenAI backend</title>
+    <rect x="850" y="270" width="130" height="80" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="915" y="296" text-anchor="middle">_OpenAIEmbedder</text>
+    <text class="box-sub" x="915" y="312" text-anchor="middle">.encode (216)</text>
+    <text class="box-sub" x="915" y="328" text-anchor="middle">API call</text>
+  </a>
+
+  <path class="edge" data-from="geIn" data-to="geWrapper" d="M170,68 H200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="185" y="60" text-anchor="middle">code</text>
+  <path class="edge" data-from="geWrapper" data-to="geSingle" d="M360,68 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="375" y="60" text-anchor="middle">singleton</text>
+  <path class="edge" data-from="geSingle" data-to="geEmbed" d="M560,68 H590" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="575" y="60" text-anchor="middle">.embed</text>
+  <path class="edge" data-from="geEmbed" data-to="geOut" d="M780,68 H820" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="60" text-anchor="middle">vector</text>
+  <path class="edge" data-from="geEmbed" data-to="geEnsure" d="M660,106 V128 H475 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="122" text-anchor="middle">backend is None</text>
+  <path class="edge" data-from="geEnsure" data-to="geSelect" d="M560,178 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="580" y="170" text-anchor="middle">pick</text>
+  <path class="edge" data-from="geSelect" data-to="geLocal" d="M660,206 V244 H135 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="238" text-anchor="middle">default local</text>
+  <path class="edge" data-from="geSelect" data-to="geOpen" d="M800,192 H915 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="852" y="240" text-anchor="middle">openai + key</text>
+  <path class="edge" data-from="geLoad" data-to="geLocal" d="M280,310 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="265" y="302" text-anchor="middle">model</text>
+  <path class="edge" data-from="geLocal" data-to="geHelpers" d="M250,300 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="292" text-anchor="middle">canonicalise + chunk</text>
+  <path class="edge" data-from="geOpen" data-to="geHelpers" d="M850,320 H820" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="836" y="312" text-anchor="middle">normalise</text>
+  <path class="edge" data-from="geLocal" data-to="geOut" d="M135,270 V230 H900 V96" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="geOpen" data-to="geOut" d="M980,310 H995 V120 H980" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+
+  <text class="box-sub" x="20" y="400">11 boxes &#183; solid = call &#183; dashed = imported-only dependency. Both backends return the same unit-norm vector shape.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. The order of work: wrapper (line 297) &rarr; singleton (289) &rarr; <code>GenotypeEmbedder.embed</code> (243) &rarr; lazy backend (<code>_ensure_backend</code>, 237) &rarr; <code>_select_default_backend</code> (271) &rarr; one of the two <code>encode</code> methods. The local path calls the four helpers in <code>geHelpers</code> (lines 95, 110, 151, 77).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: inputs, environment, returned vector</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="data flow of the embedding module">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="gdIn">
+    <title>argument, workflow source code</title>
+    <rect x="30" y="40" width="210" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="64" text-anchor="middle">genotype source</text>
+    <text class="box-sub" x="135" y="80" text-anchor="middle">str, 1 000-12 000 chars</text>
+  </g>
+
+  <a class="box" id="gdEmbed" href="../../sources/core/genotype_embedding.py">
+    <title>GenotypeEmbedder.embed, line 243</title>
+    <rect x="330" y="40" width="240" height="60" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="64" text-anchor="middle">GenotypeEmbedder.embed</text>
+    <text class="box-sub" x="450" y="80" text-anchor="middle">sha1 cache, else backend</text>
+  </a>
+
+  <g class="box" id="gdOut">
+    <title>returned value</title>
+    <rect x="660" y="40" width="250" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="785" y="62" text-anchor="middle">returns np.ndarray</text>
+    <text class="box-sub" x="785" y="78" text-anchor="middle">unit L2 norm, shape (d,)</text>
+    <text class="box-sub" x="785" y="92" text-anchor="middle">or None (lines 254-266)</text>
+  </g>
+
+  <g class="box" id="gdEnv">
+    <title>environment variables read by the backend selector</title>
+    <rect x="30" y="180" width="250" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="155" y="202" text-anchor="middle">environment</text>
+    <text class="box-sub" x="155" y="218" text-anchor="middle">MIMOSA_GENOTYPE_EMBEDDING_BACKEND (274)</text>
+    <text class="box-sub" x="155" y="232" text-anchor="middle">OPENAI_API_KEY (276)</text>
+  </g>
+
+  <a class="box" id="gdCache">
+    <title>local Hugging Face cache, read without network</title>
+    <rect x="330" y="180" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="450" y="202" text-anchor="middle">HF cache snapshot dir</text>
+    <text class="box-sub" x="450" y="218" text-anchor="middle">snapshot_download(local_files_only=True)</text>
+    <text class="box-sub" x="450" y="232" text-anchor="middle">line 53</text>
+  </a>
+
+  <g class="box" id="gdMem">
+    <title>process-local dict cache, never written to disk</title>
+    <rect x="660" y="180" width="250" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="785" y="202" text-anchor="middle">self._cache</text>
+    <text class="box-sub" x="785" y="218" text-anchor="middle">dict[str, np.ndarray] (235)</text>
+    <text class="box-sub" x="785" y="232" text-anchor="middle">key sha1, store line 267</text>
+  </g>
+
+  <path class="edge" data-from="gdIn" data-to="gdEmbed" d="M240,70 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="285" y="62" text-anchor="middle">code text</text>
+  <path class="edge" data-from="gdEmbed" data-to="gdOut" d="M570,70 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="615" y="62" text-anchor="middle">vector</text>
+  <path class="edge dashed-edge" data-from="gdEnv" data-to="gdEmbed" d="M280,215 H305 V100 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="150" text-anchor="middle">backend choice</text>
+  <path class="edge dashed-edge" data-from="gdCache" data-to="gdEmbed" d="M450,180 V100" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="458" y="140" text-anchor="start">model weights</text>
+  <path class="edge dashed-edge" data-from="gdEmbed" data-to="gdMem" d="M500,100 V144 H785 V180" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="640" y="138" text-anchor="middle">cache store</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. Config fields read: <b>none</b> (this module never receives a <code>Config</code>). Files written: <b>none</b>. The default backend issues no HTTP request: the model is loaded from the on-disk Hugging Face cache with <code>token=False</code> (lines 53, 68).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control logic: the embed guards, the backend choice, the split fallback</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 470" role="img" aria-label="decision tree of degenerate input, backend choice and chunk splitting">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="ce0">
+    <title>degenerate input guard</title>
+    <rect x="20" y="30" width="200" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="50" text-anchor="middle">str and non-empty ?</text>
+    <text class="box-sub" x="120" y="65" text-anchor="middle">line 254</text>
+  </g>
+  <g class="box" id="ce1">
+    <title>cache lookup</title>
+    <rect x="20" y="110" width="200" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="130" text-anchor="middle">sha1 key in cache ?</text>
+    <text class="box-sub" x="120" y="145" text-anchor="middle">lines 256-259</text>
+  </g>
+  <g class="box" id="ce2">
+    <title>backend failure guard</title>
+    <rect x="20" y="190" width="200" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="210" text-anchor="middle">encode raises ?</text>
+    <text class="box-sub" x="120" y="225" text-anchor="middle">lines 260-264</text>
+  </g>
+  <g class="box" id="ce3">
+    <title>vector sanity guard</title>
+    <rect x="20" y="270" width="200" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="290" text-anchor="middle">vector finite, non-empty ?</text>
+    <text class="box-sub" x="120" y="305" text-anchor="middle">line 265</text>
+  </g>
+  <g class="box" id="ceOut">
+    <title>two outcomes of the embed path</title>
+    <rect x="20" y="350" width="230" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="135" y="372" text-anchor="middle">cache key, return vector</text>
+    <text class="box-sub" x="135" y="388" text-anchor="middle">else return None (267)</text>
+    <text class="box-sub" x="135" y="404" text-anchor="middle">"no novelty" is neutral (doc, 18-21)</text>
+  </g>
+
+  <g class="box" id="cs0">
+    <title>backend selection rule</title>
+    <rect x="470" y="30" width="230" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="52" text-anchor="middle">backend == openai</text>
+    <text class="box-sub" x="585" y="68" text-anchor="middle">and OPENAI_API_KEY set ? line 276</text>
+  </g>
+  <g class="box" id="cs1">
+    <rect x="470" y="120" width="230" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="140" text-anchor="middle">_OpenAIEmbedder() raises ?</text>
+    <text class="box-sub" x="585" y="155" text-anchor="middle">lines 277-282</text>
+  </g>
+  <g class="box" id="csLocal">
+    <title>fallback and default backend</title>
+    <rect x="470" y="200" width="230" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="585" y="222" text-anchor="middle">_LocalMiniLMEmbedder</text>
+    <text class="box-sub" x="585" y="238" text-anchor="middle">default "local"; also the fallback (283)</text>
+  </g>
+  <g class="box" id="csOpen">
+    <rect x="470" y="290" width="230" height="56" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="585" y="312" text-anchor="middle">_OpenAIEmbedder</text>
+    <text class="box-sub" x="585" y="328" text-anchor="middle">one API call per text (218)</text>
+  </g>
+
+  <g class="box" id="cp0">
+    <title>splitting fallback chain</title>
+    <rect x="760" y="30" width="240" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="880" y="52" text-anchor="middle">ast.parse ok, blocks found ?</text>
+    <text class="box-sub" x="880" y="68" text-anchor="middle">_split_top_level_blocks, lines 159-174</text>
+  </g>
+  <g class="box" id="cpOk">
+    <rect x="760" y="120" width="240" height="44" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="880" y="140" text-anchor="middle">one chunk per top-level block</text>
+    <text class="box-sub" x="880" y="155" text-anchor="middle">each capped at 900 chars</text>
+  </g>
+  <g class="box" id="cpOvf">
+    <rect x="760" y="200" width="240" height="56" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="880" y="222" text-anchor="middle">_split_oversized fallback</text>
+    <text class="box-sub" x="880" y="238" text-anchor="middle">paragraph, then line, then char slice</text>
+  </g>
+
+  <path class="edge" data-from="ce0" data-to="ce1" d="M120,74 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="130" y="96" text-anchor="start">yes</text>
+  <path class="edge" data-from="ce1" data-to="ce2" d="M120,154 V190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="130" y="176" text-anchor="start">miss</text>
+  <path class="edge" data-from="ce2" data-to="ce3" d="M120,234 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="130" y="256" text-anchor="start">no</text>
+  <path class="edge" data-from="ce3" data-to="ceOut" d="M120,314 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="130" y="336" text-anchor="start">yes</text>
+  <path class="edge dashed-edge" data-from="ce0" data-to="ceOut" d="M60,74 V330 H20 V380 H60" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="ce1" data-to="ceOut" d="M220,132 H300 V380 H250" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="290" y="200" text-anchor="start">hit: cached</text>
+  <path class="edge dashed-edge" data-from="ce2" data-to="ceOut" d="M220,212 H280 V392 H250" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="276" y="240" text-anchor="start">raise: None</text>
+  <path class="edge dashed-edge" data-from="ce3" data-to="ceOut" d="M220,292 H260 V400 H250" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="264" y="320" text-anchor="start">no: None</text>
+
+  <path class="edge" data-from="cs0" data-to="cs1" d="M585,86 V120" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="595" y="108" text-anchor="start">yes</text>
+  <path class="edge" data-from="cs1" data-to="csLocal" d="M585,164 V200" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="595" y="186" text-anchor="start">raises</text>
+  <path class="edge" data-from="cs1" data-to="csOpen" d="M700,142 H720 V318 H700" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="712" y="250" text-anchor="middle">ok</text>
+  <path class="edge" data-from="cs0" data-to="csLocal" d="M470,50 H440 V228 H470" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="446" y="150" text-anchor="middle">no</text>
+
+  <path class="edge" data-from="cp0" data-to="cpOk" d="M880,86 V120" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="890" y="108" text-anchor="start">ok</text>
+  <path class="edge" data-from="cp0" data-to="cpOvf" d="M760,58 H740 V228 H760" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="746" y="150" text-anchor="middle">no / empty</text>
+  <path class="edge" data-from="csLocal" data-to="cpOk" d="M700,228 H745 V142 H760" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="735" y="196" text-anchor="end">split</text>
+
+  <text class="box-sub" x="20" y="455">left = embed guards (lines 254-267) &#183; middle = backend choice (_select_default_backend, 271-283) &#183; right = chunk splitting chain (lines 151-178).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>12 boxes</code>. Every failing guard returns <code>None</code> rather than raising, so the selection layer reads a missing signal as "no novelty". The right column is the local backend's preparation path: an unparsable or empty source falls back to <code>_split_oversized</code> (lines 161-162, 173-174).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">env var</td><td class="sym">MIMOSA_GENOTYPE_EMBEDDING_BACKEND</td><td>line 274, default "local"</td><td>choose the backend</td></tr>
+<tr><td class="sym">env var</td><td class="sym">OPENAI_API_KEY</td><td>line 276</td><td>gate for the OpenAI backend</td></tr>
+<tr><td class="sym">file read</td><td class="sym">HF cache snapshot dir</td><td>snapshot_download(local_files_only=True), line 53</td><td>offline model weights</td></tr>
+<tr><td class="sym">in-process read/write</td><td class="sym">self._cache</td><td>lines 235, 257, 267</td><td>one embedding per code text</td></tr>
+<tr><td class="sym">constant</td><td class="sym">_DEFAULT_LOCAL_MODEL</td><td>line 35 = "all-MiniLM-L6-v2"</td><td>default model name</td></tr>
+<tr><td class="sym">constant</td><td class="sym">_DEFAULT_OPENAI_MODEL</td><td>line 36 = "text-embedding-3-small"</td><td>optional backend model</td></tr>
+<tr><td class="sym">constant</td><td class="sym">_MAX_CHUNK_CHARS</td><td>line 92 = 900</td><td>cap per chunk before encoding</td></tr>
+<tr><td class="sym">returns</td><td class="sym">np.ndarray</td><td>lines 204, 220, 268</td><td>unit-norm vector for novelty</td></tr>
+<tr><td class="sym">returns</td><td class="sym">None</td><td>lines 255, 264, 266</td><td>neutral "no novelty" signal</td></tr>
+<tr><td class="sym">config field</td><td class="sym">none read</td><td>&mdash;</td><td>no Config object reaches this module</td></tr>
+<tr><td class="sym">file written</td><td class="sym">none</td><td>&mdash;</td><td>cache is process-local only</td></tr>
+</tbody>
+</table>
+<p class="note">The header states the default backend needs no network at runtime (lines 14-15). <code>load_sentence_transformer</code> still falls back to a hub load with <code>token=False</code> when the cache snapshot is missing or unreadable (lines 63-68) &mdash; that path does touch the network.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<p class="sub">11 top-level functions, 5 classes (one inside <code>__main__</code>), 9 methods.</p>
+<details><summary>every def and class in sources/core/genotype_embedding.py</summary><div class="dbody">
+<pre>_DEFAULT_LOCAL_MODEL: str = "all-MiniLM-L6-v2"                     # line 35  - default local model
+_DEFAULT_OPENAI_MODEL: str = "text-embedding-3-small"              # line 36  - optional API model
+_MAX_CHUNK_CHARS = 900                                             # line 92  - chunk size cap
+_default_embedder: GenotypeEmbedder | None = None                   # line 286 - module singleton slot
+
+_hub_model_id(model_name: str) -&gt; str                              # line 39  - add sentence-transformers prefix
+_cached_snapshot_path(model_name: str) -&gt; str | None               # line 44  - local HF cache dir, no HTTP
+load_sentence_transformer(model_name: str)                         # line 58  - load model, cache first
+_l2_normalize(vec: np.ndarray) -&gt; np.ndarray                       # line 77  - rescale to unit norm
+_canonicalise_for_embedding(code: str) -&gt; str                      # line 95  - drop comment-only lines
+_split_oversized(text: str, max_chars: int) -&gt; list[str]           # line 110 - split big block by paragraph/line
+_split_top_level_blocks(code: str, max_chars=_MAX_CHUNK_CHARS)
+    -&gt; list[str]                                                   # line 151 - one chunk per AST statement
+_select_default_backend() -&gt; _Embedder                             # line 271 - env-driven backend choice
+get_default_embedder() -&gt; GenotypeEmbedder                         # line 289 - lazy module singleton
+embed_genotype(genotype: str | None) -&gt; np.ndarray | None          # line 297 - convenience wrapper
+reset_default_embedder() -&gt; None                                   # line 302 - drop singleton (tests only)
+
+class _Embedder(Protocol):                                         # line 71  - text-to-vector interface
+    def encode(self, text: str) -&gt; np.ndarray: ...                  # line 74  - one method contract
+
+class _LocalMiniLMEmbedder:                                        # line 181 - default sentence-transformers backend
+    def __init__(self, model_name: str = _DEFAULT_LOCAL_MODEL)      # line 193 - loads model (194)
+    def encode(self, text: str) -&gt; np.ndarray                       # line 196 - chunk, mean-pool, normalise
+
+class _OpenAIEmbedder:                                             # line 207 - optional API backend
+    def __init__(self, model_name: str = _DEFAULT_OPENAI_MODEL)     # line 210 - constructs OpenAI client
+    def encode(self, text: str) -&gt; np.ndarray                       # line 216 - one embeddings.create call
+
+class GenotypeEmbedder:                                            # line 223 - cached facade
+    def __init__(self, backend: _Embedder | None = None)            # line 232 - defers backend creation
+    def _ensure_backend(self) -&gt; _Embedder                          # line 237 - instantiate default lazily
+    def embed(self, genotype: str | None) -&gt; np.ndarray | None      # line 243 - cache + guard + delegate
+
+if __name__ == "__main__":                                         # line 308 - smoke block
+    class _StubBackend:                                            # line 310 - deterministic SHA-1 stub
+        def encode(self, text: str) -&gt; np.ndarray                   # line 313 - 20-dim unit vector
+    asserts: cache identity, distinct code, unit norm, None inputs # lines 318-329</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/core/code_features.py">sources/core/code_features.py</a></td><td><code>embed_genotype</code>; wraps it as <code>genotype_embedding_descriptor</code> returning a list</td><td class="sym">lines 7, 22</td></tr>
+<tr><td class="sym"><a href="../../sources/core/selection.py">sources/core/selection.py</a></td><td>imports the wrapper from <code>code_features</code>, not this file</td><td class="sym">lines 22, 488</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_selection.py">sources/core/workflow_selection.py</a></td><td><code>load_sentence_transformer</code> for cold-start task similarity</td><td class="sym">lines 64-65</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/archive_projection.py">sources/utils/archive_projection.py</a></td><td><code>embed_genotype</code> on genotype files (analysis path, imported inside a function)</td><td class="sym">lines 194-200</td></tr>
+<tr><td class="sym"><a href="../../tests/genotype_embedding_chunking_test.py">tests/genotype_embedding_chunking_test.py</a></td><td>exercises <code>_canonicalise_for_embedding</code>, <code>_split_top_level_blocks</code>, <code>_split_oversized</code>, <code>_MAX_CHUNK_CHARS</code>, <code>_LocalMiniLMEmbedder</code> with a stubbed model</td><td class="sym">lines 20-26, 179-181</td></tr>
+<tr><td class="sym"><a href="../../tests/selection_test.py">tests/selection_test.py</a></td><td>loads the module file directly to feed the QD novelty tests</td><td class="sym">line 27</td></tr>
+</tbody>
+</table>
+<p class="note">The OpenAI backend is not covered by any test under <code>tests/</code> (grep, 2026-10-02): <code>_OpenAIEmbedder</code> appears only in this file.</p>
+</div>
+
+<footer>
+<p>Sources: <a href="../../sources/core/genotype_embedding.py">sources/core/genotype_embedding.py</a> (all 329 lines, read line by line), <a href="../../sources/core/code_features.py">sources/core/code_features.py</a>, <a href="../../tests/genotype_embedding_chunking_test.py">tests/genotype_embedding_chunking_test.py</a>, and greps over <code>sources/</code> and <code>tests/</code> for importers and for the model names.</p>
+<p class="skips">Skipped: <code>diversity_experiments/code_reference/genotype_embedding.py</code> (a mirror copy, not the runtime file); the real MiniLM load inside <code>tests/genotype_embedding_chunking_test.py:179</code> (needs the HF cache, not run); <code>docs/concepts/evolution-engine.md</code> prose (points at GitHub, not evidence about the code here).</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

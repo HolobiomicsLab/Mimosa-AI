@@ -8,7 +8,7 @@
 flowchart TB
     %% ===== task entry =====
     Task[/"task spec<br/>(user goal / benchmark row)"/]
-    Install["install task-locked checklist<br/>(Layer 2 — built once / task_hash)"]
+    Install["load per-task hybrid-verifier registry<br/>(claim ladder + cached scorers, sha256(goal))"]
     Task --> Install
 
     %% ===== initial population =====
@@ -29,11 +29,11 @@ flowchart TB
         DrawDisk["cold-start fallback:<br/>similarity-filtered disk scan"]
         Decide{{"crossover_rate ≈ 0.1?<br/>(only once initial_population met)"}}
         Mut["mutation_prompt()<br/>directive-implicit mutation magnitude<br/>+ read-only search-state block"]
-        Cross["crossover_prompt()<br/>best-parent-first ordering<br/>rubric-blind diagnosis"]
+        Cross["crossover_prompt()<br/>best-parent-first ordering<br/>verifier textual gradients"]
 
         Orch["WorkflowOrchestrator<br/>LLM → workflow code → install deps → sandbox run"]
         State["state_result.json<br/>+ workspace artefacts"]
-        Verify["multi-source per-claim verifier<br/>(see evaluation_pipeline.mermaid)<br/>→ overall_score / overall_score_uncapped<br/>→ abstracted_prompt_gradient"]
+        Verify["hybrid temporal-ladder verifier<br/>(see verifiers_judge.mermaid)<br/>→ overall_score (pairwise win-rate)<br/>→ abstracted_textual_gradient"]
 
         Validate["SelectionPressure.validate_survivor()<br/>relative_improvement > θ<br/>OR qd_score > admit_threshold"]
         Admit{{"_try_admit()<br/>is_valid?"}}

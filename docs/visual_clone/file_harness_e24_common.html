@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_common.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e24_common.py">
+<div class="wrap">
+<h1 class="hud">e24_common.py</h1>
+<p class="intro">This file holds the shared plumbing of experiment E24: fixed paths, seeds and budgets, the five pre-registered split specs, one retrying LLM call, resumable JSONL ledger helpers, the arena loader and three small metric functions. Every other E24 harness file imports it as <code>C</code> and reads its constants. It has no command-line entry point: it runs only when imported.</p>
+
+<div id="legend" data-auto></div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 — the job: constants and helpers that five E24 scripts import as <code>C</code></h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 480" role="img" aria-label="e24_common.py: literal constants and budgets feed call_llm and the ledger, plan, guard and metric helpers; five sibling E24 scripts import it as C">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="bEnv">
+    <rect x="20" y="40" width="200" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120.0" y="60" text-anchor="middle">env files</text>
+    <text class="box-sub" x="120.0" y="75" text-anchor="middle">REPO/.env, EV/.env L151</text>
+  </g>
+  <g class="box" id="bPop">
+    <rect x="20" y="130" width="200" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120.0" y="150" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="120.0" y="165" text-anchor="middle">read through E18 L249</text>
+  </g>
+  <g class="box" id="bFiles">
+    <rect x="20" y="220" width="200" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120.0" y="240" text-anchor="middle">results JSONL and JSON</text>
+    <text class="box-sub" x="120.0" y="255" text-anchor="middle">appended by callers L231</text>
+  </g>
+  <g class="box" id="bConst">
+    <rect x="270" y="30" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390.0" y="50" text-anchor="middle">constants and budgets</text>
+    <text class="box-sub" x="390.0" y="65" text-anchor="middle">L37 to L126</text>
+    <text class="box-sub" x="390.0" y="80" text-anchor="middle">seed, cap, SPLIT_SPECS</text>
+  </g>
+  <g class="box" id="bLlm">
+    <rect x="270" y="150" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390.0" y="170" text-anchor="middle">call_llm L160</text>
+    <text class="box-sub" x="390.0" y="185" text-anchor="middle">6 attempts L169</text>
+    <text class="box-sub" x="390.0" y="200" text-anchor="middle">cost row L187</text>
+  </g>
+  <g class="box" id="bLed">
+    <rect x="270" y="270" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390.0" y="290" text-anchor="middle">ledger helpers</text>
+    <text class="box-sub" x="390.0" y="305" text-anchor="middle">load_jsonl L225, append_jsonl L231</text>
+    <text class="box-sub" x="390.0" y="320" text-anchor="middle">done_keys L236</text>
+  </g>
+  <g class="box" id="bLoad">
+    <rect x="580" y="30" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700.0" y="50" text-anchor="middle">plan loaders</text>
+    <text class="box-sub" x="700.0" y="65" text-anchor="middle">load_arena L247, load_goals L256</text>
+    <text class="box-sub" x="700.0" y="80" text-anchor="middle">gid_of L243</text>
+  </g>
+  <g class="box" id="bGuard">
+    <rect x="580" y="190" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700.0" y="210" text-anchor="middle">snapshot_guard_check L263</text>
+    <text class="box-sub" x="700.0" y="225" text-anchor="middle">GUARD L260</text>
+    <text class="box-sub" x="700.0" y="240" text-anchor="middle">assert not mutated L265</text>
+  </g>
+  <g class="box" id="bMet">
+    <rect x="580" y="350" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700.0" y="370" text-anchor="middle">metrics</text>
+    <text class="box-sub" x="700.0" y="385" text-anchor="middle">midrank_auc L274</text>
+    <text class="box-sub" x="700.0" y="400" text-anchor="middle">rmse L299</text>
+  </g>
+  <g class="box" id="bClients">
+    <rect x="890" y="30" width="270" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1025.0" y="50" text-anchor="middle">five E24 scripts</text>
+    <text class="box-sub" x="1025.0" y="65" text-anchor="middle">import as C</text>
+    <text class="box-sub" x="1025.0" y="80" text-anchor="middle">call the helpers</text>
+  </g>
+  <g class="box" id="bData">
+    <rect x="890" y="190" width="270" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1025.0" y="210" text-anchor="middle">cost ledger rows</text>
+    <text class="box-sub" x="1025.0" y="225" text-anchor="middle">C.COST_LEDGER L46</text>
+    <text class="box-sub" x="1025.0" y="240" text-anchor="middle">one row per call L192</text>
+  </g>
+  <path class="edge dashed-edge" data-from="bEnv" data-to="bLlm" d="M220,70 H250 V188 H270" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="248" y="182" text-anchor="end">keys L151</text>
+  <path class="edge dashed-edge" data-from="bPop" data-to="bLoad" d="M120,130 V112 H560 V68 H580" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="430" y="106" text-anchor="middle">plan load L249</text>
+  <path class="edge" data-from="bConst" data-to="bLlm" d="M390,106 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="380" y="132" text-anchor="end">model and cap</text>
+  <path class="edge" data-from="bConst" data-to="bLed" d="M510,68 H530 V250 H400 V270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="470" y="242" text-anchor="middle">path constants L39</text>
+  <path class="edge dashed-edge" data-from="bLlm" data-to="bData" d="M510,188 H855 V228 H890" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="690" y="180" text-anchor="middle">cost row L192</text>
+  <path class="edge dashed-edge" data-from="bLed" data-to="bFiles" d="M270,308 H245 V250 H220" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="300" y="262" text-anchor="start">append row L231</text>
+  <path class="edge" data-from="bLoad" data-to="bClients" d="M820,68 H890" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="886" y="60" text-anchor="end">load_arena L247</text>
+  <path class="edge" data-from="bLed" data-to="bClients" d="M510,308 H860 V90 H890" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="126" text-anchor="middle">append_jsonl L231</text>
+  <path class="edge" data-from="bGuard" data-to="bClients" d="M700,190 V170 H850 V50 H890" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="860" y="42" text-anchor="start">checks L263</text>
+  <path class="edge" data-from="bMet" data-to="bClients" d="M820,388 H875 V80 H890" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="888" y="300" text-anchor="end">midrank_auc, rmse</text>
+  <text class="box-sub" x="20" y="466">solid = call  |  dashed = reads / writes  |  dotted = import only  |  11 boxes. No __main__ block in this file.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 — the module is a library, not a program: constants L37&#8211;L126, then four helper groups. <code>call_llm</code> L160 is the only function that reaches the network; <code>load_arena</code> L247 is the only one that reads the frozen arena.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 — data flow: env keys, plan and ledger in; returns, ledger rows and process state out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 340" role="img" aria-label="e24_common.py data flow: env files, the E14 population plan and the cost ledger go in; returned values, ledger rows and process state come out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="iEnv">
+    <rect x="20" y="30" width="250" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145.0" y="50" text-anchor="middle">env files L151</text>
+    <text class="box-sub" x="145.0" y="65" text-anchor="middle">keys copied into os.environ</text>
+    <text class="box-sub" x="145.0" y="80" text-anchor="middle">values never printed</text>
+  </g>
+  <g class="box" id="iPop">
+    <rect x="20" y="130" width="250" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145.0" y="150" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="145.0" y="165" text-anchor="middle">loaded by E18 L249</text>
+  </g>
+  <g class="box" id="iCost">
+    <rect x="20" y="230" width="250" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145.0" y="250" text-anchor="middle">E24_bt_cost_ledger_2026-09-24.jsonl</text>
+    <text class="box-sub" x="145.0" y="265" text-anchor="middle">read by load_spent L134</text>
+  </g>
+  <g class="box" id="mid">
+    <rect x="320" y="110" width="300" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="134" text-anchor="middle">e24_common.py</text>
+    <text class="box-sub" x="470.0" y="149" text-anchor="middle">301 lines, no __main__</text>
+    <text class="box-sub" x="470.0" y="164" text-anchor="middle">14 path constants L39 to L51</text>
+    <text class="box-sub" x="470.0" y="179" text-anchor="middle">imported by five scripts</text>
+  </g>
+  <g class="box" id="oRet">
+    <rect x="700" y="20" width="400" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="900.0" y="40" text-anchor="middle">return values</text>
+    <text class="box-sub" x="900.0" y="55" text-anchor="middle">str content L202 · list of dicts L228</text>
+    <text class="box-sub" x="900.0" y="70" text-anchor="middle">19 group dicts L253 · float or None L284</text>
+  </g>
+  <g class="box" id="oCost">
+    <rect x="700" y="130" width="400" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="900.0" y="150" text-anchor="middle">cost ledger append L192</text>
+    <text class="box-sub" x="900.0" y="165" text-anchor="middle">model, role, tokens</text>
+    <text class="box-sub" x="900.0" y="180" text-anchor="middle">cost_usd, latency_s L187</text>
+  </g>
+  <g class="box" id="oEnv">
+    <rect x="700" y="240" width="400" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="900.0" y="260" text-anchor="middle">process state</text>
+    <text class="box-sub" x="900.0" y="275" text-anchor="middle">os.environ setdefault L157</text>
+    <text class="box-sub" x="900.0" y="290" text-anchor="middle">SPENT usd and calls L195</text>
+  </g>
+  <path class="edge dashed-edge" data-from="iEnv" data-to="mid" d="M270,65 H300 V150 H320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="296" y="140" text-anchor="end">keys L157</text>
+  <path class="edge dashed-edge" data-from="iPop" data-to="mid" d="M270,165 H320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="295" y="157" text-anchor="middle">plan L249</text>
+  <path class="edge dashed-edge" data-from="iCost" data-to="mid" d="M270,265 H300 V190 H320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="296" y="185" text-anchor="end">spent L134</text>
+  <path class="edge" data-from="mid" data-to="oRet" d="M620,150 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="660" y="142" text-anchor="middle">returns</text>
+  <path class="edge dashed-edge" data-from="mid" data-to="oCost" d="M620,170 H660 V170 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="662" y="162" text-anchor="middle">appends L192</text>
+  <path class="edge dashed-edge" data-from="mid" data-to="oEnv" d="M620,190 H680 V280 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="682" y="240" text-anchor="start">mutates L157</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 — config fields read: none. Constants read: <code>MODEL_TEXT</code> L53, <code>PRICING</code> L54, <code>HARD_CAP_USD</code> 8.0 L57, <code>HOLDOUT_FRAC</code> 0.20 L63, <code>E24_SEED</code> 20260924 L56. Row counts on disk, my computation: 19 rows in <code class="path">results/_e24_iomap_2026-09-24.jsonl</code>, 19 rows in <code class="path">results/E24_bt_cost_ledger_2026-09-24.jsonl</code>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 — logic: the retry loop of <code>call_llm</code> and the snapshot guard</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 500" role="img" aria-label="e24_common.py logic: the six-attempt retry loop with the cost-cap stop, the empty-content fallbacks, the backoff retry and the snapshot guard assertion">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="c1">
+    <rect x="20" y="150" width="220" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130.0" y="170" text-anchor="middle">call_llm L160</text>
+    <text class="box-sub" x="130.0" y="185" text-anchor="middle">six attempts L169</text>
+  </g>
+  <g class="box" id="c2">
+    <rect x="280" y="40" width="250" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405.0" y="60" text-anchor="middle">spend over cap? L171</text>
+  </g>
+  <g class="box" id="c2r">
+    <rect x="570" y="40" width="220" height="64" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="680.0" y="60" text-anchor="middle">StopRun L172</text>
+  </g>
+  <g class="box" id="c3">
+    <rect x="280" y="130" width="250" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405.0" y="150" text-anchor="middle">litellm completion L174</text>
+  </g>
+  <g class="box" id="c4">
+    <rect x="570" y="130" width="250" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="695.0" y="150" text-anchor="middle">transport error? L205</text>
+  </g>
+  <g class="box" id="c4r">
+    <rect x="860" y="130" width="250" height="64" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="985.0" y="150" text-anchor="middle">sleep backoff L209</text>
+  </g>
+  <g class="box" id="c5">
+    <rect x="280" y="220" width="250" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405.0" y="240" text-anchor="middle">empty or length? L197</text>
+  </g>
+  <g class="box" id="c5r">
+    <rect x="570" y="220" width="300" height="64" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="720.0" y="240" text-anchor="middle">double max_tokens L198</text>
+  </g>
+  <g class="box" id="c6">
+    <rect x="280" y="310" width="250" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405.0" y="330" text-anchor="middle">content empty? L200</text>
+  </g>
+  <g class="box" id="c6r">
+    <rect x="570" y="310" width="220" height="64" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="680.0" y="330" text-anchor="middle">CallFailed L201</text>
+  </g>
+  <g class="box" id="c7">
+    <rect x="860" y="40" width="250" height="64" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="985.0" y="60" text-anchor="middle">return content L202</text>
+  </g>
+  <g class="box" id="c8">
+    <rect x="20" y="400" width="300" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170.0" y="420" text-anchor="middle">snapshot_guard_check L263</text>
+    <text class="box-sub" x="170.0" y="435" text-anchor="middle">assert not mutated L265</text>
+  </g>
+  <path class="edge" data-from="c1" data-to="c2" d="M240,182 H260 V72 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="256" y="140" text-anchor="end">check cap</text>
+  <path class="edge" data-from="c2" data-to="c2r" d="M530,72 H570" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="548" y="64" text-anchor="middle">yes</text>
+  <path class="edge" data-from="c2" data-to="c3" d="M405,104 V130" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="415" y="122" text-anchor="start">under cap</text>
+  <path class="edge" data-from="c3" data-to="c4" d="M530,162 H570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="548" y="154" text-anchor="middle">after call</text>
+  <path class="edge" data-from="c4" data-to="c4r" d="M820,162 H860" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="840" y="154" text-anchor="middle">yes</text>
+  <path class="edge" data-from="c4r" data-to="c2" d="M985,130 V118 H420 V104" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="700" y="112" text-anchor="middle">retry L169</text>
+  <path class="edge" data-from="c3" data-to="c5" d="M405,194 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="415" y="214" text-anchor="start">content L178</text>
+  <path class="edge" data-from="c5" data-to="c5r" d="M530,252 H570" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="548" y="244" text-anchor="middle">yes</text>
+  <path class="edge" data-from="c5" data-to="c6" d="M405,284 V310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="415" y="304" text-anchor="start">no</text>
+  <path class="edge" data-from="c6" data-to="c6r" d="M530,342 H570" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="548" y="334" text-anchor="middle">yes</text>
+  <path class="edge" data-from="c6" data-to="c7" d="M280,342 H250 V30 H985 V40" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="24" text-anchor="middle">return content L202</text>
+  <text class="box-sub" x="340" y="440" text-anchor="start">assertion fails -&gt; AssertionError L265; the guard runs after each E24 stage</text>
+  <text class="box-sub" x="20" y="492">lane 1: the retry loop of call_llm L169 to L210  |  lane 2: the snapshot guard L263</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 — the loop is <code>for attempt in range(6)</code> L169. Fallbacks: double <code>max_tokens</code> when the content is empty or <code>finish_reason == "length"</code> L197, and a wait of <code>min(45, 2**attempt*3)</code> seconds after any other error L209. The call timeout is 120 s L176.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>config</td><td class="sym">nothing</td><td>no <code>Config</code> import, no override flag</td><td>every setting is a literal in this file</td><td class="size">L37</td></tr>
+<tr><td>reads</td><td class="sym">repo .env files</td><td><code>REPO/.env</code>, <code>EV/.env</code>, from <code>_load_env</code> L150</td><td>key=value lines copied into <code>os.environ</code> with setdefault</td><td class="size">L151&#8211;L157</td></tr>
+<tr><td>reads</td><td class="sym">E14_bt_population.json</td><td><code>C.PLAN_PATH</code> L38</td><td>declared here; <code>load_arena</code> loads the plan through E18 L249</td><td class="size">L38</td></tr>
+<tr><td>reads</td><td class="sym">results/_e24_*.jsonl, results/_e24_*.json</td><td><code>C.IOMAP</code> L39 to <code>C.OUT_MD</code> L48</td><td>14 path constants handed to the ledger and report helpers</td><td class="size">L39&#8211;L48</td></tr>
+<tr><td>reads</td><td class="sym">E24_bt_cost_ledger_2026-09-24.jsonl</td><td><code>C.COST_LEDGER</code> L46, read by <code>load_spent</code></td><td>sum of <code>cost_usd</code> over past calls</td><td class="size">L134&#8211;L138</td></tr>
+<tr><td>reads</td><td class="sym">arena groups</td><td><code>load_arena</code> L247, via E18</td><td>19 groups with enriched inventories, sorted by gid</td><td class="size">L249&#8211;L252</td></tr>
+<tr><td>reads</td><td class="sym">task goals</td><td><code>load_goals</code> L256</td><td>goal text per <code>(campaign, task)</code> key</td><td class="size">L257</td></tr>
+<tr><td>reads</td><td class="sym">snapshot tree</td><td><code>C.GUARD</code> L260, <code>GUARD.verify_full</code> L264</td><td>sha256 check that no snapshot changed</td><td class="size">L264</td></tr>
+<tr><td>writes</td><td class="sym">E24_bt_cost_ledger_2026-09-24.jsonl</td><td><code>C.COST_LEDGER</code>, opened in append mode L192</td><td>model, role, tokens, cost_usd, latency_s, meta</td><td class="size">L187&#8211;L193</td></tr>
+<tr><td>writes</td><td class="sym">os.environ keys</td><td>process environment L157</td><td>provider credentials that litellm then reads</td><td class="size">L157</td></tr>
+<tr><td>writes</td><td class="sym">SPENT</td><td>in-process dict L130</td><td><code>usd</code> and <code>calls</code> counters, updated under a lock</td><td class="size">L195&#8211;L196</td></tr>
+<tr><td>state</td><td class="sym">GUARD, SPENT, two locks</td><td>module level, L128&#8211;L130 and L260</td><td>serialise ledger appends and keep the spend total</td><td class="size">L128&#8211;L130</td></tr>
+</tbody>
+</table>
+<p class="note">Defined but never read inside E24 (grep over <code class="path">experiments_verifiers/harness/</code>): <code>PLAN_PATH</code> L38, <code>BOOT_SEED</code> L61 and <code>N_BOOT</code> L62. Each sibling script defines its own <code>PLAN_PATH</code>, and the bootstrap counts live in <code>e15_bt_eval</code>. My computation.</p><p class="note say">The cost cap is checked before every attempt L171, and <code>StopRun</code> is re-raised without retry L203. A call raises <code>CallFailed</code> only after six attempts L210.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>2 classes and 15 callables, plus the module constants &#8212; signatures and roles</summary><div class="dbody">
+<pre>class CallFailed(Exception)                                                L142  raised after six failed attempts
+class StopRun(Exception)                                                  L146  raised when the cost cap is hit
+load_spent() -&gt; float                                                      L133  total cost from the ledger
+_load_env() -&gt; None                                                       L150  copy .env keys into os.environ
+call_llm(messages, max_tokens, role, meta, temperature=0.0) -&gt; str        L160  one cost-ledgered deepseek call
+parse_json_loose(text: str)                                               L213  strip fences and think tags, parse JSON
+load_jsonl(path: Path) -&gt; list[dict]                                       L225  read a JSONL ledger, empty if absent
+append_jsonl(path: Path, rec: dict) -&gt; None                                L231  one locked append line
+done_keys(path: Path) -&gt; set[tuple]                                        L236  (gid, uuid8) pairs already recorded
+gid_of(group: dict) -&gt; str                                                L243  campaign__task key
+load_arena() -&gt; list[dict]                                                L247  19 enriched groups, sorted by gid
+load_goals() -&gt; dict[tuple[str, str], str]                                 L256  goal text per campaign and task
+snapshot_guard_check(phase: str) -&gt; dict                                   L263  assert no snapshot mutated
+midrank_auc(y_true, scores) -&gt; float | None                               L274  ROC-AUC by midranks, no sklearn
+rmse(y_true, y_pred) -&gt; float                                              L299  root mean squared error</pre>
+<p>Module level, not functions: <code>EV</code> L32, <code>REPO</code> L33, <code>TODAY = "2026-09-24"</code> L37, the 14 path constants <code>PLAN_PATH</code> L38 to
+<code>RUN_LOG_DIR</code> L51, <code>MODEL_TEXT</code> L53, <code>PRICING</code> L54, the seeds and budgets <code>E24_SEED</code> L56 to <code>HOLDOUT_FRAC</code> L63,
+<code>PILOT_GROUPS</code> L69&#8211;L76, <code>SPLIT_SPECS</code> L80&#8211;L126, <code>_ledger_lock</code> L128, <code>_spent_lock</code> L129, <code>SPENT</code> L130,
+<code>GUARD = E18.SnapshotGuard()</code> L260.</p>
+<p>Imports: <code>datetime</code>, <code>json</code>, <code>os</code>, <code>re</code>, <code>sys</code>, <code>threading</code>, <code>time</code>, <code>Path</code> L23&#8211;L30;
+<code>e18_scripted_bt as E18</code> L35, with <code>sys.path.insert</code> for the harness folder L34. <code>litellm</code>, <code>numpy</code> and <code>csv</code> are imported
+inside the functions that use them L164, L276, L300.</p>
+<p>Five pre-registered split specs L80&#8211;L126, one per pilot group: carriers <code>csv</code> (three groups), <code>sdf</code> and <code>pkl_mols</code>;
+metric kinds <code>mean_roc_auc</code>, <code>rmse</code>, <code>accuracy</code>, <code>spearman</code>.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_iomap.py">harness/e24_iomap.py</a></td><td class="sym"><code>import e24_common as C</code> L28</td><td class="sym">call_llm L162 · parse_json_loose L166 · append_jsonl L175 · load_arena L150 · SPLIT_SPECS L276</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_holdout.py">harness/e24_holdout.py</a></td><td class="sym"><code>import e24_common as C</code> L36</td><td class="sym">SPLIT_SPECS L184 · E24_SEED L85 · HOLDOUT_FRAC · MAX_WORKERS L430 · load_jsonl L181</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_reexec.py">harness/e24_reexec.py</a></td><td class="sym"><code>import e24_common as C</code> L46</td><td class="sym">IOMAP · VENV_ROOT · RUN_LOG_DIR · SCRIPT_TIMEOUT_S 600 · GUARD L320</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_eval.py">harness/e24_eval.py</a></td><td class="sym"><code>import e24_common as C</code> L37</td><td class="sym">load_jsonl L51 · load_arena L47 · GATES_JSON L53 · OUT_JSON L497</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_gradient_duel.py">harness/e24_gradient_duel.py</a></td><td class="sym"><code>import e24_common as C</code> L27</td><td class="sym">GRAD_ROOT L31 · SPLIT_SPECS L89 · load_jsonl L147 · load_arena L145</td></tr>
+<tr><td class="sym">command line</td><td class="sym">none</td><td class="sym">no <code>__main__</code> block in this file; <code>rmse</code> ends at L301</td></tr>
+<tr><td class="sym">tests/</td><td class="sym">no test found</td><td class="sym">grep of <code>tests/</code> for <code>e24</code> returns nothing</td></tr>
+<tr><td class="sym">indirect</td><td class="sym"><code>e18_scripted_bt</code> L35</td><td class="sym">SnapshotGuard L260 · load_plan L249 · enrich_inventories L250 · load_goals L257</td></tr>
+</tbody>
+</table>
+<p>All five E24 phase scripts depend on this file, so a change here changes every phase. The experiment pages are <a href="exp_e24_common.html">exp_e24_common.html</a> and <a href="exp_e24_reexec.html">exp_e24_reexec.html</a>.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e24_common.html">exp_e24_common.html</a>, <a href="exp_index.html">exp_index.html</a>, <a href="data_experiments.html">data_experiments.html</a>, <a href="file_harness_e24_iomap.html">file_harness_e24_iomap.html</a>, <a href="file_harness_e24_reexec.html">file_harness_e24_reexec.html</a></p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_common.py</code> (301 lines, whole file); call sites in the five sibling E24 scripts (<code class="path">e24_iomap.py</code>, <code class="path">e24_holdout.py</code>, <code class="path">e24_reexec.py</code>, <code class="path">e24_eval.py</code>, <code class="path">e24_gradient_duel.py</code>) by grep; row counts of <code class="path">results/_e24_iomap_2026-09-24.jsonl</code> and <code class="path">results/E24_bt_cost_ledger_2026-09-24.jsonl</code> (json.loads, counts only); <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>.</p>
+<p class="skips">Skipped, with reason: <code>.env</code>, <code>experiments_verifiers/.env</code> (never opened, secrets; the code that reads them is described by line number only); the contents of <code class="path">results/_e24_*.jsonl</code> beyond row counts; the internals of <code class="path">e18_scripted_bt.py</code>, <code class="path">e16_gradient_audit.py</code> and <code class="path">e15_bt_eval.py</code> (other files; only the imported names are cited); <code class="path">results/_e24_venv/</code> (2.8 GB runtime environment); <code class="path">results/_e24_runlogs_2026-09-24/</code>. No script, experiment or pytest was run.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

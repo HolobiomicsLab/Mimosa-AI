@@ -23,7 +23,7 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `planner_llm_model` | `str` | `deepseek/deepseek-chat` | Layer 0 — task decomposition. |
 | `workflow_llm_model` | `str` | `openai/gpt-5.5` | Workflow synthesis. |
 | `smolagent_model_id` | `str` | `openrouter/deepseek/deepseek-v3.2` | Execution agents inside the sandbox. |
-| `judge_model` | `str` | `openai/gpt-5.5` | Verifier soft-claim verdicts. |
+| `judge_model` | `str` | `openai/gpt-5.5` | Verifier LLM: claim-ladder extraction, format digests, policy-scorer code. |
 | `capsule_namer_model` | `str` | `deepseek/deepseek-chat` | Generates human-readable capsule names. |
 | `engine_name` | `str` | `litellm` | SmolAgents engine — keep as `litellm`. |
 | `reasoning_effort` | `str` | `medium` | `minimal | low | medium | high` for models that support it. |
@@ -44,6 +44,17 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `learned_score_threshold` | `float` | `0.92` | `--learn` stops when `overall_score` reaches this. |
 | `max_learning_evolve_iterations` | `int` | `25` | Hard cap on evolve iterations. |
 | `max_concurrent_eval_tasks` | `int` | `1` | Concurrent tasks in CSV / batch modes. |
+
+## Verifier channel
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `verifier_kind` | `str` | `hybrid` | Verifier channel: `hybrid` (E19/E19b) or `legacy` (deprecated multi-source). |
+| `hybrid_verifier_num_claims` | `int` | `10` | Target key-claim count per task (extraction accepts ±2). |
+| `hybrid_verifier_refinement_rounds` | `int` | `2` | Max replacement claims per generation for dead (non-discriminative) claims. |
+| `hybrid_verifier_scorer_timeout_s` | `int` | `60` | Per scorer-subprocess timeout (seconds). |
+| `hybrid_verifier_pairwise_mode` | `str` | `temporal` | Pairwise reward mode: `temporal` (earliest-differing ladder stage decides), `temporal_strict`, `mean_diff`, `sign_sum`, or `escalation`. |
+| `hybrid_verifier_digest_max_files` | `int` | `8` | Max deliverable files sampled by the hybrid verifier format digest. |
 
 ## QD / novelty (selection & variation)
 

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tools / MCP and LLM providers - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > core > tools &amp; LLM">
+<div class="wrap">
+
+<h1 class="hud">Tools, MCP and LLM providers</h1>
+<p class="intro"><code class="path">sources/core/tools_manager.py</code> scans configured IP/port ranges for MCP servers and turns their tool lists into prompt text and client code. <code class="path">sources/core/llm_provider.py</code> wraps one LLM call behind <code>litellm</code> with a disk cache, an infinite retry loop, and per-call persistence. The literature client <code class="path">sources/utils/perspicacite_client.py</code> is documented on <a href="area_utils.html">area_utils.html</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 - MCP discovery</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 270" role="img" aria-label="MCP discovery from config port ranges to the workflow-generation prompt">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1a" href="area_entry_config.html">
+    <title>Config.discovery_addresses holds AddressMCP(ip, port_min, port_max)</title>
+    <rect x="12" y="50" width="172" height="66" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="98" y="76" text-anchor="middle">config ranges</text>
+    <text class="box-sub" x="98" y="92" text-anchor="middle">Config.discovery_addresses</text>
+    <text class="box-sub" x="98" y="104" text-anchor="middle">AddressMCP(ip, ports)</text>
+  </a>
+
+  <a class="box" id="d1b" href="#card-tm">
+    <title>ToolManager scans every configured address, one port at a time</title>
+    <rect x="206" y="50" width="172" height="66" rx="2" fill="rgba(60,240,210,0.08)" stroke="#3CF0D2"/>
+    <text class="box-label" x="292" y="76" text-anchor="middle">port scan</text>
+    <text class="box-sub" x="292" y="92" text-anchor="middle">ToolManager</text>
+    <text class="box-sub" x="292" y="104" text-anchor="middle">discover_mcp_at_address</text>
+  </a>
+
+  <a class="box" id="d1c" href="#card-tm">
+    <title>One MCP descriptor per responding port, holding its tool list</title>
+    <rect x="400" y="50" width="172" height="66" rx="12" fill="rgba(60,240,210,0.08)" stroke="#3CF0D2"/>
+    <text class="box-label" x="486" y="76" text-anchor="middle">tool list</text>
+    <text class="box-sub" x="486" y="92" text-anchor="middle">MCP(name, port, tools)</text>
+    <text class="box-sub" x="486" y="104" text-anchor="middle">self.mcps</text>
+  </a>
+
+  <a class="box" id="d1d" href="#card-tm">
+    <title>get_client_code emits Python, get_client_prompt emits tool descriptions</title>
+    <rect x="594" y="50" width="172" height="66" rx="2" fill="rgba(60,240,210,0.08)" stroke="#3CF0D2"/>
+    <text class="box-label" x="680" y="76" text-anchor="middle">client code + prompt</text>
+    <text class="box-sub" x="680" y="92" text-anchor="middle">get_client_code</text>
+    <text class="box-sub" x="680" y="104" text-anchor="middle">get_client_prompt</text>
+  </a>
+
+  <a class="box" id="d1e" href="area_sources_core.html">
+    <title>factory.load_tools_code injects client code and tool text into the workflow prompt</title>
+    <rect x="788" y="50" width="180" height="66" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="878" y="76" text-anchor="middle">workflow-gen prompt</text>
+    <text class="box-sub" x="878" y="92" text-anchor="middle">factory.load_tools_code</text>
+    <text class="box-sub" x="878" y="104" text-anchor="middle">tools_code + prompt</text>
+  </a>
+
+  <g class="box" id="d1f">
+    <title>Toolomics MCP servers answer the probe on http://address:port/mcp</title>
+    <rect x="206" y="192" width="200" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="306" y="214" text-anchor="middle">Toolomics MCP servers</text>
+    <text class="box-sub" x="306" y="230" text-anchor="middle">http://address:port/mcp</text>
+  </g>
+
+  <a class="box" id="d1g" href="area_utils.html">
+    <title>Perspicacite-AI REST service on localhost:5468 returns literature text</title>
+    <rect x="788" y="192" width="180" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="878" y="214" text-anchor="middle">Perspicacite-AI</text>
+    <text class="box-sub" x="878" y="230" text-anchor="middle">REST /api/chat</text>
+  </a>
+
+  <path class="edge" data-from="d1a" data-to="d1b" d="M184,83 H206" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="195" y="76" text-anchor="middle">addr list</text>
+
+  <path class="edge" data-from="d1b" data-to="d1c" d="M378,83 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="389" y="76" text-anchor="middle">MCP objects</text>
+
+  <path class="edge" data-from="d1c" data-to="d1d" d="M572,83 H594" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="583" y="76" text-anchor="middle">tools</text>
+
+  <path class="edge" data-from="d1d" data-to="d1e" d="M766,83 H788" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="777" y="76" text-anchor="middle">prompt text</text>
+
+  <path class="edge dashed-edge" data-from="d1f" data-to="d1b" d="M300,192 V116" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="306" y="150">HTTP /mcp probe</text>
+  <text class="edge-label" x="306" y="164">tool list</text>
+
+  <path class="edge dashed-edge" data-from="d1g" data-to="d1e" d="M878,192 V116" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="884" y="150">grounded text</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - seven boxes. Chain: <code class="path">config.py::Config.discovery_addresses</code> to <code class="path">sources/core/tools_manager.py::ToolManager.discover_network_mcp_servers</code> to <code class="path">sources/core/tools_manager.py::ToolManager.discover_mcp_at_address</code> to <code class="path">sources/core/factory.py::Factory.load_tools_code</code>. Dashed boxes are external services; dashed arrows are traffic to and from them.</p>
+
+<p class="note say">These two files decide which tools and which model a generated workflow gets: a closed port or a bad model id stops the run before any science happens.</p>
+<p class="note">Amber: the ToolHive path is disabled at the call site - <code>sources/core/tools_manager.py::ToolManager.discover_mcp_servers</code> sets <code>mcps_thv = []</code>, so only the network scan runs while <code>discover_toolhive_servers</code> stays unused.</p>
+<p class="note flag">Red: <code>sources/core/tools_manager.py::ToolManager.discover_mcp_at_address</code> documents "Per-port timeout in seconds when probing. Defaults to 2.0", but the code hardcodes <code>timeout=3.0</code> in the <code>Client(...)</code> call and never passes the <code>timeout</code> argument.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 - the LLM provider layer</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 270" role="img" aria-label="Call sites wrap through LLMProvider to litellm and the provider APIs, with cache and pricing side paths">
+  <defs>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+  </defs>
+
+  <a class="box" id="d2a" href="area_sources_core.html">
+    <title>LLMConfig holds model, provider, key, temperature, max_tokens, reasoning_effort</title>
+    <rect x="12" y="50" width="170" height="66" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="97" y="76" text-anchor="middle">LLMConfig</text>
+    <text class="box-sub" x="97" y="92" text-anchor="middle">model, provider, key</text>
+    <text class="box-sub" x="97" y="104" text-anchor="middle">from_dict()</text>
+  </a>
+
+  <a class="box" id="d2b" href="mod_core_planner.html">
+    <title>Planner, workflow_factory, variation_engine and the verifiers all build an LLMProvider</title>
+    <rect x="204" y="50" width="170" height="66" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="289" y="76" text-anchor="middle">LLM call sites</text>
+    <text class="box-sub" x="289" y="92" text-anchor="middle">planner, workflow_factory</text>
+    <text class="box-sub" x="289" y="104" text-anchor="middle">verifier, variation_engine</text>
+  </a>
+
+  <a class="box" id="d2c" href="#card-lp">
+    <title>LLMProvider.__call__ checks the cache first, then retries forever with backoff</title>
+    <rect x="396" y="50" width="190" height="66" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="491" y="76" text-anchor="middle">LLMProvider.__call__</text>
+    <text class="box-sub" x="491" y="92" text-anchor="middle">cache, retry, persist</text>
+    <text class="box-sub" x="491" y="104" text-anchor="middle">max_retries = 100</text>
+  </a>
+
+  <a class="box" id="d2d" href="#card-lp">
+    <title>One litellm.completion call per attempt, model as provider/model</title>
+    <rect x="608" y="50" width="170" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="693" y="76" text-anchor="middle">litellm.completion</text>
+    <text class="box-sub" x="693" y="92" text-anchor="middle">model = provider/model</text>
+    <text class="box-sub" x="693" y="104" text-anchor="middle">drop_params = True</text>
+  </a>
+
+  <g class="box" id="d2e">
+    <title>External LLM APIs reached through litellm</title>
+    <rect x="800" y="50" width="170" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="885" y="76" text-anchor="middle">provider APIs</text>
+    <text class="box-sub" x="885" y="92" text-anchor="middle">anthropic, openai</text>
+    <text class="box-sub" x="885" y="104" text-anchor="middle">deepseek, openrouter</text>
+  </g>
+
+  <a class="box" id="d2f" href="data_runs.html">
+    <title>One JSON per agent call, under the run uuid folder</title>
+    <rect x="380" y="190" width="170" height="66" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="465" y="216" text-anchor="middle">memory JSON per uuid</text>
+    <text class="box-sub" x="465" y="232" text-anchor="middle">sources/memory/&lt;uuid&gt;/</text>
+    <text class="box-sub" x="465" y="244" text-anchor="middle">&lt;agent_name&gt;.json</text>
+  </a>
+
+  <a class="box" id="d2g" href="area_utils.html">
+    <title>PricingCalculator reads the same memory JSON and prices every call</title>
+    <rect x="620" y="190" width="170" height="66" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="705" y="216" text-anchor="middle">cost calculation</text>
+    <text class="box-sub" x="705" y="232" text-anchor="middle">PricingCalculator</text>
+    <text class="box-sub" x="705" y="244" text-anchor="middle">calculate_cost(uuid)</text>
+  </a>
+
+  <a class="box" id="d2h" href="mod_core_evolution_engine.html">
+    <title>EvolutionEngine converts the cost into reward weights for the next generation</title>
+    <rect x="860" y="190" width="150" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="935" y="216" text-anchor="middle">evolution engine</text>
+    <text class="box-sub" x="935" y="232" text-anchor="middle">evolution_costs</text>
+    <text class="box-sub" x="935" y="244" text-anchor="middle">reward weights cost</text>
+  </a>
+
+  <path class="edge" data-from="d2a" data-to="d2b" d="M182,83 H204" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="193" y="76" text-anchor="middle">config</text>
+
+  <path class="edge" data-from="d2b" data-to="d2c" d="M374,83 H396" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="385" y="76" text-anchor="middle">prompt str</text>
+
+  <path class="edge" data-from="d2c" data-to="d2d" d="M586,83 H608" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="597" y="76" text-anchor="middle">params</text>
+
+  <path class="edge" data-from="d2d" data-to="d2e" d="M778,83 H800" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="789" y="76" text-anchor="middle">HTTPS</text>
+
+  <path class="edge dashed-edge" data-from="d2c" data-to="d2f" d="M470,116 V190" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="476" y="158">saves call JSON</text>
+
+  <path class="edge dashed-edge" data-from="d2f" data-to="d2c" d="M430,190 V116" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="424" y="140" text-anchor="end">cached response</text>
+
+  <path class="edge dashed-edge" data-from="d2f" data-to="d2g" d="M550,223 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="585" y="216" text-anchor="middle">usage, model</text>
+
+  <path class="edge" data-from="d2h" data-to="d2g" d="M860,223 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="825" y="216" text-anchor="middle">uuid in, cost out</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - eight boxes. The chain is <code class="path">sources/core/llm_provider.py::LLMProvider.__call__</code> to <code>litellm.completion</code>; the cache and pricing paths hang off the memory folder. The runner's smolagent agents use smolagents <code>LiteLLMModel</code> directly and do not pass through <code>LLMProvider</code> - see <a href="mod_core_runner.html">mod_core_runner.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File cards</h2>
+
+<div class="card l1" id="card-tm">
+<h4><a href="../../sources/core/tools_manager.py">sources/core/tools_manager.py</a></h4>
+<p class="role">Finds MCP servers on configured ports, stores each server with its tools, and writes client code plus tool descriptions for the workflow prompt.</p>
+<p class="meta">679 lines &#183; classes: <code>Tool</code>, <code>MCP</code>, <code>ToolManager</code> &#183; function: <code>normalize_mcp_endpoint</code> &#183; reads: <code>discovery_addresses</code> &#183; covered by <a href="../../tests/tools_manager_test.py">tests/tools_manager_test.py</a></p>
+<details><summary>how discovery works, step by step</summary><div class="dbody">
+<pre>ToolManager.__init__(config, mcps)          - _check_toolhive_available() runs `thv version`
+ToolManager.discover_mcp_servers()          - ToolHive path commented out, network scan only
+ToolManager.discover_network_mcp_servers()  - loops over config.discovery_addresses
+ToolManager.discover_mcp_at_address(address, port_min=5000, port_max=5250, timeout=2.0)
+                                            - range(port_min, port_max + 1), one Client per port
+ToolManager.verify_tools()                  - True when a tool named execute_command exists
+ToolManager.get_client_prompt(mcp)          - one line per tool: name + first description line
+ToolManager.get_client_code(mcp)            - smolagents MCPClient code, variable &lt;NAME&gt;_TOOLS
+ToolManager._get_client_variable_name(mcp)  - name.upper().replace(" ", "_") + "_TOOLS"</pre>
+<p>Facts from the code: <code>discover_network_mcp_servers</code> passes <code>addr.port_min</code> and <code>addr.port_max</code>, so the range comes from config, not from the function defaults (defaults are <code>5000</code> to <code>5250</code>; <code>config.py</code> default is <code>5000</code> to <code>5200</code>). Per-port probing uses a hardcoded <code>timeout=3.0</code> and a <code>3.0</code> s client timeout; a failed port is swallowed by a bare <code>except Exception: continue</code>. Network-discovered entries store the raw smolagents tool objects in <code>MCP.tools</code> (typed <code>list[Tool]</code> in the docstring); the local <code>Tool</code> wrapper is only built by the ToolHive JSON path <code>_get_tools_with_descriptions</code>. <code>get_client_code</code> raises <code>ValueError</code> for <code>stdio</code> and for entries with no URL.</p>
+</div></details>
+</div>
+
+<div class="card l2" id="card-lp">
+<h4><a href="../../sources/core/llm_provider.py">sources/core/llm_provider.py</a></h4>
+<p class="role">Sends one prompt to an LLM through litellm, returns text, and persists the call JSON for cost accounting.</p>
+<p class="meta">643 lines &#183; classes: <code>LLMConfig</code>, <code>LLMProvider</code> &#183; function: <code>extract_model_pattern</code> &#183; writes: <code>&lt;memory_path&gt;/&lt;agent_name&gt;.json</code> &#183; covered by <a href="../../tests/llm_provider_test.py">tests/llm_provider_test.py</a></p>
+<details><summary>what __call__ wraps</summary><div class="dbody">
+<pre>LLMProvider.__call__(prompt, timeout=180, use_cache=True) -&gt; str
+  1. _find_cache_match(prompt)          - exact match on (sys_msg, prompt); returns cached text
+  2. litellm.completion(...)            - inside `while True` with exponential backoff and jitter
+  3. save_call(json_res)                - when both memory_path and agent_name are set
+LLMProvider._apply_cache_control(messages)  - ephemeral cache_control on the system block
+LLMProvider._is_retryable_error(error)      - matches overload, rate_limit, timeout, 429, 5xx, context
+LLMProvider._calculate_backoff_wait(attempt, max_wait=500) - 2**attempt plus jitter, capped at 500 s
+LLMProvider._is_temperature_error(error)    - retries once with temperature = 1.0
+LLMProvider._is_quantization_routing_error(error) - drops the OpenRouter quantization filter and retries
+LLMConfig.from_dict(config)                 - dict to config, missing keys take defaults</pre>
+<p>Notable behaviours. Claude models get no <code>temperature</code> and no <code>reasoning_effort</code> parameter (<code>_is_claude_model</code>). Context-window errors shrink the user prompt to <code>0.5 ** n</code> of its length for at most <code>3</code> rounds, then fall back to backoff retries. A <code>null</code> content becomes the string <code>&lt;LLM response error&gt;</code>. The persisted JSON adds <code>response</code>, <code>message</code>, <code>temperature</code>, <code>reasoning_effort</code> and <code>model</code> as <code>provider/model</code> so the pricing matcher can find it.</p>
+<p>Cache detail: with <code>use_flat_cache=False</code>, <code>_find_cache_match</code> globs every subfolder of the memory parent folder and returns the first exact match, so a response written by another run with the same system message and prompt is returned.</p>
+</div></details>
+</div>
+
+<p class="sub">Literature client: <code class="path">sources/utils/perspicacite_client.py</code> (394 lines) queries <code>PERSPICACITE_API_URL</code> (default <code>http://localhost:5468</code>) at <code>/api/chat</code>, caches answers under <code class="path">sources/memory/perspicacite_requests/&lt;sha256&gt;.json</code>, and returns <code>None</code> when the service is down. Full card on <a href="area_utils.html">area_utils.html</a>; its callers are <code>sources/core/planner.py::Planner.perspicacite_grounding</code> and <code>sources/core/orchestrator.py::WorkflowOrchestrator._ground_with_perspicacite</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Provider and config fields</h2>
+<table>
+<thead><tr><th>Field</th><th>Default</th><th>Where</th><th>Read by</th></tr></thead>
+<tbody>
+<tr><td class="sym">discovery_addresses</td><td class="sym">0.0.0.0, ports 5000-5200</td><td class="sym">config.py</td><td class="sym">ToolManager scans these ranges</td></tr>
+<tr><td class="sym">planner_llm_model</td><td class="sym">openrouter/z-ai/glm-5.3</td><td class="sym">config.py</td><td class="sym">planner LLMConfig</td></tr>
+<tr><td class="sym">workflow_llm_model</td><td class="sym">openrouter/z-ai/glm-5.3</td><td class="sym">config.py</td><td class="sym">workflow_factory, variation_engine</td></tr>
+<tr><td class="sym">smolagent_model_id</td><td class="sym">openrouter/deepseek/deepseek-v4-flash-0731</td><td class="sym">config.py</td><td class="sym">generated workflows (LiteLLMModel)</td></tr>
+<tr><td class="sym">judge_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">config.py</td><td class="sym">verifiers, evaluators</td></tr>
+<tr><td class="sym">vision_judge_model</td><td class="sym">openrouter/moonshotai/kimi-k3</td><td class="sym">config.py</td><td class="sym">visual judge path</td></tr>
+<tr><td class="sym">engine_name</td><td class="sym">litellm</td><td class="sym">config.py</td><td class="sym">smolagent factory: mlx, litellm, inference_client</td></tr>
+<tr><td class="sym">reasoning_effort</td><td class="sym">medium</td><td class="sym">config.py</td><td class="sym">non-Claude models only</td></tr>
+<tr><td class="sym">max_tokens</td><td class="sym">16384 (config), 8192 (LLMConfig)</td><td class="sym">config.py, llm_provider.py</td><td class="sym">litellm completion params</td></tr>
+<tr><td class="sym">openrouter_provider</td><td class="sym">28 provider names</td><td class="sym">config.py</td><td class="sym">extra_body provider order, no fallbacks</td></tr>
+<tr><td class="sym">default_openrouter_quantizations</td><td class="sym">bf16, fp16, fp8</td><td class="sym">config.py</td><td class="sym">OpenRouter exclusion filter</td></tr>
+<tr><td class="sym">save_logprobs</td><td class="sym">True</td><td class="sym">config.py</td><td class="sym">smolagent factory, litellm engine only</td></tr>
+<tr><td class="sym">memory_dir</td><td class="sym">sources/memory</td><td class="sym">config.py</td><td class="sym">LLMProvider cache, PricingCalculator</td></tr>
+<tr><td class="sym">LLMConfig.max_retries</td><td class="sym">100</td><td class="sym">llm_provider.py</td><td class="sym">retry loop ceiling</td></tr>
+<tr><td class="sym">LLMConfig.temperature</td><td class="sym">1.0</td><td class="sym">llm_provider.py</td><td class="sym">non-Claude calls</td></tr>
+<tr><td class="sym">PERSPICACITE_API_URL</td><td class="sym">http://localhost:5468</td><td class="sym">perspicacite_client.py</td><td class="sym">query_perspicacite</td></tr>
+</tbody>
+</table>
+<p class="sub"><code>extract_model_pattern("openrouter/z-ai/glm-5.3")</code> returns <code>("openrouter", "z-ai/glm-5.3")</code>; a bare model name falls back to provider <code>anthropic</code>. <code>LLMConfig.__post_init__</code> also accepts a key from <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code> or <code>DEEPSEEK_API_KEY</code>, and its empty-key error is commented out.</p>
+
+<details><summary>signature list - tools_manager.py</summary><div class="dbody">
+<pre>normalize_mcp_endpoint(raw_url: str, transport: str) -&gt; tuple[str, str, dict[str, Any]]
+Tool.__init__(name: str, description: str = "") -&gt; None
+MCP.__init__(name=None, tools=None, address=None, port=None, toolhive_name=None,
+             transport="streamable-http", discovery_url=None, client_url=None) -&gt; None
+MCP.tool_names -&gt; list[str]
+ToolManager.__init__(config: Config | None = None, mcps: list[MCP] | None = None) -&gt; None
+ToolManager._check_toolhive_available() -&gt; bool
+ToolManager._attempt_mcp_stop(mcp_name: str) -&gt; bool
+ToolManager._attempt_mcp_restart(mcp_name: str) -&gt; bool
+ToolManager._attempt_full_mcp_restart(mcp_name: str) -&gt; bool
+ToolManager._get_tools_with_descriptions(server_url: str) -&gt; list[Tool]
+ToolManager.discover_toolhive_servers() -&gt; list[MCP]
+ToolManager.discover_mcp_at_address(address, port_min=5000, port_max=5250, timeout=2.0) -&gt; list[MCP]
+ToolManager.discover_network_mcp_servers() -&gt; list[MCP]
+ToolManager.verify_tools() -&gt; bool
+ToolManager.discover_mcp_servers() -&gt; list[MCP]
+ToolManager._get_client_variable_name(mcp: MCP) -&gt; str
+ToolManager.get_client_prompt(mcp: MCP) -&gt; str
+ToolManager.get_client_code(mcp: MCP) -&gt; str</pre>
+</div></details>
+
+<details><summary>signature list - llm_provider.py</summary><div class="dbody">
+<pre>extract_model_pattern(llm_model: str) -&gt; tuple[str, str]
+LLMConfig.__init__(model="anthropic/claude-sonnet-4-5", provider="anthropic",
+                   temperature=1.0, key="", reasoning_effort="medium", max_tokens=8192,
+                   openrouter_provider=None, openrouter_quantizations=("bf16","fp16","fp8")) -&gt; None
+LLMConfig.__post_init__() -&gt; None
+LLMConfig.from_dict(config: dict[str, Any] | None = None) -&gt; LLMConfig
+LLMProvider.__init__(agent_name=None, memory_path=None, system_msg=None,
+                     config: LLMConfig | None = None, use_flat_cache=False) -&gt; None
+LLMProvider._supports_reasoning_tokens() -&gt; bool
+LLMProvider._is_claude_model() -&gt; bool
+LLMProvider._supports_prompt_caching() -&gt; bool
+LLMProvider._apply_cache_control(messages) -&gt; list[dict[str, Any]]
+LLMProvider.save_call(call: dict[str, Any]) -&gt; None
+LLMProvider._find_cache_match(prompt: str) -&gt; str | None
+LLMProvider._messages_match(expected, cached) -&gt; bool
+LLMProvider._is_temperature_error(error) -&gt; bool            [staticmethod]
+LLMProvider._is_quantization_routing_error(error) -&gt; bool   [staticmethod]
+LLMProvider._is_retryable_error(error) -&gt; bool
+LLMProvider._calculate_backoff_wait(attempt: int, max_wait: int = 500) -&gt; float
+LLMProvider.__call__(prompt: str, timeout: int = 180, use_cache: bool = True) -&gt; str</pre>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/core/tools_manager.py</code>, <code class="path">sources/core/llm_provider.py</code>, <code class="path">sources/utils/perspicacite_client.py</code>, <code class="path">sources/utils/pricing.py</code>, <code class="path">sources/core/factory.py</code> (lines 40-100), <code class="path">sources/core/workflow_factory.py</code>, <code class="path">sources/core/planner.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (lines 215-240), <code class="path">config.py</code>, <code class="path">config_default.json</code>, <code class="path">tests/tools_manager_test.py</code>, <code class="path">tests/llm_provider_test.py</code>, <code class="path">UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/core/__init__.py</code> (re-exports only) &#183; ToolHive management methods <code>_attempt_mcp_stop/_restart</code> (no runtime caller, path disabled) &#183; <code class="path">sources/utils/pricing.py</code> internals (shown only as the pricing side path; full card belongs to area_utils.html) &#183; <code class="path">sources/cli/onboard_cli.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/extensibility/human_mode.py</code> (other ToolManager callers, covered by their own pages) &#183; <code>sources/evaluators/*</code> call sites (own pages) &#183; <code>tests/</code> other than the two named (area_tests.html) &#183; <code>docs/</code>, <code>datasets/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code> (Tier D, not diagrammed). Also skipped: <code>.env</code>, <code>token.json</code>, <code>credentials.json</code> (no secrets read or quoted).</p>
+<p>Limitation: the working tree had uncommitted changes when this page was built; the facts above come from the files on disk, which may differ from commit <code>7e8463b</code>.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

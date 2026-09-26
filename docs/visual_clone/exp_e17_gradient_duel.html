@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e17_gradient_duel - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e17_gradient_duel">
+<div class="wrap">
+
+<h1 class="hud">e17_gradient_duel &mdash; which feedback channel points at gold?</h1>
+<p class="intro">E17 pitted two feedback channels against each other on the same generations: the E15 preference gradient (judges saw goal and artifacts only) and the verifier's rubric gradient. It re-judged both texts with the same E16 instrument, so only the gradient text varies. The question is whether preference-grounded feedback points at gold more often; the winning channel here is the one <a href="mod_evaluators_hybrid_verifier.html">hybrid_verifier</a> writes today.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 460" role="img" aria-label="E17 design: hypothesis, inputs, stages, artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bH">
+    <title>Hypothesis under test</title>
+    <rect x="20" y="20" width="210" height="52" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="42" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="125" y="58" text-anchor="middle">preference beats rubric</text>
+  </g>
+
+  <a class="box" id="bI1" href="../../experiments_verifiers/results/E15_bt_gradients/">
+    <title>E15 preference gradients, one text file per generation</title>
+    <rect x="20" y="110" width="210" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="130" text-anchor="middle">E15_bt_gradients/</text>
+    <text class="box-sub" x="125" y="146" text-anchor="middle">&lt;campaign&gt;__&lt;task&gt;/</text>
+    <text class="box-sub" x="125" y="160" text-anchor="middle">&lt;uuid_long&gt;.txt</text>
+  </a>
+
+  <a class="box" id="bI2" href="../../experiments_verifiers/results/_e16_population.json">
+    <title>E16 population items carry goal, gold join and artifact state</title>
+    <rect x="20" y="210" width="210" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="230" text-anchor="middle">_e16_population.json</text>
+    <text class="box-sub" x="125" y="246" text-anchor="middle">goal, gold, tier</text>
+    <text class="box-sub" x="125" y="260" text-anchor="middle">verifier gradient text</text>
+  </a>
+
+  <g class="box" id="bS1">
+    <title>build_pairs() joins by uuid8 suffix</title>
+    <rect x="270" y="20" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="42" text-anchor="middle">build_pairs()</text>
+    <text class="box-sub" x="375" y="58" text-anchor="middle">uuid8 join &#183; 25 drops</text>
+  </g>
+
+  <g class="box" id="bS2">
+    <title>judge_bt() swaps only the gradient text in the prompt</title>
+    <rect x="270" y="110" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="132" text-anchor="middle">judge_bt()</text>
+    <text class="box-sub" x="375" y="148" text-anchor="middle">swaps gradient text</text>
+  </g>
+
+  <g class="box" id="bS3">
+    <title>E16.judge_item() re-judges the verifier gradient; identical payload means cache hit</title>
+    <rect x="270" y="200" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="222" text-anchor="middle">E16.judge_item()</text>
+    <text class="box-sub" x="375" y="238" text-anchor="middle">cache hit from E16</text>
+  </g>
+
+  <g class="box" id="bS4">
+    <title>paired() bootstraps over (campaign, task) groups</title>
+    <rect x="270" y="290" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="312" text-anchor="middle">paired()</text>
+    <text class="box-sub" x="375" y="328" text-anchor="middle">999 resamples &#183; seed 0</text>
+  </g>
+
+  <g class="box" id="bS5">
+    <title>main() decides the verdict, _write_md() renders it</title>
+    <rect x="270" y="380" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="402" text-anchor="middle">verdict + _write_md()</text>
+    <text class="box-sub" x="375" y="418" text-anchor="middle">CI upper bound test</text>
+  </g>
+
+  <g class="box" id="bM">
+    <title>Paired statistics object</title>
+    <rect x="530" y="290" width="170" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="615" y="310" text-anchor="middle">stats + verdict</text>
+    <text class="box-sub" x="615" y="326" text-anchor="middle">mean &#916;, CI95</text>
+    <text class="box-sub" x="615" y="340" text-anchor="middle">wins, ties, n=122</text>
+  </g>
+
+  <a class="box" id="bA1" href="../../experiments_verifiers/results/E17_gradient_duel_2026-09-23.md">
+    <title>Results of record</title>
+    <rect x="730" y="20" width="160" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="40" text-anchor="middle">E17_gradient_duel</text>
+    <text class="box-sub" x="810" y="56" text-anchor="middle">*.json + *.md</text>
+    <text class="box-sub" x="810" y="70" text-anchor="middle">123 paired rows</text>
+  </a>
+
+  <a class="box" id="bA2" href="../../experiments_verifiers/results/_e16_judge_cache.jsonl">
+    <title>Shared judge cache, appended by E16._llm()</title>
+    <rect x="730" y="150" width="160" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="172" text-anchor="middle">_e16_judge_cache.jsonl</text>
+    <text class="box-sub" x="810" y="188" text-anchor="middle">shared with E16</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="bI1" data-to="bS1" d="M230,138 H246 V46 H270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="252" y="100" text-anchor="start">preference texts</text>
+  <path class="edge dashed-edge" data-from="bI2" data-to="bS1" d="M230,243 H258 V60 H270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="266" y="200" text-anchor="start">population items</text>
+
+  <path class="edge" data-from="bS1" data-to="bS2" d="M375,72 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="94" text-anchor="start">paired items</text>
+  <path class="edge" data-from="bS2" data-to="bS3" d="M375,162 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="184" text-anchor="start">verifier gradient</text>
+  <path class="edge" data-from="bS3" data-to="bS4" d="M375,252 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="274" text-anchor="start">both judgments</text>
+  <path class="edge" data-from="bS4" data-to="bM" d="M480,316 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="505" y="308" text-anchor="middle">stats dict</text>
+  <path class="edge" data-from="bS4" data-to="bS5" d="M375,342 V380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="364" text-anchor="start">paired deltas</text>
+  <path class="edge" data-from="bS5" data-to="bA1" d="M480,406 H710 V53 H730" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="595" y="398" text-anchor="middle">json + md</text>
+  <path class="edge dashed-edge" data-from="bS3" data-to="bA2" d="M480,226 H605 V178 H730" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="600" y="212" text-anchor="middle">new BT calls</text>
+</svg>
+</div>
+<p class="figcap">11 boxes. Mint = E17 functions, steel = data files. The decisive design fact sits on the <code>judge_bt()</code> box: <code>judge_bt()</code> rebuilds the E16 prompt and replaces <code>E16.gradient_text(item)</code> with the preference text (L69), so goal, gold and artifact state stay identical for both channels. The verifier side re-enters <code>E16.judge_item()</code> and comes back as a cache hit.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/e17_gradient_duel.py">experiments_verifiers/harness/e17_gradient_duel.py</a></h4>
+<p class="role">Joins each preference gradient to its verifier gradient, re-judges both with the E16 instrument, and reports the paired difference with a cluster bootstrap.</p>
+<p class="meta">265 lines &#183; entry point <code>main()</code> (L82) &#183; 6 functions, no classes &#183; imports <code>e16_gradient_audit as E16</code> (L32) &#183; <code>CAP_USD = 3.0</code> (L38)</p>
+<details><summary>CLI, constants and call pattern</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e17_gradient_duel.py      # docstring L18
+
+No argparse: the script takes no command-line arguments.
+Entry point main() L82; worker pool ThreadPoolExecutor(max_workers=10) L89.
+</pre>
+<p>Constants: <code>TODAY = "2026-09-23"</code> (L34), <code>E15_DIR = EV / "results" / "E15_bt_gradients"</code> (L35), <code>OUT_JSON</code> (L36), <code>OUT_MD</code> (L37), <code>CAP_USD = 3.0</code> (L38).</p>
+<p>The script reuses the E16 instrument instead of copying it: <code>judge_bt()</code> calls <code>E16.judge_messages(item)</code>, substitutes the gradient text, then calls <code>E16._llm(...)</code> and <code>E16.parse_judgment()</code> (L66&ndash;76). <code>main()</code> calls <code>E16._load_env()</code> first (L83).</p>
+<p>The verdict rule (L165&ndash;170): significant BT win when <code>rel["ci95"][0] &gt; 0</code>; significant verifier win when <code>rel["ci95"][1] &lt; 0</code>; else no significant difference.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>E16 population items (<code>build_pairs</code> L43)</td><td>nothing</td><td class="sym">experiments_verifiers/results/_e16_population.json</td></tr>
+<tr><td>Preference gradient texts (<code>build_pairs</code> L45&ndash;60)</td><td>nothing</td><td class="sym">experiments_verifiers/results/E15_bt_gradients/&lt;campaign&gt;__&lt;task&gt;/&lt;uuid_long&gt;.txt</td></tr>
+<tr><td>Judge cache (<code>E16._cache_get</code> L347)</td><td>New preference judgments (<code>E16._cache_put</code> L360)</td><td class="sym">experiments_verifiers/results/_e16_judge_cache.jsonl</td></tr>
+<tr><td>API key (<code>E16._load_env</code> L337)</td><td>nothing</td><td class="sym">experiments_verifiers/.env &mdash; skipped, never opened</td></tr>
+<tr><td>nothing</td><td>Paired rows, stats and verdict (<code>OUT_JSON</code> L36, written L177)</td><td class="sym">experiments_verifiers/results/E17_gradient_duel_2026-09-23.json</td></tr>
+<tr><td>The JSON just written</td><td>Report (<code>_write_md</code> L187, written L261)</td><td class="sym">experiments_verifiers/results/E17_gradient_duel_2026-09-23.md</td></tr>
+</tbody>
+</table>
+<p class="sub">Citation form: <code>path::Symbol</code>. Line numbers are <code>e17_gradient_duel.py</code> unless a symbol names E16.</p>
+<p class="note">Amber: <code>build_pairs()</code> drops 25 E15 gradient files that have no matching verifier gradient or join key (json <code>population.drops</code>: <code>no_verifier_gradient_or_join: 25</code>; md L7 reports 123 pairs from 19 groups).</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; paired difference, preference minus verifier</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 290" role="img" aria-label="Diverging bar chart of paired mean delta, BT minus verifier">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <line x1="260" y1="30" x2="260" y2="240" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="260" y="258" text-anchor="middle">-0.40</text>
+  <line x1="440" y1="30" x2="440" y2="240" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="440" y="258" text-anchor="middle">-0.20</text>
+  <line x1="620" y1="30" x2="620" y2="240" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="620" y="258" text-anchor="middle">0.00</text>
+  <text class="box-sub" x="14" y="66" text-anchor="start" font-size="12">gold_relevance</text>
+  <text class="box-sub" x="14" y="84" text-anchor="start">Δ -0.154 [-0.276, -0.032]</text>
+  <rect x="481.4" y="60" width="138.6" height="20" fill="rgba(255,77,106,0.18)" stroke="#FF4D6A"/>
+  <line x1="371.6" y1="70" x2="591.2" y2="70" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="371.6" y1="63" x2="371.6" y2="77" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="591.2" y1="63" x2="591.2" y2="77" stroke="#E6FBFF" stroke-width="1.25"/>
+  <text class="box-sub" x="14" y="136" text-anchor="start" font-size="12">signed alignment</text>
+  <text class="box-sub" x="14" y="154" text-anchor="start">Δ -0.269 [-0.428, -0.100]</text>
+  <rect x="377.9" y="130" width="242.1" height="20" fill="rgba(255,77,106,0.18)" stroke="#FF4D6A"/>
+  <line x1="234.8" y1="140" x2="530.0" y2="140" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="234.8" y1="133" x2="234.8" y2="147" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="530.0" y1="133" x2="530.0" y2="147" stroke="#E6FBFF" stroke-width="1.25"/>
+  <text class="box-sub" x="14" y="206" text-anchor="start" font-size="12">hallucination_flag</text>
+  <text class="box-sub" x="14" y="224" text-anchor="start">Δ -0.148 [-0.311, +0.017]</text>
+  <rect x="486.8" y="200" width="133.2" height="20" fill="rgba(255,77,106,0.18)" stroke="#FF4D6A"/>
+  <line x1="340.1" y1="210" x2="635.3" y2="210" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="340.1" y1="203" x2="340.1" y2="217" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="635.3" y1="203" x2="635.3" y2="217" stroke="#E6FBFF" stroke-width="1.25"/>
+  <text class="box-sub" x="14" y="278" text-anchor="start">mean delta, 95% CI</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; the three paired axes of <code class="path">experiments_verifiers/results/E17_gradient_duel_2026-09-23.md</code> L22&ndash;24 (n=122 each). Every number is read from the results file; none is recomputed. Bar length is linear in the mean &#916; with the zero line at the right of the plot.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Paired generations / task groups</td><td class="size">123 / 19</td><td class="sym">md L7; json population.n_pairs, n_groups</td></tr>
+<tr><td>Rows usable for a paired delta</td><td class="size">122</td><td class="sym">md L22; json stats.gold_relevance.n</td></tr>
+<tr><td>Dropped E15 gradients</td><td class="size">25 of 148 files</td><td class="sym">json population.drops; md L7 (counted by me with find)</td></tr>
+<tr><td>Mean &#916; gold-relevance (preference minus verifier)</td><td class="size">-0.154 [-0.276, -0.032]</td><td class="sym">md L8 and L22</td></tr>
+<tr><td>Preference higher / verifier higher / ties</td><td class="size">40 / 75 / 7</td><td class="sym">md L8 and L22</td></tr>
+<tr><td>Mean &#916; signed alignment</td><td class="size">-0.269 [-0.428, -0.100]</td><td class="sym">md L23</td></tr>
+<tr><td>Mean &#916; hallucination flag</td><td class="size">-0.148 [-0.311, 0.017]</td><td class="sym">md L24</td></tr>
+<tr><td>Hallucination rate, preference vs verifier</td><td class="size">0.43 vs 0.59</td><td class="sym">md L9</td></tr>
+<tr><td>Direction toward, preference vs verifier</td><td class="size">0.37 vs 0.59</td><td class="sym">md L10</td></tr>
+<tr><td>Direction counts</td><td class="size">BT away 48, toward 46, unsure 29</td><td class="sym">md L26</td></tr>
+<tr><td>Direction counts, verifier</td><td class="size">toward 72, away 37, unsure 14</td><td class="sym">md L26</td></tr>
+<tr><td>&#916; relevance on SR-true generations</td><td class="size">-0.109 (n=44)</td><td class="sym">md L27</td></tr>
+<tr><td>&#916; relevance on SR-false generations</td><td class="size">-0.180 (n=78)</td><td class="sym">md L28</td></tr>
+<tr><td>Slices present</td><td class="size">tier A only</td><td class="sym">json population.by_tier</td></tr>
+<tr><td>Cached calls across E16+E17 / cost</td><td class="size">808 / $1.4135</td><td class="sym">md L32; json calls</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the CI on gold-relevance excludes zero in the verifier's favour (md L8), but the population is only the 19 chemistry and run_1 groups with frozen snapshots. The gaps section says the same thing (md L36).</p>
+<p class="note say">The comparison is channel versus channel, not system versus system: the preference judges never saw claims or a rubric (md L14), and the verifier gradient was written by the claims-based rubric verifier (md L15).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim lines from the results file</h2>
+<details><summary>7 quoted lines &mdash; population, verdict, directions, cost</summary><div class="dbody">
+<blockquote>- Population: **123 generations** (19 task groups) having BOTH an E15 preference gradient and the verifier's textual gradient.</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E17_gradient_duel_2026-09-23.md</code> line 7</p>
+<blockquote>- **Gold-relevance (paired, BT &minus; verifier): verifier feedback points at gold more often** &Delta; = -0.154 [-0.276, -0.032] (BT higher on 40, verifier higher on 75, 7 ties, n=122).</blockquote>
+<p class="sub">Same file, line 8</p>
+<blockquote>- Hallucination rate: BT 0.43 vs verifier 0.59 (paired &Delta; = -0.148).</blockquote>
+<p class="sub">Same file, line 9</p>
+<blockquote>- Direction toward: BT 0.37 vs verifier 0.59.</blockquote>
+<p class="sub">Same file, line 10</p>
+<blockquote>| gold_relevance | 122 | -0.154 | [-0.276, -0.032] | 40 | 75 | 7 |</blockquote>
+<p class="sub">Same file, line 22 (paired statistics table)</p>
+<blockquote>- Direction distribution &mdash; BT: away=48, toward=46, unsure=29; verifier: toward=72, away=37, unsure=14.</blockquote>
+<p class="sub">Same file, line 26</p>
+<blockquote>- 808 unique cached LLM calls across E16+E17 combined; total spend $1.4135 (cap for this experiment $3.0; within cap: True).</blockquote>
+<p class="sub">Same file, line 32</p>
+<p class="note say">These files are read-only evidence. Nothing under <code>experiments_verifiers/</code> was modified by this page; E17 was not re-run.</p>
+</div></details>
+
+<details><summary>What the JSON adds over the MD</summary><div class="dbody">
+<p>The JSON keeps the per-pair rows (<code>pairs</code>) with both judge verdicts side by side, the <code>direction_cross_table</code> keyed <code>bt=&hellip;|ver=&hellip;</code>, the <code>instrument</code> string and the <code>provenance_note</code>. The verdict block is <code>verdict.answer</code> = <code>"verifier feedback points at gold more often"</code> together with <code>bt_higher</code>, <code>ver_higher</code> and <code>ties</code>.</p>
+<p>Path: <code class="path">experiments_verifiers/results/E17_gradient_duel_2026-09-23.json</code> (keys <code>verdict</code>, <code>stats</code>, <code>population</code>, <code>calls</code>, <code>gaps</code>).</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e17_gradient_duel.py</code> (full); <code class="path">experiments_verifiers/results/E17_gradient_duel_2026-09-23.md</code> (full) and <code class="path">.json</code> (keys <code>verdict</code>, <code>stats</code>, <code>population</code>, <code>calls</code>, <code>gaps</code>); <code class="path">experiments_verifiers/harness/e16_gradient_audit.py</code> (the reused instrument functions and constants); <code class="path">experiments_verifiers/results/E16_gradient_relevance_2026-09-23.md</code> (instrument validation); <code class="path">experiments_verifiers/results/_e16_population.json</code> (key names only); <code class="path">experiments_verifiers/EXPERIMENTS.md</code> and <code class="path">experiments_verifiers/README.md</code>; <code class="path">docs/visual_clone/_reference.html</code> and <code class="path">docs/visual_clone/_clone.css</code>. Line count from <code>wc -l</code>; the 148 E15 gradient files counted with <code>find</code> (not opened).</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> (&mdash; never opened, rule). The 123 preference gradient texts and the 123 verifier gradient texts (read-only evidence, read by the script, not opened by me). <code class="path">E17_gradient_duel_2026-09-23.json</code> <code>pairs</code> rows (230 KB; key names and aggregate numbers only). <code class="path">harness/e18_bt_eval.py</code>, <code class="path">e18_gradient_duel.py</code>, <code class="path">e15_bt_eval.py</code> and every other <code class="path">harness/*.py</code> &mdash; other pages. <code class="path">results/E18_*</code> and <code>E19*</code> files &mdash; other pages. <code class="path">datasets/ScienceAgentBench/*</code> gold and rubric files &mdash; used by the E16 judge, not opened by me. <code class="path">run_notes/</code>, <code class="path">sources/workflows/</code>, <code class="path">workspace_artefacts/</code>, <code class="path">audits/</code>, <code class="path">webui/</code> &mdash; outside scope. No experiment, application or test run.</p>
+<p class="skips">Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02. <code>git ls-files experiments_verifiers</code> returns no files, so the line numbers above describe the working tree.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

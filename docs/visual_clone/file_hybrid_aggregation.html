@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>aggregation.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators/hybrid_verifier &gt; aggregation.py">
+<div class="wrap">
+
+<h1 class="hud">aggregation.py</h1>
+<p class="intro">This 434-line file is the scoring core of the hybrid verifier: it turns per-claim scores into one reward. It holds the zero-variance drop filter, the pairwise comparison modes and the two reward functions (win-rate and Bradley&ndash;Terry). It runs on each generation, called by <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> L389 and L397, and it reads no config key and touches no file.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does: filter dead claims, decide each pair, average into a reward</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 470" role="img" aria-label="aggregation.py: the caller passes score vectors, claim_stats filters dead claims, temporal_winner or decisive decides each pair, and win_rate_reward or bradley_terry_reward returns the reward dict">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="a1" href="../../sources/evaluators/hybrid_verifier/evaluator.py">
+    <title>evaluator.py L389 calls win_rate_reward, L397 calls bradley_terry_reward, L346 calls claim_stats</title>
+    <rect x="20" y="150" width="185" height="96" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="176" text-anchor="middle">caller</text>
+    <text class="box-sub" x="112" y="194" text-anchor="middle">evaluator.py L389 L397</text>
+    <text class="box-sub" x="112" y="212" text-anchor="middle">score vectors + claims</text>
+    <text class="box-sub" x="112" y="230" text-anchor="middle">mode from config</text>
+  </a>
+
+  <a class="box" id="a2" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>claim_stats: the E19 zero-variance filter</title>
+    <rect x="235" y="20" width="232" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="351" y="46" text-anchor="middle">claim_stats</text>
+    <text class="box-sub" x="335" y="64" text-anchor="middle">L50 &#183; drop verdict</text>
+    <text class="box-sub" x="335" y="82" text-anchor="middle">all_fail L58 &#183; zero_variance L73</text>
+  </a>
+
+  <a class="box" id="a3" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>temporal_winner: stage-by-stage elimination over the ladder</title>
+    <rect x="235" y="130" width="200" height="96" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="335" y="156" text-anchor="middle">temporal_winner</text>
+    <text class="box-sub" x="335" y="174" text-anchor="middle">L110 &#183; STAGES loop L151</text>
+    <text class="box-sub" x="335" y="192" text-anchor="middle">PASS_THRESHOLD 0.5 L44</text>
+    <text class="box-sub" x="335" y="210" text-anchor="middle">strict variant L134</text>
+  </a>
+
+  <a class="box" id="a4" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>Flat modes: decisive sums the claim-wise signs, winner_of turns them into +1/-1/0</title>
+    <rect x="235" y="255" width="232" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="351" y="281" text-anchor="middle">decisive + winner_of</text>
+    <text class="box-sub" x="351" y="299" text-anchor="middle">L78 &#183; L97 &#183; sign_sum</text>
+    <text class="box-sub" x="351" y="317" text-anchor="middle">mean_diff L102 &#183; escalation L104</text>
+  </a>
+
+  <a class="box" id="a5" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>win_rate_reward: raw majority score against every previous generation</title>
+    <rect x="500" y="20" width="230" height="96" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="615" y="46" text-anchor="middle">win_rate_reward</text>
+    <text class="box-sub" x="615" y="64" text-anchor="middle">L197 &#183; pair loop L235</text>
+    <text class="box-sub" x="615" y="82" text-anchor="middle">(wins + 0.5 ties) / n L266</text>
+    <text class="box-sub" x="615" y="100" text-anchor="middle">first gen mean L222</text>
+  </a>
+
+  <a class="box" id="a6" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>bradley_terry_reward: logistic MLE over all matches among the generations</title>
+    <rect x="500" y="145" width="230" height="110" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="615" y="171" text-anchor="middle">bradley_terry_reward</text>
+    <text class="box-sub" x="615" y="189" text-anchor="middle">L304 &#183; outcome L364</text>
+    <text class="box-sub" x="615" y="207" text-anchor="middle">Newton loop L390 &#183; ridge L400</text>
+    <text class="box-sub" x="615" y="225" text-anchor="middle">reward = sigmoid(beta_now) L417</text>
+    <text class="box-sub" x="615" y="243" text-anchor="middle">ties count half L384</text>
+  </a>
+
+  <a class="box" id="a7" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>Two private numeric helpers used by the Bradley-Terry fit</title>
+    <rect x="500" y="290" width="255" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="627" y="316" text-anchor="middle">_sigmoid &#183; _solve_linear</text>
+    <text class="box-sub" x="627" y="334" text-anchor="middle">L272 &#183; L281</text>
+    <text class="box-sub" x="627" y="352" text-anchor="middle">Gaussian elimination, pivot guard L289</text>
+  </a>
+
+  <a class="box" id="a8" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>mean_claim_score: the absolute quality diagnostic, no pairwise comparison</title>
+    <rect x="790" y="290" width="270" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="925" y="316" text-anchor="middle">mean_claim_score</text>
+    <text class="box-sub" x="925" y="334" text-anchor="middle">L428 &#183; mean of observed scores</text>
+    <text class="box-sub" x="925" y="352" text-anchor="middle">0.0 if nothing observed L434</text>
+  </a>
+
+  <a class="box" id="a9" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>Returned dict: reward, counts, per-pair records with the deciding stage, fallback flag</title>
+    <rect x="790" y="140" width="270" height="120" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="925" y="166" text-anchor="middle">returns reward dict</text>
+    <text class="box-sub" x="925" y="184" text-anchor="middle">reward 0..1, wins, losses, ties</text>
+    <text class="box-sub" x="925" y="202" text-anchor="middle">pairs with detail &#183; L259</text>
+    <text class="box-sub" x="925" y="220" text-anchor="middle">strengths &#183; iterations &#183; L416</text>
+    <text class="box-sub" x="925" y="238" text-anchor="middle">fallback "mean_claim" &#183; L230</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="a1" data-to="a2" d="M205,165 C220,165 220,63 235,63" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="222" y="120" text-anchor="start">filters</text>
+  <path class="edge" data-from="a1" data-to="a3" d="M205,185 H235" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="177" text-anchor="middle">calls</text>
+  <path class="edge" data-from="a1" data-to="a4" d="M205,225 C220,225 220,290 235,290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="222" y="255" text-anchor="start">calls</text>
+  <path class="edge dashed-edge" data-from="a2" data-to="a1" d="M235,80 C210,95 205,120 200,150" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="236" y="105" text-anchor="start">drop verdict</text>
+  <path class="edge" data-from="a3" data-to="a5" d="M435,150 C465,150 470,70 500,70" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="120" text-anchor="middle">outcome</text>
+  <path class="edge" data-from="a4" data-to="a5" d="M435,275 C465,275 470,120 500,100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="190" text-anchor="middle">outcome</text>
+  <path class="edge" data-from="a5" data-to="a9" d="M730,60 C760,60 760,175 790,180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="120" text-anchor="middle">reward</text>
+  <path class="edge" data-from="a6" data-to="a9" d="M730,200 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="192" text-anchor="middle">reward</text>
+  <path class="edge" data-from="a6" data-to="a7" d="M615,255 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="637" y="280" text-anchor="start">uses</text>
+  <path class="edge" data-from="a8" data-to="a9" d="M925,290 V260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="947" y="280" text-anchor="start">diagnostic</text>
+
+  <text class="box-sub" x="20" y="400">dashed grey = caller passes data in  |  blue dashed = verdict returned to the caller</text>
+  <text class="box-sub" x="20" y="422">the pairwise path is claim_stats then temporal_winner or decisive; mean_claim_score is outside it</text>
+  <text class="box-sub" x="20" y="444">no stage box in this file ever opens a file or reads a config key</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the whole file. <code>aggregation.py::win_rate_reward</code> L197 and <code>aggregation.py::bradley_terry_reward</code> L304 both accept the same three inputs (now, previous, claims) plus <code>mode</code>; the caller picks one through the config key <code>hybrid_verifier_reward</code> (read at evaluator.py L186).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: vectors and a mode in, a reward dict out, nothing on disk</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1060 300" role="img" aria-label="aggregation.py data flow: the config keys hybrid_verifier_pairwise_mode and hybrid_verifier_reward, the registry score vectors and the claim list enter through the caller, and one reward dictionary comes back; the file writes nothing">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="b1" href="../../config.py">
+    <title>config.py L86 hybrid_verifier_pairwise_mode, L95 hybrid_verifier_reward; both read by evaluator.py</title>
+    <rect x="20" y="20" width="250" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="44" text-anchor="middle">two config keys</text>
+    <text class="box-sub" x="145" y="62" text-anchor="middle">hybrid_verifier_pairwise_mode L86</text>
+    <text class="box-sub" x="145" y="80" text-anchor="middle">hybrid_verifier_reward L95</text>
+  </a>
+
+  <a class="box" id="b2" href="../../sources/evaluators/hybrid_verifier/registry.py">
+    <title>Per-task registry JSON holds the per-generation score vectors</title>
+    <rect x="20" y="175" width="250" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="199" text-anchor="middle">registry score vectors</text>
+    <text class="box-sub" x="145" y="217" text-anchor="middle">hybrid_registry_&lt;task&gt;.json</text>
+    <text class="box-sub" x="145" y="235" text-anchor="middle">read by caller &#183; registry.py L76</text>
+  </a>
+
+  <a class="box" id="b3" href="../../sources/evaluators/hybrid_verifier/evaluator.py">
+    <title>The caller builds the three arguments</title>
+    <rect x="320" y="90" width="230" height="96" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="435" y="116" text-anchor="middle">caller assembles</text>
+    <text class="box-sub" x="435" y="134" text-anchor="middle">now, previous, claims</text>
+    <text class="box-sub" x="435" y="152" text-anchor="middle">mode = self.pairwise_mode</text>
+    <text class="box-sub" x="435" y="170" text-anchor="middle">evaluator.py L389 L397</text>
+  </a>
+
+  <a class="box" id="b4" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>Pure functions: no open, no logger, no config lookup, no print</title>
+    <rect x="600" y="90" width="200" height="96" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="700" y="116" text-anchor="middle">11 functions</text>
+    <text class="box-sub" x="700" y="134" text-anchor="middle">5 module constants</text>
+    <text class="box-sub" x="700" y="152" text-anchor="middle">no config, no file</text>
+    <text class="box-sub" x="700" y="170" text-anchor="middle">434 lines</text>
+  </a>
+
+  <g class="box" id="b5">
+    <title>Returned values: reward dict, (winner, detail) tuple, int sign, float mean</title>
+    <rect x="850" y="90" width="195" height="96" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="947" y="116" text-anchor="middle">returns</text>
+    <text class="box-sub" x="947" y="134" text-anchor="middle">dict &#183; tuple &#183; int &#183; float</text>
+    <text class="box-sub" x="947" y="152" text-anchor="middle">L261 &#183; L172 &#183; L100 &#183; L434</text>
+    <text class="box-sub" x="947" y="170" text-anchor="middle">no rounding of reward</text>
+  </g>
+
+  <g class="box" id="b6">
+    <title>The file writes nothing; evaluator.py stores the reward in the registry</title>
+    <rect x="320" y="230" width="480" height="48" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="560" y="259" text-anchor="middle">writes none</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b3" d="M270,60 C295,60 295,110 320,125" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="292" y="95" text-anchor="middle">mode</text>
+  <path class="edge dashed-edge" data-from="b2" data-to="b3" d="M270,215 C295,215 295,175 320,165" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="292" y="205" text-anchor="middle">vectors</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M550,138 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="575" y="130" text-anchor="middle">arguments</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M800,138 H850" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="825" y="130" text-anchor="middle">returns</text>
+  <path class="edge dashed-edge" data-from="b4" data-to="b6" d="M700,186 C700,215 640,232 620,232" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="700" y="212" text-anchor="middle">no write call</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; this file has no config import and no <code>open()</code>. The two keys in the top box are read in <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (L178 for the pairwise mode, L186 for the reward mode) and passed in as the <code>mode</code> argument.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the decision rules: drop test, stage ladder, Newton stop test</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 470" role="img" aria-label="aggregation.py logic: claim_stats drops dead claims, temporal_winner walks the ladder stages from script to result and stops at the first stage where pass counts differ, and the Bradley-Terry fit stops when the Newton step is below tolerance">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-label" x="20" y="24">claim_stats &mdash; which claims survive</text>
+  <g class="box" id="q1">
+    <title>Guard 1: no observed score at all</title>
+    <rect x="20" y="36" width="220" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="62" text-anchor="middle">no observation?</text>
+    <text class="box-sub" x="130" y="80" text-anchor="middle">L53</text>
+  </g>
+  <g class="box" id="q2">
+    <title>Dead claim, reason all_fail</title>
+    <rect x="300" y="36" width="220" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="410" y="62" text-anchor="middle">drop, all_fail</text>
+    <text class="box-sub" x="410" y="80" text-anchor="middle">L58</text>
+  </g>
+  <path class="edge" data-from="q1" data-to="q2" d="M240,65 H300" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="270" y="56" text-anchor="middle">yes</text>
+
+  <g class="box" id="q3">
+    <title>Guard 2: 2 or more observations and zero spread</title>
+    <rect x="20" y="130" width="220" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="156" text-anchor="middle">variance is 0.0?</text>
+    <text class="box-sub" x="130" y="174" text-anchor="middle">L60 L67 L69</text>
+  </g>
+  <g class="box" id="q4">
+    <title>Dead claim, reason zero_variance</title>
+    <rect x="300" y="130" width="220" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="410" y="156" text-anchor="middle">drop, zero_variance</text>
+    <text class="box-sub" x="410" y="174" text-anchor="middle">L73</text>
+  </g>
+  <path class="edge" data-from="q1" data-to="q3" d="M130,94 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="152" y="118" text-anchor="start">no</text>
+  <path class="edge" data-from="q3" data-to="q4" d="M240,159 H300" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="270" y="150" text-anchor="middle">yes</text>
+
+  <g class="box" id="q5">
+    <title>Surviving claim; under two observations the variance field stays None</title>
+    <rect x="20" y="220" width="500" height="52" rx="2" fill="none" stroke="#00E5FF"/>
+    <text class="box-label" x="270" y="238" text-anchor="middle">keep the claim</text>
+    <text class="box-sub" x="270" y="258" text-anchor="middle">variance value, or None L63 L75</text>
+  </g>
+  <path class="edge" data-from="q3" data-to="q5" d="M130,188 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="152" y="210" text-anchor="start">no</text>
+
+  <text class="box-label" x="620" y="24">temporal_winner &mdash; the ladder loop</text>
+  <g class="box" id="q6">
+    <title>Stage order is fixed: script, then log, then result</title>
+    <rect x="620" y="36" width="200" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="62" text-anchor="middle">for stage in STAGES</text>
+    <text class="box-sub" x="720" y="80" text-anchor="middle">L41 L151</text>
+  </g>
+  <g class="box" id="q7">
+    <title>Stage comparison: pass counts at score 0.5 or higher</title>
+    <rect x="620" y="120" width="200" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="146" text-anchor="middle">pass counts differ?</text>
+    <text class="box-sub" x="720" y="164" text-anchor="middle">L159 &#183; L161</text>
+  </g>
+  <g class="box" id="q8">
+    <title>Winner decided at this stage, with the first claim that flips</title>
+    <rect x="860" y="120" width="200" height="58" rx="2" fill="none" stroke="#00E5FF"/>
+    <text class="box-label" x="960" y="146" text-anchor="middle">winner here</text>
+    <text class="box-sub" x="960" y="164" text-anchor="middle">L162&#8211;L174</text>
+  </g>
+  <path class="edge" data-from="q6" data-to="q7" d="M720,94 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="q7" data-to="q8" d="M820,149 H860" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="840" y="140" text-anchor="middle">yes</text>
+
+  <g class="box" id="q9">
+    <title>Second test inside the stage: the mean score difference</title>
+    <rect x="620" y="210" width="200" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="236" text-anchor="middle">stage mean-diff set?</text>
+    <text class="box-sub" x="720" y="254" text-anchor="middle">L181 &#183; L182</text>
+  </g>
+  <g class="box" id="q10">
+    <title>Tiebreak: the claim with the largest absolute difference names the stage decision</title>
+    <rect x="860" y="210" width="200" height="58" rx="2" fill="none" stroke="#00E5FF"/>
+    <text class="box-label" x="960" y="236" text-anchor="middle">winner by sign</text>
+    <text class="box-sub" x="960" y="254" text-anchor="middle">L183 &#183; tiebreak L192</text>
+  </g>
+  <path class="edge" data-from="q7" data-to="q9" d="M720,178 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="742" y="198" text-anchor="start">no</text>
+  <path class="edge" data-from="q9" data-to="q10" d="M820,239 H860" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="840" y="230" text-anchor="middle">yes</text>
+
+  <g class="box" id="q11">
+    <title>No stage separated the pair, so the outcome is a tie</title>
+    <rect x="620" y="300" width="440" height="52" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="840" y="320" text-anchor="middle">next stage, else tie</text>
+    <text class="box-sub" x="840" y="340" text-anchor="middle">all_equal L194</text>
+  </g>
+  <path class="edge" data-from="q9" data-to="q11" d="M720,268 V300" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="742" y="290" text-anchor="start">no</text>
+  <path class="edge dashed-edge" data-from="q11" data-to="q6" d="M620,326 C580,326 560,80 620,58" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="195" text-anchor="middle">next stage</text>
+
+  <text class="box-label" x="20" y="330">bradley_terry_reward &mdash; the fit loop</text>
+  <g class="box" id="q12">
+    <title>Newton ascent on the logistic likelihood, ridge regularised</title>
+    <rect x="20" y="342" width="450" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="245" y="368" text-anchor="middle">repeat up to max_iter 100</text>
+    <text class="box-sub" x="245" y="386" text-anchor="middle">L390 cap: stop when max |step| &lt; tol 1e-9 L409</text>
+    <text class="box-sub" x="245" y="404" text-anchor="middle">ridge 1.0 on the strengths L400 &#183; then centre L412</text>
+  </g>
+
+  <text class="box-sub" x="620" y="400">red = the branch that drops data or reports a tie</text>
+  <text class="box-sub" x="620" y="422">cyan = the branch that keeps a claim or decides a pair</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; three real loops and tests. The ladder is walked earliest stage first (<code>aggregation.py::STAGES</code> L41), so a script-stage failure decides the pair before any result-stage score is read. The strict mode skips the per-stage counting and returns at the first claim with different scores (L134&#8211;L148).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">now</td><td>first argument of both reward functions</td><td>current generation per-claim scores</td><td class="size">L197 L304</td></tr>
+<tr><td>reads</td><td class="sym">previous</td><td>second argument, list of vectors</td><td>every earlier generation of the task</td><td class="size">L197 L304 L236</td></tr>
+<tr><td>reads</td><td class="sym">claims</td><td>third argument, temporal order</td><td>id list and the stage of each claim</td><td class="size">L200 L307 L151</td></tr>
+<tr><td>reads</td><td class="sym">mode</td><td>keyword argument, default temporal</td><td>selects the comparison policy</td><td class="size">L38 L197 L304</td></tr>
+<tr><td>reads</td><td class="sym">observed</td><td>claim_stats argument</td><td>score history of one claim</td><td class="size">L50 L52</td></tr>
+<tr><td>reads</td><td class="sym">ridge, max_iter, tol</td><td>Bradley&ndash;Terry keyword arguments</td><td>fit regularisation and stop test</td><td class="size">L304 L404 L390 L409</td></tr>
+<tr><td>reads</td><td class="sym">config</td><td>none in this file</td><td>the mode arrives as an argument instead</td><td class="size">&#8212;</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td>no open(), no logger, no print</td><td>callers store the reward</td><td class="size">&#8212;</td></tr>
+<tr><td>returns</td><td class="sym">reward dict</td><td>return of the two reward functions</td><td>reward plus counts and per-pair detail</td><td class="size">L261 L416</td></tr>
+<tr><td>returns</td><td class="sym">(winner, detail)</td><td>return of temporal_winner</td><td>+1 / -1 / 0 and the deciding stage</td><td class="size">L141 L172 L184 L194</td></tr>
+<tr><td>returns</td><td class="sym">int sign</td><td>return of winner_of</td><td>flat-mode outcome from d and dm</td><td class="size">L99&#8211;L107</td></tr>
+<tr><td>returns</td><td class="sym">float</td><td>return of mean_claim_score</td><td>absolute quality, 0.0 when nothing observed</td><td class="size">L434</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the reward of every generation comes from these 11 functions, so the whole evolution loop inherits the stage priority encoded at L151&#8211;L194. A script-stage regression cannot be compensated by a better result-stage score.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>5 constants, 11 functions &mdash; every signature and role</summary><div class="dbody">
+<pre>PAIRWISE_MODES: tuple[str, ...]                                       L31   temporal, temporal_strict, mean_diff, sign_sum, escalation
+DEFAULT_PAIRWISE_MODE = "temporal"                                     L38   fallback mode for both reward functions
+STAGES: tuple[str, ...] = ("script", "log", "result")                  L41   ladder order, earliest first
+PASS_THRESHOLD = 0.5                                                   L44   a claim passes its rung at this score
+MIN_OBS_FOR_VARIANCE = 2                                               L47   observations before the drop verdict counts
+
+claim_stats(observed: list[float | None]) -&gt; dict[str, Any]            L50   drop verdict per claim
+decisive(now, prev, claim_ids) -&gt; tuple[int, float, int]               L78   sign sum, mean diff, effective k
+winner_of(d: int, dm: float, mode: str) -&gt; int                         L97   flat-mode winner; ValueError L107
+temporal_winner(now, prev, claims, mode="temporal")
+    -&gt; tuple[int, dict[str, Any]]                                      L110  stage-elimination winner
+win_rate_reward(now, previous, claims, mode=DEFAULT_PAIRWISE_MODE)
+    -&gt; dict[str, Any]                                                  L197  raw win-rate reward
+_sigmoid(x: float) -&gt; float                                            L272  logistic function, both signs
+_solve_linear(a: list[list[float]], b: list[float]) -&gt; list[float]     L281  Gaussian elimination with pivot guard
+bradley_terry_reward(now, previous, claims, mode=DEFAULT_PAIRWISE_MODE,
+    ridge=1.0, max_iter=100, tol=1e-9) -&gt; dict[str, Any]               L304  opponent-weighted reward
+mean_claim_score(now, claim_ids) -&gt; float                              L428  mean of the observed scores</pre>
+<p>Inner functions, defined inside another function: <code>temporal_winner._score</code> L131 (reads one claim from one vector), <code>bradley_terry_reward.outcome</code> L364 (routes one match through the selected mode).</p>
+<p>Module imports: <code>from __future__ import annotations</code> L24, <code>math</code> L26, <code>statistics</code> L27, <code>typing.Any</code> L28. No class, no dataclass, no decorator, no module-level mutable state, no <code>__main__</code> block.</p>
+<p>Written returned keys, so the reader can map them to the caller: <code>reward</code> L262 and L417, <code>n_pairs</code>, <code>wins</code>, <code>losses</code>, <code>ties</code>, <code>fallback</code> L261&#8211;L269, <code>pairs</code> with <code>prev_index</code> and <code>outcome</code> L237&#8211;L256, <code>strength_now</code>, <code>strengths</code>, <code>win_rate</code>, <code>iterations</code>, <code>converged</code> L416&#8211;L424.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_hybrid_init.html">hybrid_verifier/__init__.py</a></td><td>re-exports <code>claim_stats</code>, <code>decisive</code>, <code>winner_of</code> only</td><td class="sym">L74</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a></td><td>imports 4 names, calls <code>claim_stats</code> per claim, then both reward functions</td><td class="sym">L58&#8211;L62 L346 L389 L392 L397</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_eval.py">experiments_verifiers/harness/e19c_eval.py</a></td><td><code>import ... aggregation as AGG</code>, then <code>AGG.claim_stats</code> and <code>AGG.mean_claim_score</code></td><td class="sym">L39 L123 L194</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_online_bt.py">experiments_verifiers/harness/e19c_online_bt.py</a></td><td><code>AGG.bradley_terry_reward</code> for the online BT view</td><td class="sym">L33 L70</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_claim_stats_zero_variance_semantics</code> checks all_fail, zero_variance and the under-2 case</td><td class="sym">L475&#8211;L481</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>temporal cases: operator case, stage tie fall-through, strict vs temporal, dead-claim exclusion</td><td class="sym">L591 L608 L627 L645</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>flat modes, the unknown-mode ValueError, constants and the first-generation fallback</td><td class="sym">L656&#8211;L680</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>Bradley&ndash;Terry ordering, ties, perfect separation, determinism and temporal mode</td><td class="sym">L1199&#8211;L1262</td></tr>
+</tbody>
+</table>
+<p>See also: the <a href="mod_evaluators_hybrid_verifier.html">hybrid verifier package page</a>, <a href="file_hybrid_init.html">file_hybrid_init.html</a>, the <a href="area_evaluators.html">evaluators area</a>, <a href="flow_evolution_loop.html">flow_evolution_loop.html</a>, <a href="flow_verification.html">flow_verification.html</a> and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> (434 lines, whole file), <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code> (L74), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (L58&#8211;L62, L145&#8211;L200, L346, L380&#8211;L420), <code class="path">sources/evaluators/hybrid_verifier/registry.py</code> (L76, registry file name), <code class="path">config.py</code> (L86, L95), <code class="path">experiments_verifiers/harness/e19c_eval.py</code> and <code class="path">e19c_online_bt.py</code> (import and call lines), <code class="path">tests/hybrid_verifier_test.py</code> (test names and line ranges), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
+<p class="skips">Skipped, with reason: <code class="path">.env</code> and <code class="path">experiments_verifiers/.env</code> (never opened, secrets); <code class="path">experiments_verifiers/harness/e19_hybrid_bt.py</code> (its own <code>claim_stats</code> copy at L284 is a different function, not an importer of this file); the harness result reports under <code class="path">experiments_verifiers/results/</code> (numbers, not code); the other <code class="path">hybrid_verifier/*.py</code> files beyond their import lines (each has its own digest page); no pytest run and no script executed, as instructed.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

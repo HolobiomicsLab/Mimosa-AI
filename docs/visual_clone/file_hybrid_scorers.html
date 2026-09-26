@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>scorers.py &mdash; Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/evaluators/hybrid_verifier > scorers.py">
+<div class="wrap">
+
+<h1 class="hud">scorers.py</h1>
+<p class="intro">This file writes the prompt that asks for one deterministic scoring script per claim, screens the returned code, wraps it in a launcher and parses the single JSON line it prints. It is a pure text builder and parser: no file and no subprocess runs inside it. <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> calls it in the scorer build loop; package context is on <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; the file's job: build prompts, screen code, launcher, parse output</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1010 500" role="img" aria-label="scorers.py prompts, static screen, launcher and output parsing">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="sArgs">
+    <title>Arguments the prompt builders receive</title>
+    <rect x="10" y="40" width="170" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="95" y="64" text-anchor="middle">in: goal, claim</text>
+    <text class="box-sub" x="95" y="82" text-anchor="middle">union_inventory text</text>
+    <text class="box-sub" x="95" y="98" text-anchor="middle">digests_block (138)</text>
+    <text class="box-sub" x="95" y="114" text-anchor="middle">claim stage used (146)</text>
+    <text class="box-sub" x="95" y="130" text-anchor="middle">passed by layers.py:335</text>
+  </g>
+
+  <a class="box" id="sPrompt" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>scorer_prompt: the policy-script request</title>
+    <rect x="205" y="40" width="180" height="110" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="295" y="64" text-anchor="middle">scorer_prompt (133)</text>
+    <text class="box-sub" x="295" y="82" text-anchor="middle">goal cut at 2500 chars (168)</text>
+    <text class="box-sub" x="295" y="98" text-anchor="middle">claim as JSON (172)</text>
+    <text class="box-sub" x="295" y="114" text-anchor="middle">contract rules (178-198)</text>
+    <text class="box-sub" x="295" y="130" text-anchor="middle">asks one python block (198)</text>
+  </a>
+
+  <g class="box" id="sPromptOut">
+    <title>Prompt text for the judge</title>
+    <rect x="410" y="40" width="180" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="500" y="64" text-anchor="middle">out: prompt text</text>
+    <text class="box-sub" x="500" y="82" text-anchor="middle">scorer text ends at 198</text>
+    <text class="box-sub" x="500" y="98" text-anchor="middle">repair text ends at 225</text>
+    <text class="box-sub" x="500" y="114" text-anchor="middle">goes to llm_text</text>
+    <text class="box-sub" x="500" y="130" text-anchor="middle">(layers.py:344)</text>
+  </g>
+
+  <a class="box" id="sRepair" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>repair_prompt: failure report plus previous code</title>
+    <rect x="615" y="40" width="180" height="110" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="705" y="64" text-anchor="middle">repair_prompt (201)</text>
+    <text class="box-sub" x="705" y="82" text-anchor="middle">feedback cut at 4000 (206)</text>
+    <text class="box-sub" x="705" y="98" text-anchor="middle">full previous script (209)</text>
+    <text class="box-sub" x="705" y="114" text-anchor="middle">repeats the contract (211-224)</text>
+    <text class="box-sub" x="705" y="130" text-anchor="middle">lists pitfalls (220-223)</text>
+    <text class="box-sub" x="705" y="146" text-anchor="middle">in: feedback text (202), prev code</text>
+  </a>
+
+  <a class="box" id="sParse" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>parse_code: take the longest fenced python block</title>
+    <rect x="10" y="195" width="180" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="100" y="219" text-anchor="middle">parse_code (228)</text>
+    <text class="box-sub" x="100" y="237" text-anchor="middle">findall fenced blocks (230)</text>
+    <text class="box-sub" x="100" y="253" text-anchor="middle">longest block wins (232)</text>
+    <text class="box-sub" x="100" y="269" text-anchor="middle">bare text needs 80 chars (234)</text>
+    <text class="box-sub" x="100" y="285" text-anchor="middle">else None</text>
+    <text class="box-sub" x="100" y="301" text-anchor="middle">called at layers.py:349</text>
+  </a>
+
+  <a class="box" id="sScreen" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>static_violations: import screen, banned snippets, regexes, write-mode open</title>
+    <rect x="215" y="195" width="190" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="310" y="219" text-anchor="middle">static_violations (237)</text>
+    <text class="box-sub" x="310" y="237" text-anchor="middle">imports not in allow list (241)</text>
+    <text class="box-sub" x="310" y="253" text-anchor="middle">14 banned snippets (244)</text>
+    <text class="box-sub" x="310" y="269" text-anchor="middle">14 write APIs (245)</text>
+    <text class="box-sub" x="310" y="285" text-anchor="middle">2 dump regexes (247)</text>
+    <text class="box-sub" x="310" y="301" text-anchor="middle">write-mode open (250)</text>
+  </a>
+
+  <a class="box" id="sLaunch" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>build_launcher: prefix the constants</title>
+    <rect x="430" y="195" width="185" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="522" y="219" text-anchor="middle">build_launcher (255)</text>
+    <text class="box-sub" x="522" y="237" text-anchor="middle">WORKSPACE_ROOT literal (257)</text>
+    <text class="box-sub" x="522" y="253" text-anchor="middle">CLAIM as JSON string (258)</text>
+    <text class="box-sub" x="522" y="269" text-anchor="middle">header then body (259-266)</text>
+    <text class="box-sub" x="522" y="285" text-anchor="middle">no argv in this repo (11-14)</text>
+    <text class="box-sub" x="522" y="301" text-anchor="middle">called at 364 and 407</text>
+  </a>
+
+  <g class="box" id="sRun">
+    <title>Execution happens in the caller</title>
+    <rect x="640" y="195" width="185" height="115" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="732" y="219" text-anchor="middle">host: run_script</text>
+    <text class="box-sub" x="732" y="237" text-anchor="middle">python_executable=sys.executable</text>
+    <text class="box-sub" x="732" y="253" text-anchor="middle">cwd = workspace (module doc 8-9)</text>
+    <text class="box-sub" x="732" y="269" text-anchor="middle">timeout from scorer_timeout_s</text>
+    <text class="box-sub" x="732" y="285" text-anchor="middle">returns ExecOutcome (112)</text>
+    <text class="box-sub" x="732" y="301" text-anchor="middle">not run from this file</text>
+  </g>
+
+  <a class="box" id="sParseOut" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>parse_scorer_output: the one-JSON-line contract</title>
+    <rect x="850" y="195" width="150" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="925" y="219" text-anchor="middle">parse_scorer_output (269)</text>
+    <text class="box-sub" x="925" y="237" text-anchor="middle">last line, then all (279)</text>
+    <text class="box-sub" x="925" y="253" text-anchor="middle">no bool scores (287)</text>
+    <text class="box-sub" x="925" y="269" text-anchor="middle">finite check (290)</text>
+    <text class="box-sub" x="925" y="285" text-anchor="middle">clamp 0..1 (294)</text>
+    <text class="box-sub" x="925" y="301" text-anchor="middle">trim to 60 and 300 (293-295)</text>
+  </a>
+
+  <g class="box" id="sOutDict">
+    <title>Parsed score handed back to the layer</title>
+    <rect x="430" y="365" width="200" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="530" y="389" text-anchor="middle">out: claim_id, score, evidence</text>
+    <text class="box-sub" x="530" y="407" text-anchor="middle">{"claim_id": str, "score": float,</text>
+    <text class="box-sub" x="530" y="423" text-anchor="middle">"evidence": str} (292-296)</text>
+    <text class="box-sub" x="530" y="439" text-anchor="middle">None when the contract broke</text>
+    <text class="box-sub" x="530" y="455" text-anchor="middle">becomes LayerScore (layers.py:425)</text>
+  </g>
+
+  <a class="box" id="sFeedback" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>feedback_lines: last lines plus exit status</title>
+    <rect x="10" y="365" width="190" height="110" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="105" y="389" text-anchor="middle">feedback_lines (300)</text>
+    <text class="box-sub" x="105" y="407" text-anchor="middle">stderr then stdout (302)</text>
+    <text class="box-sub" x="105" y="423" text-anchor="middle">last 30 non-empty lines (303)</text>
+    <text class="box-sub" x="105" y="439" text-anchor="middle">"[exit code N]" or timeout (304)</text>
+    <text class="box-sub" x="105" y="455" text-anchor="middle">called at layers.py:379</text>
+  </a>
+
+  <g class="box" id="sOutcome">
+    <title>ExecOutcome fields read by feedback_lines</title>
+    <rect x="225" y="365" width="180" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="315" y="389" text-anchor="middle">in: ExecOutcome</text>
+    <text class="box-sub" x="315" y="407" text-anchor="middle">rc: int (115)</text>
+    <text class="box-sub" x="315" y="423" text-anchor="middle">stdout, stderr: str</text>
+    <text class="box-sub" x="315" y="439" text-anchor="middle">timeout: bool (118)</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="sArgs" data-to="sPrompt" d="M180,95 H205" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="192" y="88" text-anchor="middle">arguments</text>
+  <path class="edge" data-from="sPrompt" data-to="sPromptOut" d="M385,95 H410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="397" y="88" text-anchor="middle">returns (198)</text>
+  <path class="edge" data-from="sRepair" data-to="sPromptOut" d="M615,110 H590" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="125" text-anchor="middle">returns (225)</text>
+
+  <path class="edge" data-from="sParse" data-to="sScreen" d="M190,252 H215" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="202" y="245" text-anchor="middle">raw code</text>
+  <path class="edge" data-from="sScreen" data-to="sLaunch" d="M405,252 H430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="417" y="245" text-anchor="middle">clean code (364)</text>
+  <path class="edge dashed-edge" data-from="sLaunch" data-to="sRun" d="M615,252 H640" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="627" y="245" text-anchor="middle">launcher (362)</text>
+  <path class="edge dashed-edge" data-from="sRun" data-to="sParseOut" d="M825,252 H850" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="837" y="245" text-anchor="middle">stdout (368)</text>
+
+  <path class="edge" data-from="sParseOut" data-to="sOutDict" d="M925,310 V350 H630 V365" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="345" text-anchor="middle">returns dict</text>
+  <path class="edge dashed-edge" data-from="sRun" data-to="sFeedback" d="M732,310 V340 H105 V365" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="420" y="335" text-anchor="middle">outcome on failure</text>
+  <path class="edge" data-from="sOutcome" data-to="sFeedback" d="M225,420 H200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="212" y="413" text-anchor="middle">fields</text>
+  <path class="edge" data-from="sFeedback" data-to="sRepair" d="M105,365 V175 H705 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="170" text-anchor="middle">feedback closes the loop</text>
+
+  <text class="box-sub" x="10" y="492">The retry loop itself lives in layers._build_scorer (333-380): this file only builds prompts, screens code, wraps it and parses one line of stdout.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; three lanes: the two prompt builders (top), the screen and launcher path (middle), and the output parsing with the feedback edge back into <code>repair_prompt</code> (bottom). Solid edges are calls made in this file; dashed edges pass values or hand work to the caller. Line numbers in brackets.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: strings in, strings and one dict out, no file touched</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 400" role="img" aria-label="scorers.py data flow">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="qIn">
+    <title>Values passed in by layers.py</title>
+    <rect x="10" y="30" width="230" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="54" text-anchor="middle">in: text values</text>
+    <text class="box-sub" x="125" y="72" text-anchor="middle">goal str (cut 2500)</text>
+    <text class="box-sub" x="125" y="88" text-anchor="middle">claim dict (claim["stage"])</text>
+    <text class="box-sub" x="125" y="104" text-anchor="middle">union inventory text</text>
+    <text class="box-sub" x="125" y="120" text-anchor="middle">digests block text</text>
+    <text class="box-sub" x="125" y="136" text-anchor="middle">feedback text, prev code, ExecOutcome</text>
+    <text class="box-sub" x="125" y="152" text-anchor="middle">no config key read here</text>
+  </g>
+
+  <a class="box" id="qFn" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>The seven module functions</title>
+    <rect x="270" y="30" width="220" height="130" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="380" y="54" text-anchor="middle">scorers.py functions</text>
+    <text class="box-sub" x="380" y="72" text-anchor="middle">reads no file</text>
+    <text class="box-sub" x="380" y="88" text-anchor="middle">opens no subprocess</text>
+    <text class="box-sub" x="380" y="104" text-anchor="middle">makes no network call</text>
+    <text class="box-sub" x="380" y="120" text-anchor="middle">pure text in, text out</text>
+    <text class="box-sub" x="380" y="136" text-anchor="middle">writes nothing</text>
+    <text class="box-sub" x="380" y="152" text-anchor="middle">all state is local</text>
+  </a>
+
+  <g class="box" id="qOut">
+    <title>Returned values</title>
+    <rect x="520" y="30" width="240" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="640" y="54" text-anchor="middle">out: strings and one dict</text>
+    <text class="box-sub" x="640" y="72" text-anchor="middle">prompt strings (198, 225)</text>
+    <text class="box-sub" x="640" y="88" text-anchor="middle">longest fenced block (232)</text>
+    <text class="box-sub" x="640" y="104" text-anchor="middle">violation list (252)</text>
+    <text class="box-sub" x="640" y="120" text-anchor="middle">launcher script text (266)</text>
+    <text class="box-sub" x="640" y="136" text-anchor="middle">{"claim_id","score","evidence"} (292)</text>
+    <text class="box-sub" x="640" y="152" text-anchor="middle">feedback text (309)</text>
+  </g>
+
+  <g class="box" id="qExt">
+    <title>Where the launcher text goes</title>
+    <rect x="790" y="30" width="200" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="890" y="54" text-anchor="middle">executed outside this file</text>
+    <text class="box-sub" x="890" y="72" text-anchor="middle">run_script(workspace,</text>
+    <text class="box-sub" x="890" y="88" text-anchor="middle">launcher, id)</text>
+    <text class="box-sub" x="890" y="104" text-anchor="middle">cwd = workspace being scored</text>
+    <text class="box-sub" x="890" y="120" text-anchor="middle">script reads files read-only</text>
+    <text class="box-sub" x="890" y="136" text-anchor="middle">prints one JSON line</text>
+  </g>
+
+  <g class="box" id="qDefs">
+    <title>Shared constants that shape every script</title>
+    <rect x="10" y="210" width="300" height="140" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="160" y="234" text-anchor="middle">module constants</text>
+    <text class="box-sub" x="160" y="252" text-anchor="middle">ALLOWED_IMPORTS: 31 names (27)</text>
+    <text class="box-sub" x="160" y="268" text-anchor="middle">28 stdlib + numpy + pandas + PIL</text>
+    <text class="box-sub" x="160" y="284" text-anchor="middle">_BANNED_SNIPPETS: 14 strings (64)</text>
+    <text class="box-sub" x="160" y="300" text-anchor="middle">_EXTRA_BANNED: 14 write APIs (84)</text>
+    <text class="box-sub" x="160" y="316" text-anchor="middle">_EXTRA_BANNED_RE: 2 regexes (100)</text>
+    <text class="box-sub" x="160" y="332" text-anchor="middle">MAX_CODE_ATTEMPTS = 3 (108)</text>
+  </g>
+
+  <g class="box" id="qNoWrite">
+    <title>Files this module touches</title>
+    <rect x="340" y="210" width="280" height="140" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="480" y="234" text-anchor="middle">files: none</text>
+    <text class="box-sub" x="480" y="252" text-anchor="middle">no open() call in the module</text>
+    <text class="box-sub" x="480" y="268" text-anchor="middle">no Path read or write</text>
+    <text class="box-sub" x="480" y="284" text-anchor="middle">the generated script opens files,</text>
+    <text class="box-sub" x="480" y="300" text-anchor="middle">but it runs in the caller's subprocess</text>
+    <text class="box-sub" x="480" y="316" text-anchor="middle">cwd = workspace (docstring 8-9)</text>
+  </g>
+
+  <g class="box" id="qNote">
+    <title>Documented deviation from the harness port</title>
+    <rect x="650" y="210" width="340" height="140" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="820" y="234" text-anchor="middle">argv replaced by constants</text>
+    <text class="box-sub" x="820" y="252" text-anchor="middle">harness passed argv[1], argv[2]</text>
+    <text class="box-sub" x="820" y="268" text-anchor="middle">repo runner passes no argv</text>
+    <text class="box-sub" x="820" y="284" text-anchor="middle">so build_launcher injects</text>
+    <text class="box-sub" x="820" y="300" text-anchor="middle">WORKSPACE_ROOT and CLAIM (257-263)</text>
+    <text class="box-sub" x="820" y="316" text-anchor="middle">documented at lines 11-14</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="qIn" data-to="qFn" d="M240,95 H270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="255" y="88" text-anchor="middle">arguments</text>
+  <path class="edge" data-from="qFn" data-to="qOut" d="M490,95 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="505" y="88" text-anchor="middle">returns</text>
+  <path class="edge dashed-edge" data-from="qOut" data-to="qExt" d="M760,95 H790" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="775" y="88" text-anchor="middle">launcher text</text>
+  <path class="edge dashed-edge" data-from="qDefs" data-to="qFn" d="M160,210 V180 H380 V160" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="380" y="175" text-anchor="middle">constants shape prompts</text>
+
+  <text class="box-sub" x="10" y="380">This module builds and checks text. It never scores a workspace itself: the generated script does that, in the caller's subprocess.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; values in, strings and one dict out. The module reads and writes no file, and the generated script is executed by <code>run_script</code> in the caller, with the workspace as working directory.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control: the static screen ladder and the output acceptance test</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1010 480" role="img" aria-label="scorers.py static screening and output parsing decisions">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="xScan" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>Import scan over every import line</title>
+    <rect x="10" y="40" width="200" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="64" text-anchor="middle">_IMPORT_RE over code (240)</text>
+    <text class="box-sub" x="110" y="82" text-anchor="middle">root module name compared</text>
+    <text class="box-sub" x="110" y="98" text-anchor="middle">with ALLOWED_IMPORTS (242)</text>
+  </a>
+
+  <g class="box" id="xImp">
+    <title>Import decision</title>
+    <rect x="240" y="40" width="200" height="90" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="340" y="64" text-anchor="middle">root in allow list?</text>
+    <text class="box-sub" x="340" y="82" text-anchor="middle">no: "import not allowed: X"</text>
+    <text class="box-sub" x="340" y="98" text-anchor="middle">yes: next check</text>
+  </g>
+
+  <g class="box" id="xSnip">
+    <title>Banned substring check</title>
+    <rect x="470" y="40" width="220" height="90" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="580" y="64" text-anchor="middle">any banned snippet present?</text>
+    <text class="box-sub" x="580" y="82" text-anchor="middle">subprocess, socket, requests</text>
+    <text class="box-sub" x="580" y="98" text-anchor="middle">to_csv, savefig, write_text (84-99)</text>
+  </g>
+
+  <g class="box" id="xWrite">
+    <title>Write-mode open check</title>
+    <rect x="720" y="40" width="280" height="90" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="860" y="64" text-anchor="middle">open( with a write mode?</text>
+    <text class="box-sub" x="860" y="82" text-anchor="middle">regex on "w" "a" "x" "b" "+" (106)</text>
+    <text class="box-sub" x="860" y="98" text-anchor="middle">yes: "write-mode open() detected"</text>
+  </g>
+
+  <a class="box" id="xLines" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>Accepted stdout candidates</title>
+    <rect x="10" y="195" width="200" height="105" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="219" text-anchor="middle">drop blank lines (276)</text>
+    <text class="box-sub" x="110" y="237" text-anchor="middle">try the last line</text>
+    <text class="box-sub" x="110" y="253" text-anchor="middle">if that fails, try all (279)</text>
+    <text class="box-sub" x="110" y="269" text-anchor="middle">nothing left: return None (277)</text>
+  </a>
+
+  <a class="box" id="xDict" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>Shape checks on the parsed object</title>
+    <rect x="240" y="195" width="220" height="105" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="350" y="219" text-anchor="middle">json.loads gives a dict? (281)</text>
+    <text class="box-sub" x="350" y="237" text-anchor="middle">not a dict: try next candidate</text>
+    <text class="box-sub" x="350" y="253" text-anchor="middle">score present and numeric (287)</text>
+    <text class="box-sub" x="350" y="269" text-anchor="middle">bool rejected explicitly</text>
+  </a>
+
+  <a class="box" id="xFin" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>Finite test and clamp</title>
+    <rect x="490" y="195" width="220" height="105" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="600" y="219" text-anchor="middle">math.isfinite(score)? (290)</text>
+    <text class="box-sub" x="600" y="237" text-anchor="middle">no: return None for the whole line</text>
+    <text class="box-sub" x="600" y="253" text-anchor="middle">yes: min(1.0, max(0.0, s)) (294)</text>
+    <text class="box-sub" x="600" y="269" text-anchor="middle">claim_id cut to 60 chars (293)</text>
+  </a>
+
+  <a class="box" id="xKeep" href="../../sources/evaluators/hybrid_verifier/scorers.py">
+    <title>Returned dict</title>
+    <rect x="740" y="195" width="260" height="105" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="870" y="219" text-anchor="middle">dict accepted (292-296)</text>
+    <text class="box-sub" x="870" y="237" text-anchor="middle">claim_id, score, evidence</text>
+    <text class="box-sub" x="870" y="253" text-anchor="middle">evidence cut to 300 chars (295)</text>
+    <text class="box-sub" x="870" y="269" text-anchor="middle">missing keys become empty strings</text>
+  </a>
+
+  <path class="edge" data-from="xScan" data-to="xImp" d="M210,85 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="78" text-anchor="middle">each import</text>
+  <path class="edge" data-from="xImp" data-to="xSnip" d="M440,85 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="455" y="78" text-anchor="middle">allowed</text>
+  <path class="edge" data-from="xSnip" data-to="xWrite" d="M690,85 H720" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="705" y="78" text-anchor="middle">clean</text>
+  <path class="edge" data-from="xLines" data-to="xDict" d="M210,247 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="240" text-anchor="middle">candidate text</text>
+  <path class="edge" data-from="xDict" data-to="xFin" d="M460,247 H490" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="475" y="240" text-anchor="middle">numeric score</text>
+  <path class="edge" data-from="xFin" data-to="xKeep" d="M710,247 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="725" y="240" text-anchor="middle">clamped</text>
+
+  <text class="box-sub" x="10" y="350">A violation list is not an exception: the caller turns each violation into feedback text and retries, up to MAX_CODE_ATTEMPTS = 3 in layers.py:333.</text>
+  <text class="box-sub" x="10" y="372">The screen is textual: it matches snippets and regexes, so it can reject a harmless name that contains a banned substring.</text>
+  <text class="box-sub" x="10" y="394">parse_scorer_output clamps rather than rejects: a score of 1.7 becomes 1.0, while NaN or infinity rejects the line (290).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the static screen ladder (top) and the output acceptance test (bottom). Every condition is quoted from <a href="../../sources/evaluators/hybrid_verifier/scorers.py">sources/evaluators/hybrid_verifier/scorers.py</a> with line numbers.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">goal text</td><td class="sym">argument (134); cut at 2500 (168)</td><td>context in the scorer prompt</td></tr>
+<tr><td>reads</td><td class="sym">claim dict</td><td class="sym">argument (135); stage at 146</td><td>the rung the script must score</td></tr>
+<tr><td>reads</td><td class="sym">union inventory and digests text</td><td class="sym">arguments (136-137)</td><td>real paths and file formats</td></tr>
+<tr><td>reads</td><td class="sym">model output text</td><td class="sym">parse_code argument (228)</td><td>fenced code block, or bare text</td></tr>
+<tr><td>reads</td><td class="sym">scorer stdout</td><td class="sym">parse_scorer_output (269)</td><td>the one JSON score line</td></tr>
+<tr><td>reads</td><td class="sym">ExecOutcome fields</td><td class="sym">feedback_lines (301-308)</td><td>repair feedback text</td></tr>
+<tr><td>config</td><td class="sym">none</td><td class="sym">no config import in the file</td><td>timeout text arrives as an argument</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td class="sym">no file open, no subprocess</td><td>all outputs are returned strings or dicts</td></tr>
+<tr><td>returns</td><td class="sym">prompt text</td><td class="sym">scorer_prompt (153-198), repair_prompt (203-225)</td><td>judge call in layers.py:344</td></tr>
+<tr><td>returns</td><td class="sym">code block or None</td><td class="sym">parse_code (232, 234)</td><td>candidate script body</td></tr>
+<tr><td>returns</td><td class="sym">violation list</td><td class="sym">static_violations (252)</td><td>feedback text, retry decision</td></tr>
+<tr><td>returns</td><td class="sym">launcher script text</td><td class="sym">build_launcher (266)</td><td>input of <code>run_script</code></td></tr>
+<tr><td>returns</td><td class="sym">claim_id, score, evidence</td><td class="sym">parse_scorer_output (292-296)</td><td>LayerScore fields (layers.py:425)</td></tr>
+<tr><td>returns</td><td class="sym">feedback text</td><td class="sym">feedback_lines (309)</td><td>next repair_prompt (layers.py:340)</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the same script text grades every workspace, so the measured quantity stays stable across generations.</p>
+<p class="note flag">Real deviation from the harness port: the harness passed the workspace and claim as <code>argv[1]</code> and <code>argv[2]</code>; the repo runner passes no argv, so <code>build_launcher</code> injects <code>WORKSPACE_ROOT</code> and <code>CLAIM</code> as module constants (L11-14, L257-263). A harness script and a repo scorer script are therefore not interchangeable.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Symbol inventory, callers and tests</h2>
+<details><summary>Full symbol inventory &mdash; 2 dataclasses, 7 module functions, 5 constants</summary><div class="dbody">
+<pre>ExecOutcome (dataclass, L112)          # rc: int, stdout: str, stderr: str, timeout: bool
+ScorerAttempt (dataclass, L122)        # attempt, parse, static_violations, executed, ok, feedback
+scorer_prompt(goal: str, claim: dict, union_inventory: str, digests_block: str = "") -&gt; str   # L133 ladder-rung policy prompt
+repair_prompt(feedback: str, prev_code: str) -&gt; str                    # L201  repair prompt with failure report
+parse_code(text: str) -&gt; str | None                                    # L228  longest fenced python block
+static_violations(code: str) -&gt; list[str]                              # L237  import, snippet and write screening
+build_launcher(workspace: Path, claim: dict, body: str) -&gt; str         # L255  prefix WORKSPACE_ROOT and CLAIM
+parse_scorer_output(stdout: str) -&gt; dict | None                        # L269  one JSON line, clamped 0..1
+feedback_lines(outcome: ExecOutcome, timeout_s: int) -&gt; str            # L300  exit status plus last 30 lines
+ALLOWED_IMPORTS: frozenset[str] (L27)   # 31 names: 28 stdlib plus numpy, pandas, PIL
+_BANNED_SNIPPETS: tuple[str, ...] (L64) # 14 network, process, randomness, delete strings
+_EXTRA_BANNED: tuple[str, ...] (L84)    # 14 write APIs: to_csv, savefig, write_text, mkdir, ...
+_EXTRA_BANNED_RE: tuple[Pattern, ...] (L100)  # json.dump( and pickle.dump(
+MAX_CODE_ATTEMPTS = 3 (L108)            # initial plus two repairs
+_IMPORT_RE (L105), _WRITE_MODE_OPEN_RE (L106) # the two screening regexes
+</pre>
+<p>Justification comment kept in the file: the two dumper calls use an explicit open-paren, because bare <code>json.dump</code> would also ban <code>json.dumps</code> (L81-83).</p>
+</div></details>
+
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>MAX_CODE_ATTEMPTS</code>, <code>scorer_prompt</code>, <code>repair_prompt</code>, <code>parse_code</code>, <code>static_violations</code>, <code>build_launcher</code>, <code>parse_scorer_output</code>, <code>feedback_lines</code>, <code>ExecOutcome</code></td><td class="sym">imports L27, L29; calls 333-380, 407-421</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td>only the <code>ExecOutcome</code> type for its runner helper</td><td class="sym">import L66</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td>the same functions, with its own build loop and sandbox</td><td class="sym">import L50; 449-516, 611-613, 729-731</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>ExecOutcome</code>, <code>parse_scorer_output</code>, <code>static_violations</code>, <code>build_launcher</code></td><td class="sym">import L46; 114-133, 274-330</td></tr>
+<tr><td class="sym">test_parse_scorer_output_contract</td><td>a good line passes; no JSON, empty text and NaN give None</td><td class="sym">test 273-299</td></tr>
+<tr><td class="sym">test_static_violations_catches_write_and_network_apis</td><td>catches <code>requests</code>, <code>to_csv</code>, write-mode open and <code>json.dump</code></td><td class="sym">test 301-311</td></tr>
+<tr><td class="sym">test_launcher_injects_constants</td><td><code>WORKSPACE_ROOT</code> and <code>CLAIM</code> present in the launcher text</td><td class="sym">test 314-330</td></tr>
+<tr><td class="sym">test_scorer_build_repairs_on_bad_output</td><td>a stdout-print body fails, the repair body returns a score</td><td class="sym">test 333-368</td></tr>
+<tr><td class="sym">test_scorer_build_exhausts_attempts_and_soft_fails</td><td>three unparsable runs give a None score</td><td class="sym">test 370-378</td></tr>
+<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>stage text and digest block reach <code>scorer_prompt</code></td><td class="sym">test 1181-1191</td></tr>
+</tbody>
+</table>
+<p class="note flag">Unused symbol: <code>ScorerAttempt</code> (L122) is defined and never used anywhere in the repository (<code>grep -rn ScorerAttempt .</code> matches only the definition). The build loop in <code>layers.py</code> records plain dicts instead (L342, L372-374).</p>
+<p class="note">Not tested directly: <code>repair_prompt</code>, <code>parse_code</code> and <code>feedback_lines</code> have no test that names them; <code>parse_code</code> and <code>feedback_lines</code> run inside the build-loop tests above.</p>
+</div>
+
+<footer>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/scorers.py">sources/evaluators/hybrid_verifier/scorers.py</a> (all 309 lines, line by line, including the constants counted from the source), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L27-L29, L317-L380, L382-L432), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L66, L178-L181, L196-L212), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L46, L114-L133, L273-L378, L1181-L1191), <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L50, L449-L516), plus greps over <code>sources/</code>, <code>tests/</code> and the repository root. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the harness sources named in the docstring (<code>experiments_verifiers/harness/e19b_extract.py</code>, <code>e18_scripted_bt.py</code>, <code>e19_hybrid_bt.py</code>) &mdash; the port is quoted from the docstring, not verified against those files; the internals of <code>WorkflowRunner</code> (the subprocess pinning happens there); the <code>scorer.py</code> scripts generated at runtime, which are not part of this repository. Every credential file, including <code>experiments_verifiers/.env</code>, was skipped, not opened. No pytest run and no application run, by the build rules.</p>
+<p>Sibling file digests: <a href="file_hybrid_inventory.html">file_hybrid_inventory.html</a>, <a href="file_hybrid_layers.html">file_hybrid_layers.html</a>, <a href="file_hybrid_registry.html">file_hybrid_registry.html</a>, <a href="file_hybrid_claims.html">file_hybrid_claims.html</a>, <a href="file_hybrid_digest.html">file_hybrid_digest.html</a>, <a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a>, <a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a>, <a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a>; hub: <a href="file_index.html">file_index.html</a>.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git status --porcelain sources/evaluators/hybrid_verifier</code> reports the whole package as <code>??</code> (untracked), so this page describes the working tree, not the committed tree.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

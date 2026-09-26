@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Extensibility - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > extensibility > human mode and TTS">
+<div class="wrap">
+
+<h1 class="hud">Human mode and the TTS hook</h1>
+<p class="intro">Human mode replaces the LLM decision step with an operator menu: <code>--manual</code> loops over MCP servers and tools until <code>Ctrl+C</code>. The text-to-speech hook is a separate optional path: <code>Planner.run_attempts</code> speaks task events through <code>TTSService</code>. Neither path is read by the verifier.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 - human mode in the loop, next to the LLM path</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 330" role="img" aria-label="Human mode decision path contrasted with the LLM path">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="h1" href="area_entry_config.html">
+    <title>main.py dispatches --manual to manual_mode</title>
+    <rect x="14" y="64" width="158" height="60" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="93" y="90" text-anchor="middle">main.py</text>
+    <text class="box-sub" x="93" y="106" text-anchor="middle">--manual flag</text>
+  </a>
+
+  <a class="box" id="h2" href="#card-human">
+    <title>HumanMode.shellLoop is the decision point</title>
+    <rect x="204" y="64" width="186" height="60" rx="14" fill="rgba(94,140,163,0.12)" stroke="#5E8CA3"/>
+    <text class="box-label" x="297" y="90" text-anchor="middle">shellLoop</text>
+    <text class="box-sub" x="297" y="106" text-anchor="middle">HumanMode, no LLM</text>
+  </a>
+
+  <g class="box" id="h3">
+    <title>operator picks server, tool and arguments</title>
+    <rect x="422" y="64" width="168" height="60" rx="14" fill="rgba(94,140,163,0.12)" stroke="#5E8CA3"/>
+    <text class="box-label" x="506" y="90" text-anchor="middle">operator prompt</text>
+    <text class="box-sub" x="506" y="106" text-anchor="middle">input() at stdin</text>
+  </g>
+
+  <g class="box" id="h4">
+    <title>HumanMode.execute_tool calls the tool through fastmcp</title>
+    <rect x="622" y="64" width="158" height="60" rx="14" fill="rgba(94,140,163,0.12)" stroke="#5E8CA3"/>
+    <text class="box-label" x="701" y="90" text-anchor="middle">execute_tool</text>
+    <text class="box-sub" x="701" y="106" text-anchor="middle">fastmcp call_tool</text>
+  </g>
+
+  <g class="box" id="h5">
+    <title>external MCP server reached over HTTP</title>
+    <rect x="812" y="64" width="114" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="869" y="90" text-anchor="middle">MCP server</text>
+    <text class="box-sub" x="869" y="106" text-anchor="middle">external</text>
+  </g>
+
+  <path class="edge" data-from="h1" data-to="h2" d="M172,94 H204" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="188" y="57" text-anchor="middle">calls</text>
+  <path class="edge" data-from="h2" data-to="h3" d="M390,94 H422" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="406" y="57" text-anchor="middle">lists MCP, tools</text>
+  <path class="edge" data-from="h3" data-to="h4" d="M590,94 H622" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="606" y="57" text-anchor="middle">tool name, args</text>
+  <path class="edge" data-from="h4" data-to="h5" d="M780,94 H812" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="796" y="57" text-anchor="middle">JSON-RPC</text>
+
+  <a class="box" id="h6" href="mod_core_tools_llm.html">
+    <title>the LLM path picks the tool inside a generated workflow</title>
+    <rect x="204" y="220" width="420" height="60" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="414" y="246" text-anchor="middle">LLM path instead</text>
+    <text class="box-sub" x="414" y="262" text-anchor="middle">workflow genotype calls tool, no stdin</text>
+  </a>
+  <path class="edge" data-from="h2" data-to="h6" d="M297,124 V220" fill="none" stroke="#8FB8C9" stroke-width="1.25" stroke-dasharray="5 4" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="288" y="176" text-anchor="end">not used here</text>
+
+  <text class="box-sub" x="14" y="308">solid = call | dashed box = external | dashed arrow = the other path | max 6 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - <code>main.py::manual_mode</code> calls <code>HumanMode.shellLoop</code>; the LLM path (dashed, bottom) is never entered in <code>--manual</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 - the TTS hook chain</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 210" role="img" aria-label="Text to speech hook chain">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="t1" href="mod_core_planner.html">
+    <title>planner speaks task events from run_attempts</title>
+    <rect x="14" y="64" width="150" height="60" rx="2" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="89" y="90" text-anchor="middle">run_attempts</text>
+    <text class="box-sub" x="89" y="106" text-anchor="middle">task events</text>
+  </a>
+
+  <a class="box" id="t2" href="#card-tts">
+    <title>TTSService.speak picks a voice and drives the chain</title>
+    <rect x="204" y="64" width="160" height="60" rx="14" fill="rgba(94,140,163,0.12)" stroke="#5E8CA3"/>
+    <text class="box-label" x="284" y="90" text-anchor="middle">TTSService.speak</text>
+    <text class="box-sub" x="284" y="106" text-anchor="middle">text_to_speech.py</text>
+  </a>
+
+  <g class="box" id="t3">
+    <title>language picks the text processor</title>
+    <rect x="404" y="64" width="150" height="60" rx="14" fill="rgba(94,140,163,0.12)" stroke="#5E8CA3"/>
+    <text class="box-label" x="479" y="90" text-anchor="middle">TextProcessor</text>
+    <text class="box-sub" x="479" y="106" text-anchor="middle">strips code, URLs</text>
+  </g>
+
+  <g class="box" id="t4">
+    <title>Kokoro synthesizes audio frames, optional package</title>
+    <rect x="594" y="64" width="150" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="669" y="90" text-anchor="middle">KokoroTTSEngine</text>
+    <text class="box-sub" x="669" y="106" text-anchor="middle">kokoro package</text>
+  </g>
+
+  <g class="box" id="t5">
+    <title>saves a wav and plays it through the OS</title>
+    <rect x="784" y="64" width="180" height="60" rx="14" fill="rgba(94,140,163,0.12)" stroke="#5E8CA3"/>
+    <text class="box-label" x="874" y="90" text-anchor="middle">SystemAudioPlayer</text>
+    <text class="box-sub" x="874" y="106" text-anchor="middle">writes .voices/sample_*.wav</text>
+  </g>
+
+  <path class="edge" data-from="t1" data-to="t2" d="M164,94 H204" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="184" y="57" text-anchor="middle">task text</text>
+  <path class="edge" data-from="t2" data-to="t3" d="M364,94 H404" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="57" text-anchor="middle">raw text</text>
+  <path class="edge" data-from="t3" data-to="t4" d="M554,94 H594" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="574" y="57" text-anchor="middle">clean text</text>
+  <path class="edge" data-from="t4" data-to="t5" d="M744,94 H784" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="764" y="57" text-anchor="middle">audio</text>
+
+  <text class="box-sub" x="14" y="190">dashed box = external engine, installed separately | a second sink is JupyterAudioPlayer | max 5 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - <code>sources/core/planner.py::Planner.run_attempts</code> holds the only producer of these events; <code>TTSService.speak</code> returns the wav <code>Path</code> or <code>None</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Files and signatures</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/extensibility/human_mode.py">human_mode.py</a></td><td>Operator picks server, tool and arguments.</td><td class="size">339</td><td class="sym">HumanMode</td></tr>
+<tr><td class="sym"><a href="../../sources/extensibility/text_to_speech.py">text_to_speech.py</a></td><td>Turns text into a wav and plays it.</td><td class="size">375</td><td class="sym">TTSService, KokoroTTSEngine</td></tr>
+</tbody>
+</table>
+
+<div class="card steel" id="card-human">
+<h4><a href="../../sources/extensibility/human_mode.py">sources/extensibility/human_mode.py</a></h4>
+<p class="role">Loops the operator through MCP server choice, tool choice, schema-driven arguments, and one tool call. Discovery goes through one <code>ToolManager</code> instance.</p>
+<p class="meta">339 lines &#183; class: HumanMode &#183; reads: Config, ToolManager, MCP, Tool &#183; called from <code>main.py::manual_mode</code></p>
+<details><summary>signatures</summary><div class="dbody">
+<pre>HumanMode.__init__(config)
+HumanMode.shellLoop() -&gt; None
+HumanMode.mcp_selection(mcps: list[MCP]) -&gt; MCP
+HumanMode.tool_selection(tools: list) -&gt; Tool
+HumanMode.discover_tools(mcp) -&gt; list | None
+HumanMode.get_tool_arguments(tool: Tool) -&gt; dict
+HumanMode.execute_tool(mcp, tool_name, arguments) -&gt; None
+HumanMode.validate_choice(choice: str, attribution_map: dict) -&gt; bool
+HumanMode._convert_value(value, param_type) -&gt; int | float | bool | list | str
+HumanMode._get_parameter_input(param_name, param_schema) -&gt; any
+HumanMode._format_output(data) -&gt; str</pre>
+<p>Reads: <code>mcp.address</code>, <code>mcp.port</code>, <code>tool.name</code>, <code>tool.description</code>, <code>tool.inputSchema</code>. Skips a required argument only after a retry of the same prompt. Tests: none import this module; <code class="path">tests/planner_human_approve_test.py</code> covers the planner gate, not this shell.</p>
+</div></details>
+</div>
+
+<div class="card steel" id="card-tts">
+<h4><a href="../../sources/extensibility/text_to_speech.py">sources/extensibility/text_to_speech.py</a></h4>
+<p class="role">Picks a text processor by language, synthesizes with Kokoro into frames, saves one wav per frame, then plays it. Also displays audio in Jupyter.</p>
+<p class="meta">375 lines &#183; classes: TTSService, KokoroTTSEngine, SystemAudioPlayer, JupyterAudioPlayer &#183; functions: create_tts_service, speak &#183; no config field</p>
+<details><summary>signatures and defaults</summary><div class="dbody">
+<pre>create_tts_service(enable: bool = True, output_dir: str = ".voices") -&gt; TTSService | None
+speak(text: str, language: str = "en", voice_index: int = 0, speed: float = 1.2) -&gt; None
+TTSService.__init__(engine=None, audio_player=None, output_dir=Path(".voices"))
+TTSService.speak(text, language=Language.ENGLISH, voice_index=0, speed=1.2) -&gt; Path | None
+KokoroTTSEngine.synthesize(text: str, config: VoiceConfig) -&gt; Generator
+KokoroTTSEngine.is_available() -&gt; bool
+KokoroTTSEngine.get_available_voices(language: Language) -&gt; list[str]
+TextProcessorFactory.create(language: Language) -&gt; TextProcessor
+SystemAudioPlayer.play(audio_path: Path) -&gt; None
+JupyterAudioPlayer.play(audio_data, sample_rate=24000, autoplay=True) -&gt; None
+VoiceConfig(language, voice_name, speed=1.2)</pre>
+<p><code>Planner.__init__(enable_tts=True)</code> default builds the service; no caller passes <code>enable_tts=False</code>. Value conversion: <code>speed</code> must be positive. Audio rate is fixed at <code>24000 Hz</code> in <code>_save_audio</code>. Voices: <code>af_kore</code>, <code>zf_xiaobei</code> and 19 more in <code>KokoroTTSEngine.VOICES</code>; <code>voice_index</code> is clamped to the list. <code>JapaneseTextProcessor</code> and <code>FrenchTextProcessor</code> delegate to the English one.</p>
+</div></details>
+</div>
+
+<p class="note say">Both paths are optional side branches: no verifier claim, scorer or reward reads them, so they never change <code>VER</code>, <code>SR</code> or <code>CBS</code>.</p>
+<p class="note">Amber: <code>kokoro</code> and <code>soundfile</code> are not in <code>pyproject.toml</code>, so on a fresh install <code>KokoroTTSEngine.is_available()</code> returns <code>False</code> and <code>TTSService.speak</code> returns <code>None</code>.</p>
+<p class="note">Amber: <code>HumanMode.discover_tools</code> and <code>HumanMode.execute_tool</code> build the URL as <code>http://{mcp.address}:{mcp.port}/mcp</code> and ignore <code>MCP.transport</code>, so an SSE server is unreachable from human mode.</p>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/extensibility/human_mode.py</code>, <code class="path">sources/extensibility/text_to_speech.py</code>, <code class="path">main.py</code> (lines 37, 160-162, 276, 343, 395-396), <code class="path">sources/core/planner.py</code> (lines 62-98, 451-497, 811-924, 951-956), <code class="path">sources/core/tools_manager.py</code> (Tool, MCP, discovery_addresses), <code class="path">config.py</code> (<code>planner_human_approve</code>), <code class="path">config_default.json</code> line 89, <code class="path">tests/planner_human_approve_test.py</code>, <code class="path">tests/planner_json_extraction_test.py</code> (stubs <code>create_tts_service</code>), <code class="path">pyproject.toml</code>, <code class="path">docs/DEVELOPER_GUIDE.md</code> line 153. Symbols cited: <code>main.py::manual_mode</code>, <code>HumanMode.shellLoop</code>, <code>HumanMode.execute_tool</code>, <code>Planner.run_attempts</code>, <code>TTSService.speak</code>, <code>KokoroTTSEngine.synthesize</code>, <code>Planner._request_human_plan_validation</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/extensibility/__pycache__/</code> (compiled bytecode). <code class="path">docs/DEVELOPER_GUIDE.md</code>, <code class="path">docs/concepts/</code>, <code class="path">docs/reference/</code> beyond the one line that names the TTS hook - they hold no human-mode or TTS design text. <code class="path">sources/cli/</code> - no route into human mode or TTS (the zero-arg wizard does not offer <code>--manual</code>). <code>tmp/run_*</code> site-packages matches - vendored third-party <code>text_to_speech</code> symbols, not this repo. <code>HumanMode</code> private print helpers <code>_print_header</code>, <code>_print_section</code>, <code>_print_error</code>, <code>_print_success</code>, <code>_print_info</code> - console formatting only.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had 53 uncommitted changes at build time; none of them touch <code class="path">sources/extensibility/</code>.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

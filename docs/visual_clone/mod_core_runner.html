@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Runner and factories - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > core > runner and factories">
+<div class="wrap">
+
+<h1 class="hud">Sandboxed execution: runner and factories</h1>
+<p class="intro">These five files turn a goal into a Python program and then run it. The factories splice the LLM-written workflow with two injected templates; <code>workflow_runner.py</code> writes the result to a temp script and starts a host subprocess. The single-agent path replaces the LangGraph workflow with one <code>CodeAgent</code> script.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Synthesis to workspace</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 460" role="img" aria-label="Synthesis, injection, subprocess run and workspace">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="30" y="10">1 synthesis</text>
+  <text class="box-sub" x="30" y="176">2 injection</text>
+  <text class="box-sub" x="340" y="10">3 run</text>
+
+  <a class="box" id="b1" href="mod_core_evolution_engine.html">
+    <title>EvolutionEngine calls the orchestrator once per generation.</title>
+    <rect x="340" y="16" width="210" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="445" y="40" text-anchor="middle">evolution_engine.py</text>
+    <text class="box-sub" x="445" y="56" text-anchor="middle">EvolutionEngine</text>
+  </a>
+
+  <a class="box" id="b2" href="#orchestrator">
+    <title>WorkflowOrchestrator.orchestrate_workflow runs the whole pipeline.</title>
+    <rect x="340" y="100" width="210" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="445" y="124" text-anchor="middle">orchestrator.py</text>
+    <text class="box-sub" x="445" y="140" text-anchor="middle">orchestrate_workflow()</text>
+  </a>
+
+  <a class="box" id="b3" href="#workflow-factory">
+    <title>WorkflowFactory.craft_workflow builds multi-agent code.</title>
+    <rect x="340" y="184" width="210" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="445" y="208" text-anchor="middle">workflow_factory.py</text>
+    <text class="box-sub" x="445" y="224" text-anchor="middle">craft_workflow()</text>
+  </a>
+
+  <a class="box" id="b4" href="#workflow-runner">
+    <title>WorkflowRunner.execute writes the script and spawns the process.</title>
+    <rect x="340" y="268" width="210" height="56" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="445" y="292" text-anchor="middle">workflow_runner.py</text>
+    <text class="box-sub" x="445" y="308" text-anchor="middle">execute()</text>
+  </a>
+
+  <g class="box" id="b5">
+    <title>Generated script on disk: temp_dir/&lt;execution_id&gt;.py.</title>
+    <rect x="340" y="352" width="210" height="56" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <ellipse cx="445" cy="352" rx="105" ry="8" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="445" y="380" text-anchor="middle">tmp/&lt;exec_id&gt;.py</text>
+    <text class="box-sub" x="445" y="396" text-anchor="middle">runner_temp_dir</text>
+  </g>
+
+  <a class="box" id="b6" href="#factory">
+    <title>Factory.load_tools_code returns MCP client code.</title>
+    <rect x="30" y="100" width="190" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="125" y="124" text-anchor="middle">factory.py</text>
+    <text class="box-sub" x="125" y="140" text-anchor="middle">load_tools_code()</text>
+  </a>
+
+  <a class="box" id="b7" href="data_modules_prompts.html">
+    <title>Two templates read from disk during assembly.</title>
+    <rect x="30" y="184" width="190" height="56" rx="8" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <ellipse cx="125" cy="184" rx="95" ry="8" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="125" y="208" text-anchor="middle">sources/modules/</text>
+    <text class="box-sub" x="125" y="224" text-anchor="middle">state + agent code</text>
+  </a>
+
+  <a class="box" id="b8" href="#single-agent-factory">
+    <title>SingleAgentFactory.craft_single_agent emits one agent script.</title>
+    <rect x="680" y="100" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="780" y="124" text-anchor="middle">single_agent_factory.py</text>
+    <text class="box-sub" x="780" y="140" text-anchor="middle">craft_single_agent()</text>
+  </a>
+
+  <a class="box" id="b9" href="mod_core_tools_llm.html">
+    <title>llm_provider.py calls the external model API.</title>
+    <rect x="680" y="184" width="200" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="780" y="208" text-anchor="middle">LLM provider API</text>
+    <text class="box-sub" x="780" y="224" text-anchor="middle">llm_provider.py</text>
+  </a>
+
+  <a class="box" id="b10" href="area_utils.html">
+    <title>Subprocess cwd is the Toolomics workspace; snapshots go to /tmp.</title>
+    <rect x="680" y="352" width="200" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <ellipse cx="780" cy="352" rx="100" ry="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="780" y="380" text-anchor="middle">workspace_dir</text>
+    <text class="box-sub" x="780" y="396" text-anchor="middle">+ /tmp snapshots</text>
+  </a>
+
+  <path class="edge" data-from="b1" data-to="b2" d="M445,72 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="455" y="90">orchestrate_workflow()</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M445,156 V184" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="455" y="174">craft_workflow()</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M445,240 V268" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="455" y="258">complete_code</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M445,324 V352" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="455" y="342">execute() writes</text>
+  <path class="edge" data-from="b6" data-to="b2" d="M220,128 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="280" y="122" text-anchor="middle">load_tools_code()</text>
+  <path class="edge dashed-edge" data-from="b7" data-to="b3" d="M220,212 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="280" y="206" text-anchor="middle">assemble_workflow()</text>
+  <path class="edge" data-from="b2" data-to="b8" d="M550,128 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="615" y="122" text-anchor="middle">craft_single_agent()</text>
+  <path class="edge dashed-edge" data-from="b3" data-to="b9" d="M550,212 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="615" y="206" text-anchor="middle">LLMProvider()</text>
+  <path class="edge dashed-edge" data-from="b4" data-to="b10" d="M550,296 H680" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="615" y="290" text-anchor="middle">cwd = workspace_dir</text>
+  <path class="edge dashed-edge" data-from="b4" data-to="b1" d="M550,318 H920 V44 H550" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="725" y="36" text-anchor="middle">output, uuid, executed</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - arrow labels name the symbol that produces the flow. Entry point: <code class="path">sources/core/evolution_engine.py:495</code> calls <code>orchestrator.orchestrate_workflow()</code>; the tuple <code>(output, uuid, genotype, executed)</code> returns to the evolution loop.</p>
+<p class="note say">The AST allow-list is not in <code>workflow_runner.py</code>: it lives inside the SmolAgents <code>CodeAgent</code> that the injected <code>SmolAgentFactory</code> builds, so it applies to agent-written code inside the run, not to the assembled script itself.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The sandbox boundary</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 420" role="img" aria-label="Allowed imports and forbidden calls">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="20" y="40" width="400" height="300" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+  <text class="box-label" x="36" y="66">ALLOWED IMPORTS</text>
+  <text class="box-sub" x="36" y="84">CodeAgent allow-list - smolagent_factory.py:154-180</text>
+  <text class="box-sub" x="36" y="106">requests, json, requests.exceptions</text>
+  <text class="box-sub" x="36" y="123">os, sys, pathlib, shutil, glob, tempfile, argparse</text>
+  <text class="box-sub" x="36" y="140">configparser, logging</text>
+  <text class="box-sub" x="36" y="157">collections, itertools, functools, heapq, bisect</text>
+  <text class="box-sub" x="36" y="174">dataclasses, enum, types</text>
+  <text class="box-sub" x="36" y="191">re, string, textwrap, difflib, unicodedata</text>
+  <text class="box-sub" x="36" y="208">csv, xml, xml.etree, pickle, base64, html</text>
+  <text class="box-sub" x="36" y="225">pandas, numpy, yaml</text>
+  <text class="box-sub" x="36" y="242">datetime, time, calendar</text>
+  <text class="box-sub" x="36" y="259">urllib, http, socket, email, mimetypes</text>
+  <text class="box-sub" x="36" y="276">hashlib, hmac, secrets, uuid</text>
+  <text class="box-sub" x="36" y="293">math, random, statistics, decimal, fractions</text>
+  <text class="box-sub" x="36" y="310">traceback, inspect, gc, warnings, io</text>
+  <text class="box-sub" x="36" y="327">gzip, zipfile, tarfile, zlib</text>
+
+  <rect x="470" y="40" width="410" height="300" rx="2" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+  <text class="box-label" x="486" y="66">FORBIDDEN CALLS</text>
+  <text class="box-sub" x="486" y="84">check_safer_result - local_python_executor.py:156-184</text>
+  <text class="box-sub" x="486" y="106">builtins.compile, builtins.eval, builtins.exec</text>
+  <text class="box-sub" x="486" y="123">builtins.globals, builtins.locals</text>
+  <text class="box-sub" x="486" y="140">builtins.__import__</text>
+  <text class="box-sub" x="486" y="157">os.popen, os.system, posix.system</text>
+  <text class="box-label" x="486" y="196">ALSO ENFORCED</text>
+  <text class="box-sub" x="486" y="214">MAX_OPERATIONS = 10000000 - local_python_executor.py:1444</text>
+  <text class="box-sub" x="486" y="231">Import must pass check_import_authorized - line 1309-1340</text>
+  <text class="box-sub" x="486" y="248">DANGEROUS_MODULES is defined at line 130 and not read again</text>
+  <text class="box-sub" x="486" y="265">SmolAgentFactory rebinds it empty at smolagent_factory.py:50</text>
+  <text class="box-sub" x="486" y="282">Both names come from smolagents 1.26.0, not from this repo</text>
+  <text class="box-sub" x="486" y="299">Import list per agent: same list in single_agent_factory.py:200</text>
+
+  <rect x="20" y="355" width="860" height="52" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+  <text class="box-label" x="36" y="378">OUTER BOUNDARY - workflow_runner.py:364-460</text>
+  <text class="box-sub" x="36" y="396">create_subprocess_exec, host env, cwd = workspace_dir; no AST check, no memory or CPU cap; timeout only, workflow_runner.py:413-433</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - two lists in one diagram. Left: what the injected agents may import. Right and bottom: what the executor denies and what the runner enforces.</p>
+<p class="note flag">Docs mismatch: <code class="path">docs/concepts/architecture.md:74</code> says the runner imposes "per-run limits on time, memory, and CPU", but <code>RuntimeConfig.max_memory_mb</code> and <code>max_cpu_percent</code> (<code class="path">sources/core/workflow_runner.py:81-82</code>) are stored and never read; only <code>timeout</code> is enforced.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File cards</h2>
+
+<div class="card l3" id="workflow-runner">
+<h4><a href="../../sources/core/workflow_runner.py">sources/core/workflow_runner.py</a></h4>
+<p class="role">Writes generated code to a temp script, starts a host subprocess, streams stdout, enforces the timeout, and kills on cancel.</p>
+<p class="meta">651 lines &#183; classes: ExecutionStatus, ExecutionResult, RuntimeConfig, WorkflowRunner &#183; reads: runner_default_timeout, runner_temp_dir</p>
+<details><summary>signatures and config fields</summary><div class="dbody">
+<pre>WorkflowRunner.__init__(config: RuntimeConfig | None = None, execution_dir: str = '.')
+WorkflowRunner._setup_environment() -&gt; None
+WorkflowRunner._resolve_python_executable() -&gt; list[str] | None
+WorkflowRunner._check_python_version() -&gt; bool
+WorkflowRunner._ensure_venv() -&gt; None
+WorkflowRunner.ensure_pip() -&gt; None                       # async
+WorkflowRunner.install_dependencies(requirements=None) -&gt; ExecutionResult   # async
+WorkflowRunner.execute(code: str, execution_id=None, progress_callback=None) -&gt; ExecutionResult
+WorkflowRunner._run_command(cmd, execution_id=None, progress_callback=None) -&gt; ExecutionResult
+WorkflowRunner._stream_output_pty(process, master_fd, progress_callback=None) -&gt; tuple[str, str]
+WorkflowRunner._stream_output_pipe(process, progress_callback=None) -&gt; tuple[str, str]
+WorkflowRunner.cancel_execution(execution_id) -&gt; bool
+WorkflowRunner._kill_process(execution_id) -&gt; bool
+WorkflowRunner.get_active_executions() -&gt; list[str]
+WorkflowRunner.cleanup() -&gt; None</pre>
+<p>Config fields read: <code>runner_default_python_version</code>, <code>runner_default_timeout</code>, <code>runner_default_max_memory_mb</code>, <code>runner_temp_dir</code>, <code>runner_requirements</code>. Callers: <code>orchestrator.py:49</code>, <code>sources/evaluators/hybrid_verifier/evaluator.py:247</code>.</p>
+<p>Covered by: <code>tests/hybrid_verifier_test.py:381</code> (one real execution).</p>
+</div></details>
+</div>
+
+<div class="card l2" id="workflow-factory">
+<h4><a href="../../sources/core/workflow_factory.py">sources/core/workflow_factory.py</a></h4>
+<p class="role">Asks the LLM for the LangGraph workflow body, validates its structure, then splices it with the templates into one script.</p>
+<p class="meta">514 lines &#183; class: WorkflowFactory (extends Factory) &#183; reads: workflow_llm_model, schema_code_path, smolagent_factory_code_path</p>
+<details><summary>signatures and config fields</summary><div class="dbody">
+<pre>WorkflowFactory.get_system_prompt() -&gt; str
+WorkflowFactory.extract_python_code(code: str) -&gt; str      # static
+WorkflowFactory.remove_imports(code: str) -&gt; str
+WorkflowFactory.llm_make_workflow(system_prompt, craft_instructions, existing_tool_prompt, path, allow_cache) -&gt; str
+WorkflowFactory.create_workflow_genotype_code(craft_instructions, existing_tool_prompt, path, allow_cache) -&gt; str
+WorkflowFactory.validate_workflow_structure(workflow_genotype_code: str) -&gt; None
+WorkflowFactory.assemble_workflow(tools_code, state_code, smolagent_factory_code, workflow_genotype_code, workflow_path, memory_path, uuid_str, goal, smolagent_system_prompt=None) -&gt; str
+WorkflowFactory.craft_workflow(goal, craft_instructions, save_workflow=True, original_task=None) -&gt; tuple[str, str, str]</pre>
+<p>Config fields read: <code>workflow_llm_model</code>, <code>reasoning_effort</code>, <code>smolagent_model_id</code>, <code>agent_execution_timeout</code>, <code>save_logprobs</code>, <code>engine_name</code>, <code>orchestrator_choose_model</code>, <code>openrouter_provider_for()</code>.</p>
+<p>Structural checks raise <code>ValueError("UUID:&lt;uuid&gt;|&lt;msg&gt;")</code> at <code class="path">workflow_factory.py:488</code>; <code>WorkflowOrchestrator._parse_generation_error</code> decodes it.</p>
+</div></details>
+</div>
+
+<div class="card l2" id="factory">
+<h4><a href="../../sources/core/factory.py">sources/core/factory.py</a></h4>
+<p class="role">Base class for both factories: discovers MCP tools, creates the workflow and memory folders, writes the genotype, goal and task files.</p>
+<p class="meta">208 lines &#183; class: Factory (parent of WorkflowFactory, SingleAgentFactory) &#183; reads: workflow_dir, memory_dir</p>
+<details><summary>signatures</summary><div class="dbody">
+<pre>Factory.load_tools_code() -&gt; tuple[str, str]              # async; retries to 300 s, backoff cap 30 s
+Factory.load_single_agent_system_prompt() -&gt; str          # async
+Factory.create_folder_structure(uuid_str) -&gt; tuple[str, str]
+Factory._extract_original_from_goal(goal: str) -&gt; str
+Factory.save_workflow_files(path, uuid_str, workflow_genotype_code, goal, original_task=None) -&gt; None</pre>
+<p>Config fields read: <code>workflow_dir</code>, <code>memory_dir</code>, <code>prompt_smolagent</code>, plus the discovery ranges via <code>ToolManager</code>.</p>
+</div></details>
+</div>
+
+<div class="card l2" id="single-agent-factory">
+<h4><a href="../../sources/core/single_agent_factory.py">sources/core/single_agent_factory.py</a></h4>
+<p class="role">Builds the baseline one-agent script: one CodeAgent with the MCP tools, its own memory saver, and a state_result.json for cost tracking.</p>
+<p class="meta">315 lines &#183; class: SingleAgentFactory (extends Factory) &#183; reads: smolagent_model_id, max_tokens, engine_name, save_logprobs</p>
+<details><summary>signatures and config fields</summary><div class="dbody">
+<pre>SingleAgentFactory.craft_single_agent(goal: str, original_task: str | None = None) -&gt; tuple[str, str, str]   # async</pre>
+<p>Returns <code>(code, code, uuid_str)</code>; the uuid is prefixed <code>single_agent_</code>. The emitted script sets <code>CodeAgent(max_steps=64)</code> (<code class="path">single_agent_factory.py:195-199</code>) and writes <code>state_result.json</code> with <code>"single_agent_mode": True</code>.</p>
+<p>Covered by: <code class="path">tests/single_agent_factory_logprobs_test.py</code> (logprobs wiring in the generated code).</p>
+</div></details>
+</div>
+
+<div class="card l2" id="orchestrator">
+<h4><a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a></h4>
+<p class="role">Runs the pipeline: optional literature grounding, factory call, dependency install, subprocess run, and the tuple the evolution loop reads.</p>
+<p class="meta">428 lines &#183; class: WorkflowOrchestrator &#183; reads: runner_default_* fields, literrature_grounding, orchestrator_choose_model</p>
+<details><summary>signatures and config fields</summary><div class="dbody">
+<pre>WorkflowOrchestrator.workflow_requirements_install() -&gt; None                  # async
+WorkflowOrchestrator.workflow_sandbox_run(workflow_genotype_code: str) -&gt; str  # async
+WorkflowOrchestrator.perspicacite_grounding_task(task: str) -&gt; str
+WorkflowOrchestrator._ground_with_perspicacite(task, craft_instructions) -&gt; str
+WorkflowOrchestrator._generate_workflow_code(goal, craft_instructions, single_agent_mode, original_task) -&gt; tuple[str, str, str]
+WorkflowOrchestrator._parse_generation_error(error: Exception) -&gt; tuple[str, str]   # static
+WorkflowOrchestrator._execute_in_sandbox(complete_code: str) -&gt; tuple[str, float, float]
+WorkflowOrchestrator._notify_execution_failure(uuid, goal, workflow_time, error) -&gt; None
+WorkflowOrchestrator._prompt_agents_model_list(craft_instructions: str) -&gt; str
+WorkflowOrchestrator.orchestrate_workflow(goal, craft_instructions, original_task=None, single_agent_mode=False, no_run=False) -&gt; tuple[str, str, str, bool]</pre>
+<p>Returns <code>(execution_output, uuid, genotype, executed)</code>; <code>executed=False</code> marks a failed generation or run, and <code>uuid="generation_failed"</code> when no uuid was encoded.</p>
+<p>Config fields read: <code>runner_default_python_version</code>, <code>runner_default_timeout</code>, <code>runner_default_max_memory_mb</code>, <code>runner_temp_dir</code>, <code>runner_requirements</code>, <code>literrature_grounding</code>, <code>orchestrator_choose_model</code>, <code>pushover_token</code>, <code>pushover_user</code>, <code>workspace_dir</code>.</p>
+</div></details>
+</div>
+
+<p class="note">Amber: <code>Factory.save_workflow_files</code> calls <code>self.get_system_prompt()</code> (<code class="path">sources/core/factory.py:185</code>), which only <code>WorkflowFactory</code> defines, so single-agent runs log a failure and write no <code>system_prompt_&lt;uuid&gt;.md</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Resource limits and defaults</h2>
+<details><summary>config fields, RuntimeConfig defaults and enforcement</summary><div class="dbody">
+<table>
+<thead><tr><th>Field</th><th class="size">Default</th><th>Read at</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td class="sym">runner_default_python_version</td><td class="size">"3.12"</td><td class="sym">orchestrator.py:44</td><td>Runner resolves <code>pythonX.Y</code> on PATH; <code>python_executable</code> overrides it.</td></tr>
+<tr><td class="sym">runner_default_timeout</td><td class="size">10800 s</td><td class="sym">orchestrator.py:45</td><td>Enforced per command by <code>asyncio.wait_for</code>; on expiry status is TIMEOUT.</td></tr>
+<tr><td class="sym">runner_default_max_memory_mb</td><td class="size">10000 MB</td><td class="sym">orchestrator.py:46</td><td>Stored on <code>RuntimeConfig</code>; never read when spawning.</td></tr>
+<tr><td class="sym">runner_default_max_cpu_percent</td><td class="size">100 %</td><td class="sym">not passed by WorkflowOrchestrator</td><td>Only stored in config; <code>RuntimeConfig</code> keeps its own default 100.</td></tr>
+<tr><td class="sym">runner_temp_dir</td><td class="size">&lt;repo&gt;/tmp</td><td class="sym">orchestrator.py:47</td><td>Scripts go to <code>&lt;temp_dir&gt;/&lt;execution_id&gt;.py</code>; venv at <code>&lt;temp_dir&gt;/mimosa_venv</code>.</td></tr>
+<tr><td class="sym">runner_requirements</td><td class="size">14 entries</td><td class="sym">orchestrator.py:58</td><td>pip-installed before each run into the managed venv.</td></tr>
+<tr><td class="sym">agent_execution_timeout</td><td class="size">18000 s</td><td class="sym">workflow_factory.py:359</td><td>Injected as <code>AGENT_EXECUTION_TIMEOUT</code>; read by the agent factory.</td></tr>
+<tr><td class="sym">RuntimeConfig.timeout</td><td class="size">1800 s</td><td class="sym">workflow_runner.py:80</td><td>Applies when a caller builds the config directly.</td></tr>
+<tr><td class="sym">RuntimeConfig.max_memory_mb</td><td class="size">1024 MB</td><td class="sym">workflow_runner.py:81</td><td>Advisory only; no <code>setrlimit</code> call exists in the repo.</td></tr>
+<tr><td class="sym">RuntimeConfig.max_cpu_percent</td><td class="size">100 %</td><td class="sym">workflow_runner.py:82</td><td>Advisory only; never read.</td></tr>
+<tr><td class="sym">RuntimeConfig.use_pty</td><td class="size">True</td><td class="sym">workflow_runner.py:89</td><td>PTY gives coloured stdout; False uses plain pipes.</td></tr>
+</tbody>
+</table>
+<p>Defaults cited from <code class="path">config.py:229-236</code> and <code class="path">config.py:242</code>; CLI overrides at <code class="path">main.py:69-72</code> and <code class="path">main.py:131-136</code>. <code>paths.default_tmp_dir()</code> returns <code>&lt;repo&gt;/tmp</code> in a checkout (<code class="path">sources/utils/paths.py:96-99</code>).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Injected templates</h2>
+<div class="card l2">
+<h4><a href="../../sources/modules/state_schema.py">sources/modules/state_schema.py</a></h4>
+<p class="role">Defines WorkflowState, the Answer model with its JSON repair helpers, and the two routers the generated graph reuses.</p>
+<p class="meta">151 lines &#183; symbols: WorkflowState, Answer, master_router, debate_router &#183; read by: workflow_factory.py:326-337</p>
+</div>
+<div class="card l2">
+<h4><a href="../../sources/modules/smolagent_factory.py">sources/modules/smolagent_factory.py</a></h4>
+<p class="role">Builds each workflow node: CodeAgent with the allow-list, memory load and save, retry loop, and the node factory.</p>
+<p class="meta">501 lines &#183; symbols: SmolAgentFactory, WorkflowNodeFactory.create_agent_node &#183; read by: workflow_factory.py:367-371</p>
+</div>
+<p>Both files are read as text at assembly time and pasted into the generated script, so they are not imported by the runner. Injection order and globals: <code class="path">sources/core/workflow_factory.py:354-379</code>. Detail page: <a href="data_modules_prompts.html">data_modules_prompts.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/core/workflow_runner.py</code>, <code class="path">sources/core/workflow_factory.py</code>, <code class="path">sources/core/factory.py</code>, <code class="path">sources/core/single_agent_factory.py</code>, <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/modules/state_schema.py</code>, <code class="path">sources/modules/smolagent_factory.py</code>, <code class="path">config.py</code>, <code class="path">main.py</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code class="path">docs/concepts/architecture.md</code>.</p>
+<p>Skipped: <code class="path">sources/core/__init__.py</code> (re-exports only); <code class="path">sources/core/tools_manager.py</code> and <code>llm_provider.py</code> (belong to mod_core_tools_llm.html, cited only); <code class="path">sources/utils/workspace_management.py</code> and <code>transfer_toolomics.py</code> (belong to area_utils.html, cited for the /tmp snapshot path); <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (belongs to mod_evaluators_hybrid_verifier.html, cited for _build_runner); <code class="path">sources/benchmark_evaluation/execution_sandbox.py</code> (belongs to area_benchmark_evaluation.html); <code>sources/modules/__pycache__</code> (build artifact); <code class="path">sources/workflows/</code>, <code>tmp/</code> (runtime artifacts, Tier D).</p>
+<p class="skips">The AST allow-list and deny-list facts come from the installed dependency <code>smolagents 1.26.0</code> (<code>local_python_executor.py</code> in <code>.venv</code>), not from repository code; no dependency file was modified. The working tree had uncommitted changes at build time (<code>git status --porcelain</code> lists modified evaluators, <code>main.py</code>, <code>config.py</code>, docs and datasets).</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

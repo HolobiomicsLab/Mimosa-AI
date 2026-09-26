@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Batch benchmark flow - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > benchmark evaluation > batch benchmark flow">
+<div class="wrap">
+
+<h1 class="hud">Batch benchmark flow</h1>
+<p class="intro">Batch mode reads a CSV of tasks and grades each task with the ScienceAgentBench graders. <code>--papers &lt;csv&gt;</code> builds the goal from the row, and <code>--science_agent_bench</code> adds dataset transfer plus VER / SR / CBS grading. Every task leaves one run-notes JSON that holds the verifier rewards and the per-iteration ablations.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>1. Pipeline: CSV rows to run-notes JSON</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 270" role="img" aria-label="Batch benchmark pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- row 1: the task loop -->
+  <g class="box" id="b1">
+    <title>CSV task list read row by row by csv.DictReader</title>
+    <rect x="16" y="34" width="140" height="58" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="86" y="58" text-anchor="middle">CSV rows</text>
+    <text class="box-sub" x="86" y="74" text-anchor="middle">datasets/ScienceAgentBench.csv</text>
+  </g>
+
+  <a class="box" id="b2" href="area_benchmark_evaluation.html">
+    <title>CsvEvaluationMode.start_evaluation picks the sequential or concurrent loop</title>
+    <rect x="196" y="34" width="200" height="58" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="296" y="58" text-anchor="middle">per-task loop</text>
+    <text class="box-sub" x="296" y="74" text-anchor="middle">CsvEvaluationMode</text>
+  </a>
+
+  <a class="box" id="b3" href="mod_core_evolution_engine.html">
+    <title>EvolutionEngine.start_workflow_evolution synthesises and evolves workflows</title>
+    <rect x="436" y="34" width="190" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="531" y="58" text-anchor="middle">evolution</text>
+    <text class="box-sub" x="531" y="74" text-anchor="middle">start_workflow_evolution</text>
+  </a>
+
+  <a class="box" id="b4" href="data_runs.html">
+    <title>LocalTransfer copies the workspace into runs_capsule/run_&lt;x&gt;/&lt;capsule&gt;</title>
+    <rect x="666" y="34" width="170" height="58" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="751" y="58" text-anchor="middle">capsule snapshot</text>
+    <text class="box-sub" x="751" y="74" text-anchor="middle">runs_capsule/run_x/</text>
+  </a>
+
+  <a class="box" id="b5" href="area_benchmark_evaluation.html">
+    <title>CapsuleEvaluator.evaluate_all runs VER, SR and CBS on the capsule</title>
+    <rect x="876" y="34" width="190" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="971" y="58" text-anchor="middle">CapsuleEvaluator</text>
+    <text class="box-sub" x="971" y="74" text-anchor="middle">evaluate_all</text>
+  </a>
+
+  <!-- row 1 arrows -->
+  <path class="edge" data-from="b1" data-to="b2" d="M156,63 H196" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="176" y="26" text-anchor="middle">row dict</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M396,63 H436" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="416" y="26" text-anchor="middle">goal str</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M626,63 H666" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="646" y="26" text-anchor="middle">workspace files</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M836,63 H876" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="856" y="26" text-anchor="middle">capsule dir</text>
+
+  <!-- row 2: grading and the record -->
+  <a class="box" id="b6" href="area_benchmark_evaluation.html">
+    <title>ExecutionSandbox.run_generated_code executes the generated script for VER</title>
+    <rect x="876" y="150" width="190" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="971" y="174" text-anchor="middle">ExecutionSandbox</text>
+    <text class="box-sub" x="971" y="190" text-anchor="middle">run_generated_code</text>
+  </a>
+
+  <a class="box" id="b7" href="area_benchmark_evaluation.html">
+    <title>The graders in datasets/ScienceAgentBench/eval_programs end with print(eval())</title>
+    <rect x="656" y="150" width="190" height="58" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="751" y="174" text-anchor="middle">eval_programs/*.py</text>
+    <text class="box-sub" x="751" y="190" text-anchor="middle">graders + gold_results</text>
+  </a>
+
+  <a class="box" id="b8" href="flow_evolution_loop.html">
+    <title>csv_mode._evaluate_snapshot_ablations grades every /tmp evolution snapshot</title>
+    <rect x="416" y="150" width="200" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="516" y="174" text-anchor="middle">snapshot ablations</text>
+    <text class="box-sub" x="516" y="190" text-anchor="middle">_evaluate_snapshot_ablations</text>
+  </a>
+
+  <a class="box" id="b9" href="data_runs.html">
+    <title>csv_mode._save_run_notes writes run_notes/run_&lt;x&gt;/&lt;capsule_name&gt;.json</title>
+    <rect x="196" y="150" width="190" height="58" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="291" y="174" text-anchor="middle">run_notes JSON</text>
+    <text class="box-sub" x="291" y="190" text-anchor="middle">&lt;capsule_name&gt;.json</text>
+  </a>
+
+  <!-- row 2 arrows (right to left: drill-down detail) -->
+  <path class="edge" data-from="b5" data-to="b6" d="M971,92 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="980" y="126" text-anchor="start">capsule path</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M876,179 H846" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="861" y="142" text-anchor="middle">runs eval script</text>
+  <path class="edge" data-from="b3" data-to="b8" d="M516,92 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="525" y="126" text-anchor="start">tmp snapshots</text>
+  <path class="edge" data-from="b8" data-to="b9" d="M416,179 H386" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="401" y="142" text-anchor="middle">ablations[]</text>
+  <path class="edge" data-from="b3" data-to="b9" d="M456,92 V112 H291 V150" fill="none" stroke="#4D9FFF" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw)"/>
+  <text class="edge-label" x="373" y="106" text-anchor="middle">evolution_rewards</text>
+
+  <text class="box-sub" x="16" y="240">row 1 left to right = the task loop; row 2 = grading detail and the record it writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - batch benchmark pipeline. Loop symbols: <code class="path">sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode.run_single_thread_eval_loop</code> (line 1394) and <code class="path">::CsvEvaluationMode.run_concurrent_eval_loop</code> (line 1269). The dashed blue arrow is the field <code>evolution_rewards</code>; <code>ablations[]</code> arrives from the snapshot lane.</p>
+
+<h3>Stages in csv_mode.py</h3>
+<table>
+<thead><tr><th>Stage</th><th>Symbol</th><th>What it writes</th></tr></thead>
+<tbody>
+<tr><td>entry</td><td class="sym">CsvEvaluationMode.start_evaluation</td><td>nothing; picks sequential or concurrent loop</td></tr>
+<tr><td>sequential loop</td><td class="sym">run_single_thread_eval_loop</td><td>one run-notes JSON per row</td></tr>
+<tr><td>concurrent loop</td><td class="sym">run_concurrent_eval_loop</td><td>one run-notes JSON per row, semaphore-bounded</td></tr>
+<tr><td>per-task step</td><td class="sym">_process_single_task_once</td><td>capsule folder; returns execution data</td></tr>
+<tr><td>capsule grade</td><td class="sym">_evaluate_with_science_agent_bench</td><td>capsule <code>evaluation_results.json</code>; VER/SR/CBS into data</td></tr>
+<tr><td>snapshot ablation</td><td class="sym">_evaluate_snapshot_ablations</td><td>returns <code>ablations[]</code>; saves no file</td></tr>
+<tr><td>run-notes writer</td><td class="sym">_save_run_notes</td><td><code>run_notes/run_&lt;x&gt;/&lt;capsule_name&gt;.json</code></td></tr>
+<tr><td>queue summary</td><td class="sym">_print_final_summary</td><td>appends <code>final_results</code> to the CLI notes file</td></tr>
+<tr><td>prompt builder</td><td class="sym">_generate_task_science_agent_bench</td><td>task prompt text; returns scenario id, rubric name</td></tr>
+<tr><td>network guard</td><td class="sym">_wait_for_network_recovery</td><td>excluded row entry when DNS stays down</td></tr>
+</tbody>
+</table>
+<p class="figcap">All symbols are in <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (1 826 lines). <code>_save_run_notes</code> is at line 415, <code>_evaluate_snapshot_ablations</code> at line 774, <code>_evaluate_with_science_agent_bench</code> at line 680.</p>
+
+<div class="card ice">
+<h4><a href="../../main.py">main.py</a> and <a href="../../sources/cli/evaluation_cli.py">sources/cli/evaluation_cli.py</a></h4>
+<p class="role">Two entries reach this flow: CLI mode dispatch, and the queued EvaluationCLI which gives each run its own notes folder.</p>
+<p class="meta">main.py: <code>papers_mode</code> (line 164), <code>science_bench_papers_mode</code> (line 172) &#183; flags: <code>--papers</code>, <code>--science_agent_bench</code>, <code>--csv_runs_limit</code> (default <code>200</code>, line 288) &#183; EvaluationCLI passes <code>run_notes_dir=run_notes/run_&lt;id&gt;</code> (line 1078)</p>
+<details><summary>what each entry does</summary><div class="dbody">
+<pre>papers_mode            -&gt; start_evaluation(dataset_type="default", dataset_path=args.papers)
+science_bench_papers_mode -&gt; start_evaluation(dataset_type="science_agent_bench",
+                          dataset_path="datasets/ScienceAgentBench.csv", concurrent=True)
+WorkflowEval.run_workflow_eval_loop_model -&gt; WorkflowOrchestrator.orchestrate_workflow(no_run=True)</pre>
+<p><code>--papers</code> uses <code>dataset_type="default"</code>: the Planner runs and no VER/SR grading happens. The class default for <code>csv_runs_limit</code> is <code>103</code>, while the CLI flag default is <code>200</code>.</p>
+</div></details>
+</div>
+
+<p class="note">Checked-in CSV has 20 task rows; the 102-row file is <code class="path">datasets/ScienceAgentBench_backup_full.csv</code>, so <code>--csv_runs_limit</code> above 20 changes nothing on this checkout.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>2. The run-notes record</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 800 300" role="img" aria-label="run_notes JSON schema tree">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="r" href="data_runs.html">
+    <title>One JSON file per task, named after the capsule</title>
+    <rect x="14" y="112" width="210" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="119" y="138" text-anchor="middle">run-notes JSON</text>
+    <text class="box-sub" x="119" y="154" text-anchor="middle">run_notes/run_x/&lt;task&gt;.json</text>
+  </a>
+
+  <g class="box" id="k1">
+    <title>Who ran what, and on which commit</title>
+    <rect x="320" y="10" width="450" height="44" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="336" y="30">run identity</text>
+    <text class="box-sub" x="336" y="46">timestamp, model, goal, execution_time_seconds, start_row, git{commit,branch,dirty}</text>
+  </g>
+  <g class="box" id="k2">
+    <title>The batch counters over every graded task in the folder</title>
+    <rect x="320" y="68" width="450" height="44" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="336" y="88">batch counters</text>
+    <text class="box-sub" x="336" y="104">total_eval, ver_success, sr_success, avg_cbs, total_cost</text>
+  </g>
+  <g class="box" id="k3">
+    <title>This task's own verdict and reward</title>
+    <rect x="320" y="126" width="450" height="44" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="336" y="146">task verdict</text>
+    <text class="box-sub" x="336" y="162">capsule_name, is_success, task_cost, max_judge_reward</text>
+  </g>
+  <g class="box" id="k4">
+    <title>One entry per evolution iteration, oldest first</title>
+    <rect x="320" y="184" width="450" height="44" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="336" y="204">evolution lineage</text>
+    <text class="box-sub" x="336" y="220">evolution_iterations, evolved_workflows_uuids[], evolution_rewards[], evolution_costs[]</text>
+  </g>
+  <g class="box" id="k5">
+    <title>Benchmark score for every generation, not just the shipped one</title>
+    <rect x="320" y="242" width="450" height="44" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="336" y="262">ablations[] entry</text>
+    <text class="box-sub" x="336" y="278">evolution_index, uuid, VER, SR, CBS, cost, status, source</text>
+  </g>
+
+  <path class="edge" data-from="r" data-to="k1" d="M224,118 L320,32" fill="none" stroke="#4D9FFF" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw)"/>
+  <path class="edge" data-from="r" data-to="k2" d="M224,130 L320,90" fill="none" stroke="#4D9FFF" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw)"/>
+  <path class="edge" data-from="r" data-to="k3" d="M224,142 L320,148" fill="none" stroke="#4D9FFF" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw)"/>
+  <path class="edge" data-from="r" data-to="k4" d="M224,154 L320,206" fill="none" stroke="#4D9FFF" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw)"/>
+  <path class="edge" data-from="r" data-to="k5" d="M224,166 L320,264" fill="none" stroke="#4D9FFF" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw)"/>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - keys of one record, read from <code class="path">run_notes/run_1/llm_response_error_mat_feature_select.json</code>. The writer is <code class="path">sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode._save_run_notes</code> (line 448 builds the dict).</p>
+
+<p class="note say">The ablation writer never calls <code>save_results()</code>, so the <code>/tmp/mimosa_run_*</code> snapshots stay unmodified (<code class="path">sources/benchmark_evaluation/csv_mode.py</code>, line 894).</p>
+<p class="note flag">Real mismatch, my computation: in 99 of the 207 run-notes files that carry ablations, every <code>ablations[].evolution_index</code> sits beyond the length of <code>evolved_workflows_uuids</code>, because older snapshots were named with a bare 8-hex uuid that the uuid-to-index map never matched.</p>
+
+<h3>Ablations outrank the verifier reward</h3>
+<blockquote>Ablations: <code>ablations</code> outranks the verifier reward - it is what the benchmark actually graded. <code>source</code> is <code>snapshot</code> (genotype re-graded) or <code>capsule</code> (final submission).</blockquote>
+<p class="figcap">Quoted from <code class="path">AGENTS.md</code>, section "Auditing finished runs", evidence map row for <code>run_notes/run_&lt;x&gt;/&lt;task&gt;.json</code>.</p>
+
+<details><summary>schema as a tree (keys quoted from the file above)</summary><div class="dbody">
+<pre>run_notes/run_1/llm_response_error_mat_feature_select.json
+├─ "timestamp": "2026-09-20T07:32:46.422353"
+├─ "model": "openrouter/deepseek/deepseek-v3.2"
+├─ "goal": "&lt;task text&gt;"
+├─ "execution_time_seconds": 36977.67
+├─ "total_eval": 1
+├─ "start_row": 1
+├─ "git": { "commit": "80b386eb...", "branch": "mimosa_v2_verifier_tweaks", "dirty": true }
+├─ "capsule_name": "llm_response_error_mat_feature_select"
+├─ "ver_success": 1
+├─ "sr_success": 0
+├─ "avg_cbs": 0.8947
+├─ "total_cost": 23.18588
+├─ "is_success": false
+├─ "task_cost": 23.18588
+├─ "max_judge_reward": 0.9325
+├─ "evolution_iterations": 15
+├─ "evolved_workflows_uuids": ["20260919_211400_447c9921", ..., "generation_failed", ...]
+├─ "evolution_rewards": [0.8734, 0.0, 0.8861, ..., 0.9325]
+├─ "evolution_costs": [1.203, 0.0687, ...]        # per-iteration deltas
+├─ "evolution_total_cost": 23.18588
+├─ "evolution_avg_reward": 0.74424
+├─ "evolution_avg_cost": 1.54573
+└─ "ablations": [
+     {
+       "evolution_index": 0,
+       "uuid": "20260919_211400_447c9921",
+       "VER": true,  "VER_message": "Code executed. Output: CBFV is an optional ...",
+       "SR": false,  "SR_message": "N/A",
+       "CBS": 0.0,
+       "cost": 1.203053065,
+       "status": "evaluated",
+       "source": "snapshot"
+     }, ...
+   ]</pre>
+<p>Schema check over <code>run_notes/**/*.json</code> (473 files, my computation): 460 files carry the 23 top-level keys above; 2 files carry the 7 base keys only (<code class="path">run_notes/chemistry_iterative_v4_flash/plot_phonon_dos_dfpt_vasp_plot_phonon_dos.json</code> and <code class="path">run_notes/asb_full_single_1/clintox_multitask_toxicity_approval_prediction_clintox_nn.json</code>); 11 files in <code class="path">run_notes/evaluations/</code> use the queue shape, 9 of them with <code>final_results</code>.</p>
+</div></details>
+
+<details><summary>ablation entries: counted facts (my computation)</summary><div class="dbody">
+<pre>ablation entries total ............... 1166
+  source = "snapshot" ................ 1058   (re-graded /tmp workspace)
+  source = "capsule" ................. 108    (best run: capsule metrics reused)
+  status = "excluded" ................ 10     (infra failure, VER/SR/CBS = null)
+  index == position in uuid list ..... 493
+  index beyond uuid list length ...... 673    (orphan snapshots)</pre>
+<p>Snapshots are written by <code class="path">sources/utils/workspace_management.py::WorkspaceManager.save_run_snapshot</code> (line 87) as <code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code>. Gates: <code>evaluate_snapshot_ablations</code> (<code>config_default.json</code> line 68, default <code>true</code>).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>3. How a capsule is graded</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 220" role="img" aria-label="Capsule grading path">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="g1" href="area_benchmark_evaluation.html">
+    <title>CapsuleEvaluator.evaluate_all returns VER, SR, CBS, cost</title>
+    <rect x="16" y="40" width="190" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="111" y="64" text-anchor="middle">CapsuleEvaluator</text>
+    <text class="box-sub" x="111" y="80" text-anchor="middle">evaluate_all</text>
+  </a>
+  <a class="box" id="g2" href="area_benchmark_evaluation.html">
+    <title>ExecutionSandbox.run_generated_code runs the generated script in a venv</title>
+    <rect x="240" y="40" width="200" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="340" y="64" text-anchor="middle">ExecutionSandbox</text>
+    <text class="box-sub" x="340" y="80" text-anchor="middle">run_generated_code</text>
+  </a>
+  <a class="box" id="g3" href="area_benchmark_evaluation.html">
+    <title>ExecutionSandbox.run_eval_script parses the last (status, message) tuple</title>
+    <rect x="474" y="40" width="200" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="574" y="64" text-anchor="middle">run_eval_script</text>
+    <text class="box-sub" x="574" y="80" text-anchor="middle">parses result tuple</text>
+  </a>
+  <a class="box" id="g4" href="area_benchmark_evaluation.html">
+    <title>110 grader scripts define eval() and print a tuple</title>
+    <rect x="708" y="40" width="190" height="58" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="803" y="64" text-anchor="middle">eval_programs/*.py</text>
+    <text class="box-sub" x="803" y="80" text-anchor="middle">110 graders</text>
+  </a>
+  <g class="box" id="g5">
+    <title>Gold reference data copied next to the eval script</title>
+    <rect x="708" y="140" width="190" height="58" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="803" y="164" text-anchor="middle">gold_results/</text>
+    <text class="box-sub" x="803" y="180" text-anchor="middle">112 gold files</text>
+  </g>
+
+  <path class="edge" data-from="g1" data-to="g2" d="M206,69 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="223" y="32" text-anchor="middle">capsule path</text>
+  <path class="edge" data-from="g2" data-to="g3" d="M440,69 H474" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="457" y="32" text-anchor="middle">VER pass</text>
+  <path class="edge" data-from="g3" data-to="g4" d="M674,69 H708" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="691" y="32" text-anchor="middle">runs grader</text>
+  <path class="edge dashed-edge" data-from="g4" data-to="g5" d="M803,98 V140" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="812" y="122" text-anchor="start">reads gold</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - grader path. Loader symbols: <code class="path">sources/benchmark_evaluation/science_agent_bench.py::ScienceAgentBenchLoader.get_eval_script_path</code> and <code>::get_gold_program_path</code>. The sandbox copies <code>gold_results/</code> into <code>benchmark/eval_programs/gold_results</code> before the grader runs (<code class="path">execution_sandbox.py::ExecutionSandbox.run_eval_script</code>, line 990).</p>
+
+<h3>Where each metric comes from</h3>
+<table>
+<thead><tr><th>Metric</th><th>Writer</th><th>How it is produced</th></tr></thead>
+<tbody>
+<tr><td class="sym">VER</td><td class="sym">CapsuleEvaluator.evaluate_success_rate</td><td>generated script exits 0 and writes every expected file; timeout <code>900 s</code></td></tr>
+<tr><td class="sym">SR</td><td class="sym">ExecutionSandbox.run_eval_script</td><td>grader prints <code>(1, message)</code>; timeout <code>300 s</code></td></tr>
+<tr><td class="sym">CBS</td><td class="sym">CapsuleEvaluator.calculate_codebert_score</td><td>CodeBERT token F1; forced to <code>1.0</code> when SR is true</td></tr>
+<tr><td class="sym">cost</td><td class="sym">CsvEvaluationMode._compute_per_iteration_costs</td><td>deltas of cumulative <code>IndividualRun.cost</code> per iteration</td></tr>
+<tr><td class="sym">excluded</td><td class="sym">EvalInfraError</td><td>VER, SR, CBS become <code>null</code>; task leaves the mean</td></tr>
+</tbody>
+</table>
+<p class="figcap">Message shapes seen in <code class="path">run_notes/run_1/llm_response_error_mat_feature_select.json</code>: <code>"N/A"</code> is hardcoded in <code class="path">datasets/ScienceAgentBench/eval_programs/eval_mat_feature_select.py</code> (<code>return int(overlap &gt;= 14), "N/A"</code>). <code class="path">run_notes/run_1/llm_response_error_papyrus_filtering.json</code> shows <code>"0 / 336"</code>, the shape of <code>eval_papyrus.py</code> line 16.</p>
+
+<div class="grid2">
+<div class="card l4">
+<h4><a href="../../sources/benchmark_evaluation/capsule_evaluator.py">sources/benchmark_evaluation/capsule_evaluator.py</a></h4>
+<p class="role">Runs VER, SR and CBS for one capsule or one snapshot and returns the metric dict.</p>
+<p class="meta">372 lines &#183; class: CapsuleEvaluator &#183; reads config field <code>runs_capsule_dir</code> indirectly</p>
+<details><summary>signatures</summary><div class="dbody">
+<pre>CapsuleEvaluator.evaluate_all() -&gt; dict
+CapsuleEvaluator.evaluate_success_rate() -&gt; (SR, SR_msg, VER, VER_msg)
+CapsuleEvaluator.calculate_codebert_score() -&gt; float
+CapsuleEvaluator.save_results(output_path=None) -&gt; Path</pre>
+<p><code>_expected_outputs()</code> adds statically named <code class="path">pred_results/...</code> paths found in the grader text (line 152).</p>
+</div></details>
+</div>
+
+<div class="card l4">
+<h4><a href="../../sources/benchmark_evaluation/execution_sandbox.py">sources/benchmark_evaluation/execution_sandbox.py</a></h4>
+<p class="role">Builds a reused Python 3.10 venv, runs the generated script, then runs the grader subprocess.</p>
+<p class="meta">1 126 lines &#183; class: ExecutionSandbox, EvalInfraError &#183; base stack pinned in <code>BASIC_PACKAGES</code> (line 160)</p>
+<details><summary>signatures and limits</summary><div class="dbody">
+<pre>ExecutionSandbox.run_generated_code(script_path, script_name, expected_output, timeout=3600) -&gt; (bool, str)
+ExecutionSandbox.run_eval_script(eval_script_path, visual_judge_path=None, timeout=600) -&gt; (bool, str)
+ExecutionSandbox._parse_eval_output(output: str) -&gt; (bool, str)
+ExecutionSandbox.cleanup() -&gt; None</pre>
+<p><code>SANDBOX_PYTHON_VERSION = "3.10"</code> (line 26). 69 of 111 grader files import <code>gpt4_visual_judge</code>, so those tasks need <code>OPENAI_API_KEY</code> or they are excluded (my count of <code>eval_programs/*.py</code>).</p>
+</div></details>
+</div>
+
+<div class="card l4">
+<h4><a href="../../sources/benchmark_evaluation/codebert_scorer.py">sources/benchmark_evaluation/codebert_scorer.py</a></h4>
+<p class="role">Scores generated code against the gold program with CodeBERT embeddings and greedy token F1.</p>
+<p class="meta">167 lines &#183; functions: calculate_codebert_score, preload_codebert_model &#183; model <code>microsoft/codebert-base</code></p>
+<details><summary>signature</summary><div class="dbody">
+<pre>calculate_codebert_score(generated_code_path: Path, gold_code_path: Path) -&gt; float  # raises on failure</pre>
+<p>The caller owns the fallback: <code>CapsuleEvaluator</code> records the reason in <code>self._cbs_error</code> and returns <code>0.0</code>.</p>
+</div></details>
+</div>
+
+<div class="card steel">
+<h4><a href="../../sources/benchmark_evaluation/science_agent_bench.py">sources/benchmark_evaluation/science_agent_bench.py</a></h4>
+<p class="role">Resolves dataset folders, grader scripts and gold program paths for one CSV row.</p>
+<p class="meta">222 lines &#183; class: ScienceAgentBenchLoader &#183; base path <code>datasets/ScienceAgentBench</code></p>
+<details><summary>signatures</summary><div class="dbody">
+<pre>ScienceAgentBenchLoader.load_csv_data(csv_path=None) -&gt; list[dict]
+ScienceAgentBenchLoader.get_dataset_path(task_data) -&gt; Path
+ScienceAgentBenchLoader.get_eval_script_path(task_data) -&gt; (Path, Path | None)
+ScienceAgentBenchLoader.get_gold_program_path(task_data) -&gt; Path</pre>
+<p>Missing dataset folder, grader or gold program raises; the caller turns these into infra exclusions.</p>
+</div></details>
+</div>
+
+<div class="card steel">
+<h4><a href="../../sources/benchmark_evaluation/scenario_loader.py">sources/benchmark_evaluation/scenario_loader.py</a></h4>
+<p class="role">Reads JSON rubric files; its own docstring says it is not used for ScienceAgentBench grading.</p>
+<p class="meta">196 lines &#183; class: ScenarioLoader &#183; default dir <code>datasets/ScienceAgentBench/scoring_rubrics</code> (102 files)</p>
+<details><summary>signatures</summary><div class="dbody">
+<pre>ScenarioLoader.load_scenario(scenario_rubric: str) -&gt; dict | None
+ScenarioLoader._validate_rubric_format(scenario) -&gt; bool</pre>
+<p>Only caller in this flow: <code class="path">sources/core/evolution_engine.py</code> line 871, for assertion plots. Batch mode passes <code>scenario_rubric=None</code>, so the CSV column <code>scoring_rubric_file</code> does not affect the score.</p>
+</div></details>
+</div>
+
+<div class="card steel">
+<h4><a href="../../sources/benchmark_evaluation/eval_workflow_generation.py">sources/benchmark_evaluation/eval_workflow_generation.py</a></h4>
+<p class="role">Separate benchmark: scores LLMs on workflow generation only, with <code>no_run=True</code> and no grading.</p>
+<p class="meta">189 lines &#183; class: WorkflowEval &#183; entry <code>main.py::workflow_generation_evals</code> (line 192)</p>
+<details><summary>signatures</summary><div class="dbody">
+<pre>WorkflowEval.run_workflow_eval_loop(dataset_type, dataset_path) -&gt; None
+WorkflowEval.run_workflow_eval_loop_model(dataset_type, dataset_path, model_name) -&gt; None
+WorkflowEval._display_comparative_report() -&gt; None</pre>
+<p>Per task it calls <code>WorkflowOrchestrator.orchestrate_workflow(no_run=True)</code> under a <code>asyncio.wait_for(..., timeout=180)</code>, then counts success, timeouts and average time.</p>
+</div></details>
+</div>
+</div>
+</div>
+
+<footer>
+<p>Sources: <code>UPDATE_VISUAL_CLONE.md</code> sections 1, 3, 4, 6, 7, 9; <code class="path">docs/visual_clone/_reference.html</code>; <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p>Code read: <code>main.py</code> (mode dispatch, flags), <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (entry, both loops, run-notes writer, ablation writer, summary), <code class="path">sources/benchmark_evaluation/capsule_evaluator.py</code>, <code class="path">sources/benchmark_evaluation/execution_sandbox.py</code>, <code class="path">sources/benchmark_evaluation/science_agent_bench.py</code>, <code class="path">sources/benchmark_evaluation/scenario_loader.py</code>, <code class="path">sources/benchmark_evaluation/codebert_scorer.py</code>, <code class="path">sources/benchmark_evaluation/eval_workflow_generation.py</code>, <code class="path">sources/cli/evaluation_cli.py</code> (run-notes folder per run), <code class="path">sources/utils/workspace_management.py</code> (snapshot path), <code class="path">sources/utils/transfer_toolomics.py</code> (capsule transfer), <code>config.py</code> and <code>config_default.json</code> (<code>evaluate_snapshot_ablations</code>, <code>max_concurrent_eval_tasks</code>).</p>
+<p>Data read: <code class="path">datasets/ScienceAgentBench.csv</code> (header and row count), <code class="path">datasets/ScienceAgentBench_backup_full.csv</code> (row count), <code class="path">datasets/ScienceAgentBench/eval_programs/</code> (file counts, <code>eval_mat_feature_select.py</code>, <code>eval_papyrus.py</code>, <code>antibioticsai_filter_eval.py</code>, <code>clintox_nn_eval.py</code>, <code>gpt4_visual_judge.py</code>), <code class="path">datasets/ScienceAgentBench/eval_programs/gold_results/</code> (count), <code>run_notes/**/*.json</code> (schema counts) and <code class="path">run_notes/run_1/llm_response_error_mat_feature_select.json</code> (quoted keys).</p>
+<p class="skips">Skipped: <code class="path">datasets/ScienceAgentBench/datasets/</code>, <code>datasets_chemistry/</code>, <code>gold_programs/</code> and <code>scoring_rubrics/</code> contents (data only; counts given). Skipped on purpose: the 1 100-line body of <code>execution_sandbox.py</code> dependency rules and the 1 826-line body of <code>csv_mode.py</code> summary/email helpers (not on this flow). Skipped: <code class="path">sources/workflows/</code>, <code>runs_capsule/</code>, <code class="path">sources/memory/</code>, <code>logs/</code> (Tier D runtime, named only). Skipped: the 110 remaining grader files after sampling 5 (their shape is uniform: <code>def eval()</code> plus <code>print(eval())</code> in 110 of 111 files, my count).</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time, so line numbers and counts are a snapshot of this checkout.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

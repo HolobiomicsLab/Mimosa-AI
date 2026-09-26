@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Test coverage matrix - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > tests > coverage matrix">
+<div class="wrap">
+
+<h1 class="hud">Test coverage matrix</h1>
+<p class="intro">This page maps each file in <code>tests/</code> to the module it exercises. Coverage means the test file imports that module, or loads it by path with <code>importlib</code>. The suite runs offline: tests stub or mock the LLM calls (<code>AGENTS.md:163</code>).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Where the 45 files in tests/ point</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="Test file groups and the source folders they cover">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="g1" href="area_sources_core.html">
+    <title>11 test files exercise sources/core</title>
+    <rect x="12" y="16" width="138" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="81" y="44" text-anchor="middle">core</text>
+    <text class="box-sub" x="81" y="62" text-anchor="middle">11 test files</text>
+    <text class="box-sub" x="81" y="76" text-anchor="middle">planner, selection, ...</text>
+  </a>
+  <a class="box" id="g2" href="area_evaluators.html">
+    <title>11 test files exercise sources/evaluators</title>
+    <rect x="156" y="16" width="138" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="225" y="44" text-anchor="middle">evaluators</text>
+    <text class="box-sub" x="225" y="62" text-anchor="middle">11 test files</text>
+    <text class="box-sub" x="225" y="76" text-anchor="middle">verifier, hybrid_verifier</text>
+  </a>
+  <a class="box" id="g3" href="area_utils.html">
+    <title>5 test files exercise sources/utils</title>
+    <rect x="300" y="16" width="138" height="70" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="369" y="44" text-anchor="middle">utils</text>
+    <text class="box-sub" x="369" y="62" text-anchor="middle">5 test files</text>
+    <text class="box-sub" x="369" y="76" text-anchor="middle">paths, pricing, precheck</text>
+  </a>
+  <a class="box" id="g4" href="area_cli.html">
+    <title>4 test files exercise sources/cli and sources/transparency</title>
+    <rect x="444" y="16" width="138" height="70" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="513" y="44" text-anchor="middle">cli + transparency</text>
+    <text class="box-sub" x="513" y="62" text-anchor="middle">4 test files</text>
+    <text class="box-sub" x="513" y="76" text-anchor="middle">onboard, eval, theme, astra</text>
+  </a>
+  <a class="box" id="g5" href="area_benchmark_evaluation.html">
+    <title>9 test files exercise benchmark_evaluation and workflow templates</title>
+    <rect x="588" y="16" width="138" height="70" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="657" y="44" text-anchor="middle">benchmark + templates</text>
+    <text class="box-sub" x="657" y="62" text-anchor="middle">9 test files</text>
+    <text class="box-sub" x="657" y="76" text-anchor="middle">sandbox, csv_mode</text>
+  </a>
+  <a class="box" id="g6" href="area_entry_config.html">
+    <title>1 test file takes config.py as its subject</title>
+    <rect x="732" y="16" width="156" height="70" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="810" y="44" text-anchor="middle">config + main</text>
+    <text class="box-sub" x="810" y="62" text-anchor="middle">1 test file</text>
+    <text class="box-sub" x="810" y="76" text-anchor="middle">11 files import config</text>
+  </a>
+
+  <g class="box" id="t1">
+    <title>the seven source folders under test</title>
+    <rect x="140" y="222" width="270" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="275" y="248" text-anchor="middle">sources/ modules</text>
+    <text class="box-sub" x="275" y="266" text-anchor="middle">7 folders under test</text>
+  </g>
+  <g class="box" id="t2">
+    <title>repo root files under test</title>
+    <rect x="530" y="222" width="270" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="665" y="248" text-anchor="middle">repo root files</text>
+    <text class="box-sub" x="665" y="266" text-anchor="middle">config.py, main.py</text>
+  </g>
+
+  <path class="edge" data-from="g1" data-to="t1" d="M81,86 L165,222" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="123" y="160" text-anchor="middle">sources/core/*</text>
+  <path class="edge" data-from="g2" data-to="t1" d="M225,86 L220,222" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="222" y="160" text-anchor="middle">sources/evaluators/*</text>
+  <path class="edge" data-from="g3" data-to="t1" d="M369,86 L275,222" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="322" y="160" text-anchor="middle">sources/utils/*</text>
+  <path class="edge" data-from="g4" data-to="t1" d="M513,86 L330,222" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="421" y="160" text-anchor="middle">sources/cli/*</text>
+  <path class="edge" data-from="g5" data-to="t1" d="M657,86 L385,222" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="521" y="160" text-anchor="middle">sources/benchmark_evaluation/*</text>
+  <path class="edge" data-from="g6" data-to="t2" d="M810,86 L665,222" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="733" y="160" text-anchor="middle">config.py, main.py</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - 41 of the 45 files are pytest tests; box 4 groups the <a href="area_security_transparency.html">transparency</a> tests, box 5 groups the <a href="data_modules_prompts.html">template</a> test (one file: <code>smolagent_factory_logprobs_test.py</code>).</p>
+
+<table>
+<thead><tr><th>Test file</th><th class="size">Lines</th><th>Group</th><th>Modules covered</th><th class="size">Test funcs</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/archive_projection_test.py">archive_projection_test.py</a></td><td class="size">99</td><td>utils</td><td><a href="area_utils.html"><code class="path">sources/utils/archive_projection.py</code></a></td><td class="size">8</td></tr>
+<tr><td class="sym"><a href="../../tests/astra_exporter_test.py">astra_exporter_test.py</a></td><td class="size">649</td><td>cli + transparency</td><td><a href="area_security_transparency.html"><code>sources/transparency/*</code></a>, <code class="path">core/llm_provider.py</code>, <code class="path">core/evolution_engine.py</code>, <code>config.py</code></td><td class="size">47</td></tr>
+<tr><td class="sym"><a href="../../tests/config_roundtrip_test.py">config_roundtrip_test.py</a></td><td class="size">170</td><td>config + main</td><td><a href="area_entry_config.html"><code>config.py</code></a></td><td class="size">4</td></tr>
+<tr><td class="sym"><a href="../../tests/csv_mode_ablation_index_test.py">csv_mode_ablation_index_test.py</a></td><td class="size">222</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a>, <code class="path">core/schema.py</code></td><td class="size">4</td></tr>
+<tr><td class="sym"><a href="../../tests/csv_mode_cache_restore_test.py">csv_mode_cache_restore_test.py</a></td><td class="size">180</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a></td><td class="size">9</td></tr>
+<tr><td class="sym"><a href="../../tests/csv_mode_logging_test.py">csv_mode_logging_test.py</a></td><td class="size">66</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a></td><td class="size">3</td></tr>
+<tr><td class="sym"><a href="../../tests/csv_mode_network_retry_test.py">csv_mode_network_retry_test.py</a></td><td class="size">104</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a></td><td class="size">7</td></tr>
+<tr><td class="sym"><a href="../../tests/csv_mode_run_notes_fallback_test.py">csv_mode_run_notes_fallback_test.py</a></td><td class="size">280</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a>, <code class="path">core/schema.py</code></td><td class="size">4</td></tr>
+<tr><td class="sym"><a href="../../tests/evaluation_cli_test.py">evaluation_cli_test.py</a></td><td class="size">332</td><td>cli + transparency</td><td><a href="area_cli.html"><code class="path">sources/cli/evaluation_cli.py</code></a>, <code>config.py</code></td><td class="size">15</td></tr>
+<tr><td class="sym"><a href="../../tests/evaluator_test.py">evaluator_test.py</a></td><td class="size">95</td><td>evaluators</td><td><a href="area_evaluators.html"><code class="path">evaluators/evaluator.py</code></a>, <code>config.py</code>; DEAD <code class="path">core/dgm.py</code></td><td class="size">2</td></tr>
+<tr><td class="sym"><a href="../../tests/failure_fingerprint_test.py">failure_fingerprint_test.py</a></td><td class="size">156</td><td>core</td><td><a href="area_sources_core.html"><code class="path">sources/core/failure_fingerprint.py</code></a></td><td class="size">12</td></tr>
+<tr><td class="sym"><a href="../../tests/genotype_embedding_chunking_test.py">genotype_embedding_chunking_test.py</a></td><td class="size">198</td><td>core</td><td><a href="area_sources_core.html"><code class="path">sources/core/genotype_embedding.py</code></a></td><td class="size">12</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">hybrid_verifier_test.py</a></td><td class="size">1270</td><td>evaluators</td><td><a href="mod_evaluators_hybrid_verifier.html"><code>evaluators/hybrid_verifier/*</code></a> 7 modules, <code class="path">evaluators/base.py</code>, <code class="path">evaluators/evaluator.py</code>, <code class="path">evaluators/verifier.py</code>, <code class="path">core/failure_fingerprint.py</code>, <code>main.py</code></td><td class="size">41</td></tr>
+<tr><td class="sym"><a href="../../tests/judge_test.py">judge_test.py</a></td><td class="size">40</td><td>evaluators</td><td><a href="area_entry_config.html"><code>config.py</code></a>; DEAD <code class="path">core/judge.py</code></td><td class="size">1</td></tr>
+<tr><td class="sym"><a href="../../tests/lineage_goal_filter_test.py">lineage_goal_filter_test.py</a></td><td class="size">88</td><td>core</td><td><a href="mod_core_lineage.html"><code class="path">sources/core/lineage.py</code></a> (loaded by path)</td><td class="size">5</td></tr>
+<tr><td class="sym"><a href="../../tests/llm_provider_test.py">llm_provider_test.py</a></td><td class="size">137</td><td>core</td><td><a href="mod_core_tools_llm.html"><code class="path">sources/core/llm_provider.py</code></a></td><td class="size">5</td></tr>
+<tr><td class="sym"><a href="../../tests/onboard_cli_test.py">onboard_cli_test.py</a></td><td class="size">101</td><td>cli + transparency</td><td><a href="area_cli.html"><code class="path">sources/cli/onboard_cli.py</code></a></td><td class="size">7</td></tr>
+<tr><td class="sym"><a href="../../tests/paths_test.py">paths_test.py</a></td><td class="size">121</td><td>utils</td><td><a href="area_utils.html"><code class="path">sources/utils/paths.py</code></a>, <code>config.py</code></td><td class="size">10</td></tr>
+<tr><td class="sym"><a href="../../tests/planner_human_approve_test.py">planner_human_approve_test.py</a></td><td class="size">119</td><td>core</td><td><a href="mod_core_planner.html"><code class="path">sources/core/planner.py</code></a>, <code>config.py</code></td><td class="size">7</td></tr>
+<tr><td class="sym"><a href="../../tests/planner_json_extraction_test.py">planner_json_extraction_test.py</a></td><td class="size">262</td><td>core</td><td><a href="mod_core_planner.html"><code class="path">core/planner.py</code></a>, <code class="path">core/schema.py</code> (loaded by path, siblings stubbed)</td><td class="size">9</td></tr>
+<tr><td class="sym"><a href="../../tests/planner_test.py">planner_test.py</a></td><td class="size">98</td><td>core</td><td><a href="mod_core_planner.html"><code class="path">core/planner.py</code></a>, <code class="path">core/schema.py</code></td><td class="size">4</td></tr>
+<tr><td class="sym"><a href="../../tests/precheck_test.py">precheck_test.py</a></td><td class="size">104</td><td>utils</td><td><a href="area_utils.html"><code class="path">sources/utils/precheck.py</code></a></td><td class="size">3</td></tr>
+<tr><td class="sym"><a href="../../tests/pricing_test.py">pricing_test.py</a></td><td class="size">386</td><td>utils</td><td><a href="area_utils.html"><code class="path">utils/pricing.py</code></a>, <code class="path">utils/mock_data.py</code>, <code>config.py</code></td><td class="size">10</td></tr>
+<tr><td class="sym"><a href="../../tests/run_metrics_test.py">run_metrics_test.py</a></td><td class="size">63</td><td>utils</td><td><a href="area_utils.html"><code class="path">sources/utils/run_metrics.py</code></a></td><td class="size">8</td></tr>
+<tr><td class="sym"><a href="../../tests/scenario_rubric_test.py">scenario_rubric_test.py</a></td><td class="size">163</td><td>evaluators</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/scenario_loader.py</code></a>, <code class="path">evaluators/evaluator.py</code> re-exported <code>ScenarioEvaluator</code>, <code>config.py</code></td><td class="size">3</td></tr>
+<tr><td class="sym"><a href="../../tests/selection_test.py">selection_test.py</a></td><td class="size">220</td><td>core</td><td><a href="mod_core_selection.html"><code class="path">core/selection.py</code></a>, <code class="path">core/genotype_embedding.py</code>, <code class="path">core/code_features.py</code></td><td class="size">8</td></tr>
+<tr><td class="sym"><a href="../../tests/single_agent_factory_logprobs_test.py">single_agent_factory_logprobs_test.py</a></td><td class="size">207</td><td>core</td><td><a href="area_sources_core.html"><code class="path">sources/core/single_agent_factory.py</code></a></td><td class="size">9</td></tr>
+<tr><td class="sym"><a href="../../tests/smolagent_factory_logprobs_test.py">smolagent_factory_logprobs_test.py</a></td><td class="size">258</td><td>benchmark + templates</td><td><a href="data_modules_prompts.html"><code class="path">sources/modules/smolagent_factory.py</code></a> (exec&#39;d with stub globals)</td><td class="size">13</td></tr>
+<tr><td class="sym"><a href="../../tests/test_benchmark_eval_error_handling.py">test_benchmark_eval_error_handling.py</a></td><td class="size">325</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/execution_sandbox.py</code></a>, <code>capsule_evaluator.py</code>, <code>science_agent_bench.py</code></td><td class="size">26</td></tr>
+<tr><td class="sym"><a href="../../tests/test_detect_language.py">test_detect_language.py</a></td><td class="size">46</td><td>evaluators</td><td><a href="area_evaluators_legacy.html"><code class="path">evaluators/verifier_per_claim.py</code></a></td><td class="size">4</td></tr>
+<tr><td class="sym"><a href="../../tests/test_sandbox_provisioning_pins.py">test_sandbox_provisioning_pins.py</a></td><td class="size">198</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/execution_sandbox.py</code></a></td><td class="size">16</td></tr>
+<tr><td class="sym"><a href="../../tests/test_sandbox_source_build_constraints.py">test_sandbox_source_build_constraints.py</a></td><td class="size">182</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/execution_sandbox.py</code></a></td><td class="size">5</td></tr>
+<tr><td class="sym"><a href="../../tests/theme_test.py">theme_test.py</a></td><td class="size">127</td><td>cli + transparency</td><td><a href="area_cli.html"><code class="path">sources/cli/theme.py</code></a></td><td class="size">12</td></tr>
+<tr><td class="sym"><a href="../../tests/tools_manager_test.py">tools_manager_test.py</a></td><td class="size">25</td><td>core</td><td><a href="mod_core_tools_llm.html"><code class="path">core/tools_manager.py</code></a>, <code>config.py</code></td><td class="size">1</td></tr>
+<tr><td class="sym"><a href="../../tests/variation_engine_test.py">variation_engine_test.py</a></td><td class="size">323</td><td>core</td><td><a href="mod_core_variation.html"><code class="path">sources/core/variation_engine.py</code></a></td><td class="size">20</td></tr>
+<tr><td class="sym"><a href="../../tests/verifier_claim_cache_test.py">verifier_claim_cache_test.py</a></td><td class="size">199</td><td>evaluators</td><td><a href="area_evaluators_legacy.html"><code class="path">evaluators/verifier.py</code></a>, <code class="path">core/failure_fingerprint.py</code></td><td class="size">9</td></tr>
+<tr><td class="sym"><a href="../../tests/verifier_importance_test.py">verifier_importance_test.py</a></td><td class="size">229</td><td>evaluators</td><td><a href="area_evaluators.html"><code class="path">sources/evaluators/verifier.py</code></a></td><td class="size">9</td></tr>
+<tr><td class="sym"><a href="../../tests/verifier_recovery_test.py">verifier_recovery_test.py</a></td><td class="size">415</td><td>evaluators</td><td><a href="area_evaluators_legacy.html"><code class="path">evaluators/verifier.py</code></a>, <code class="path">evaluators/verifier_per_claim.py</code>, <code class="path">core/failure_fingerprint.py</code></td><td class="size">17</td></tr>
+<tr><td class="sym"><a href="../../tests/verifier_result_focused_claims_test.py">verifier_result_focused_claims_test.py</a></td><td class="size">141</td><td>evaluators</td><td><a href="area_evaluators.html"><code class="path">evaluators/verifier_claim_sources.py</code></a>, <code>verifier_per_claim.py</code>, <code>verifier_workspace.py</code>, <code class="path">core/failure_fingerprint.py</code></td><td class="size">6</td></tr>
+<tr><td class="sym"><a href="../../tests/verifier_visual_test.py">verifier_visual_test.py</a></td><td class="size">353</td><td>evaluators</td><td><a href="area_evaluators_legacy.html"><code class="path">evaluators/verifier.py</code></a>, <code class="path">core/failure_fingerprint.py</code></td><td class="size">14</td></tr>
+<tr><td class="sym"><a href="../../tests/workflow_evaluator_test.py">workflow_evaluator_test.py</a></td><td class="size">168</td><td>evaluators</td><td><a href="area_evaluators.html"><code class="path">sources/evaluators/evaluator.py</code></a></td><td class="size">2</td></tr>
+<tr><td class="sym"><a href="../../tests/cosine_similarity.py">cosine_similarity.py</a></td><td class="size">81</td><td>helper</td><td>none in <code>sources/</code>; calls <code>openai.OpenAI()</code></td><td class="size">0</td></tr>
+<tr><td class="sym"><a href="../../tests/memory_read.py">memory_read.py</a></td><td class="size">34</td><td>helper</td><td>none; reads <code>sources/memory/&lt;uuid&gt;/*.json</code></td><td class="size">0</td></tr>
+<tr><td class="sym"><a href="../../tests/brute_gold_eval.py">brute_gold_eval.py</a></td><td class="size">269</td><td>helper</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/execution_sandbox.py</code></a></td><td class="size">0</td></tr>
+<tr><td class="sym"><a href="../../tests/__init.py">__init.py</a></td><td class="size">0</td><td>helper</td><td>none - empty file, 0 bytes</td><td class="size">0</td></tr>
+</tbody>
+</table>
+<p class="sub">45 rows: 9303 lines and 411 test functions in total (my computation).</p>
+
+<details><summary>how I counted (and what the count misses)</summary><div class="dbody">
+<p>Method: python <code>ast</code> pass over every <code>.py</code> file for imports, path literals and <code>def test_*</code> names, plus <code>grep -n</code> to confirm each named symbol. <code>lines</code> is the newline count (<code>wc -l</code>).</p>
+<p>Five files do not import their target; they load it by path so that <code class="path">sources/core/__init__.py</code> (litellm, sentence-transformers) never runs: <code>archive_projection_test.py:23</code>, <code>lineage_goal_filter_test.py:19</code>, <code>planner_json_extraction_test.py:29</code>, <code>selection_test.py:16</code>, <code>smolagent_factory_logprobs_test.py:71</code>.</p>
+<p><code>test funcs</code> counts functions, not collected tests: <code>smolagent_factory_logprobs_test.py</code> uses <code>@pytest.mark.parametrize</code>, so pytest collects more items than this column shows.</p>
+<p>Per-file line split of the biggest files: <code>hybrid_verifier_test.py</code> 1270 lines, <code>astra_exporter_test.py</code> 649, <code>verifier_recovery_test.py</code> 415.</p>
+</div></details>
+
+<p class="note say">Why it matters: the whole suite is offline and needs no API key, MCP server or Toolomics (<code>AGENTS.md:161-165</code>), so it can run in CI without secrets.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Files pytest does not collect</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 230" role="img" aria-label="Four files pytest does not collect and what they touch">
+  <defs>
+    <marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="w2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+  </defs>
+  <g class="box" id="h1">
+    <title>calculator with no test functions</title>
+    <rect x="18" y="24" width="200" height="54" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="118" y="48" text-anchor="middle">cosine_similarity.py</text>
+    <text class="box-sub" x="118" y="66" text-anchor="middle">81 lines, no tests</text>
+  </g>
+  <g class="box" id="h2">
+    <title>helper script reading runtime memory files</title>
+    <rect x="18" y="98" width="200" height="54" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="118" y="122" text-anchor="middle">memory_read.py</text>
+    <text class="box-sub" x="118" y="140" text-anchor="middle">34 lines, no tests</text>
+  </g>
+  <g class="box" id="h3">
+    <title>gold-solution harness, run as a script</title>
+    <rect x="18" y="172" width="200" height="54" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="118" y="196" text-anchor="middle">brute_gold_eval.py</text>
+    <text class="box-sub" x="118" y="214" text-anchor="middle">269 lines, no tests</text>
+  </g>
+
+  <g class="box" id="e1">
+    <title>external embeddings API</title>
+    <rect x="420" y="24" width="230" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="535" y="48" text-anchor="middle">OpenAI embeddings</text>
+    <text class="box-sub" x="535" y="66" text-anchor="middle">external call</text>
+  </g>
+  <g class="box" id="e2">
+    <title>runtime memory folder, JSON files on disk</title>
+    <path d="M420,110 v35 a115,11 0 0 0 230,0 v-35" fill="rgba(143,184,201,0.06)" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <ellipse cx="535" cy="110" rx="115" ry="11" fill="rgba(143,184,201,0.06)" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="535" y="132" text-anchor="middle">sources/memory/&lt;uuid&gt;/</text>
+    <text class="box-sub" x="535" y="150" text-anchor="middle">runtime JSON, not code</text>
+  </g>
+  <g class="box" id="e3">
+    <title>sandbox class that runs generated code</title>
+    <rect x="420" y="172" width="300" height="54" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="570" y="196" text-anchor="middle">execution_sandbox.py</text>
+    <text class="box-sub" x="570" y="214" text-anchor="middle">ExecutionSandbox, imported but not collected</text>
+  </g>
+
+  <path class="edge" data-from="h1" data-to="e1" d="M218,51 H420" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#w1)"/>
+  <text class="edge-label" x="319" y="44" text-anchor="middle">embeddings request</text>
+  <path class="edge dashed-edge" data-from="h2" data-to="e2" d="M218,125 H420" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#w1)"/>
+  <text class="edge-label" x="319" y="118" text-anchor="middle">reads one JSON file</text>
+  <path class="edge dotted-edge" data-from="h3" data-to="e3" d="M218,199 H420" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#w2)"/>
+  <text class="edge-label" x="319" y="192" text-anchor="middle">imports and runs</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - four files in <code>tests/</code> are not tests. <code>__init.py</code> is not drawn: it is empty (0 bytes) and pytest ignores it.</p>
+
+<div class="grid2">
+<div class="card steel">
+<h4><a href="../../tests/cosine_similarity.py">tests/cosine_similarity.py</a></h4>
+<p class="role">Helper with no test functions. Calls <code>openai.OpenAI()</code> (<code>cosine_similarity.py:42</code>) and <code>load_dotenv()</code> (<code>:7</code>).</p>
+<p class="meta">81 lines &#183; covers nothing in sources/</p>
+</div>
+<div class="card steel">
+<h4><a href="../../tests/memory_read.py">tests/memory_read.py</a></h4>
+<p class="role">Script that reads one runtime file: <code>read_memory_file()</code> opens <code>sources/memory/&lt;uuid&gt;/&lt;file&gt;</code> (<code>memory_read.py:17</code>).</p>
+<p class="meta">34 lines &#183; no sources/ code, reads <a href="data_runs.html">sources/memory</a></p>
+</div>
+<div class="card l3">
+<h4><a href="../../tests/brute_gold_eval.py">tests/brute_gold_eval.py</a></h4>
+<p class="role">Gold-solution harness for the benchmark. It does import <code>ExecutionSandbox</code> (<code>:31</code>), but its own docstring says pytest does not collect it (<code>:21</code>).</p>
+<p class="meta">269 lines &#183; run as <code>python3.12 tests/brute_gold_eval.py</code> (<a href="flow_sab_batch.html">batch flow</a>)</p>
+</div>
+<div class="card steel">
+<h4><a href="../../tests/__init.py">tests/__init.py</a></h4>
+<p class="role">Empty file (0 bytes). The name is missing the <code>.py</code> package convention, so Python never imports it.</p>
+<p class="meta">0 lines &#183; covers nothing</p>
+</div>
+</div>
+
+<p class="note">Limitation: <code>ls tests/</code> prints 46 entries, but one of them is the <code>__pycache__</code> folder, so this page describes 45 <code>.py</code> files (41 tests plus the 4 above).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Two test files import removed modules</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 780 200" role="img" aria-label="Two legacy test files import modules that no longer exist">
+  <defs>
+    <marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4F7486"/>
+    </marker>
+  </defs>
+  <g class="box" id="k1">
+    <title>legacy test kept for review</title>
+    <rect x="18" y="20" width="200" height="54" rx="2" fill="rgba(79,116,134,0.10)" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="118" y="44" text-anchor="middle">evaluator_test.py</text>
+    <text class="box-sub" x="118" y="62" text-anchor="middle">95 lines, 2 test funcs</text>
+  </g>
+  <g class="box" id="k2">
+    <title>legacy test kept for review</title>
+    <rect x="18" y="110" width="200" height="54" rx="2" fill="rgba(79,116,134,0.10)" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="118" y="134" text-anchor="middle">judge_test.py</text>
+    <text class="box-sub" x="118" y="152" text-anchor="middle">40 lines, 1 test func</text>
+  </g>
+  <g class="box" id="k3">
+    <title>module removed in the evolution-engine refactor</title>
+    <rect x="330" y="20" width="230" height="54" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="445" y="44" text-anchor="middle">sources/core/dgm.py</text>
+    <text class="box-sub" x="445" y="62" text-anchor="middle">absent from the tree</text>
+  </g>
+  <g class="box" id="k4">
+    <title>module removed when judging moved to sources/evaluators</title>
+    <rect x="330" y="110" width="230" height="54" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="445" y="134" text-anchor="middle">sources/core/judge.py</text>
+    <text class="box-sub" x="445" y="152" text-anchor="middle">absent from the tree</text>
+  </g>
+  <g class="box" id="k5">
+    <title>pytest skips collection instead of failing</title>
+    <rect x="620" y="65" width="150" height="54" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="695" y="89" text-anchor="middle">importorskip</text>
+    <text class="box-sub" x="695" y="107" text-anchor="middle">skips collection</text>
+  </g>
+  <path class="edge dotted-edge" data-from="k1" data-to="k3" d="M218,47 H330" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#d1)"/>
+  <text class="edge-label" x="274" y="40" text-anchor="middle">import fails</text>
+  <path class="edge dotted-edge" data-from="k2" data-to="k4" d="M218,137 H330" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#d1)"/>
+  <text class="edge-label" x="274" y="130" text-anchor="middle">import fails</text>
+  <path class="edge" data-from="k3" data-to="k5" d="M560,47 L620,78" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#d1)"/>
+  <path class="edge" data-from="k4" data-to="k5" d="M560,137 L620,106" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#d1)"/>
+  <text class="edge-label" x="592" y="182" text-anchor="middle">test body never runs</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - both files name a module that is not in the tree at commit <code>7e8463b</code>; <code>grep -rn "class DarwinMachine" sources/</code> and <code>grep -rn "class WorkflowJudge" sources/</code> return nothing.</p>
+
+<p class="note flag">Real mismatch: <code>evaluator_test.py</code> and <code>judge_test.py</code> are named as tests, but every test in them is dead - <code>pytest.importorskip</code> skips them before the test body runs.</p>
+
+<blockquote>``sources.core.dgm`` / ``DarwinMachine`` were removed during the evolution
+engine refactor. This file was left behind; skip collection cleanly until
+the user decides whether to rewrite it against the current EvolutionEngine
+API or delete it.</blockquote>
+<p class="sub">tests/evaluator_test.py:18-21</p>
+
+<blockquote>``sources.core.judge`` / ``WorkflowJudge`` were removed during the
+refactor that moved the judging logic into ``sources.evaluators``.
+This file was left behind; skip collection cleanly until the user decides
+whether to rewrite it against the current evaluator API or delete it.</blockquote>
+<p class="sub">tests/judge_test.py:8-11</p>
+
+<details><summary>skip mechanics, with line numbers</summary><div class="dbody">
+<pre>tests/evaluator_test.py:22  pytest.importorskip(
+tests/evaluator_test.py:24      reason="sources.core.dgm no longer exists; legacy test file kept for review")
+tests/evaluator_test.py:26  from sources.core.dgm import DarwinMachine
+tests/evaluator_test.py:27  from sources.evaluators.evaluator import WorkflowEvaluator
+
+tests/judge_test.py:12      pytest.importorskip(
+tests/judge_test.py:14          reason="sources.core.judge no longer exists; legacy test file kept for review")
+tests/judge_test.py:16      from sources.core.judge import WorkflowJudge</pre>
+<p>Both files still import <code>config.Config</code> and call <code>load_dotenv()</code>, so they load <code>.env</code> when run directly as scripts, not under pytest.</p>
+<p>The live evaluator tests are <a href="../../tests/workflow_evaluator_test.py">workflow_evaluator_test.py</a>, <a href="../../tests/scenario_rubric_test.py">scenario_rubric_test.py</a> and <a href="../../tests/hybrid_verifier_test.py">hybrid_verifier_test.py</a>.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">AGENTS.md</code> (Testing section, lines 155-168); <code class="path">UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <code class="path">_clone.js</code>; all 45 <code class="path">tests/*.py</code> files (imports, path literals, <code>def test_*</code> names); <code class="path">sources/core/</code>, <code class="path">sources/utils/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/cli/</code>, <code class="path">sources/benchmark_evaluation/</code>, <code class="path">sources/transparency/</code>, <code class="path">sources/modules/</code> file listings; <code class="path">config.py</code>, <code class="path">main.py</code> symbol greps.</p>
+<p class="skips">Skipped: <code class="path">tests/__pycache__/</code> (43 compiled <code>.pyc</code> files; generated output, not source); test bodies (this page is a coverage matrix, not per-test text); <code>pytest.ini</code>/<code>pyproject.toml</code> collection settings are not repeated here (they live on <a href="area_entry_config.html">area_entry_config.html</a>); <code>datasets/</code> and <code class="path">sources/memory/</code> contents (Tier D / runtime data, on <a href="data_runs.html">data_runs.html</a>); no test was executed - the pytest suite was not run.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (<code>git status --porcelain</code> lists modified <code>config.py</code>, <code>main.py</code>, <code>sources/benchmark_evaluation/*</code>, <code>sources/evaluators/*</code> and others), so line numbers may differ from a clean checkout of <code>7e8463b</code>.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

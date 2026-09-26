@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e13_l3_extreme.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > experiments_verifiers/harness > e13_l3_extreme.py">
+<div class="wrap">
+
+<h1 class="hud">e13_l3_extreme.py</h1>
+<p class="intro">The E13 study runner: eight argv-selected stages test whether claim-set structure (clusters, set attention, soft judge scores, base rates, goal conditioning) beats the linear L3 score. It runs offline on frozen caches, with zero LLM API calls. Each stage appends its arm into one shared results JSON, and the last stage writes the Markdown report.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Master diagram &mdash; stage dispatch and the work of each stage</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="e13_l3_extreme.py stage dispatch and the seven stage boxes">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="bin" href="#reads">
+    <title>All inputs are frozen files on disk</title>
+    <rect x="14" y="20" width="158" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="93" y="44" text-anchor="middle">frozen inputs</text>
+    <text class="box-sub" x="93" y="60" text-anchor="middle">e5 npz &#183; claims jsonl</text>
+    <text class="box-sub" x="93" y="76" text-anchor="middle">run_notes &#183; eval_programs</text>
+  </a>
+
+  <a class="box" id="bmain" href="#reads">
+    <title>main() loops over sys.argv, loads results, calls one stage, saves results</title>
+    <rect x="14" y="150" width="158" height="72" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="93" y="174" text-anchor="middle">main()</text>
+    <text class="box-sub" x="93" y="190" text-anchor="middle">argv stage dispatch</text>
+    <text class="box-sub" x="93" y="206" text-anchor="middle">STAGES[arg](out)</text>
+  </a>
+
+  <a class="box" id="srep" href="#reads">
+    <title>reproduce: LOTO anchor that must equal E5's 0.753</title>
+    <rect x="240" y="8" width="216" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="348" y="30" text-anchor="middle">reproduce</text>
+    <text class="box-sub" x="348" y="46" text-anchor="middle">K.loto_run &#183; assert 0.753</text>
+  </a>
+
+  <a class="box" id="sa" href="#reads">
+    <title>Arm a: cluster piecewise L3 and k-NN smoothing on the claim manifold</title>
+    <rect x="240" y="72" width="216" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="348" y="94" text-anchor="middle">a &#183; geometry</text>
+    <text class="box-sub" x="348" y="110" text-anchor="middle">piecewise_feats_factory</text>
+    <text class="box-sub" x="348" y="126" text-anchor="middle">knn_smooth_loto</text>
+  </a>
+
+  <a class="box" id="sb" href="#reads">
+    <title>Arm b: set encoders and a hashed pairwise feature block</title>
+    <rect x="240" y="142" width="216" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="348" y="164" text-anchor="middle">b &#183; set attention</text>
+    <text class="box-sub" x="348" y="180" text-anchor="middle">DeepSets &#183; SetAttn</text>
+    <text class="box-sub" x="348" y="196" text-anchor="middle">train_torch &#183; pair_features</text>
+  </a>
+
+  <a class="box" id="sc" href="#reads">
+    <title>Arm c: recover continuous judge scores from SR messages into soft targets</title>
+    <rect x="240" y="212" width="216" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="348" y="234" text-anchor="middle">c &#183; noise-first</text>
+    <text class="box-sub" x="348" y="250" text-anchor="middle">classify_message &#183; match_eval</text>
+    <text class="box-sub" x="348" y="266" text-anchor="middle">soft_targets &#183; soft_l3b_fit</text>
+  </a>
+
+  <a class="box" id="sd" href="#reads">
+    <title>Arm d: add global and within-task claim pass frequencies</title>
+    <rect x="240" y="280" width="216" height="60" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="348" y="302" text-anchor="middle">d &#183; base rates</text>
+    <text class="box-sub" x="348" y="318" text-anchor="middle">freq_global (pass+1)/(total+2)</text>
+    <text class="box-sub" x="348" y="334" text-anchor="middle">fhist over prior generations</text>
+  </a>
+
+  <a class="box" id="se" href="#reads">
+    <title>Arm e: goal embeddings, head+tail re-encode and a FiLM probe</title>
+    <rect x="240" y="346" width="216" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="348" y="368" text-anchor="middle">e &#183; goal conditioning</text>
+    <text class="box-sub" x="348" y="384" text-anchor="middle">headtail_encode &#183; film_loto</text>
+    <text class="box-sub" x="348" y="400" text-anchor="middle">prefix-domination diagnosis</text>
+  </a>
+
+  <a class="box" id="srep2" href="#reads">
+    <title>replay applies the gate and runs E9 within-task replay; report compiles the MD</title>
+    <rect x="240" y="414" width="216" height="52" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="348" y="434" text-anchor="middle">replay + report</text>
+    <text class="box-sub" x="348" y="450" text-anchor="middle">_fit_*_scorer &#183; stage_report</text>
+  </a>
+
+  <g class="box" id="bout">
+    <title>Each stage writes back into the shared results JSON; report also writes the MD</title>
+    <rect x="700" y="120" width="184" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="792" y="146" text-anchor="middle">writes</text>
+    <text class="box-sub" x="792" y="166" text-anchor="middle">E13_l3_extreme_2026-09-23.json</text>
+    <text class="box-sub" x="792" y="186" text-anchor="middle">E13_l3_extreme_2026-09-23.md</text>
+    <text class="box-sub" x="792" y="206" text-anchor="middle">_cache_e13_goal_headtail</text>
+    <text class="box-sub" x="792" y="222" text-anchor="middle">_2026-09-23.npz</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="bin" data-to="bmain" d="M93,92 V150" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="100" y="124" text-anchor="start">load_results()</text>
+
+  <path class="edge" data-from="bmain" data-to="srep" d="M172,160 L240,36" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="180" y="96" text-anchor="start">reproduce</text>
+  <path class="edge" data-from="bmain" data-to="sa" d="M172,178 L240,103" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="206" y="146" text-anchor="middle">a</text>
+  <path class="edge" data-from="bmain" data-to="sb" d="M172,190 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="206" y="182" text-anchor="middle">b</text>
+  <path class="edge" data-from="bmain" data-to="sc" d="M172,202 L240,243" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="206" y="230" text-anchor="middle">c</text>
+  <path class="edge" data-from="bmain" data-to="sd" d="M172,212 L240,310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="268" text-anchor="middle">d</text>
+  <path class="edge" data-from="bmain" data-to="se" d="M172,222 L240,377" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="196" y="312" text-anchor="middle">e</text>
+  <path class="edge" data-from="bmain" data-to="srep2" d="M172,230 L240,440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="192" y="360" text-anchor="middle">replay / report</text>
+
+  <path class="edge dashed-edge" data-from="srep" data-to="bout" d="M456,36 C600,36 620,120 700,140" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="sa" data-to="bout" d="M456,103 C600,103 620,130 700,150" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="sb" data-to="bout" d="M456,173 C600,173 620,150 700,160" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="sc" data-to="bout" d="M456,243 C600,243 620,180 700,176" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="sd" data-to="bout" d="M456,310 C600,310 620,200 700,190" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="se" data-to="bout" d="M456,377 C600,377 620,215 700,204" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="srep2" data-to="bout" d="M456,440 C600,440 620,230 700,218" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="560" y="130" text-anchor="middle">save_results() after each stage</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>STAGES</code> (line 1428) maps seven argv tokens to stage functions; <code>main()</code> (line 1432) calls one stage per token and saves the dict after each. Stage names and helpers are real symbols in <a href="../../experiments_verifiers/harness/e13_l3_extreme.py">e13_l3_extreme.py</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Data flow &mdash; frozen evidence in, one results file out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="e13_l3_extreme.py data flow: caches and run_notes in, results JSON and MD out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="d1">
+    <title>Read-only frozen inputs</title>
+    <rect x="14" y="30" width="200" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="114" y="54" text-anchor="middle">reads (never written)</text>
+    <text class="box-sub" x="114" y="76" text-anchor="middle">results/_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="114" y="94" text-anchor="middle">data/verifier_claims.jsonl</text>
+    <text class="box-sub" x="114" y="112" text-anchor="middle">data/verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="114" y="130" text-anchor="middle">run_notes/*/*.json</text>
+    <text class="box-sub" x="114" y="148" text-anchor="middle">datasets/.../eval_programs/*.py</text>
+    <text class="box-sub" x="114" y="166" text-anchor="middle">results/_cache_e10_goal_emb.npz</text>
+  </g>
+
+  <a class="box" id="d2" href="#reads">
+    <title>Stage functions add keys under out["arms"]</title>
+    <rect x="268" y="60" width="176" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="356" y="84" text-anchor="middle">out dict</text>
+    <text class="box-sub" x="356" y="102" text-anchor="middle">arms.reproduce</text>
+    <text class="box-sub" x="356" y="118" text-anchor="middle">arms.a_geometry &#8230; e_goal</text>
+    <text class="box-sub" x="356" y="134" text-anchor="middle">gate, runtimes, environment</text>
+  </a>
+
+  <a class="box" id="d3" href="#reads">
+    <title>headtail_encode writes a new npz cache on first run</title>
+    <rect x="500" y="24" width="176" height="72" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="588" y="48" text-anchor="middle">headtail_encode()</text>
+    <text class="box-sub" x="588" y="64" text-anchor="middle">if out_npz exists: load</text>
+    <text class="box-sub" x="588" y="80" text-anchor="middle">else MiniLM re-encode 128+128</text>
+  </a>
+
+  <g class="box" id="d4">
+    <title>Three files written</title>
+    <rect x="700" y="100" width="186" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="793" y="124" text-anchor="middle">writes</text>
+    <text class="box-sub" x="793" y="144" text-anchor="middle">E13_l3_extreme_2026-09-23.json</text>
+    <text class="box-sub" x="793" y="164" text-anchor="middle">E13_l3_extreme_2026-09-23.md</text>
+    <text class="box-sub" x="793" y="184" text-anchor="middle">_cache_e13_goal_headtail</text>
+    <text class="box-sub" x="793" y="200" text-anchor="middle">_2026-09-23.npz</text>
+    <text class="box-sub" x="793" y="220" text-anchor="middle">(npz only on a cold cache)</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d2" d="M214,105 H268" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="241" y="97" text-anchor="middle">load_e5() etc.</text>
+  <path class="edge" data-from="d2" data-to="d3" d="M444,90 L500,62" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="66" text-anchor="middle">stage e</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="d4" d="M676,70 L700,120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="88" text-anchor="middle">savez()</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d4" d="M444,150 L700,160" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="570" y="146" text-anchor="middle">save_results() &#183; OUT_MD.write_text()</text>
+
+  <text class="box-sub" x="14" y="222">No project config field is read: the script hardcodes TODAY = "2026-09-23" in e13_common (line 21 there) for every output name.</text>
+  <text class="box-sub" x="14" y="244">run_notes/ is read-only evidence; the script joins it by uuid suffix (e13_common.uuid_match, lines 213&ndash;220 there).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; reads at lines 44&ndash;57 (<code>load_e5</code>, <code>load_emb</code>, <code>load_sane</code>), 477 (<code>eval_programs</code> glob), 608 (<code>run_notes_index</code>), 880 (<code>_cache_e10_goal_emb.npz</code>). Writes at lines 844, 1424, and through <code>K.save_results</code> at line 1439.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic &mdash; stage dispatch loop and the replay gate</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 320" role="img" aria-label="e13_l3_extreme.py dispatch loop and replay gate decision">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="k1" href="#reads">
+    <title>main() iterates over argv, defaulting to reproduce</title>
+    <rect x="20" y="30" width="164" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="102" y="54" text-anchor="middle">for arg in sys.argv[1:]</text>
+    <text class="box-sub" x="102" y="70" text-anchor="middle">default ["reproduce"]</text>
+  </a>
+
+  <a class="box" id="k2" href="#reads">
+    <title>Unknown stage names stop the run</title>
+    <rect x="236" y="20" width="180" height="64" rx="12" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="326" y="44" text-anchor="middle">arg not in STAGES</text>
+    <text class="box-sub" x="326" y="60" text-anchor="middle">raise SystemExit</text>
+    <text class="box-sub" x="326" y="76" text-anchor="middle">lists known stages</text>
+  </a>
+
+  <a class="box" id="k3" href="#reads">
+    <title>One stage runs, then the dict and its runtime are saved</title>
+    <rect x="236" y="120" width="180" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="326" y="144" text-anchor="middle">STAGES[arg](out)</text>
+    <text class="box-sub" x="326" y="160" text-anchor="middle">runtimes[arg] = elapsed</text>
+    <text class="box-sub" x="326" y="176" text-anchor="middle">save_results(out)</text>
+  </a>
+
+  <a class="box" id="k4" href="#reads">
+    <title>stage_replay builds candidates from every arm's paired report</title>
+    <rect x="480" y="30" width="196" height="72" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="578" y="54" text-anchor="middle">candidates</text>
+    <text class="box-sub" x="578" y="70" text-anchor="middle">delta = arm AUC - L3 AUC</text>
+    <text class="box-sub" x="578" y="86" text-anchor="middle">ci_lo from bootstrap or t CI</text>
+  </a>
+
+  <a class="box" id="k5" href="#reads">
+    <title>The gate rule: plus 0.02 AUC and a CI that excludes zero</title>
+    <rect x="480" y="130" width="196" height="84" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="578" y="154" text-anchor="middle">gate rule</text>
+    <text class="box-sub" x="578" y="170" text-anchor="middle">delta &gt;= +0.02</text>
+    <text class="box-sub" x="578" y="186" text-anchor="middle">AND ci_lo &gt; 0</text>
+    <text class="box-sub" x="578" y="202" text-anchor="middle">else: no winner</text>
+  </a>
+
+  <a class="box" id="k6" href="#reads">
+    <title>Winners get an E9 within-task replay; no winner means replay stays None</title>
+    <rect x="730" y="40" width="156" height="72" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="808" y="64" text-anchor="middle">winners?</text>
+    <text class="box-sub" x="808" y="80" text-anchor="middle">yes: E9.replay per arm</text>
+    <text class="box-sub" x="808" y="96" text-anchor="middle">no: gate.replay = None</text>
+  </a>
+
+  <path class="edge" data-from="k1" data-to="k2" d="M184,52 L236,52" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="210" y="44" text-anchor="middle">check</text>
+  <path class="edge" data-from="k1" data-to="k3" d="M184,74 L236,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="112" text-anchor="middle">known</text>
+  <path class="edge" data-from="k3" data-to="k4" d="M416,150 L480,80" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="436" y="112" text-anchor="middle">replay stage</text>
+  <path class="edge" data-from="k4" data-to="k5" d="M578,102 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="586" y="120" text-anchor="start">filter</text>
+  <path class="edge" data-from="k5" data-to="k6" d="M676,158 L730,86" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="694" y="126" text-anchor="middle">branch</text>
+
+  <text class="box-sub" x="20" y="242">Second rule inside every LOTO stage: a fold whose train side holds a single label skips the fit and scores its test rows 0.0 (e.g. lines 649&ndash;651, 855&ndash;857).</text>
+  <text class="box-sub" x="20" y="264">Third rule: <code>soft_targets</code> has four modes (line 598); censored rows are capped at weight 0.25 or dropped.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the dispatch loop (lines 1432&ndash;1440) and the gate decision at lines 1192&ndash;1199. The gate is the only place where this file decides whether the E9 replay code path runs at all.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="reads">What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym">reads</td><td class="sym">verifier_claims.jsonl</td><td><code>K.load_e5()</code></td><td>E5 anchor universe, 607 rows</td><td class="size">44</td></tr>
+<tr><td class="sym">reads</td><td class="sym">_cache_e5_embeddings.npz</td><td><code>K.load_emb()</code></td><td>claim embeddings and names</td><td class="size">45</td></tr>
+<tr><td class="sym">reads</td><td class="sym">verifier_claims_sane.jsonl</td><td><code>K.load_sane()</code></td><td>SR-null-free universe for arms c and replay</td><td class="size">53</td></tr>
+<tr><td class="sym">reads</td><td class="sym">eval_programs/*.py</td><td><code>glob.glob</code></td><td>recover thresholds and comparison operators</td><td class="size">477</td></tr>
+<tr><td class="sym">reads</td><td class="sym">run_notes/*/*.json</td><td><code>K.run_notes_index()</code></td><td>SR_message text, goal, generation order</td><td class="size">608</td></tr>
+<tr><td class="sym">reads</td><td class="sym">_cache_e10_goal_emb.npz</td><td><code>np.load(EV_GOAL_CACHE)</code></td><td>goal vectors for the FiLM probe</td><td class="size">880</td></tr>
+<tr><td class="sym">reads</td><td class="sym">results JSON</td><td><code>K.load_results()</code></td><td>previous arm outputs and per-example L3 scores</td><td class="size">1436</td></tr>
+<tr><td class="sym">writes</td><td class="sym">results JSON</td><td><code>K.save_results(out)</code></td><td>arms, runtimes, gate, environment</td><td class="size">1439</td></tr>
+<tr><td class="sym">writes</td><td class="sym">E13_l3_extreme_2026-09-23.md</td><td><code>K.OUT_MD.write_text</code></td><td>report with tables and gaps</td><td class="size">1424</td></tr>
+<tr><td class="sym">writes</td><td class="sym">_cache_e13_goal_headtail_2026-09-23.npz</td><td><code>np.savez</code></td><td>head+tail goal embeddings</td><td class="size">844</td></tr>
+<tr><td class="sym">reads</td><td class="sym">config fields</td><td>none</td><td>no project config key is read</td><td class="size">&ndash;</td></tr>
+</tbody>
+</table>
+
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e13_l3_extreme.py">experiments_verifiers/harness/e13_l3_extreme.py</a></h4>
+<p class="role">Runs six L3-extension arms over frozen claim caches, gates them on paired AUC gain, and writes one report.</p>
+<p class="meta">1 444 lines &#183; classes: DeepSets, SetAttn &#183; 46 symbols &#183; imports e5_common, e13_common, torch, sklearn</p>
+<details><summary>full symbol inventory &mdash; every class, method and top-level function</summary><div class="dbody">
+<pre>stage_reproduce(out)                                   # 43: L3 LOTO anchor, asserts 0.753
+piecewise_feats_factory(exs, embz, idx, fold_meta)      # 82: per-fold k-means piecewise features
+  feats(tr, te)                                        # 90: nested; pick k by silhouette, build X
+  build(rows)                                          # 106: nested; psi_global + alive blocks
+knn_smooth_loto(y, tid, X, k_grid=(3,5,10,20),
+                a_grid=(0.25,0.5,1.0))                 # 130: LOTO score + cosine kNN correction
+stage_a(out)                                           # 176: runs piecewise, kNN, manifold R2
+class DeepSets(nn.Module)                              # 246: phi/rho mean-pool encoder
+  __init__(self)                                       # 247: 389->192->96 then 96->96->1
+  forward(self, E, s, kk, mask)                        # 253: masked mean pool, one logit
+class SetAttn(nn.Module)                               # 260: one self-attention block encoder
+  __init__(self, h=96, heads=4)                        # 261: Linear, LayerNorm, MHA, FF, head
+  forward(self, E, s, kk, mask)                        # 270: key-padding mask, mean pool
+build_tokens(exs, embz, idx)                           # 280: per claim [emb, s, kind one-hot]
+pad_batch(items)                                       # 293: zero-pad E, s, kk and mask
+train_torch(model, toks, y, fit_idx, val_idx, seed,
+            epochs=80, bs=32, lr=1e-3, wd=1e-2)        # 305: AdamW, early stop patience 10
+  fwd(idxs)                                            # 311: nested; batch forward
+  val_loss()                                           # 317: nested; mean loss over val rows
+torch_scores(model, toks, idxs)                        # 351: batched inference, no grad
+pair_features(toks, n_hash=256, seed=0)                # 361: hashed pair block + histograms
+stage_b(out)                                           # 384: 40-seed task-level protocol
+_norm(s)                                               # 470: lowercase alphanumeric key
+build_eval_map()                                       # 474: eval stem -> threshold, op, figure
+match_eval(task, evmap)                                # 495: longest normalized substring match
+classify_message(msg, evrec)                           # 505: message -> (kind, margin, detail)
+soft_targets(y, kinds, margins, censored, scale,
+             rows=None, mode="soft_rw")                # 554: soft labels + reliability weights
+soft_l3b_fit(Xtr, ttr, wtr, Cv)                        # 578: weighted logistic via row duplication
+stage_c(out)                                           # 601: four soft-label modes, LOTO compare
+stage_d(out)                                           # 738: global and within-task pass rates
+  with_cols(extra)                                     # 786: nested; z-score extra columns
+  feats(tr, te)                                        # 787: nested; L3 + extras per fold
+headtail_encode(goals, out_npz=K.GOAL_HEADTAIL_NPZ)    # 828: 128+128 token re-encode, cached npz
+film_loto(y, tid, X, G, grid=K.SMALL_C_GRID)           # 848: FiLM probe as logistic on [z, z*g, g]
+stage_e(out)                                           # 870: prefix-domination diagnosis, FiLM arms
+  gmat(source)                                         # 914: nested; goal vector per example
+_fit_piecewise_scorer(train, test, embz, idx)          # 976: replay scorer, arm a clusters
+_fit_knn_scorer(train, test, embz, idx)                # 988: replay scorer, smoothed L3
+  zn(A)                                                # 994: nested; L2 normalize rows
+_fit_hashed_scorer(train, test, embz, idx, with_l3)    # 1025: replay scorer, hashed pairs
+_fit_torch_scorer(train, test, embz, idx, model_kind)  # 1037: replay scorer, torch encoder
+_fit_soft_l3b_scorer(train, test, embz, idx)           # 1051: replay scorer, soft labels
+_fit_baserate_scorer(train, test, embz, idx, with_hist) # 1092: replay scorer, base rates
+_fit_film_scorer(train, test, embz, idx, headtail)     # 1138: replay scorer, goal conditioning
+stage_replay(out)                                      # 1162: gate + E9 within-task replay
+_fmt_rep(rep, base_label="L3")                         # 1251: one-line paired-report string
+stage_report(out)                                      # 1260: compiles the Markdown report
+main()                                                 # 1432: argv loop, save after each stage</pre>
+<p>Module constants: <code>T0</code> (36), <code>EPS</code> (37), <code>K_GRID</code> (78), <code>MIN_BLOCK_SUPPORT</code> (79), <code>FIG_RE</code> / <code>NUM_RE</code> / <code>FRAC_RE</code> / <code>CENSORED_PAT</code> (462&ndash;467), <code>RECOVERABLE</code> (551), <code>C_MODES</code> (598), <code>EV_GOAL_CACHE</code> (971), <code>STAGES</code> (1428).</p>
+</div></details>
+
+<details><summary>stage results recorded in the JSON (read from the results file)</summary><div class="dbody">
+<blockquote>{"reproduce": 6.3, "a": 94.2, "b": 113.5, "c": 252.8, "d": 261.9, "e": 22.6, "umap": "see harness/e13_umap.py", "replay": 1.3, "report": 1.3}</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E13_l3_extreme_2026-09-23.json</code>, key <code>runtimes</code> (seconds, as written at line 1438)</p>
+<blockquote>"l3_loto_auc_sr": 0.7531463954893274</blockquote>
+<p class="sub">same file, key <code>arms.reproduce.l3_loto_auc_sr</code>; the assert at line 52 accepts it as the 0.753 reproduction.</p>
+<p>The JSON has 9 120 lines; the arms present are <code>reproduce</code>, <code>a_geometry</code>, <code>b_set_attention</code>, <code>c_noise_first</code>, <code>d_base_rates</code>, <code>e_goal_conditioning</code>.</p>
+</div></details>
+
+<p class="note">The file declares 0 LLM API calls and writes that into <code>environment.total_llm_api_calls</code> (line 1418). The two local models still download or load weights: <code>all-MiniLM-L6-v2</code> (lines 834, 886) and <code>torch</code>.</p>
+<p class="note flag">The E9 replay code path (lines 1201&ndash;1246) is dead unless an arm clears the gate at line 1192. The recorded JSON holds a <code>gate</code> key, so the condition is decided at run time, not by the reader.</p>
+<p class="note">Sources named inside the file's own gaps lists: no capsule <code>evaluation_results.json</code> exists under <code>workspace_artefacts/snapshots</code> (line 720), so arm c uses <code>SR_message</code> as the only continuous score carrier.</p>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">importers</td><td>no importer found (grep over <code>.py</code>, <code>.md</code>, <code>.sh</code>)</td><td>no importer found; the file is a CLI</td></tr>
+<tr><td class="sym">run command</td><td>stages as argv tokens</td><td>stage names as argv tokens (docstring line 13)</td></tr>
+<tr><td class="sym">imports</td><td><code>e5_common as C</code>, <code>e13_common as K</code></td><td>lines 33&ndash;34; <code>e5b_splits</code> at lines 385, 1032</td></tr>
+<tr><td class="sym">imported by</td><td>head+tail cache re-used by <code>_fit_film_scorer</code></td><td>line 882 in stage <code>e</code> and line 1145 in <code>_fit_film_scorer</code></td></tr>
+<tr><td class="sym">companion file</td><td><a href="file_harness_e13_umap.html">e13_umap.py</a> writes the arm-a figure</td><td>figure name recorded at line 232 as <code>umap_png</code></td></tr>
+<tr><td class="sym">tests</td><td>none</td><td><code>grep -rn "e13_l3_extreme" tests/</code> returns nothing</td></tr>
+</tbody>
+</table>
+<p class="note">Full run command from the docstring: <code>uv run python experiments_verifiers/harness/e13_l3_extreme.py reproduce a b c d e replay report</code>.</p>
+<p class="note">Related pages: the experiment overview <a href="exp_e13_l3_extreme.html">exp_e13_l3_extreme</a>, the shared harness page <a href="exp_e13_common.html">exp_e13_common</a>, the index of experiments <a href="exp_index.html">exp_index</a>, and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e13_l3_extreme.py</code> (1 444 lines, read in full), <code class="path">experiments_verifiers/harness/e13_common.py</code> (constants, LOTO helpers, result IO), <code class="path">experiments_verifiers/results/E13_l3_extreme_2026-09-23.json</code> (<code>runtimes</code>, <code>arms</code> keys and the recorded 0.753 anchor), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> (never opened), <code class="path">e5_common.py</code> and <code class="path">e5b_splits.py</code> bodies beyond the symbols this file calls, <code class="path">e9_deployment.py</code> (imported at line 1163, only the replay entry points are named here), the torch and sklearn package sources, and the <code class="path">datasets/ScienceAgentBench/eval_programs/</code> file bodies (their thresholds are described as the code reads them, not re-measured). No stage was executed. Greps for importers and tests ran over the working copy only.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

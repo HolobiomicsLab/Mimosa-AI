@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5_md - E5 markdown renderer - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e5_md">
+<div class="wrap">
+
+<h1 class="hud">e5_md &mdash; the E5 summary renderer</h1>
+<p class="intro">The E5 run leaves one JSON as the data of record, and a separate script renders the operator-facing markdown from it. This page covers <code>e5_md.py</code>, a 140-line renderer with one optional CLI argument. It also records one table defect in the file it produced.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; JSON in, markdown out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 400" role="img" aria-label="e5_md inputs, render steps and output file">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="hyp">
+    <title>The renderer assumes the JSON holds every number it needs</title>
+    <rect x="20" y="20" width="450" height="48" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text x="245" y="40" text-anchor="middle" fill="#E6FBFF" font-size="11.5">hypothesis: the JSON is the whole story</text>
+    <text class="box-sub" x="245" y="56" text-anchor="middle">the markdown is derived, never re-measured</text>
+  </g>
+
+  <a class="box" id="a1" href="../../experiments_verifiers/results/E5_learned_importance_2026-09-21.json">
+    <title>The E5 results JSON, produced by e5_run.py</title>
+    <rect x="20" y="100" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="124" text-anchor="middle">E5 results JSON</text>
+    <text class="box-sub" x="155" y="140" text-anchor="middle">E5_learned_importance_&lt;date&gt;.json</text>
+  </a>
+  <a class="box" id="b1" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>Source file comes from argv or from the newest matching glob</title>
+    <rect x="340" y="100" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="124" text-anchor="middle">pick source file L12</text>
+    <text class="box-sub" x="460" y="140" text-anchor="middle">argv[1] or newest glob</text>
+  </a>
+  <g class="box" id="c1">
+    <title>The parsed payload, read with json.loads at L13</title>
+    <rect x="630" y="100" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="124" text-anchor="middle">payload dict</text>
+    <text class="box-sub" x="755" y="140" text-anchor="middle">metrics, gate, curves, gaps</text>
+  </g>
+
+  <g class="box" id="a2">
+    <title>The nine metric keys the renderer keeps</title>
+    <rect x="20" y="200" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="224" text-anchor="middle">KEEP field list L15</text>
+    <text class="box-sub" x="155" y="240" text-anchor="middle">9 metric keys per row</text>
+  </g>
+  <a class="box" id="b2" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>fmt prints floats to three decimals</title>
+    <rect x="340" y="200" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="224" text-anchor="middle">fmt L19</text>
+    <text class="box-sub" x="460" y="240" text-anchor="middle">3 decimals for floats</text>
+  </a>
+  <g class="box" id="c2">
+    <title>One pipe row per ladder variant</title>
+    <rect x="630" y="200" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="224" text-anchor="middle">markdown table rows</text>
+    <text class="box-sub" x="755" y="240" text-anchor="middle">L58, one per variant</text>
+  </g>
+
+  <g class="box" id="a3">
+    <title>The append-only line buffer</title>
+    <rect x="20" y="300" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="324" text-anchor="middle">markdown line buffer</text>
+    <text class="box-sub" x="155" y="340" text-anchor="middle">lines = [] L23, A = append</text>
+  </g>
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>The whole buffer is joined and written once</title>
+    <rect x="340" y="300" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="324" text-anchor="middle">write_text L139</text>
+    <text class="box-sub" x="460" y="340" text-anchor="middle">same stem, new suffix</text>
+  </a>
+  <a class="box" id="c3" href="../../experiments_verifiers/results/E5_learned_importance_2026-09-21.md">
+    <title>The rendered markdown summary</title>
+    <rect x="630" y="300" width="250" height="60" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="755" y="324" text-anchor="middle">E5 MD summary</text>
+    <text class="box-sub" x="755" y="340" text-anchor="middle">168 lines in the built file</text>
+  </a>
+
+  <path class="edge" data-from="hyp" data-to="a1" d="M155,68 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="163" y="88" text-anchor="start">reads</text>
+
+  <path class="edge" data-from="a1" data-to="b1" d="M290,130 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="122" text-anchor="middle">arg or glob</text>
+  <path class="edge" data-from="b1" data-to="c1" d="M580,130 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="122" text-anchor="middle">json.loads</text>
+
+  <path class="edge" data-from="a2" data-to="b2" d="M290,230 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="222" text-anchor="middle">metric names</text>
+  <path class="edge" data-from="b2" data-to="c2" d="M580,230 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="222" text-anchor="middle">cells</text>
+
+  <path class="edge" data-from="a3" data-to="b3" d="M290,330 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="322" text-anchor="middle">joins lines</text>
+  <path class="edge" data-from="b3" data-to="c3" d="M580,330 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="322" text-anchor="middle">writes</text>
+
+  <text class="box-sub" x="20" y="384">steel = data on disk &#183; cyan pill = function or call in e5_md.py &#183; 10 boxes, no crossing arrows</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. The renderer never fits a model and never touches the claim data; rows 1&ndash;3 are one pass over the JSON. Line numbers are from <a href="../../experiments_verifiers/harness/e5_md.py">e5_md.py</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e5_md.py">experiments_verifiers/harness/e5_md.py</a></h4>
+<p class="role">Reads the E5 results JSON and re-renders the whole markdown summary: question, provenance, ladder table, gate verdict, curves, permutation tests, weights and gaps.</p>
+<p class="meta">140 lines &#183; 1 function (<code>fmt</code> L19), no class &#183; entry point: <code>uv run python experiments_verifiers/harness/e5_md.py [results_json]</code> (docstring L4) &#183; CLI arguments: one optional positional path at L12</p>
+<details><summary>the render order and what each block reads</summary><div class="dbody">
+<pre>src = Path(sys.argv[1]) if len(sys.argv) &gt; 1 else sorted((EV / "results").glob("E5_learned_importance_*.json"))[-1]   # L12
+d = json.loads(src.read_text())        # L13
+KEEP = [...9 metric keys...]           # L15-L16
+fmt(v) -&gt; f"{v:.3f}" if isinstance(v, float) else str(v)      # L19-L20
+lines = []  ;  A = lines.append        # L23-L24
+out = EV / "results" / (src.stem + ".md")    # L138
+out.write_text("\n".join(lines) + "\n")     # L139</pre>
+<p>Section headers, in output order, with the line that emits each: title L25, Question L29, Provenance recovery L36, source classifier note L49, Ladder results L53, bootstrap CIs L61, Success gate L68, Learning curves L75, Gate verdict L81, paired-test table L90, Permutation tests L98, learned weights L105, top 30 L116, bottom 15 L124, Gaps L132, Runtime L137.</p>
+<p>JSON keys read: <code>date</code>, <code>provenance</code>, <code>source_classifier</code>, <code>metrics</code>, <code>auc_bootstrap_ci</code>, <code>gate</code>, <code>learning_curves</code>, <code>paired_tests</code>, <code>permutation_tests</code>, <code>weights_analysis</code>, <code>gaps</code>, <code>runtime_s</code>.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th>Cited at</th></tr></thead>
+<tbody>
+<tr><td>One JSON path from the command line</td><td>nothing, keeps it in <code>src</code></td><td class="sym">any results JSON passed as argv[1]</td><td class="sym">e5_md.py L12</td></tr>
+<tr><td>The newest matching JSON by name</td><td>nothing, default source</td><td class="sym">experiments_verifiers/results/E5_learned_importance_*.json</td><td class="sym">glob L12, sorted last</td></tr>
+<tr><td>All numeric blocks of that JSON</td><td>One markdown file, same stem</td><td class="sym">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</td><td class="sym">stem L138, write L139</td></tr>
+</tbody>
+</table>
+<p class="sub">The output path is derived from the input name, not configured. Nothing else on disk is written.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; the learning curve the markdown renders</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 260" role="img" aria-label="Learning curves for three rungs, four training fractions each">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <polyline points="150,192.5 350,175.8 550,168.5 750,158.4" fill="none" stroke="#00E5FF" stroke-width="1.8"/>
+  <circle cx="150" cy="192.5" r="3" fill="#00E5FF"/>
+  <text class="box-sub" x="150" y="184.5" text-anchor="middle" style="font-size:8.5px;fill:#00E5FF">0.624</text>
+  <circle cx="350" cy="175.8" r="3" fill="#00E5FF"/>
+  <text class="box-sub" x="350" y="167.8" text-anchor="middle" style="font-size:8.5px;fill:#00E5FF">0.647</text>
+  <circle cx="550" cy="168.5" r="3" fill="#00E5FF"/>
+  <text class="box-sub" x="550" y="160.5" text-anchor="middle" style="font-size:8.5px;fill:#00E5FF">0.657</text>
+  <circle cx="750" cy="158.4" r="3" fill="#00E5FF"/>
+  <text class="box-sub" x="750" y="150.4" text-anchor="middle" style="font-size:8.5px;fill:#00E5FF">0.671</text>
+  <text class="edge-label" x="768" y="162.4" text-anchor="start" style="fill:#00E5FF">L1 group</text>
+  <polyline points="150,185.3 350,136.5 550,135.8 750,123.5" fill="none" stroke="#4D9FFF" stroke-width="1.8"/>
+  <circle cx="150" cy="185.3" r="3" fill="#4D9FFF"/>
+  <text class="box-sub" x="150" y="177.3" text-anchor="middle" style="font-size:8.5px;fill:#4D9FFF">0.634</text>
+  <circle cx="350" cy="136.5" r="3" fill="#4D9FFF"/>
+  <text class="box-sub" x="350" y="128.5" text-anchor="middle" style="font-size:8.5px;fill:#4D9FFF">0.701</text>
+  <circle cx="550" cy="135.8" r="3" fill="#4D9FFF"/>
+  <text class="box-sub" x="550" y="127.8" text-anchor="middle" style="font-size:8.5px;fill:#4D9FFF">0.702</text>
+  <circle cx="750" cy="123.5" r="3" fill="#4D9FFF"/>
+  <text class="box-sub" x="750" y="115.5" text-anchor="middle" style="font-size:8.5px;fill:#4D9FFF">0.719</text>
+  <text class="edge-label" x="768" y="127.5" text-anchor="start" style="fill:#4D9FFF">L2 gbm</text>
+  <polyline points="150,125.6 350,80.5 550,63.8 750,67.5" fill="none" stroke="#7DF9C7" stroke-width="1.8"/>
+  <circle cx="150" cy="125.6" r="3" fill="#7DF9C7"/>
+  <text class="box-sub" x="150" y="117.6" text-anchor="middle" style="font-size:8.5px;fill:#7DF9C7">0.716</text>
+  <circle cx="350" cy="80.5" r="3" fill="#7DF9C7"/>
+  <text class="box-sub" x="350" y="72.5" text-anchor="middle" style="font-size:8.5px;fill:#7DF9C7">0.778</text>
+  <circle cx="550" cy="63.8" r="3" fill="#7DF9C7"/>
+  <text class="box-sub" x="550" y="55.8" text-anchor="middle" style="font-size:8.5px;fill:#7DF9C7">0.801</text>
+  <circle cx="750" cy="67.5" r="3" fill="#7DF9C7"/>
+  <text class="box-sub" x="750" y="59.5" text-anchor="middle" style="font-size:8.5px;fill:#7DF9C7">0.796</text>
+  <text class="edge-label" x="768" y="71.5" text-anchor="start" style="fill:#7DF9C7">L3 name+desc</text>
+  <text class="box-sub" x="150" y="232" text-anchor="middle">25%</text>
+  <text class="box-sub" x="350" y="232" text-anchor="middle">50%</text>
+  <text class="box-sub" x="550" y="232" text-anchor="middle">75%</text>
+  <text class="box-sub" x="750" y="232" text-anchor="middle">100%</text>
+  <path d="M40,210 H860" fill="none" stroke="#1B4B6B" stroke-width="1.2"/>
+  <path d="M40,137.3 H860" fill="none" stroke="#0E2A3F" stroke-width="1" stroke-dasharray="4 4"/>
+  <text class="box-sub" x="34" y="214" text-anchor="end">0.60</text>
+  <text class="box-sub" x="34" y="141" text-anchor="end">0.70</text>
+  <text class="box-sub" x="150" y="252" text-anchor="middle">fraction of training tasks; fixed 25% test tasks, 10 seeds</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; twelve auc values, three rungs, read from the markdown lines 62&ndash;64 (identical to JSON <code>learning_curves</code> at lines 276&ndash;341). The L3 curve rises to 0.801 at 75% and falls back to 0.796 at 100%.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Rendered markdown length</td><td class="size">168 lines</td><td class="sym">E5_learned_importance_2026-09-21.md (wc -l)</td></tr>
+<tr><td>Rendered markdown size</td><td class="size">15 385 bytes (my computation)</td><td class="sym">os.path.getsize at 2026-10-02</td></tr>
+<tr><td>Metric keys kept per row</td><td class="size">9</td><td class="sym">e5_md.py L15-L16</td></tr>
+<tr><td>L1 curve, 25 / 50 / 75 / 100%</td><td class="size">0.624 / 0.647 / 0.657 / 0.671</td><td class="sym">E5_learned_importance_2026-09-21.md L62</td></tr>
+<tr><td>L2 gbm curve, 25 / 50 / 75 / 100%</td><td class="size">0.634 / 0.701 / 0.702 / 0.719</td><td class="sym">E5_learned_importance_2026-09-21.md L63</td></tr>
+<tr><td>L3 curve, 25 / 50 / 75 / 100%</td><td class="size">0.716 / 0.778 / 0.801 / 0.796</td><td class="sym">E5_learned_importance_2026-09-21.md L64</td></tr>
+<tr><td>Gate clauses passing</td><td class="size">4 of 5 listed clauses</td><td class="sym">E5_learned_importance_2026-09-21.md L68-L72</td></tr>
+<tr><td>Gate verdict line</td><td class="size">3 of 4 clauses pass, conditional pass</td><td class="sym">E5_learned_importance_2026-09-21.md L74</td></tr>
+<tr><td>Top-30 weight table rows</td><td class="size">30</td><td class="sym">E5_learned_importance_2026-09-21.md L109-L138</td></tr>
+<tr><td>Bottom-15 weight table rows</td><td class="size">15</td><td class="sym">E5_learned_importance_2026-09-21.md L144-L158</td></tr>
+<tr><td>Runtime line</td><td class="size">1083.1 s</td><td class="sym">E5_learned_importance_2026-09-21.md L168</td></tr>
+</tbody>
+</table>
+<p class="sub">The markdown lists 5 gate clauses (4 PASS, 1 FAIL); the verdict sentence says &ldquo;3 of 4&rdquo;, counting the two AUC-vs-baseline clauses as one.</p>
+
+<details><summary>verbatim: the learning-curve lines and the gate verdict</summary><div class="dbody">
+<blockquote>- L1_group_logistic &mdash; 25%: 0.624, 50%: 0.647, 75%: 0.657, 100%: 0.671
+- L2_lexical_gbm &mdash; 25%: 0.634, 50%: 0.701, 75%: 0.702, 100%: 0.719
+- L3_embed_name_desc_logistic &mdash; 25%: 0.716, 50%: 0.778, 75%: 0.801, 100%: 0.796</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> lines 62&ndash;64 (em dash as in the file).</p>
+<blockquote>- FAIL &mdash; within_task_ge_70pct: {"best_value": 0.6962457337883959, "L3_value": 0.6928327645051194, "uniform_baseline": 0.6962457337883959}</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> line 72, rendered from JSON <code>gate.within_task_ge_70pct</code> at lines 8644&ndash;8648.</p>
+<blockquote>**3 of 4 clauses PASS (auc vs L0 and vs L1 with &gt;= +0.05, tau_top_quartile &gt; 0); the within-task &gt;= 70% clause FAILS narrowly for every rung (best 0.693 L3; the trivial uniform pass-rate baseline is 0.696 and nothing clears 70%). Overall: conditional pass &mdash; the learned importance function wins between-task ranking decisively (paired dAUC +0.114, p=0.009) but adds nothing to within-task ordering.**</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> line 74, bolded in the file.</p>
+<blockquote>| variant | n | n_pos | auc_sr | auc_ver | tau_all | tau_top_q | within-task acc | pairs (ties) |
+|---|---|---|---|---|---|---|---|---|
+| baseline_const_0.5 | 607 | 191 | 0.500 | 0.500 | nan | nan | 0.500 | 293 | 293 | (293 / 293) |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> lines 20&ndash;22: 9 header columns against 11 cells per row.</p>
+</div></details>
+
+<p class="note flag">Red: the ladder table is malformed. <code>KEEP</code> (e5_md.py L15&ndash;16) already carries <code>n_contrast_pairs</code> and <code>n_contrast_ties</code>, and the row builder L58 appends them a second time as one <code>(pairs / ties)</code> cell, so each rendered row has 11 cells under 9 headers (md L20 against L22). The two extra cells land outside the <code>pairs (ties)</code> header.</p>
+<p class="note">Amber: the default source is chosen by name sort of the glob (<code>sorted(...)[-1]</code>, L12), which works because the file name carries an ISO date; a file with a different suffix would win the sort instead.</p>
+<p class="note">Amber: the markdown is fully derived, so a manual edit to it is overwritten the next time the script runs. The JSON stays the data of record.</p>
+<p class="note say">Why it matters: the ladder table in this markdown is the table quoted by peer pages and by <code class="path">EXPERIMENTS.md</code> L11&ndash;13, so its extra cells travel with the numbers.</p>
+</div>
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e5_md.py</code> (whole file, 140 lines), <code class="path">e5_run.py</code> (the JSON keys it emits); <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> (whole file, 168 lines, quoted by line) and <code class="path">.json</code> (L276&ndash;341 learning curves, L8624&ndash;8657 gate, L8615&ndash;8622 gaps); <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (L11&ndash;13, rule 8 of section 2). Line counts and file size from <code>wc -l</code> and <code>os.path.getsize</code> at 2026-10-02.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; never opened, by the build rules. The 30 top-weight and 15 bottom-weight table rows &mdash; they restate JSON <code>weights_analysis.top30</code> (L401) and <code>bottom15</code> (L613) and are summarised on <a href="exp_e5_run.html">exp_e5_run.html</a>. <code class="path">results/E5b_L3_splits_*</code>, <code class="path">results/E5c_data_efficiency_*</code> &mdash; separate results files with their own pages. <code class="path">REPORT_e10_weights_visualization.html</code> &mdash; 0 matches for <code>E5</code>. <code class="path">REPORT_e11_theory.html</code> &mdash; quotes the run, not this renderer; cited on <a href="exp_e5_run.html">exp_e5_run.html</a>. No render run, no pytest, per the build rules: the markdown was read, not regenerated.</p>
+<p>Gone at 2026-10-02: nothing this page needed. The markdown is derived, so a re-run of <code class="path">e5_md.py</code> against the same JSON would rewrite these 168 lines, and any row fix would carry the same cell-count defect until the row builder changes.</p>
+<p>The folder <code class="path">experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

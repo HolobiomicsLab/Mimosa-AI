@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19_hybrid_bt - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e19_hybrid_bt">
+<div class="wrap">
+
+<h1 class="hud">e19_hybrid_bt &mdash; claims, scorers, ledgers</h1>
+<p class="intro">This experiment asks whether a few curated, task-defining claims plus one deterministic scorer per claim can rank the 667 generation pairs of the E14 arena. The script extracts 3-7 claims per group, writes one scorer per claim, and runs that same script on every workspace of the group. It writes four ledgers and a pilot gate record; the ranking readouts live in <a href="exp_e19_bt_eval.html">exp_e19_bt_eval.html</a>.</p>
+
+<div id="legend" data-auto></div>
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; one judge call per group, one scorer per claim</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 480" role="img" aria-label="E19 hybrid BT pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="hyp">
+    <rect x="20" y="30" width="190" height="56" rx="12" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="115" y="54" text-anchor="middle">Claims rank workspaces</text>
+    <text class="box-sub" x="115" y="70" text-anchor="middle">hypothesis</text>
+  </g>
+  <a class="box" id="plan" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>Frozen arena plan read by PLAN_PATH</title>
+    <rect x="240" y="30" width="200" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="340" y="54" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="340" y="70" text-anchor="middle">19 groups, 667 pairs</text>
+  </a>
+  <g class="box" id="inv">
+    <rect x="480" y="14" width="180" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="570" y="38" text-anchor="middle">union_inventory()</text>
+    <text class="box-sub" x="570" y="54" text-anchor="middle">paths, sizes</text>
+  </g>
+  <g class="box" id="prev">
+    <rect x="480" y="84" width="180" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="570" y="108" text-anchor="middle">deliverable_previews()</text>
+    <text class="box-sub" x="570" y="124" text-anchor="middle">up to 3 files</text>
+  </g>
+  <g class="box" id="ext">
+    <rect x="300" y="180" width="280" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="440" y="204" text-anchor="middle">run_extract()</text>
+    <text class="box-sub" x="440" y="220" text-anchor="middle">one judge call per group</text>
+  </g>
+  <g class="box" id="sc">
+    <rect x="20" y="290" width="200" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="314" text-anchor="middle">run_claim_scorer()</text>
+    <text class="box-sub" x="120" y="330" text-anchor="middle">repair up to 3 times</text>
+  </g>
+  <g class="box" id="sv">
+    <rect x="250" y="290" width="200" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="314" text-anchor="middle">static screen</text>
+    <text class="box-sub" x="350" y="330" text-anchor="middle">static_violations_scorer()</text>
+  </g>
+  <g class="box" id="exe">
+    <rect x="480" y="290" width="180" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="570" y="314" text-anchor="middle">execute_scorer()</text>
+    <text class="box-sub" x="570" y="330" text-anchor="middle">60 s subprocess</text>
+  </g>
+  <g class="box" id="pso">
+    <rect x="700" y="290" width="180" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="790" y="314" text-anchor="middle">parse_scorer_output</text>
+    <text class="box-sub" x="790" y="330" text-anchor="middle">one JSON line</text>
+  </g>
+  <g class="box" id="cs">
+    <rect x="700" y="400" width="180" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="790" y="424" text-anchor="middle">claim_stats()</text>
+    <text class="box-sub" x="790" y="440" text-anchor="middle">drops zero variance</text>
+  </g>
+  <a class="box" id="out" href="../../experiments_verifiers/results/E19_scores_2026-09-23.jsonl">
+    <title>E19_claims, E19_scorers, E19_scores, E19_bt_cost_ledger</title>
+    <rect x="20" y="400" width="620" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="330" y="424" text-anchor="middle">four result ledgers</text>
+    <text class="box-sub" x="330" y="440" text-anchor="middle">experiments_verifiers/results/E19_*.jsonl</text>
+  </a>
+  <path class="edge" d="M210,58 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="50" text-anchor="middle">hypothesis</text>
+  <path class="edge" d="M340,86 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="350" y="140" text-anchor="start">19 groups</text>
+  <path class="edge" d="M570,70 L560,180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="566" y="128" text-anchor="start">group inventory</text>
+  <path class="edge" d="M570,140 L500,180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="506" y="150" text-anchor="start">&le;3 previews</text>
+  <path class="edge" d="M300,236 L215,290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="236" y="274" text-anchor="start">claims JSON</text>
+  <path class="edge" d="M220,318 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="235" y="310" text-anchor="middle">script code</text>
+  <path class="edge" d="M450,318 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="419" y="310" text-anchor="middle">screened code</text>
+  <path class="edge" d="M660,318 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="680" y="310" text-anchor="middle">one JSON line</text>
+  <path class="edge" d="M790,346 V400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="378" text-anchor="start">score 0..1</text>
+  <path class="edge" d="M700,428 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="670" y="420" text-anchor="middle">score rows</text>
+  <text class="box-sub" x="20" y="472">dashed = reads / writes &#183; solid = call &#183; 11 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 11 boxes. Solid = call; the mint box holds the written ledgers. <code>run_extract</code> (L470) also writes the claims ledger; that write is drawn once to keep arrows from crossing. Frozen snapshot reads (<code>REPO/snapshot_path</code> from the plan) are named in the script card, not drawn.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e19_hybrid_bt.py">experiments_verifiers/harness/e19_hybrid_bt.py</a></h4>
+<p class="role">Extracts 3-7 claims per group, writes one deterministic scorer per claim, runs it on every workspace, and appends resumable ledgers.</p>
+<p class="meta">1 044 lines (<code>wc -l</code>) &#183; entry point <code>main()</code> L1024 &#183; subcommands: status, pilot, extract, score, run, det, verify &#183; only CLI option: <code>--workers</code> (default 6)</p>
+<details><summary>signatures, constants, ledger paths</summary><div class="dbody">
+<pre>run_extract(group, goal) -&gt; dict                       # Phase A, L470
+run_claim_scorer(group, goal, claim, tmp_root) -&gt; dict    # Phase B, L632
+execute_scorer(code, ws_root, claim, tmp_root) -&gt; dict    # subprocess, L607
+parse_scorer_output(stdout) -&gt; dict | None               # L583
+static_violations_scorer(code) -&gt; list[str]               # L141
+claim_stats(scores, n_gens) -&gt; dict                       # L284
+surviving_claims(n_gens_by_gid) -&gt; dict                   # L825
+eval_pilot_gate(pilot_gids) -&gt; dict                       # L846
+most_complete_workspace(group) -&gt; dict / union_inventory(group) -&gt; str / deliverable_previews(gen, max_files=3) -&gt; str</pre>
+<p>Constants: <code>MODEL_TEXT = "openrouter/deepseek/deepseek-v4.1-flash"</code> L79, <code>HARD_CAP_USD = 15.0</code> L86, <code>SUBPROC_TIMEOUT = 60</code> L85, <code>MAX_CODE_ATTEMPTS = 3</code> L83, <code>DET_FRAC = 0.05</code> L82, <code>PILOT_COST_GATE = 1.0</code> L87.</p>
+<p>Ledger paths: <code>CLAIMS</code>, <code>SCORERS</code>, <code>SCORES</code>, <code>COST_LEDGER</code>, <code>DETS</code>, <code>PILOT_JSON</code> (L72&ndash;77), all under <code class="path">experiments_verifiers/results/</code>. Every ledger is append-only and resumable: <code>claims_done</code> L272, <code>scorers_done</code> L276, <code>scores_done</code> L280.</p>
+<p>Snapshot hygiene: scorers run with cwd = fresh temp dir and a clean env without the API key (<code>execute_scorer</code> L609&ndash;617); <code>E18.SnapshotGuard</code> re-checks the tree after every execution (L628).</p>
+</div></details>
+</div>
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Frozen arena plan: 19 groups, 667 pairs</td><td>&mdash;</td><td class="sym"><a href="../../experiments_verifiers/results/E14_bt_population.json">results/E14_bt_population.json</a> (L71)</td></tr>
+<tr><td>Goal text per task</td><td>&mdash;</td><td class="sym">E18.load_goals(plan), L915</td></tr>
+<tr><td>Snapshot trees + artifact inventories</td><td>&mdash;</td><td class="sym">plan <code>snapshot_path</code>, L635</td></tr>
+<tr><td>E18 guards and JSON helpers</td><td>&mdash;</td><td class="sym"><a href="../../experiments_verifiers/harness/e18_scripted_bt.py">harness/e18_scripted_bt.py</a> (import L67)</td></tr>
+<tr><td>&mdash;</td><td>19 claim records, 114 claims</td><td class="sym"><a href="../../experiments_verifiers/results/E19_claims_2026-09-23.jsonl">results/E19_claims_2026-09-23.jsonl</a></td></tr>
+<tr><td>&mdash;</td><td>114 scorer scripts</td><td class="sym"><a href="../../experiments_verifiers/results/E19_scorers_2026-09-23.jsonl">results/E19_scorers_2026-09-23.jsonl</a></td></tr>
+<tr><td>&mdash;</td><td>870 score cells</td><td class="sym"><a href="../../experiments_verifiers/results/E19_scores_2026-09-23.jsonl">results/E19_scores_2026-09-23.jsonl</a></td></tr>
+<tr><td>&mdash;</td><td>188 LLM call rows</td><td class="sym"><a href="../../experiments_verifiers/results/E19_bt_cost_ledger_2026-09-23.jsonl">results/E19_bt_cost_ledger_2026-09-23.jsonl</a></td></tr>
+<tr><td>&mdash;</td><td>6 determinism records</td><td class="sym"><a href="../../experiments_verifiers/results/_e19_determinism_2026-09-23.jsonl">results/_e19_determinism_2026-09-23.jsonl</a></td></tr>
+<tr><td>&mdash;</td><td>Pilot gate record</td><td class="sym"><a href="../../experiments_verifiers/results/_e19_pilot_2026-09-23.json">results/_e19_pilot_2026-09-23.json</a></td></tr>
+<tr><td>Archived pilot-1 gate record</td><td>&mdash;</td><td class="sym"><a href="../../experiments_verifiers/results/_e19_pilot1_gate_FAILED.json">results/_e19_pilot1_gate_FAILED.json</a> (read by <code>e19_bt_eval.py</code> L559; no writer in harness)</td></tr>
+</tbody>
+</table>
+<details><summary>how a claim is scored, quoted from the prompt constants</summary><div class="dbody">
+<blockquote>Print EXACTLY ONE line to stdout: a single JSON object
+  {"claim_id": "&lt;claim id&gt;", "score": &lt;number 0..1&gt;, "evidence": "&lt;=40 words with the measured numbers&gt;"}</blockquote>
+<p>Path: <code class="path">experiments_verifiers/harness/e19_hybrid_bt.py</code> lines 539&ndash;540 (<code>SCORER_TEMPLATE</code> starts L515; the 3-7 requirement is L419). Claims are produced by <code>EXTRACT_TEMPLATE</code> L390 and validated by <code>valid_claims</code> L443, which enforces exactly 3-7 claims (L466).</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; cost by LLM role, from the ledger</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 620 250" role="img" aria-label="E19 cost by LLM role in USD">
+  <line x1="20" y1="200" x2="600" y2="200" stroke="#1B4B6B" stroke-width="1.5"/>
+  <rect x="40" y="179.2" width="80" height="20.8" fill="rgba(0,229,255,0.12)" stroke="#00E5FF"/>
+  <text class="box-label" x="80" y="172.2" text-anchor="middle">0.0312</text>
+  <text class="box-sub" x="80" y="218" text-anchor="middle">extract</text>
+  <rect x="170" y="105.6" width="80" height="94.4" fill="rgba(0,229,255,0.12)" stroke="#00E5FF"/>
+  <text class="box-label" x="210" y="98.6" text-anchor="middle">0.1416</text>
+  <text class="box-sub" x="210" y="218" text-anchor="middle">scorer</text>
+  <rect x="300" y="172.5" width="80" height="27.5" fill="rgba(0,229,255,0.12)" stroke="#00E5FF"/>
+  <text class="box-label" x="340" y="165.5" text-anchor="middle">0.0412</text>
+  <text class="box-sub" x="340" y="218" text-anchor="middle">repair</text>
+  <rect x="430" y="57.3" width="80" height="142.7" fill="rgba(0,229,255,0.12)" stroke="#00E5FF"/>
+  <text class="box-label" x="470" y="50.3" text-anchor="middle">0.2140</text>
+  <text class="box-sub" x="470" y="218" text-anchor="middle">total</text>
+  <text class="box-sub" x="20" y="238">axis 0 to 0.24 &#183; values labelled on each bar</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; USD per role, read from <code class="path">experiments_verifiers/results/E19_bt_cost_ledger_2026-09-23.jsonl</code> (188 rows) and <code>E19_hybrid_bt_2026-09-23.json</code> L2626&ndash;2639. The declared cap is $15.00 (L2641); it is not drawn because it is 70x the total.</p>
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Groups in the arena</td><td class="size">19</td><td class="sym">E19_hybrid_bt_2026-09-23.json L166</td></tr>
+<tr><td>Claims extracted</td><td class="size">114</td><td class="sym">json L167; 19 records in E19_claims jsonl</td></tr>
+<tr><td>Claims surviving the variance filter</td><td class="size">56</td><td class="sym">json L168</td></tr>
+<tr><td>Claims dropped, reason zero_variance</td><td class="size">58</td><td class="sym">json L2621&ndash;2622</td></tr>
+<tr><td>Score cells / observed scores</td><td class="size">870 / 870</td><td class="sym">json L174&ndash;175; E19_scores jsonl</td></tr>
+<tr><td>Pairs decided, no per-pair LLM call</td><td class="size">667</td><td class="sym">json L176</td></tr>
+<tr><td>LLM calls in phases A-C</td><td class="size">188</td><td class="sym">E19_bt_cost_ledger jsonl (188 rows)</td></tr>
+<tr><td>Cost of phases A-C</td><td class="size">$0.2140</td><td class="sym">json L2626</td></tr>
+<tr><td>Scorer attempts 1 / 2 / 3</td><td class="size">109 / 4 / 1</td><td class="sym">json L2602&ndash;2606</td></tr>
+<tr><td>Determinism reruns bit-identical</td><td class="size">6 / 6</td><td class="sym">json L2611&ndash;2614</td></tr>
+<tr><td>Gradient files written by e19_bt_eval</td><td class="size">148</td><td class="sym">json L183; my count of E19_bt_gradients/</td></tr>
+<tr><td>Snapshot mutations recorded</td><td class="size">0</td><td class="sym">json L2620</td></tr>
+<tr><td>Pilot gate all_pass</td><td class="size">false</td><td class="sym">_e19_pilot_2026-09-23.json L41</td></tr>
+</tbody></table>
+<p class="note">Amber: the strict pilot gate failed on one criterion (<code>gate_2_surviving_all</code>, L34) and the run continued. The recorded reason is population homogeneity: 5 of 6 claims are satisfied by all 3 drugex_vis workspaces, so those claims are dropped as zero-variance (L49).</p>
+<p class="note say">Why it matters: one scorer script is reused for every workspace of a group, so a score difference is an artifact difference, not a new measurement.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>8 lines from the E19 ledgers and gate records</summary><div class="dbody">
+<p class="sub">Path: <code class="path">experiments_verifiers/results/_e19_pilot_2026-09-23.json</code> &#183; line 34</p>
+<blockquote> "gate_2_surviving_all": false,</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/_e19_pilot_2026-09-23.json</code> &#183; line 38</p>
+<blockquote> "cum_spend_usd": 0.0715,</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/_e19_pilot_2026-09-23.json</code> &#183; line 47</p>
+<blockquote> "gate_verdict_strict": "FAIL (one criterion)",</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/_e19_pilot_2026-09-23.json</code> &#183; line 49 &#183; the recorded cause of the failed criterion</p>
+<blockquote>  "gate_2_surviving_all: drugex_vis has 1 surviving claim (5/6 claims zero-variance: all 3 workspaces satisfy them)"</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/_e19_pilot1_gate_FAILED.json</code> &#183; line 35 &#183; pilot attempt 1, before the screener fix</p>
+<blockquote> "gate_scorer_success_ge_080": false,</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_bt_cost_ledger_2026-09-23.jsonl</code> &#183; line 1 &#183; line 1 of 188</p>
+<blockquote>{"model": "openrouter/deepseek/deepseek-v4.1-flash", "role": "extract", "prompt_tokens": 8376, "completion_tokens": 939, "cost_usd": 0.003458, "latency_s": 6.5, "ts": "2026-09-24T05:38:42", "group": "chemistry_iterative_v4_flash__llm_response_error_fingerprint_similarity_vis", "attempt": 1}</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_scores_2026-09-23.jsonl</code> &#183; line 1 &#183; line 1 of 870</p>
+<blockquote>{"group": "chemistry_iterative_v4_flash__llm_response_error_drugex_vis", "claim_id": "C1", "uuid8": "1d104ce6", "score": 1.0, "evidence": "found pred_results/drugex_vis_pred.png, valid PNG, 231413 bytes", "claim_id_echo": "C1", "rc": 0, "attempt": 1, "ts": "2026-09-24T05:41:43"}</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/_e19_determinism_2026-09-23.jsonl</code> &#183; line 1 &#183; line 1 of 6</p>
+<blockquote>{"key": "chemistry_iterative_v4_flash__llm_response_error_brain_blood_qsar|C6", "reruns": 2, "n_workspaces": 9, "stdout_scores_exact_identical": true, "reproduces_recorded_scores": true, "scores": {"02138cf7": 0.5, "27fbf721": 0.5, "2a515eef": 0.5, "72ca8bc5": 1.0, "881a1601": 1.0, "b4a03c56": 1.0, "b65758ed": 0.5, "bc76583a": 1.0, "d15fe897": 1.0}}</blockquote>
+</div></details>
+</div>
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19_hybrid_bt.py</code> (1 044 lines), <code class="path">harness/e18_scripted_bt.py</code> (import target), <code class="path">results/E14_bt_population.json</code>, <code class="path">results/E19_claims_2026-09-23.jsonl</code>, <code class="path">results/E19_scorers_2026-09-23.jsonl</code>, <code class="path">results/E19_scores_2026-09-23.jsonl</code>, <code class="path">results/E19_bt_cost_ledger_2026-09-23.jsonl</code>, <code class="path">results/_e19_determinism_2026-09-23.jsonl</code>, <code class="path">results/_e19_pilot_2026-09-23.json</code>, <code class="path">results/_e19_pilot1_gate_FAILED.json</code>, <code class="path">results/E19_hybrid_bt_2026-09-23.json</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (&sect;2 constitution, &sect;3 data map), <code class="path">experiments_verifiers/README.md</code> (&sect;0 codenames). Line counts from <code>wc -l</code>; numbers not quoted with a file and line are my counts of those files.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; never opened (build rule). <code class="path">results/E19b_*</code>, <code class="path">results/E19c_*</code>, <code class="path">results/E24_*</code> &mdash; later experiments, other pages. <code class="path">results/_e19_pilot1_scorers_archived.jsonl</code> and <code class="path">_e19_pilot1_scores_archived.jsonl</code> &mdash; pilot-1 archive, counted only (2 files, 145 lines). <code class="path">results/E19_bt_gradients/</code> &mdash; listed (19 dirs, 148 files); its text is quoted on <a href="exp_e19_gradient_duel.html">exp_e19_gradient_duel.html</a>. The ranking readouts in <code class="path">results/E19_hybrid_bt_2026-09-23.{json,md}</code> are written by <code>e19_bt_eval.py</code> and described on <a href="exp_e19_bt_eval.html">exp_e19_bt_eval.html</a>. No script was run, no pytest, no application start.</p>
+<p><code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

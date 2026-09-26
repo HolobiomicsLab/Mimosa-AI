@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>failure_fingerprint.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/core > failure_fingerprint.py">
+<div class="wrap">
+
+<h1 class="hud">failure_fingerprint.py</h1>
+<p class="intro">Turns the verifier's per-claim verdicts into a fixed-length pass-rate profile: one slot per claim source, centred on the mean of the sources that spoke. It runs inside the evaluator right after a verification round, and the profile is persisted into <code>state_result.json</code>. The module header marks the descriptor as deprecated (line 3), so the QD archive no longer reads it; see the <a href="mod_core_selection.html">selection page</a> for the descriptor that replaced it.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what this file does: verdicts in, profile out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 350" role="img" aria-label="failure fingerprint compute and read paths">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="fpIn">
+    <title>per-claim dicts produced by the evaluator</title>
+    <rect x="20" y="40" width="150" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="95" y="64" text-anchor="middle">per_claim</text>
+    <text class="box-sub" x="95" y="80" text-anchor="middle">status + claim.source</text>
+  </g>
+
+  <a class="box" id="fpLetter" href="../../sources/core/failure_fingerprint.py">
+    <title>_source_letter normalises a claim source label</title>
+    <rect x="210" y="40" width="140" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="280" y="64" text-anchor="middle">_source_letter</text>
+    <text class="box-sub" x="280" y="80" text-anchor="middle">lowercase a-g or None</text>
+  </a>
+
+  <a class="box" id="fpTally" href="../../sources/core/failure_fingerprint.py">
+    <title>_pass_total_by_source tallies passes and totals</title>
+    <rect x="390" y="40" width="150" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="465" y="64" text-anchor="middle">_pass_total_by_source</text>
+    <text class="box-sub" x="465" y="80" text-anchor="middle">(passes, total) per letter</text>
+  </a>
+
+  <a class="box" id="fpCompute" href="../../sources/core/failure_fingerprint.py">
+    <title>compute_failure_fingerprint: rate, present mask, centring</title>
+    <rect x="580" y="30" width="170" height="76" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="665" y="58" text-anchor="middle">compute_failure_fingerprint</text>
+    <text class="box-sub" x="665" y="74" text-anchor="middle">rate, mask, centre</text>
+    <text class="box-sub" x="665" y="90" text-anchor="middle">returns 3 fixed lists</text>
+  </a>
+
+  <g class="box" id="fpOut">
+    <title>the three returned lists</title>
+    <rect x="790" y="40" width="130" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="855" y="62" text-anchor="middle">fingerprint</text>
+    <text class="box-sub" x="855" y="78" text-anchor="middle">vector, mask, rates</text>
+  </g>
+
+  <g class="box" id="fpFile">
+    <title>persisted state_result.json inside the workflow folder</title>
+    <rect x="20" y="220" width="170" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="244" text-anchor="middle">state_result.json</text>
+    <text class="box-sub" x="105" y="260" text-anchor="middle">&lt;workflow_dir&gt;/&lt;uuid&gt;/</text>
+  </g>
+
+  <a class="box" id="fpFromDir" href="../../sources/core/failure_fingerprint.py">
+    <title>failure_fingerprint_from_workflow_dir reads the file</title>
+    <rect x="240" y="220" width="180" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="244" text-anchor="middle">..._from_workflow_dir</text>
+    <text class="box-sub" x="330" y="260" text-anchor="middle">json.loads, then delegates</text>
+  </a>
+
+  <a class="box" id="fpFromState" href="../../sources/core/failure_fingerprint.py">
+    <title>failure_fingerprint_from_state_result walks the nested keys</title>
+    <rect x="470" y="220" width="190" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="565" y="244" text-anchor="middle">..._from_state_result</text>
+    <text class="box-sub" x="565" y="260" text-anchor="middle">evaluation.verifier keys</text>
+  </a>
+
+  <g class="box" id="fpVec">
+    <title>centred vector of length DESCRIPTOR_DIM, or None</title>
+    <rect x="710" y="220" width="150" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="785" y="242" text-anchor="middle">vector</text>
+    <text class="box-sub" x="785" y="258" text-anchor="middle">list[float] or None</text>
+  </g>
+
+  <a class="box" id="fpNeutral" href="../../sources/core/failure_fingerprint.py">
+    <title>neutral_fingerprint returns the zero vector</title>
+    <rect x="710" y="300" width="150" height="44" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="785" y="320" text-anchor="middle">neutral_fingerprint</text>
+    <text class="box-sub" x="785" y="335" text-anchor="middle">cold-start zeros</text>
+  </a>
+
+  <path class="edge" data-from="fpIn" data-to="fpLetter" d="M170,68 H210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="190" y="60" text-anchor="middle">claim dicts</text>
+  <path class="edge" data-from="fpLetter" data-to="fpTally" d="M350,68 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="370" y="60" text-anchor="middle">letter</text>
+  <path class="edge" data-from="fpTally" data-to="fpCompute" d="M540,68 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="60" text-anchor="middle">tally</text>
+  <path class="edge" data-from="fpCompute" data-to="fpOut" d="M750,68 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="770" y="60" text-anchor="middle">3 lists</text>
+
+  <path class="edge dashed-edge" data-from="fpOut" data-to="fpFile" d="M855,96 V180 H105 V220" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="470" y="172" text-anchor="middle">verifier writes the field</text>
+
+  <path class="edge dashed-edge" data-from="fpFile" data-to="fpFromDir" d="M190,248 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="215" y="240" text-anchor="middle">read_text</text>
+  <path class="edge" data-from="fpFromDir" data-to="fpFromState" d="M420,248 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="445" y="240" text-anchor="middle">json dict</text>
+  <path class="edge" data-from="fpFromState" data-to="fpVec" d="M660,248 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="685" y="240" text-anchor="middle">vector</text>
+  <path class="edge" data-from="fpNeutral" data-to="fpVec" d="M785,300 V276" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="795" y="292" text-anchor="start">fallback</text>
+
+  <text class="box-sub" x="20" y="200">top lane = compute path (lines 56-96) &#183; bottom lane = read-back path (lines 99-153). No config field, no file write.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. Muted dashed = data that lives outside the file. Arrows are real calls: <code>_source_letter</code> (line 47), <code>_pass_total_by_source</code> (line 72), <code>failure_fingerprint_from_state_result</code> (line 143). The one dashed out-edge is not a call: the evaluator stores the returned <code>vector</code> under <code>evaluation.verifier.failure_fingerprint</code> in <code>state_result.json</code> (<code class="path">sources/evaluators/verifier.py:376</code>; the file write is <code class="path">sources/evaluators/base.py:272</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: what goes in, what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="data flow in and out of failure_fingerprint">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="dfIn">
+    <title>argument of compute_failure_fingerprint</title>
+    <rect x="30" y="40" width="230" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="64" text-anchor="middle">per_claim iterable</text>
+    <text class="box-sub" x="145" y="80" text-anchor="middle">dicts: status, claim.source</text>
+    <text class="box-sub" x="145" y="94" text-anchor="middle">argument, line 57</text>
+  </g>
+
+  <a class="box" id="dfCompute" href="../../sources/core/failure_fingerprint.py">
+    <title>compute_failure_fingerprint, pure function</title>
+    <rect x="350" y="40" width="230" height="64" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="465" y="64" text-anchor="middle">compute_failure_fingerprint</text>
+    <text class="box-sub" x="465" y="80" text-anchor="middle">reads SOURCES, _PASS_STATUS</text>
+    <text class="box-sub" x="465" y="94" text-anchor="middle">no config field, no disk</text>
+  </a>
+
+  <g class="box" id="dfOut">
+    <title>returned dict, key vector/presence_mask/pass_rates</title>
+    <rect x="670" y="40" width="240" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="790" y="62" text-anchor="middle">returns dict</text>
+    <text class="box-sub" x="790" y="78" text-anchor="middle">vector: centred rates</text>
+    <text class="box-sub" x="790" y="92" text-anchor="middle">presence_mask: 1.0 / 0.0</text>
+  </g>
+
+  <g class="box" id="dfFile">
+    <title>file read by the from_workflow_dir helper</title>
+    <rect x="30" y="190" width="230" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="212" text-anchor="middle">state_result.json</text>
+    <text class="box-sub" x="145" y="228" text-anchor="middle">&lt;workflow_dir&gt;/&lt;uuid&gt;/</text>
+    <text class="box-sub" x="145" y="242" text-anchor="middle">path, line 138</text>
+  </g>
+
+  <a class="box" id="dfRead" href="../../sources/core/failure_fingerprint.py">
+    <title>failure_fingerprint_from_workflow_dir</title>
+    <rect x="350" y="190" width="230" height="64" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="465" y="212" text-anchor="middle">..._from_workflow_dir</text>
+    <text class="box-sub" x="465" y="228" text-anchor="middle">returns None on any failure</text>
+    <text class="box-sub" x="465" y="242" text-anchor="middle">OSError, JSONDecodeError (141)</text>
+  </a>
+
+  <g class="box" id="dfVec">
+    <title>returned value</title>
+    <rect x="670" y="190" width="240" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="790" y="212" text-anchor="middle">returns vector</text>
+    <text class="box-sub" x="790" y="228" text-anchor="middle">list[float] of len 7</text>
+    <text class="box-sub" x="790" y="242" text-anchor="middle">or None (line 124, 143)</text>
+  </g>
+
+  <path class="edge" data-from="dfIn" data-to="dfCompute" d="M260,72 H350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="305" y="64" text-anchor="middle">verdicts</text>
+  <path class="edge" data-from="dfCompute" data-to="dfOut" d="M580,72 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="625" y="64" text-anchor="middle">dict</text>
+  <path class="edge dashed-edge" data-from="dfFile" data-to="dfRead" d="M260,222 H350" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="305" y="214" text-anchor="middle">reads file</text>
+  <path class="edge" data-from="dfRead" data-to="dfVec" d="M580,222 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="625" y="214" text-anchor="middle">vector</text>
+  <path class="edge dashed-edge" data-from="dfCompute" data-to="dfFile" d="M465,104 V160 H145 V190" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="330" y="156" text-anchor="middle">evaluator writes field</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. Dashed = reads or writes. Config fields read: <b>none</b> &mdash; the module never touches <code>Config</code>. Files written: <b>none</b>. State key read: <code>state_result.json</code> &rarr; <code>evaluation</code> &rarr; <code>verifier</code> &rarr; <code>failure_fingerprint</code> &rarr; <code>vector</code> (lines 111-124).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control logic: the tally/centre rule and the read-back guards</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 440" role="img" aria-label="decision tree for centring and for reading state_result.json">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="lc0">
+    <title>loop over the seven canonical source letters</title>
+    <rect x="20" y="30" width="180" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="110" y="50" text-anchor="middle">for each of 7 letters</text>
+    <text class="box-sub" x="110" y="65" text-anchor="middle">line 75</text>
+  </g>
+
+  <g class="box" id="lc1">
+    <title>is total greater than zero</title>
+    <rect x="240" y="30" width="170" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="325" y="50" text-anchor="middle">total &gt; 0 ?</text>
+    <text class="box-sub" x="325" y="65" text-anchor="middle">line 77</text>
+  </g>
+
+  <g class="box" id="lcYes">
+    <title>present source: raw pass rate, presence 1.0</title>
+    <rect x="200" y="110" width="210" height="44" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="305" y="130" text-anchor="middle">rate = passes / total</text>
+    <text class="box-sub" x="305" y="145" text-anchor="middle">presence = 1.0 (lines 78-79)</text>
+  </g>
+
+  <g class="box" id="lcNo">
+    <title>absent source gets the neutral rate and presence 0.0</title>
+    <rect x="200" y="180" width="210" height="44" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="305" y="200" text-anchor="middle">absent source: neutral rate</text>
+    <text class="box-sub" x="305" y="215" text-anchor="middle">_NEUTRAL_PASS_RATE (lines 81-82)</text>
+  </g>
+
+  <g class="box" id="lc3">
+    <title>mean of the present rates; zero when no source spoke</title>
+    <rect x="200" y="260" width="210" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="305" y="282" text-anchor="middle">mean_present</text>
+    <text class="box-sub" x="305" y="298" text-anchor="middle">0.0 when present_values empty</text>
+    <text class="box-sub" x="305" y="312" text-anchor="middle">lines 84-87</text>
+  </g>
+
+  <g class="box" id="lc4">
+    <title>centred vector rule: all-pass and all-fail both give zero</title>
+    <rect x="190" y="352" width="230" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="305" y="374" text-anchor="middle">vector = rate - mean_present</text>
+    <text class="box-sub" x="305" y="390" text-anchor="middle">absent slot stays 0.0</text>
+    <text class="box-sub" x="305" y="404" text-anchor="middle">lines 88-91</text>
+  </g>
+
+  <g class="box" id="g0">
+    <title>guard chain of failure_fingerprint_from_state_result</title>
+    <rect x="520" y="30" width="250" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="645" y="50" text-anchor="middle">state_result, evaluation,</text>
+    <text class="box-sub" x="645" y="66" text-anchor="middle">verifier all dict ? lines 109-115</text>
+  </g>
+  <g class="box" id="g1">
+    <rect x="520" y="112" width="250" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="645" y="132" text-anchor="middle">failure_fingerprint is dict ?</text>
+    <text class="box-sub" x="645" y="147" text-anchor="middle">line 118</text>
+  </g>
+  <g class="box" id="g2">
+    <rect x="520" y="186" width="250" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="645" y="206" text-anchor="middle">vector list, len 7 ?</text>
+    <text class="box-sub" x="645" y="221" text-anchor="middle">line 121, DESCRIPTOR_DIM</text>
+  </g>
+  <g class="box" id="g3">
+    <rect x="520" y="260" width="250" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="645" y="280" text-anchor="middle">float(x) succeeds for all ?</text>
+    <text class="box-sub" x="645" y="295" text-anchor="middle">TypeError/ValueError, lines 123-125</text>
+  </g>
+  <g class="box" id="g6">
+    <title>success return of the read path</title>
+    <rect x="520" y="344" width="250" height="44" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="645" y="364" text-anchor="middle">return list[float]</text>
+    <text class="box-sub" x="645" y="379" text-anchor="middle">line 124</text>
+  </g>
+  <g class="box" id="gN">
+    <title>every failing guard returns None instead of raising</title>
+    <rect x="800" y="186" width="150" height="44" rx="2" fill="rgba(143,184,201,0.08)" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="875" y="206" text-anchor="middle">return None</text>
+    <text class="box-sub" x="875" y="221" text-anchor="middle">caller uses neutral</text>
+  </g>
+
+  <path class="edge" data-from="lc0" data-to="lc1" d="M200,52 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="44" text-anchor="middle">counts</text>
+  <path class="edge" data-from="lc1" data-to="lcYes" d="M325,74 V110" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="335" y="96" text-anchor="start">yes</text>
+  <path class="edge" data-from="lc1" data-to="lcNo" d="M240,74 L165,202 H200" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="176" y="186" text-anchor="middle">no</text>
+  <path class="edge" data-from="lcYes" data-to="lc3" d="M305,154 V260" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="lcNo" data-to="lc3" d="M305,224 V260" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="lc3" data-to="lc4" d="M305,320 V352" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="342" text-anchor="start">centre</text>
+
+  <path class="edge" data-from="g0" data-to="g1" d="M645,82 V112" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="g1" data-to="g2" d="M645,156 V186" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="g2" data-to="g3" d="M645,230 V260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="g3" data-to="g6" d="M645,304 V344" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="655" y="330" text-anchor="start">yes</text>
+  <path class="edge dashed-edge" data-from="g0" data-to="gN" d="M770,56 H785 V208 H800" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g1" data-to="gN" d="M770,134 H800" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g2" data-to="gN" d="M770,208 H800" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g3" data-to="gN" d="M770,282 H785 V230 H800" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="778" y="76" text-anchor="start">no</text>
+  <text class="edge-label" x="778" y="140" text-anchor="start">no</text>
+  <text class="edge-label" x="778" y="200" text-anchor="start">no</text>
+  <text class="edge-label" x="778" y="292" text-anchor="start">no</text>
+
+  <text class="box-sub" x="20" y="432">left = compute_failure_fingerprint (lines 72-96) &#183; right = failure_fingerprint_from_state_result guard chain (lines 109-126).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>12 boxes</code>. Left column: the tally and centring rule; the branch on <code>total &gt; 0</code> (line 77) chooses between a real pass rate and the neutral 0.5, and the empty-presence case sets the mean to 0.0 (line 86). Right column: the read-back guard chain; every "no" branch returns <code>None</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">argument</td><td class="sym">per_claim</td><td>line 57 signature</td><td>source of every pass/fail tally</td></tr>
+<tr><td class="sym">constant</td><td class="sym">SOURCES</td><td>line 13: ("a"&#8230;"g")</td><td>fixed 7-slot letter order</td></tr>
+<tr><td class="sym">constant</td><td class="sym">DESCRIPTOR_DIM</td><td>line 14 = len(SOURCES)</td><td>length check and zero vector</td></tr>
+<tr><td class="sym">constant</td><td class="sym">_NEUTRAL_PASS_RATE</td><td>line 16 = 0.5</td><td>fills a silent source</td></tr>
+<tr><td class="sym">constant</td><td class="sym">_PASS_STATUS</td><td>line 17 = "pass"</td><td>the only status counted as a pass</td></tr>
+<tr><td class="sym">file read</td><td class="sym">state_result.json</td><td>&lt;workflow_dir&gt;/&lt;uuid&gt;/ (line 138)</td><td>read a persisted fingerprint</td></tr>
+<tr><td class="sym">state key</td><td class="sym">evaluation.verifier.failure_fingerprint.vector</td><td>lines 111-124</td><td>extract the centred vector</td></tr>
+<tr><td class="sym">returns</td><td class="sym">vector, presence_mask, pass_rates</td><td>lines 92-96</td><td>descriptor for the evaluator</td></tr>
+<tr><td class="sym">returns</td><td class="sym">list[float] or None</td><td>lines 124 and 143</td><td>vector for a caller or a neutral fallback</td></tr>
+<tr><td class="sym">config field</td><td class="sym">none read</td><td>&mdash;</td><td>the module takes no Config object</td></tr>
+<tr><td class="sym">file written</td><td class="sym">none</td><td>&mdash;</td><td>the evaluator writes the JSON field</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<p class="sub">6 top-level functions, no class. Signatures verbatim.</p>
+<details><summary>every def in sources/core/failure_fingerprint.py</summary><div class="dbody">
+<pre>SOURCES: tuple[str, ...] = ("a", "b", "c", "d", "e", "f", "g")        # line 13  - 7 claim-source letters
+DESCRIPTOR_DIM: int = len(SOURCES)                                    # line 14  - vector length
+_NEUTRAL_PASS_RATE: float = 0.5                                       # line 16  - absent-source filler
+_PASS_STATUS: str = "pass"                                            # line 17  - pass status literal
+
+_source_letter(raw: Any) -&gt; str | None                                # line 20  - normalise "source_a"/"A" to "a"
+_pass_total_by_source(per_claim: Iterable[dict[str, Any]])
+    -&gt; dict[str, tuple[int, int]]                                     # line 34  - tally passes and totals per letter
+compute_failure_fingerprint(per_claim: Iterable[dict[str, Any]])
+    -&gt; dict[str, list[float]]                                         # line 56  - rate, mask, centred vector
+failure_fingerprint_from_state_result(
+    state_result: dict[str, Any] | None) -&gt; list[float] | None        # line 99  - pull vector from a state dict
+failure_fingerprint_from_workflow_dir(
+    workflow_dir: str | Path, uuid: str) -&gt; list[float] | None        # line 129 - read state_result.json from disk
+neutral_fingerprint() -&gt; list[float]                                 # line 146 - zero vector of length 7
+
+if __name__ == "__main__":                                            # line 156 - smoke asserts, not run at import
+    all-pass and all-fail both yield [0.0]*DESCRIPTOR_DIM             # lines 168-169
+    mixed a-pass/b-fail yields positive then negative slot            # lines 172-179
+    round-trip through failure_fingerprint_from_state_result          # lines 189-192</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/verifier.py">sources/evaluators/verifier.py</a></td><td>imports constants + <code>compute_failure_fingerprint</code>; stores result, writes zeros on failure</td><td class="sym">lines 29-33, 376, 567</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a></td><td>imports <code>DESCRIPTOR_DIM</code> as <code>_FP_DIM</code>; writes the zero/neutral field, does not compute it</td><td class="sym">lines 47, 496, 607</td></tr>
+<tr><td class="sym">no importer found</td><td>no source file calls the read helpers at runtime (grep, 2026-10-02)</td><td class="sym">grep -rn sources/</td></tr>
+<tr><td class="sym"><a href="../../tests/failure_fingerprint_test.py">tests/failure_fingerprint_test.py</a></td><td>exercises all four functions: dimension, firewall, label forms, disk read</td><td class="sym">lines 13-148</td></tr>
+<tr><td class="sym"><a href="../../tests/verifier_recovery_test.py">tests/verifier_recovery_test.py</a></td><td>imports <code>compute_failure_fingerprint</code> to prime the import chain</td><td class="sym">lines 31-32</td></tr>
+<tr><td class="sym"><a href="../../tests/verifier_claim_cache_test.py">tests/verifier_claim_cache_test.py</a></td><td>same import for chain priming</td><td class="sym">lines 22-27</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>same import for chain priming</td><td class="sym">lines 33-34</td></tr>
+<tr><td class="sym"><a href="../../tests/verifier_visual_test.py">tests/verifier_visual_test.py</a> &#183; <a href="../../tests/verifier_result_focused_claims_test.py">verifier_result_focused_claims_test.py</a></td><td>import only, for the core/evaluators import order</td><td class="sym">lines 30 and 20-22</td></tr>
+</tbody>
+</table>
+<p class="note flag">Mismatch: <code>sources/core/failure_fingerprint.py:13</code> defines 7 letters <code>("a"&#8230;"g")</code>, so <code>DESCRIPTOR_DIM == 7</code>, but <code class="path">tests/failure_fingerprint_test.py:27-29</code> asserts <code>DESCRIPTOR_DIM == 6</code> and <code>SOURCES == ("a".."f")</code>. A run of that test against this file fails on both asserts. The docstring at line 21 also says "``a``-``f``" while the tuple ends at <code>g</code>.</p>
+<p class="note">The descriptor is marked deprecated in the module header (line 3), yet the legacy verifier still computes and stores it (<code class="path">sources/evaluators/verifier.py:376</code>), so the JSON key is present in fresh <code>state_result.json</code> files.</p>
+</div>
+
+<footer>
+<p>Sources: <a href="../../sources/core/failure_fingerprint.py">sources/core/failure_fingerprint.py</a> (all 195 lines, read line by line), <a href="../../sources/evaluators/verifier.py">sources/evaluators/verifier.py</a> (imports and fingerprint writes), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a> (import and zero-field writes), <a href="../../tests/failure_fingerprint_test.py">tests/failure_fingerprint_test.py</a>, and greps over <code>sources/</code> and <code>tests/</code> for importers.</p>
+<p class="skips">Skipped: <code>diversity_experiments/</code> and <code>experiments_verifiers/</code> (analysis scripts that read the JSON field directly, outside the runtime path); <code>docs/site/</code> and <code>docs/concepts/</code> prose (not evidence about the code); the <code>__main__</code> smoke block is documented in the inventory, not re-run.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

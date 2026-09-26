@@ -19,7 +19,7 @@ mimosa-ai/
 │   │   ├── workflow_selection.py          # Parent retrieval (archive / disk)
 │   │   ├── genotype_embedding.py          # Code-genotype embedding backend → QD behaviour descriptor
 │   │   ├── code_features.py               # genotype_embedding_descriptor shim (QD novelty)
-│   │   ├── failure_fingerprint.py         # Verifier verdicts → failure fingerprint (persisted diagnostic, deprecated, 7-D centered)
+│   │   ├── failure_fingerprint.py         # Legacy verifier fingerprint (deprecated; hybrid writes a neutral placeholder)
 │   │   ├── lineage.py                     # Parent → child sidecar records
 │   │   ├── orchestrator.py                # Grounding → factory → sandbox
 │   │   ├── workflow_factory.py            # Multi-agent workflow synthesis
@@ -33,8 +33,10 @@ mimosa-ai/
 │   │   ├── schema.py                      # IndividualRun, Plan, Task, …
 │   │   └── evaluators/                    # Verifier backends
 │   │       ├── evaluator.py               # Facade (routes to backends)
-│   │       ├── verifier.py                # Default multi-source per-claim verifier
-│   │       ├── grounding.py               # Perspicacité adapter
+│   │       ├── hybrid_verifier/           # Hybrid temporal-ladder verifier (default): claims, digest,
+│   │       │                              # scorers, registry, aggregation, gradient, layers
+│   │       ├── verifier.py                # Legacy multi-source per-claim verifier (deprecated)
+│   │       ├── grounding.py               # Perspicacité adapter (legacy verifier / generic)
 │   │       ├── generic.py                 # Legacy 4-criterion judge
 │   │       ├── scenario.py                # Rubric-based scoring
 │   │       ├── bs_detection.py            # BullshitDetector penalty

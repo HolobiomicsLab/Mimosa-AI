@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19c_eval.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > experiments_verifiers/harness > e19c_eval.py">
+<div class="wrap">
+
+<h1 class="hud">e19c_eval.py</h1>
+<p class="intro">Offline scorer for the E19c phase-C campaign: it rebuilds every pairwise verdict from the stored per-claim scores and writes one gradient text per generation. It imports the production verifier modules verbatim (<code>aggregation</code>, <code>claims</code>, <code>gradient</code>) and makes no LLM call and reads no label (docstring L18). It runs as a script: <code>if __name__ == "__main__": main()</code> at L337&ndash;338, with a fixed output name dated <code>2026-09-25</code> (L43).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 500" role="img" aria-label="e19c_eval.py job and order of work">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- inputs -->
+  <a class="box" id="d1Led" href="exp_e19c_ratchet.html">
+    <title>Five E19c JSONL ledgers, read through e19c_ratchet loaders</title>
+    <rect x="20" y="60" width="160" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="100" y="84" text-anchor="middle">E19c ledgers</text>
+    <text class="box-sub" x="100" y="100" text-anchor="middle">claims, scorers, scores,</text>
+    <text class="box-sub" x="100" y="113" text-anchor="middle">digests, cost (L58&ndash;61)</text>
+  </a>
+
+  <!-- entry -->
+  <a class="box" id="d1Main" href="../../experiments_verifiers/harness/e19c_eval.py">
+    <title>main() drives every stage</title>
+    <rect x="230" y="60" width="150" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="305" y="84" text-anchor="middle">main() driver</text>
+    <text class="box-sub" x="305" y="100" text-anchor="middle">entry point L105</text>
+    <text class="box-sub" x="305" y="113" text-anchor="middle">guard L337</text>
+  </a>
+
+  <!-- stage: load -->
+  <g class="box" id="d1Load">
+    <title>load_state() reads the ledgers and builds the score matrix</title>
+    <rect x="430" y="60" width="160" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="510" y="84" text-anchor="middle">load_state()</text>
+    <text class="box-sub" x="510" y="100" text-anchor="middle">smat, evid L68&ndash;73</text>
+    <text class="box-sub" x="510" y="113" text-anchor="middle">returns 8 values L74</text>
+  </g>
+
+  <!-- stage: helpers -->
+  <g class="box" id="d1Help">
+    <title>claim_lists, pair_winner and _temporal_detail, all called from main</title>
+    <rect x="640" y="60" width="180" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="730" y="84" text-anchor="middle">claim and pair helpers</text>
+    <text class="box-sub" x="730" y="100" text-anchor="middle">claim_lists L77 &#183; pair_winner L88</text>
+    <text class="box-sub" x="730" y="113" text-anchor="middle">_temporal_detail L97</text>
+  </g>
+
+  <!-- external modules -->
+  <g class="box" id="d1Mods">
+    <title>Imported modules; the file calls their functions verbatim</title>
+    <rect x="870" y="60" width="230" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="985" y="84" text-anchor="middle">imported modules</text>
+    <text class="box-sub" x="985" y="100" text-anchor="middle">AGG L39 &#183; CLAIMS L40 &#183; GRADIENT L41</text>
+    <text class="box-sub" x="985" y="113" text-anchor="middle">E15E L35 &#183; RC L36</text>
+  </g>
+
+  <!-- stage 1 -->
+  <g class="box" id="d1Var">
+    <title>Variance filter via AGG.claim_stats, then surviving claims in temporal order</title>
+    <rect x="20" y="250" width="180" height="68" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="110" y="274" text-anchor="middle">variance filter</text>
+    <text class="box-sub" x="110" y="290" text-anchor="middle">AGG.claim_stats L123</text>
+    <text class="box-sub" x="110" y="303" text-anchor="middle">surviving L126&ndash;128</text>
+  </g>
+
+  <!-- stage 2 -->
+  <g class="box" id="d1BT">
+    <title>Offline Bradley-Terry fit over all planned pairs, per mode</title>
+    <rect x="250" y="250" width="180" height="68" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="340" y="274" text-anchor="middle">offline BT fit</text>
+    <text class="box-sub" x="340" y="290" text-anchor="middle">pair winners L132&ndash;137</text>
+    <text class="box-sub" x="340" y="303" text-anchor="middle">bt_fit_weighted L155</text>
+  </g>
+
+  <!-- stage 3 -->
+  <g class="box" id="d1Online">
+    <title>Production online view in evolution order</title>
+    <rect x="480" y="250" width="180" height="68" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="570" y="274" text-anchor="middle">online win-rate view</text>
+    <text class="box-sub" x="570" y="290" text-anchor="middle">RC.evolution_order L164</text>
+    <text class="box-sub" x="570" y="303" text-anchor="middle">win_rate_reward L173</text>
+  </g>
+
+  <!-- stage 4 -->
+  <g class="box" id="d1Grad">
+    <title>One gradient text per generation, written by the production builder</title>
+    <rect x="710" y="250" width="180" height="68" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="800" y="274" text-anchor="middle">gradient writer</text>
+    <text class="box-sub" x="800" y="290" text-anchor="middle">build_gradient L197</text>
+    <text class="box-sub" x="800" y="303" text-anchor="middle">per uuid L196&ndash;206</text>
+  </g>
+
+  <!-- stage 5 -->
+  <g class="box" id="d1Check">
+    <title>Cost summary, determinism re-run and antisymmetry check</title>
+    <rect x="940" y="250" width="160" height="68" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1020" y="274" text-anchor="middle">checks</text>
+    <text class="box-sub" x="1020" y="290" text-anchor="middle">cost L261 &#183; determinism L276</text>
+    <text class="box-sub" x="1020" y="303" text-anchor="middle">antisymmetry L317</text>
+  </g>
+
+  <!-- outputs -->
+  <g class="box" id="d1Out">
+    <title>One JSON bundle and one gradient directory per group</title>
+    <rect x="480" y="400" width="620" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="790" y="424" text-anchor="middle">writes results</text>
+    <text class="box-sub" x="790" y="440" text-anchor="middle">_e19c_label_free_2026-09-25.json L251 &#183; E19c_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt L205</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="d1Led" data-to="d1Main" d="M180,92 H230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="205" y="84" text-anchor="middle">reads</text>
+  <path class="edge" data-from="d1Main" data-to="d1Load" d="M380,92 H430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="405" y="84" text-anchor="middle">calls()</text>
+  <path class="edge" data-from="d1Main" data-to="d1Help" d="M380,110 H420 V40 H700 V60" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="34" text-anchor="middle">calls inside loop</text>
+  <path class="edge dotted-edge" data-from="d1Help" data-to="d1Mods" d="M820,92 H870" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="845" y="84" text-anchor="middle">imports</text>
+
+  <path class="edge" data-from="d1Main" data-to="d1Var" d="M305,124 V230 H110 V250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="210" y="242" text-anchor="middle">runs stages per group</text>
+  <path class="edge" data-from="d1Var" data-to="d1BT" d="M200,284 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="276" text-anchor="middle">surviving claims</text>
+  <path class="edge" data-from="d1BT" data-to="d1Online" d="M430,284 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="455" y="276" text-anchor="middle">four modes</text>
+  <path class="edge" data-from="d1Online" data-to="d1Grad" d="M660,284 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="685" y="276" text-anchor="middle">pair records</text>
+  <path class="edge" data-from="d1Grad" data-to="d1Check" d="M890,284 H940" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="915" y="276" text-anchor="middle">then</text>
+
+  <path class="edge dashed-edge" data-from="d1Grad" data-to="d1Out" d="M800,318 V400" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="807" y="350" text-anchor="start">writes uuid.txt L205</text>
+  <path class="edge dashed-edge" data-from="d1Check" data-to="d1Out" d="M1020,318 V400" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="1027" y="350" text-anchor="start">writes JSON L251</text>
+
+  <text class="box-sub" x="20" y="480">solid = call  |  dashed = reads/writes  |  dotted = import only</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the order of work in <code class="path">experiments_verifiers/harness/e19c_eval.py</code>. The helpers box is called from inside the loop (L135) and from the antisymmetry check (L331&ndash;332); the checks stage runs after the group loop (L231, L234). Boxes link to the pages and files they name.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; what goes in and what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 420" role="img" aria-label="e19c_eval.py data flow">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="d2In">
+    <title>JSONL ledgers and the E14 plan, all read before any computing</title>
+    <rect x="20" y="50" width="270" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="155" y="72" text-anchor="middle">files read</text>
+    <text class="box-sub" x="155" y="88" text-anchor="middle">E19c_claims/scorers/scores/digests.jsonl</text>
+    <text class="box-sub" x="155" y="101" text-anchor="middle">E19c_bt_cost_ledger.jsonl (L262)</text>
+    <text class="box-sub" x="155" y="114" text-anchor="middle">E14_bt_population.json &#183; run_notes/*.json</text>
+    <text class="box-sub" x="155" y="126" text-anchor="middle">no config field read</text>
+  </g>
+
+  <g class="box" id="d2Load">
+    <title>load_state builds the score matrix and the evidence map</title>
+    <rect x="330" y="50" width="270" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="465" y="72" text-anchor="middle">load_state() L55</text>
+    <text class="box-sub" x="465" y="88" text-anchor="middle">smat[gid][cid][uuid8] = score</text>
+    <text class="box-sub" x="465" y="101" text-anchor="middle">evid[(gid,cid,uuid8)] = text</text>
+    <text class="box-sub" x="465" y="114" text-anchor="middle">returns 8 values L74</text>
+  </g>
+
+  <g class="box" id="d2Loop">
+    <title>Per-group loop: claims, pairs, BT arms, online reward, gradients</title>
+    <rect x="640" y="50" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="765" y="72" text-anchor="middle">main() group loop L112</text>
+    <text class="box-sub" x="765" y="88" text-anchor="middle">claims_g, vecs, pair_rows</text>
+    <text class="box-sub" x="765" y="101" text-anchor="middle">arm_scores, online, mean_score</text>
+    <text class="box-sub" x="765" y="114" text-anchor="middle">label_free["groups"] L208</text>
+  </g>
+
+  <g class="box" id="d2Checks">
+    <title>Cost, determinism and antisymmetry summaries</title>
+    <rect x="950" y="50" width="150" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1025" y="80" text-anchor="middle">checks L231&#8211;234</text>
+    <text class="box-sub" x="1025" y="98" text-anchor="middle">det, antisym dicts</text>
+    <text class="box-sub" x="1025" y="114" text-anchor="middle">summary L239&#8211;250</text>
+  </g>
+
+  <g class="box" id="d2OutTxt">
+    <title>One gradient text per generation</title>
+    <rect x="20" y="300" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="155" y="322" text-anchor="middle">files written: gradients</text>
+    <text class="box-sub" x="155" y="338" text-anchor="middle">E19c_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</text>
+    <text class="box-sub" x="155" y="351" text-anchor="middle">GRAD_ROOT L46 &#183; mkdir L192</text>
+    <text class="box-sub" x="155" y="364" text-anchor="middle">write_text L205</text>
+  </g>
+
+  <g class="box" id="d2OutJson">
+    <title>The full label-free bundle</title>
+    <rect x="330" y="300" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="465" y="322" text-anchor="middle">file written: JSON</text>
+    <text class="box-sub" x="465" y="338" text-anchor="middle">_e19c_label_free_2026-09-25.json</text>
+    <text class="box-sub" x="465" y="351" text-anchor="middle">OUT_JSON L45 &#183; write L251</text>
+    <text class="box-sub" x="465" y="364" text-anchor="middle">keys: groups, cost, summary</text>
+  </g>
+
+  <g class="box" id="d2OutTmp">
+    <title>Scratch directory of the determinism re-run, removed afterwards</title>
+    <rect x="950" y="300" width="150" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1025" y="322" text-anchor="middle">temp dir</text>
+    <text class="box-sub" x="1025" y="338" text-anchor="middle">e19c_det_* L283</text>
+    <text class="box-sub" x="1025" y="351" text-anchor="middle">rmtree L313</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="d2In" data-to="d2Load" d="M290,90 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="310" y="82" text-anchor="middle">reads L58</text>
+  <path class="edge" data-from="d2Load" data-to="d2Loop" d="M600,90 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="620" y="82" text-anchor="middle">returns state</text>
+  <path class="edge" data-from="d2Loop" data-to="d2Checks" d="M890,90 H950" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="920" y="82" text-anchor="middle">then calls</text>
+
+  <path class="edge dashed-edge" data-from="d2Loop" data-to="d2OutTxt" d="M660,130 V240 H155 V300" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="400" y="232" text-anchor="middle">writes uuid.txt L205</text>
+  <path class="edge dashed-edge" data-from="d2Loop" data-to="d2OutJson" d="M765,130 V300" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="772" y="222" text-anchor="start">writes JSON L251</text>
+  <path class="edge dashed-edge" data-from="d2Checks" data-to="d2OutTmp" d="M1025,130 V300" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="1032" y="222" text-anchor="start">scorer re-run L286</text>
+
+  <text class="box-sub" x="640" y="360">determinism_check also reads back</text>
+  <text class="box-sub" x="640" y="374">the scores ledger (L306) and the</text>
+  <text class="box-sub" x="640" y="388">workspace snapshots (L294, L297).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; inputs and outputs with the real paths. Ledger paths are constants of <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L55&ndash;59); the plan comes from <code class="path">experiments_verifiers/results/E14_bt_population.json</code> (e18_scripted_bt.py L63) through <code>RC.load_plan_groups</code> (e19c_ratchet.py L233, asserts 19 groups and 667 pairs). Config fields read: <b>none</b> &mdash; the file imports no <code>Config</code>; <code>EV</code> and <code>REPO</code> are derived from <code>__file__</code> (L31&ndash;32).</p>
+<p class="note flag">The digests ledger is read (L61) and returned, but <code>digests</code> is never used after the unpack at L106&ndash;107: it has no effect on any output.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; decisions, branches and the per-mode loop</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 470" role="img" aria-label="e19c_eval.py control logic">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="d3A">
+    <title>Warning when a group has no claim record</title>
+    <rect x="20" y="30" width="330" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="185" y="52" text-anchor="middle">group missing in claims? L62</text>
+    <text class="box-sub" x="185" y="70" text-anchor="middle">if failed_extraction L64</text>
+  </g>
+  <g class="box" id="d3B">
+    <title>Warning branch: the group is still scored</title>
+    <rect x="20" y="130" width="330" height="58" rx="2" fill="rgba(255,181,71,0.10)" stroke="#FFB547"/>
+    <text class="box-label" x="185" y="152" text-anchor="middle">yes: print WARNING L65</text>
+    <text class="box-sub" x="185" y="170" text-anchor="middle">unscored group, all pairs tie</text>
+  </g>
+  <g class="box" id="d3C">
+    <title>Claim drop test comes from the production claim_stats</title>
+    <rect x="20" y="230" width="330" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="185" y="252" text-anchor="middle">claim dropped? L123&#8211;126</text>
+    <text class="box-sub" x="185" y="270" text-anchor="middle">no score, or zero variance</text>
+  </g>
+  <g class="box" id="d3D">
+    <title>Only surviving claims reach the pairwise modes</title>
+    <rect x="20" y="330" width="330" height="58" rx="2" fill="rgba(255,181,71,0.10)" stroke="#FFB547"/>
+    <text class="box-label" x="185" y="352" text-anchor="middle">yes: drop from surviving L126</text>
+    <text class="box-sub" x="185" y="370" text-anchor="middle">surv_ids feeds every mode L128</text>
+  </g>
+
+  <g class="box" id="d3E">
+    <title>pair_winner dispatches on the mode string</title>
+    <rect x="620" y="30" width="340" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="790" y="52" text-anchor="middle">pair_winner() mode dispatch L90</text>
+    <text class="box-sub" x="790" y="70" text-anchor="middle">four modes in MODES L44</text>
+  </g>
+  <g class="box" id="d3F">
+    <title>Temporal path</title>
+    <rect x="620" y="130" width="340" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="790" y="152" text-anchor="middle">temporal or strict? L91</text>
+    <text class="box-sub" x="790" y="170" text-anchor="middle">AGG.temporal_winner(...) L91</text>
+  </g>
+  <g class="box" id="d3G">
+    <title>Flat path</title>
+    <rect x="620" y="230" width="340" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="790" y="252" text-anchor="middle">else: decisive + winner_of L93</text>
+    <text class="box-sub" x="790" y="270" text-anchor="middle">sign_sum and mean_diff L44</text>
+  </g>
+  <g class="box" id="d3H">
+    <title>Ties become two half-weight matches for the BT fit</title>
+    <rect x="620" y="330" width="340" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="790" y="352" text-anchor="middle">sign of the verdict L146</text>
+    <text class="box-sub" x="790" y="370" text-anchor="middle">ties add 0.5 twice L151&#8211;152</text>
+  </g>
+  <g class="box" id="d3I">
+    <title>Empty match list falls back to zeros</title>
+    <rect x="620" y="420" width="340" height="44" rx="2" fill="rgba(255,181,71,0.10)" stroke="#FFB547"/>
+    <text class="box-label" x="790" y="446" text-anchor="middle">empty match list L158</text>
+  </g>
+  <g class="box" id="d3J">
+    <title>Antisymmetry check swaps the pair order</title>
+    <rect x="20" y="420" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="185" y="446" text-anchor="middle">w(i,j) == -w(j,i)? L331</text>
+  </g>
+
+  <path class="edge" data-from="d3A" data-to="d3B" d="M120,88 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="127" y="112" text-anchor="start">yes</text>
+  <path class="edge" data-from="d3A" data-to="d3C" d="M250,88 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="257" y="160" text-anchor="start">no, next group</text>
+  <path class="edge" data-from="d3C" data-to="d3D" d="M120,288 V330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="127" y="312" text-anchor="start">yes</text>
+  <path class="edge dashed-edge" data-from="d3C" data-to="d3J" d="M250,288 V420" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="257" y="356" text-anchor="start">no, keeps it</text>
+
+  <path class="edge" data-from="d3E" data-to="d3F" d="M700,88 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="707" y="112" text-anchor="start">yes</text>
+  <path class="edge" data-from="d3E" data-to="d3G" d="M880,88 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="887" y="160" text-anchor="start">no</text>
+  <path class="edge" data-from="d3F" data-to="d3H" d="M700,188 V330" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d3G" data-to="d3H" d="M880,288 V330" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d3H" data-to="d3I" d="M790,388 V420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="797" y="410" text-anchor="start">per mode</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the three real branch groups: the missing-claims warning (L62&ndash;67), the claim-stats drop filter (L123&ndash;128), and the mode dispatch plus BT tie expansion (L90&ndash;94, L146&ndash;158). The antisymmetry check re-runs <code>pair_winner</code> with the pair swapped for 10% of rows per group (<code>ANTISYM_FRAC</code>, L48, L326&ndash;333); the determinism check re-runs 5% of <code>ok</code> scorers twice (<code>DET_FRAC</code>, L47, L280&ndash;302) and skips a record when its group is absent (<code>if g is None: continue</code>, L289&ndash;290).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>kind</th><th>name</th><th>where</th><th>used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">file read</td><td class="sym">E19c_claims_2026-09-25.jsonl</td><td>RC.CLAIMS_LEDGER (e19c_ratchet.py L56), read at L58</td><td>claim records per group; temporally sorted at L77, L81</td></tr>
+<tr><td class="sym">file read</td><td class="sym">E19c_scorers_2026-09-25.jsonl</td><td>RC.SCORERS_LEDGER (L57), read at L59</td><td>scorer scripts and status for the determinism re-run L279</td></tr>
+<tr><td class="sym">file read</td><td class="sym">E19c_scores_2026-09-25.jsonl</td><td>RC.SCORES_LEDGER (L58), read at L60</td><td>per-claim scores into <code>smat</code> L71 and evidence L73</td></tr>
+<tr><td class="sym">file read</td><td class="sym">E19c_digests_2026-09-25.jsonl</td><td>RC.DIGESTS (L55), read at L61</td><td>nothing; returned as <code>digests</code>, never used again</td></tr>
+<tr><td class="sym">file read</td><td class="sym">E19c_bt_cost_ledger_2026-09-25.jsonl</td><td>RC.COST_LEDGER (L59), read at L262</td><td>cost totals per role, credited cap <code>RC.HARD_CAP_USD</code> L273</td></tr>
+<tr><td class="sym">file read</td><td class="sym">E14_bt_population.json</td><td>via <code>RC.load_plan_groups</code> L56 (e19c_ratchet.py L233; path e18_scripted_bt.py L63)</td><td>groups, generations, <code>design.judging_order</code> pairs L132</td></tr>
+<tr><td class="sym">file read</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td><td>via <code>RC.load_goals</code> L57 (e19c_ratchet.py L245)</td><td><code>goal</code> text handed to the gradient L198</td></tr>
+<tr><td class="sym">file read</td><td class="sym">workspace snapshots</td><td>RC.ws_root_of, used at L294 and L297</td><td>re-execute the picked scorer scripts in place</td></tr>
+<tr><td class="sym">file read</td><td class="sym">E19c_scores ledger (again)</td><td>re-read inside determinism_check L306</td><td>compare the fresh scores with the recorded ones L309</td></tr>
+<tr><td class="sym">file written</td><td class="sym">_e19c_label_free_2026-09-25.json</td><td>OUT_JSON L45; written at L251 with <code>OUT_JSON.write_text</code></td><td>whole bundle: groups, cost, summary</td></tr>
+<tr><td class="sym">file written</td><td class="sym">E19c_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</td><td>GRAD_ROOT L46; <code>mkdir</code> L192; written at L205</td><td>one production gradient text per generation</td></tr>
+<tr><td class="sym">dir written</td><td class="sym">e19c_det_&lt;random&gt;</td><td>tempfile.mkdtemp L283; removed L313</td><td>scratch space for the double scorer re-run</td></tr>
+<tr><td class="sym">state key</td><td class="sym">smat, evid</td><td>built at L68&ndash;73 in load_state</td><td>score lookup per group, claim, uuid; evidence text</td></tr>
+<tr><td class="sym">state key</td><td class="sym">label_free["groups"], ["cost"], ["summary"]</td><td>L110, L208, L239</td><td>the JSON body written at L251</td></tr>
+<tr><td class="sym">config field</td><td class="sym">none</td><td>no <code>Config</code> import; EV and REPO from <code>__file__</code> L31&ndash;32</td><td>every path is a module constant, not a config field</td></tr>
+<tr><td class="sym">constant</td><td class="sym">MODES</td><td>L44</td><td>the four verdict modes looped in main L134, L142</td></tr>
+<tr><td class="sym">constant</td><td class="sym">DET_FRAC, ANTISYM_FRAC, E19C_SEED</td><td>L47, L48, L49</td><td>5% re-run share, 10% pair share, RNG seeds L278, L318</td></tr>
+</tbody>
+</table>
+<p class="sub">Paths are relative to the repository root except the ledger constants, which are built from <code>EV = experiments_verifiers</code> (L31). Naming of each ledger comes from <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> L53&ndash;59 with <code>TODAY = "2026-09-25"</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>8 top-level functions and 7 module constants, no classes</summary><div class="dbody">
+<pre># module docstring L1-19 ........ design record: ledgers in, BT + online reward + gradients out, no LLM call
+from __future__ import annotations  L21
+
+TODAY = "2026-09-25"                                     L43  date stamp for output names
+MODES = ("temporal", "temporal_strict", "sign_sum", "mean_diff")  L44  the four verdict modes
+OUT_JSON = EV / "results" / f"_e19c_label_free_{TODAY}.json"      L45  JSON summary target
+GRAD_ROOT = EV / "results" / "E19c_bt_gradients"                  L46  gradient text root
+DET_FRAC = 0.05                                          L47  determinism re-run subsample
+ANTISYM_FRAC = 0.10                                      L48  antisymmetry pair fraction
+E19C_SEED = 20260925                                     L49  RNG seed; antisymmetry uses +5 (L318)
+
+def load_state()                                                     L55  reads five ledgers, builds smat and evid
+def claim_lists(claims_ledger: list[dict]) -&gt; dict[str, list[dict]]  L77  gid -&gt; claims in temporal order
+def pair_winner(mode: str, now: dict, prev: dict, claims: list[dict]) L88  +1 now / -1 prev / 0 tie
+def _temporal_detail(a: dict, b: dict, claims: list[dict]) -&gt; str     L97  deciding "stage:kind" label, or "tie"
+def main()                                                           L105  whole pipeline: load, per-group loop, checks, write
+def cost_summary() -&gt; dict                                           L261  cost ledger totals, calls per role, cap
+def determinism_check(groups: list[dict], scorers: list[dict]) -&gt; dict L276  re-run 5% of ok scorers twice
+def antisymmetry_check(group_data: list[dict]) -&gt; dict                L317  swapped-order verdict check per mode
+
+if __name__ == "__main__":  main()  L337-338  script guard; there is no other entry point</pre>
+<p>Module constants aside, the file has no class. Import aliases (L35&ndash;41): <code>E15E</code> = <code>e15_bt_eval</code>, <code>RC</code> = <code>e19c_ratchet</code>, <code>AGG</code> = <code>sources.evaluators.hybrid_verifier.aggregation</code>, <code>CLAIMS</code> = <code>...claims</code>, <code>GRADIENT</code> = <code>...gradient</code>. <code>import sources.core.workflow_runner</code> (L38) carries <code>F401</code> and the comment <em>import-order anchor</em>: it is imported for its side effect and never called here. <code>sys.path.insert</code> at L33&ndash;34 puts the harness folder and the repo root on the path before those imports.</p>
+<h3>External functions this file calls, with their real lines</h3>
+<pre>RC.load_plan_groups()            e19c_ratchet.py L233   RC.load_goals()      e19c_ratchet.py L245
+RC.load_jsonl(path)              e19c_ratchet.py L207   RC.gid_of()          e19c_ratchet.py L253
+RC.evolution_order(group)        e19c_ratchet.py L272   RC.ws_root_of()      e19c_ratchet.py L257
+RC.execute_scorer(...)           e19c_ratchet.py L290   RC.SCORERS.build_launcher / parse_scorer_output   L295, L299
+E15E.bt_fit_weighted(...)        e15_bt_eval.py L90     E15E.expit(x)        e15_bt_eval.py L86
+AGG.claim_stats(observed)        aggregation.py L50     AGG.decisive(...)    aggregation.py L78
+AGG.winner_of(d, dm, mode)       aggregation.py L97     AGG.temporal_winner(...)  aggregation.py L110
+AGG.win_rate_reward(...)         aggregation.py L197    AGG.mean_claim_score(...) aggregation.py L428
+CLAIMS.sort_claims_temporally()  claims.py L289         GRADIENT.build_gradient(...) gradient.py L82</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers, tests and neighbours</h2>
+<table>
+<thead><tr><th>question</th><th>finding</th><th>evidence</th></tr></thead>
+<tbody>
+<tr><td>which repo file imports it</td><td>no importer found</td><td><code>grep -rn 'e19c_eval' .</code> returns only this page and two binary caches</td></tr>
+<tr><td>was it ever imported</td><td>yes, by a process no longer on disk</td><td><code class="path">experiments_verifiers/harness/__pycache__/e19c_eval.cpython-311.pyc</code> exists</td></tr>
+<tr><td>what calls it now</td><td>manual script run only</td><td>guard <code>if __name__ == "__main__"</code> L337; no launcher flags in main</td></tr>
+<tr><td>tests in tests/</td><td>none</td><td>no match for <code>e19c</code> under tests/; <code>grep</code> returns nothing</td></tr>
+<tr><td>who reads its JSON</td><td>unknown</td><td>no source file names <code>_e19c_label_free_2026-09-25.json</code></td></tr>
+<tr><td>sibling ledgers writer</td><td><a href="exp_e19c_ratchet.html">e19c_ratchet.py</a></td><td>test: it owns the four ledger constants this file reads</td></tr>
+<tr><td>production modules called</td><td><a href="mod_evaluators_hybrid_verifier.html">hybrid_verifier package</a></td><td>aggregation, claims and gradient used verbatim</td></tr>
+</tbody>
+</table>
+<p class="sub">Output on disk, checked at build time: <code class="path">experiments_verifiers/results/_e19c_label_free_2026-09-25.json</code> has exactly three keys (<code>groups</code>, <code>cost</code>, <code>summary</code>) and its <code>summary</code> records 19 groups, 182 claims, 116 surviving, 1459 score cells, 148 gradient files, determinism 9/9 exact and 0 antisymmetry violations in 66 checked pairs. That is a disk observation, not a fresh run.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Related pages</h2>
+<p class="sub">File digests in this batch: <a href="file_harness_e19c_ratchet.html">file_harness_e19c_ratchet.html</a>, <a href="file_harness_e19c_online_bt.html">file_harness_e19c_online_bt.html</a>, <a href="file_harness_e19c_gradient_duel.html">file_harness_e19c_gradient_duel.html</a>, <a href="file_harness_e19c_confirm.html">file_harness_e19c_confirm.html</a>.</p>
+<p class="sub">Same experiment: <a href="exp_e19c_eval.html">exp_e19c_eval.html</a> &#183; <a href="exp_e19c_ratchet.html">exp_e19c_ratchet.html</a> &#183; <a href="exp_e19c_confirm.html">exp_e19c_confirm.html</a> &#183; <a href="exp_e19c_online_bt.html">exp_e19c_online_bt.html</a> &#183; <a href="exp_e19c_gradient_duel.html">exp_e19c_gradient_duel.html</a> &#183; <a href="exp_e19_bt_eval.html">exp_e19_bt_eval.html</a> &#183; <a href="exp_e19_hybrid_bt.html">exp_e19_hybrid_bt.html</a> &#183; <a href="exp_e19_gradient_duel.html">exp_e19_gradient_duel.html</a> &#183; <a href="exp_e16_gradient_audit.html">exp_e16_gradient_audit.html</a>. Areas and flows: <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> &#183; <a href="area_evaluators.html">area_evaluators.html</a> &#183; <a href="data_experiments.html">data_experiments.html</a> &#183; <a href="flow_verification.html">flow_verification.html</a> &#183; <a href="exp_index.html">exp_index.html</a> &#183; <a href="index.html">index.html</a> &#183; <a href="overview.html">overview.html</a> &#183; <a href="file_index.html">file_index.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19c_eval.py</code> (all 338 lines, line numbers from the file itself), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>. Cross-checks by targeted grep or read: <code class="path">experiments_verifiers/harness/e19c_ratchet.py</code> (L37&ndash;72, L207&ndash;213, L233&ndash;258, L289&ndash;300, L306), <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> (L86, L90), <code class="path">experiments_verifiers/harness/e18_scripted_bt.py</code> (L63), <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> (L50, L78, L97, L110, L197, L428), <code class="path">.../claims.py</code> (L289), <code class="path">.../gradient.py</code> (L82), <code class="path">experiments_verifiers/results/</code> listing, <code class="path">run_notes/</code> listing, <code class="path">tests/</code> grep. Line counts from <code>wc -l</code>; page shape and text budget per <code class="path">UPDATE_VISUAL_CLONE.md</code>.</p>
+<p class="skips">Skipped: the internals of <code>e19c_ratchet.py</code>, <code>e15_bt_eval.py</code>, <code>aggregation.py</code>, <code>claims.py</code> and <code>gradient.py</code> &mdash; only the signatures and lines used here were read; their own pages cover them. Not opened: any <code>.env</code> file, credential file or API key, by rule. No pytest run and no application or experiment run, by rule; the numbers in the caller section are disk observations of an output written earlier. The page <code>file_harness_e19c_ratchet.html</code> was not on disk when this page was written, so it is linked from the related-pages list without a content check; <code>exp_e19c_ratchet.html</code> is linked as well. Nothing inside <code>experiments_verifiers/</code> was modified.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

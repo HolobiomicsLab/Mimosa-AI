@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>inventory.py &mdash; Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/evaluators/hybrid_verifier > inventory.py">
+<div class="wrap">
+
+<h1 class="hud">inventory.py</h1>
+<p class="intro">This file lists every file of a workspace with its size and, when cheap, a CSV shape or PNG size. Claim extraction and scorer prompts read those listings, so the judge sees which paths exist and which are stable across generations. It runs on every evaluated generation, called from <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> and from <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a>; the package context is on <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; the file's job: walk, signal, rank, preview, render</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 520" role="img" aria-label="inventory.py walk, signals, previews and union rendering">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="iWs">
+    <title>Workspace root path passed by the caller</title>
+    <rect x="14" y="45" width="150" height="95" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="89" y="70" text-anchor="middle">in: workspace Path</text>
+    <text class="box-sub" x="89" y="88" text-anchor="middle">max_entries = 400 (96)</text>
+    <text class="box-sub" x="89" y="104" text-anchor="middle">missing dir gives {} (110)</text>
+    <text class="box-sub" x="89" y="120" text-anchor="middle">evaluator.py:311, 564</text>
+  </g>
+
+  <a class="box" id="iScan" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>scan_workspace: os.walk, kind label, cheap signal per file</title>
+    <rect x="190" y="30" width="180" height="125" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="280" y="55" text-anchor="middle">scan_workspace (95)</text>
+    <text class="box-sub" x="280" y="73" text-anchor="middle">os.walk, skip dirs (113)</text>
+    <text class="box-sub" x="280" y="89" text-anchor="middle">kind: csv/tsv/png</text>
+    <text class="box-sub" x="280" y="105" text-anchor="middle">script/text/other (122-131)</text>
+    <text class="box-sub" x="280" y="121" text-anchor="middle">stops at 400 files (139)</text>
+    <text class="box-sub" x="280" y="137" text-anchor="middle">calls file_signal (135)</text>
+  </a>
+
+  <a class="box" id="iSig" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>file_signal: dispatch by extension to one cheap signal</title>
+    <rect x="400" y="30" width="170" height="125" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="485" y="55" text-anchor="middle">file_signal (84)</text>
+    <text class="box-sub" x="485" y="73" text-anchor="middle">.png gives png_dims (87)</text>
+    <text class="box-sub" x="485" y="89" text-anchor="middle">.csv/.tsv gives csv_shape (90)</text>
+    <text class="box-sub" x="485" y="105" text-anchor="middle">anything else returns "" (92)</text>
+    <text class="box-sub" x="485" y="121" text-anchor="middle">text "8x6 px"</text>
+    <text class="box-sub" x="485" y="137" text-anchor="middle">text "3 rows x 2 cols"</text>
+  </a>
+
+  <a class="box" id="iShape" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>csv_shape and png_dims read headers only</title>
+    <rect x="600" y="30" width="180" height="125" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="690" y="55" text-anchor="middle">csv_shape (59)</text>
+    <text class="box-sub" x="690" y="73" text-anchor="middle">png_dims (71)</text>
+    <text class="box-sub" x="690" y="91" text-anchor="middle">_read_head (63)</text>
+    <text class="box-sub" x="690" y="109" text-anchor="middle">_count_newlines (68)</text>
+    <text class="box-sub" x="690" y="127" text-anchor="middle">delimiter by count (66)</text>
+    <text class="box-sub" x="690" y="145" text-anchor="middle">IHDR bytes 16:24 (77)</text>
+  </a>
+
+  <g class="box" id="iOutDict">
+    <title>Return value of scan_workspace</title>
+    <rect x="810" y="45" width="175" height="95" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="897" y="70" text-anchor="middle">out: inventory dict</text>
+    <text class="box-sub" x="897" y="88" text-anchor="middle">{rel: {bytes, kind, signal}}</text>
+    <text class="box-sub" x="897" y="104" text-anchor="middle">built at 132-138</text>
+    <text class="box-sub" x="897" y="120" text-anchor="middle">merged by registry (256)</text>
+  </g>
+
+  <g class="box" id="iInRows">
+    <title>Inventory rows handed to the preview helpers</title>
+    <rect x="14" y="210" width="150" height="95" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="89" y="235" text-anchor="middle">in: inventory rows</text>
+    <text class="box-sub" x="89" y="253" text-anchor="middle">rel -&gt; bytes, kind, signal</text>
+    <text class="box-sub" x="89" y="269" text-anchor="middle">from lane 1 dict</text>
+    <text class="box-sub" x="89" y="285" text-anchor="middle">layers.py:197, 203</text>
+  </g>
+
+  <a class="box" id="iRank" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>_deliverable_rank: E19 preference order</title>
+    <rect x="190" y="195" width="185" height="125" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="282" y="220" text-anchor="middle">_deliverable_rank (149)</text>
+    <text class="box-sub" x="282" y="238" text-anchor="middle">pred_results + csv/tsv = 0</text>
+    <text class="box-sub" x="282" y="254" text-anchor="middle">+ json = 1, + txt/log = 2</text>
+    <text class="box-sub" x="282" y="270" text-anchor="middle">root script = 3</text>
+    <text class="box-sub" x="282" y="286" text-anchor="middle">everything else = 9</text>
+    <text class="box-sub" x="282" y="302" text-anchor="middle">digest.py:147 reuses it</text>
+  </a>
+
+  <a class="box" id="iPrev" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>deliverable_previews: rank, sort, byte budget</title>
+    <rect x="405" y="195" width="200" height="125" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="505" y="220" text-anchor="middle">deliverable_previews (164)</text>
+    <text class="box-sub" x="505" y="238" text-anchor="middle">keeps rank &lt; 9 (180)</text>
+    <text class="box-sub" x="505" y="254" text-anchor="middle">sort rank, then bytes down (182)</text>
+    <text class="box-sub" x="505" y="270" text-anchor="middle">at most 3 files (183)</text>
+    <text class="box-sub" x="505" y="286" text-anchor="middle">14 KiB shared budget (185)</text>
+    <text class="box-sub" x="505" y="302" text-anchor="middle">CSV head 11 lines (191)</text>
+  </a>
+
+  <g class="box" id="iOutPrev">
+    <title>Return value of deliverable_previews</title>
+    <rect x="635" y="210" width="170" height="95" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="720" y="235" text-anchor="middle">out: previews text</text>
+    <text class="box-sub" x="720" y="253" text-anchor="middle">"--- preview: path (N B) ---"</text>
+    <text class="box-sub" x="720" y="269" text-anchor="middle">joined at 216</text>
+    <text class="box-sub" x="720" y="285" text-anchor="middle">into extract prompt (204)</text>
+  </g>
+
+  <a class="box" id="iHasArt" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>workspace_has_artifacts: any non-script entry</title>
+    <rect x="14" y="365" width="190" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="109" y="390" text-anchor="middle">workspace_has_artifacts (144)</text>
+    <text class="box-sub" x="109" y="408" text-anchor="middle">any kind != "script"</text>
+    <text class="box-sub" x="109" y="424" text-anchor="middle">takes lane-1 dict</text>
+    <text class="box-sub" x="109" y="440" text-anchor="middle">called by evaluator.py:565</text>
+    <text class="box-sub" x="109" y="456" text-anchor="middle">feeds the artifact flag</text>
+  </a>
+
+  <a class="box" id="iRender" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>render_union_inventory: union listing for prompts</title>
+    <rect x="300" y="365" width="200" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="400" y="390" text-anchor="middle">render_union_inventory (219)</text>
+    <text class="box-sub" x="400" y="408" text-anchor="middle">sort by count desc, then path (241)</text>
+    <text class="box-sub" x="400" y="424" text-anchor="middle">"present in C/N workspaces" (247)</text>
+    <text class="box-sub" x="400" y="440" text-anchor="middle">marks current paths (245)</text>
+    <text class="box-sub" x="400" y="456" text-anchor="middle">cap 300 lines (249)</text>
+  </a>
+
+  <g class="box" id="iOutUnion">
+    <title>Return values of the lane-3 helpers</title>
+    <rect x="560" y="365" width="200" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="660" y="390" text-anchor="middle">out: bool / union text</text>
+    <text class="box-sub" x="660" y="408" text-anchor="middle">True or False (146)</text>
+    <text class="box-sub" x="660" y="424" text-anchor="middle">listing text (247)</text>
+    <text class="box-sub" x="660" y="440" text-anchor="middle">"(workspace empty)" (253)</text>
+    <text class="box-sub" x="660" y="456" text-anchor="middle">"[N more paths truncated]" (251)</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="iWs" data-to="iScan" d="M164,92 H190" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="177" y="85" text-anchor="middle">walks tree</text>
+
+  <path class="edge" data-from="iScan" data-to="iSig" d="M370,92 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="385" y="85" text-anchor="middle">per file (135)</text>
+
+  <path class="edge" data-from="iSig" data-to="iShape" d="M570,92 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="585" y="85" text-anchor="middle">csv/tsv or png</text>
+
+  <path class="edge dashed-edge" data-from="iScan" data-to="iOutDict" d="M280,155 V175 H897 V140" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="520" y="170" text-anchor="middle">returns dict (130)</text>
+
+  <path class="edge dashed-edge" data-from="iInRows" data-to="iRank" d="M164,257 H190" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="177" y="250" text-anchor="middle">each row</text>
+
+  <path class="edge" data-from="iRank" data-to="iPrev" d="M375,257 H405" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="390" y="250" text-anchor="middle">rank &lt; 9 (180)</text>
+
+  <path class="edge dashed-edge" data-from="iPrev" data-to="iOutPrev" d="M605,257 H635" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="620" y="250" text-anchor="middle">returns text</text>
+
+  <path class="edge dashed-edge" data-from="iOutDict" data-to="iHasArt" d="M897,140 V345 H109 V365" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="500" y="340" text-anchor="middle">lane-1 dict (146)</text>
+
+  <path class="edge" data-from="iRender" data-to="iOutUnion" d="M500,420 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="530" y="413" text-anchor="middle">returns listing</text>
+
+  <path class="edge" data-from="iHasArt" data-to="iOutUnion" d="M109,475 V500 H660 V475" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="495" text-anchor="middle">returns bool (146)</text>
+
+  <text class="box-sub" x="14" y="515">rounded = function (line number)  |  dashed = value or input  |  solid = call inside this file  |  dashed arrow = reads a value or file</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; three lanes: walk and signal (top), rank and preview (middle), artifact check and union rendering (bottom). Every solid arrow is a call inside <code class="path">sources/evaluators/hybrid_verifier/inventory.py</code>; dashed arrows carry a value or read a file. Line numbers in brackets.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: what goes in, what comes out, what is written</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 400" role="img" aria-label="inventory.py data flow">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="dCfg">
+    <title>Config field read by the caller, not by this file</title>
+    <rect x="14" y="30" width="180" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="104" y="54" text-anchor="middle">config.workspace_dir</text>
+    <text class="box-sub" x="104" y="72" text-anchor="middle">read in evaluator.py:164-168</text>
+    <text class="box-sub" x="104" y="88" text-anchor="middle">passed as workspace (311)</text>
+    <text class="box-sub" x="104" y="104" text-anchor="middle">this file reads no config key</text>
+  </g>
+
+  <g class="box" id="dWs">
+    <title>Workspace tree on disk</title>
+    <rect x="230" y="30" width="190" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="325" y="54" text-anchor="middle">workspace files</text>
+    <text class="box-sub" x="325" y="72" text-anchor="middle">.csv .tsv .png .py .txt .json</text>
+    <text class="box-sub" x="325" y="88" text-anchor="middle">stat size (118)</text>
+    <text class="box-sub" x="325" y="104" text-anchor="middle">read head bytes (63, 190)</text>
+  </g>
+
+  <a class="box" id="dScan" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>scan_workspace</title>
+    <rect x="460" y="30" width="170" height="90" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="545" y="54" text-anchor="middle">scan_workspace (95)</text>
+    <text class="box-sub" x="545" y="72" text-anchor="middle">in: Path, max_entries</text>
+    <text class="box-sub" x="545" y="88" text-anchor="middle">out: dict of dicts</text>
+    <text class="box-sub" x="545" y="104" text-anchor="middle">no file written</text>
+  </a>
+
+  <g class="box" id="dOut1">
+    <title>Returned inventory</title>
+    <rect x="670" y="30" width="200" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="770" y="54" text-anchor="middle">returns inventory dict</text>
+    <text class="box-sub" x="770" y="72" text-anchor="middle">rel -&gt; bytes, kind, signal</text>
+    <text class="box-sub" x="770" y="88" text-anchor="middle">consumers: layers.py:197</text>
+    <text class="box-sub" x="770" y="104" text-anchor="middle">registry.merge_inventory (256)</text>
+  </g>
+
+  <g class="box" id="dReg">
+    <title>Per-task registry state read for the union listing</title>
+    <rect x="14" y="180" width="200" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="114" y="204" text-anchor="middle">registry.inventory</text>
+    <text class="box-sub" x="114" y="222" text-anchor="middle">rel -&gt; {count, signal}</text>
+    <text class="box-sub" x="114" y="238" text-anchor="middle">persisted in registry JSON</text>
+    <text class="box-sub" x="114" y="254" text-anchor="middle">hybrid_registry_&lt;key&gt;.json</text>
+    <text class="box-sub" x="114" y="270" text-anchor="middle">read here as a dict (241)</text>
+  </g>
+
+  <a class="box" id="dRender" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>render_union_inventory</title>
+    <rect x="250" y="180" width="200" height="100" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="350" y="204" text-anchor="middle">render_union_inventory (219)</text>
+    <text class="box-sub" x="350" y="222" text-anchor="middle">in: union, n_workspaces</text>
+    <text class="box-sub" x="350" y="238" text-anchor="middle">in: current path list</text>
+    <text class="box-sub" x="350" y="254" text-anchor="middle">out: newline listing</text>
+    <text class="box-sub" x="350" y="270" text-anchor="middle">no file written</text>
+  </a>
+
+  <g class="box" id="dPrev">
+    <title>Preview bytes read from disk</title>
+    <rect x="490" y="180" width="200" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="590" y="204" text-anchor="middle">file head and tail bytes</text>
+    <text class="box-sub" x="590" y="222" text-anchor="middle">CSV sniff 64 KiB (190)</text>
+    <text class="box-sub" x="590" y="238" text-anchor="middle">text head 6 KiB + tail 1 KiB</text>
+    <text class="box-sub" x="590" y="254" text-anchor="middle">seeks from end (203)</text>
+    <text class="box-sub" x="590" y="270" text-anchor="middle">read-only, OSError skipped</text>
+  </g>
+
+  <g class="box" id="dOut2">
+    <title>What this file writes</title>
+    <rect x="720" y="180" width="260" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="850" y="204" text-anchor="middle">writes: nothing</text>
+    <text class="box-sub" x="850" y="222" text-anchor="middle">no open(..., "w") anywhere</text>
+    <text class="box-sub" x="850" y="238" text-anchor="middle">previews text returned (216)</text>
+    <text class="box-sub" x="850" y="254" text-anchor="middle">union text returned (253)</text>
+    <text class="box-sub" x="850" y="270" text-anchor="middle">persisting is registry.save()</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="dCfg" data-to="dWs" d="M194,75 H230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="212" y="68" text-anchor="middle">root path</text>
+
+  <path class="edge dashed-edge" data-from="dWs" data-to="dScan" d="M420,75 H460" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="440" y="68" text-anchor="middle">walk + stat</text>
+
+  <path class="edge" data-from="dScan" data-to="dOut1" d="M630,75 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="650" y="68" text-anchor="middle">returns</text>
+
+  <path class="edge dashed-edge" data-from="dWs" data-to="dPrev" d="M420,120 V150 H590 V180" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="520" y="145" text-anchor="middle">preview reads bytes</text>
+
+  <path class="edge dashed-edge" data-from="dReg" data-to="dRender" d="M214,230 H250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="232" y="223" text-anchor="middle">union dict</text>
+
+  <path class="edge" data-from="dRender" data-to="dOut2" d="M450,230 H720" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="580" y="223" text-anchor="middle">returns listing</text>
+
+  <text class="box-sub" x="14" y="330">no writes: every function returns a dict or a string; the caller decides what to persist.</text>
+  <text class="box-sub" x="14" y="352">The registry JSON path is built by registry.py:76 as &lt;root&gt;/hybrid_registry_&lt;task_key&gt;.json; a real example on disk: experiments_verifiers/results/E19c_registries/hybrid_registry_4a7029eb0b6b62e9.json.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; inputs are the workspace root (from <code>config.workspace_dir</code>, read in the caller) and the registry's union dict; outputs are returned values only. Dashed arrows are reads or passed values; this file writes no file.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the two decision rules: the 400-file walk cap and the deliverable ladder</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 470" role="img" aria-label="inventory.py walk cap loop and deliverable rank ladder">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="cWalk" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>Walk loop inside scan_workspace</title>
+    <rect x="14" y="30" width="200" height="80" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="114" y="54" text-anchor="middle">os.walk loop (112)</text>
+    <text class="box-sub" x="114" y="72" text-anchor="middle">drop skipped dirs (113)</text>
+    <text class="box-sub" x="114" y="88" text-anchor="middle">for name in files (114)</text>
+  </a>
+
+  <g class="box" id="cSkip">
+    <title>Directory skip decision</title>
+    <rect x="250" y="30" width="200" height="80" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="54" text-anchor="middle">dir in _SKIP_DIRS?</text>
+    <text class="box-sub" x="350" y="72" text-anchor="middle">.git, __pycache__, .venv</text>
+    <text class="box-sub" x="350" y="88" text-anchor="middle">node_modules, .mypy_cache (29)</text>
+  </g>
+
+  <g class="box" id="cStat">
+    <title>Size read failure</title>
+    <rect x="486" y="30" width="210" height="80" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="591" y="54" text-anchor="middle">fp.stat() raises OSError?</text>
+    <text class="box-sub" x="591" y="72" text-anchor="middle">yes: continue (119-120)</text>
+    <text class="box-sub" x="591" y="88" text-anchor="middle">no: classify extension (121)</text>
+  </g>
+
+  <g class="box" id="cCap">
+    <title>Entry cap inside the loop</title>
+    <rect x="732" y="30" width="250" height="80" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="857" y="54" text-anchor="middle">len(out) &gt;= max_entries?</text>
+    <text class="box-sub" x="857" y="72" text-anchor="middle">default 400 (96)</text>
+    <text class="box-sub" x="857" y="88" text-anchor="middle">yes: return early (139-140)</text>
+  </g>
+
+  <a class="box" id="cKind" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>Kind ladder by extension</title>
+    <rect x="14" y="160" width="230" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="129" y="184" text-anchor="middle">kind by extension (122-131)</text>
+    <text class="box-sub" x="129" y="202" text-anchor="middle">.csv/.tsv -&gt; "csv"/"tsv"</text>
+    <text class="box-sub" x="129" y="218" text-anchor="middle">.png -&gt; "png"</text>
+    <text class="box-sub" x="129" y="234" text-anchor="middle">.py .R .r .sh .jl -&gt; "script"</text>
+    <text class="box-sub" x="129" y="250" text-anchor="middle">.txt .log .json .md -&gt; "text"</text>
+    <text class="box-sub" x="129" y="266" text-anchor="middle">else -&gt; "other"</text>
+  </a>
+
+  <a class="box" id="cShape">
+    <title>Signal guards</title>
+    <rect x="284" y="160" width="230" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="399" y="184" text-anchor="middle">signal computed only for</text>
+    <text class="box-sub" x="399" y="202" text-anchor="middle">kind in csv/tsv/png (136)</text>
+    <text class="box-sub" x="399" y="218" text-anchor="middle">csv_shape: size &gt; 8 MiB stops (61)</text>
+    <text class="box-sub" x="399" y="234" text-anchor="middle">empty header stops (64)</text>
+    <text class="box-sub" x="399" y="250" text-anchor="middle">png_dims: needs IHDR (76)</text>
+    <text class="box-sub" x="399" y="266" text-anchor="middle">failure returns "" (88, 91)</text>
+  </a>
+
+  <a class="box" id="cLadder" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>_deliverable_rank ladder</title>
+    <rect x="554" y="160" width="230" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="669" y="184" text-anchor="middle">rank ladder (151-161)</text>
+    <text class="box-sub" x="669" y="202" text-anchor="middle">"pred_results"/"results" test (152)</text>
+    <text class="box-sub" x="669" y="218" text-anchor="middle">+ csv/tsv -&gt; 0</text>
+    <text class="box-sub" x="669" y="234" text-anchor="middle">+ json -&gt; 1, + txt/log -&gt; 2</text>
+    <text class="box-sub" x="669" y="250" text-anchor="middle">root script -&gt; 3</text>
+    <text class="box-sub" x="669" y="266" text-anchor="middle">else -&gt; 9 (excluded)</text>
+  </a>
+
+  <g class="box" id="cBudget">
+    <title>Preview selection and byte budget</title>
+    <rect x="824" y="160" width="160" height="110" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="904" y="184" text-anchor="middle">preview budget</text>
+    <text class="box-sub" x="904" y="202" text-anchor="middle">rank &lt; 9 (180)</text>
+    <text class="box-sub" x="904" y="218" text-anchor="middle">sort rank, -bytes (182)</text>
+    <text class="box-sub" x="904" y="234" text-anchor="middle">[:3] files (183)</text>
+    <text class="box-sub" x="904" y="250" text-anchor="middle">truncate to remaining (209)</text>
+    <text class="box-sub" x="904" y="266" text-anchor="middle">break when 0 (214-215)</text>
+  </g>
+
+  <path class="edge" data-from="cWalk" data-to="cSkip" d="M214,70 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="232" y="63" text-anchor="middle">each dir</text>
+  <path class="edge" data-from="cSkip" data-to="cStat" d="M450,70 H486" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="468" y="63" text-anchor="middle">kept dirs</text>
+  <path class="edge" data-from="cStat" data-to="cCap" d="M696,70 H732" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="714" y="63" text-anchor="middle">after append</text>
+  <path class="edge" data-from="cKind" data-to="cShape" d="M244,215 H284" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="264" y="208" text-anchor="middle">kind test</text>
+  <path class="edge" data-from="cLadder" data-to="cBudget" d="M784,215 H824" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="804" y="208" text-anchor="middle">rank value</text>
+
+  <text class="box-sub" x="14" y="320">Loop stop test: the walk returns as soon as the dict holds 400 entries, so a huge workspace keeps the first 400 files found (139-140).</text>
+  <text class="box-sub" x="14" y="342">Deliverable rule: only rank 0-3 files become previews, sorted so result CSVs come first and the biggest win ties (180-183).</text>
+  <text class="box-sub" x="14" y="364">Guard: csv_shape gives None above 8 MiB and without a header, so the signal stays cheap (61-68).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the walk cap (top row) and the deliverable ladder with its preview budget (bottom row). The conditions are quoted from <code class="path">sources/evaluators/hybrid_verifier/inventory.py</code> with line numbers.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">workspace tree: dirs, files, sizes</td><td class="sym">Path arg (95, 112); evaluator.py:311</td><td>one entry per file, kind label (132)</td></tr>
+<tr><td>reads</td><td class="sym">file head bytes, up to 64 KiB</td><td class="sym">open(path, "rb") (36)</td><td>CSV delimiter sniff (63, 66)</td></tr>
+<tr><td>reads</td><td class="sym">4 MiB chunks, cap 64 MiB</td><td class="sym">_count_newlines (42-56)</td><td>row-count proxy for csv/tsv (68)</td></tr>
+<tr><td>reads</td><td class="sym">PNG first 26 bytes</td><td class="sym">png_dims (74-78)</td><td>width and height from IHDR</td></tr>
+<tr><td>reads</td><td class="sym">text head 6 KiB and tail 1 KiB</td><td class="sym">deliverable_previews (197-208)</td><td>preview body for the prompt</td></tr>
+<tr><td>reads</td><td class="sym">registry union dict</td><td class="sym">union arg (241); registry.inventory</td><td>presence counts in the listing</td></tr>
+<tr><td>reads</td><td class="sym">current path list</td><td class="sym">current arg (239, 245)</td><td>mark live paths in the listing</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td class="sym">no write call in the file</td><td>all results are returned values</td></tr>
+<tr><td>returns</td><td class="sym">dict rel -&gt; bytes/kind/signal</td><td class="sym">scan_workspace (132-138)</td><td>claim prompt and registry merge</td></tr>
+<tr><td>returns</td><td class="sym">preview blocks text</td><td class="sym">deliverable_previews (216)</td><td>injected into the extract prompt (204)</td></tr>
+<tr><td>returns</td><td class="sym">union listing text</td><td class="sym">render_union_inventory (253)</td><td>extract and refine prompts (198, 288)</td></tr>
+<tr><td>returns</td><td class="sym">bool</td><td class="sym">workspace_has_artifacts (146)</td><td>artifact flag in evaluator.py:565</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: prompts that write claims and scorer scripts see real file names and real CSV widths, so a scorer matches the layout that exists.</p>
+<p class="note">Budget note: the file caps its own work with constants at the top &mdash; 300 union lines, 14 KiB of previews, 3 preview files, 11 CSV head lines, 6 KiB text head (21-28); all are module constants, not config keys.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Symbol inventory, callers and tests</h2>
+<details><summary>Full symbol inventory &mdash; 10 top-level defs, no classes (all in inventory.py)</summary><div class="dbody">
+<pre>_read_head(path: Path, cap: int) -&gt; str                                    # L33   first cap bytes, "" on error
+_count_newlines(path: Path, cap_bytes: int = 64*1024*1024) -&gt; int          # L42   chunked row count, -1 on OSError
+csv_shape(path: Path, size: int) -&gt; tuple[int, int] | None                 # L59   rows and cols, header sniff
+png_dims(path: Path) -&gt; tuple[int, int] | None                             # L71   width/height from IHDR
+file_signal(path: Path, size: int, ext: str) -&gt; str                        # L84   "WxH px" or "N rows x M cols"
+scan_workspace(workspace: Path, max_entries: int = 400) -&gt; dict[str, dict] # L95   recursive inventory
+workspace_has_artifacts(inventory: dict[str, dict]) -&gt; bool                # L144  any non-script entry
+_deliverable_rank(rel: str, info: dict[str, Any]) -&gt; int                   # L149  preference order 0..3, else 9
+deliverable_previews(inventory, workspace, max_files=3, budget=14336) -&gt; str # L164 preview blocks under budget
+render_union_inventory(union, n_workspaces: int, current=()) -&gt; str        # L219  union listing for prompts
+</pre>
+<p>Module constants, no config keys: <code>UNION_LINE_CAP = 300</code> (21), <code>PREVIEW_TOTAL_CAP = 14 * 1024</code> (22), <code>PREVIEW_MAX_FILES = 3</code> (23), <code>_PREVIEW_HEAD_LINES = 11</code> (24), <code>_TEXT_PREVIEW_BYTES = 6 * 1024</code> (25), <code>_TEXT_PREVIEW_TAIL = 1024</code> (26), <code>_CSV_SNIFF_BYTES = 64 * 1024</code> (27), <code>_CSV_MAX_BYTES = 8 * 1024 * 1024</code> (28), <code>_SKIP_DIRS</code> (29), <code>_SCRIPT_EXTS</code> (30).</p>
+</div></details>
+
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td><code>scan_workspace</code> for the registry merge and for the artifact flag</td><td class="sym">import L57; calls 311, 564-565</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>scan_workspace</code>, <code>render_union_inventory</code>, <code>deliverable_previews</code> in <code>_extract</code> and <code>_union_for_prompt</code></td><td class="sym">import L26; calls 197-203, 291, 303</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/digest.py">hybrid_verifier/digest.py</a></td><td>private <code>_deliverable_rank</code>, to rank digest candidates</td><td class="sym">import L25; calls 147, 150</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td><code>scan_workspace</code>, <code>render_union_inventory</code>, <code>deliverable_previews</code></td><td class="sym">import L48; calls 358, 381-383, 566</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_inventory_signals_and_union_render</code>: signals, artifact check, union text, previews</td><td class="sym">import L45; test 984-1015</td></tr>
+<tr><td class="sym">test_full_pipeline_real_subprocess</td><td>runs the real scorer path, which exercises <code>scan_workspace</code> through the layer</td><td class="sym">test 380-473</td></tr>
+</tbody>
+</table>
+<p class="note">Not tested directly: <code>_read_head</code>, <code>_count_newlines</code>, <code>png_dims</code>, <code>file_signal</code>, <code>_deliverable_rank</code> have no test of their own; they run through <code>scan_workspace</code> and <code>deliverable_previews</code> in the test above. <code>grep -rn scan_workspace tests/</code> shows only that one test.</p>
+</div>
+
+<footer>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/inventory.py">sources/evaluators/hybrid_verifier/inventory.py</a> (all 253 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L26, L197-L203, L288-L291, L303), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L57, L164-L168, L191-L193, L311-L313, L564-L565), <a href="../../sources/evaluators/hybrid_verifier/digest.py">digest.py</a> (L25, L147-L150), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L76 path build, L256-L270 merge), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L45, L984-L1015), <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L48, L358-L383, L566), plus greps over <code>sources/</code> and <code>tests/</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the ported harness sources named in the module docstring (<code>experiments_verifiers/harness/e19_hybrid_bt.py</code>, <code>e14_bt_enabler.py</code>) were not read; the docstring claim that the union inventory "accumulates across generations" is not implemented in this file (the merge happens in <code>registry.merge_inventory</code>, registry.py:256). Also skipped: <code>experiments_verifiers/.env</code> and every credential file, not opened. No pytest run and no application run, by the build rules.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git status --porcelain sources/evaluators/hybrid_verifier</code> reports the whole package as <code>??</code> (untracked), so this page describes the working tree, not the committed tree.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

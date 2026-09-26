@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hybrid verification flow - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > evaluators > verification flow">
+<div class="wrap">
+
+<h1 class="hud">Hybrid verification flow</h1>
+<p class="intro">The hybrid verifier grades one workflow workspace per generation. It spends one LLM call on 8&#8211;12 stage-tagged claims, then one LLM call per claim to write a deterministic Python scorer, and runs each scorer as a host subprocess. The reward is a pairwise win-rate over the task's previous generations, decided at the earliest ladder stage where the two differ.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>The temporal ladder and the pairwise decision</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 480" role="img" aria-label="Temporal ladder staircase with the pairwise comparison rail">
+  <defs>
+    <marker id="arwB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="arwC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="b_inv" href="../../sources/evaluators/hybrid_verifier/inventory.py">
+    <title>inventory.py scans the workspace being scored</title>
+    <rect x="20" y="30" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="54" text-anchor="middle">inventory.py</text>
+    <text class="box-sub" x="110" y="70" text-anchor="middle">workspace paths, signals</text>
+  </a>
+
+  <a class="box" id="b_claims" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>claims.py builds the ladder from one LLM call</title>
+    <rect x="240" y="30" width="190" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="54" text-anchor="middle">claims.py</text>
+    <text class="box-sub" x="335" y="70" text-anchor="middle">one LLM call, 8&#8211;12 claims</text>
+  </a>
+
+  <a class="box" id="s1" href="mod_evaluators_hybrid_verifier.html">
+    <title>Stage 1 claims read the delivered code</title>
+    <rect x="250" y="260" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="350" y="283" text-anchor="middle">stage 1 &#183; script</text>
+    <text class="box-sub" x="350" y="300" text-anchor="middle">code exists, reads inputs</text>
+    <text class="box-sub" x="350" y="317" text-anchor="middle">gen N 2/3 &#183; gen N&#8722;1 1/3</text>
+  </a>
+
+  <a class="box" id="s2" href="mod_evaluators_hybrid_verifier.html">
+    <title>Stage 2 claims parse run logs</title>
+    <rect x="530" y="170" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="630" y="193" text-anchor="middle">stage 2 &#183; log</text>
+    <text class="box-sub" x="630" y="210" text-anchor="middle">loss, accuracy, NaN</text>
+    <text class="box-sub" x="630" y="227" text-anchor="middle">pass-counts equal</text>
+  </a>
+
+  <a class="box" id="s3" href="mod_evaluators_hybrid_verifier.html">
+    <title>Stage 3 claims grade the result artifacts</title>
+    <rect x="810" y="80" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="910" y="103" text-anchor="middle">stage 3 &#183; result</text>
+    <text class="box-sub" x="910" y="120" text-anchor="middle">schema, rows, sanity</text>
+    <text class="box-sub" x="910" y="137" text-anchor="middle">not consulted</text>
+  </a>
+
+  <a class="box" id="b_win" href="flow_evolution_loop.html">
+    <title>aggregation.py returns the pairwise winner as reward</title>
+    <rect x="1040" y="80" width="150" height="70" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1115" y="106" text-anchor="middle">pairwise winner</text>
+    <text class="box-sub" x="1115" y="123" text-anchor="middle">reward = win-rate</text>
+    <text class="box-sub" x="1115" y="139" text-anchor="middle">ties count 0.5</text>
+  </a>
+
+  <path class="edge" data-from="b_inv" data-to="b_claims" d="M200,58 H240" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwB)"/>
+  <text class="edge-label" x="220" y="22" text-anchor="middle">union inventory</text>
+
+  <path class="edge" data-from="b_claims" data-to="s1" d="M335,86 V260" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwB)"/>
+  <text class="edge-label" x="345" y="180">stage-tagged claims</text>
+
+  <path class="edge" data-from="s1" data-to="s2" d="M450,295 L530,205" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwB)"/>
+  <text class="edge-label" x="490" y="256" text-anchor="middle">next rung</text>
+
+  <path class="edge" data-from="s2" data-to="s3" d="M730,205 L810,115" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwB)"/>
+  <text class="edge-label" x="770" y="166" text-anchor="middle">next rung</text>
+
+  <path class="edge" data-from="s3" data-to="b_win" d="M1010,115 H1040" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1025" y="68" text-anchor="middle">reward</text>
+
+  <path class="edge" d="M350,420 H910" fill="none" stroke="#4D9FFF" stroke-width="1.2" stroke-dasharray="5 4"/>
+  <path class="edge dashed-edge" data-from="s1" data-to="b_win" d="M350,330 V420" fill="none" stroke="#4D9FFF" stroke-width="1.2" marker-end="url(#arwC)"/>
+  <path class="edge dashed-edge" data-from="s2" data-to="b_win" d="M630,240 V420" fill="none" stroke="#4D9FFF" stroke-width="1.2" marker-end="url(#arwC)"/>
+  <path class="edge dashed-edge" data-from="s3" data-to="b_win" d="M910,150 V420" fill="none" stroke="#4D9FFF" stroke-width="1.2" marker-end="url(#arwC)"/>
+
+  <circle cx="350" cy="420" r="4" fill="#FFB547"/>
+  <text class="edge-label" x="360" y="409" style="fill:#FFB547">decided here</text>
+
+  <text class="box-sub" x="250" y="445">script: gen N 2/3, gen N&#8722;1 1/3</text>
+  <text class="box-sub" x="600" y="445">log: equal</text>
+  <text class="box-sub" x="780" y="445">result: not consulted</text>
+  <text class="box-sub" x="20" y="470">the earliest differing rung decides the pair; a claim passes at score &#8805; 0.5; a stage tie falls back to that stage's mean score-diff</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - the three rungs of the ladder and the comparison rail below them. Winner logic: <code>../../sources/evaluators/hybrid_verifier/aggregation.py::temporal_winner</code>. The rail compares the current generation against every previous generation of the same task.</p>
+
+<p>A claim passes its rung at <code>score &gt;= 0.5</code> (<code>PASS_THRESHOLD</code>), so a script-stage failure dominates a later result-stage advantage. Claims with no score variance across workspaces are dropped (<code>claim_stats</code>, <code>MIN_OBS_FOR_VARIANCE = 2</code>) and may be replaced by refinement claims.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Call sequence for one generation</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1010 500" role="img" aria-label="Sequence diagram of the hybrid verifier calls">
+  <defs>
+    <marker id="arwD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+    
+  </defs>
+
+  <a class="box" id="l1" href="area_evaluators.html">
+    <title>Facade that picks the verifier kind</title>
+    <rect x="20" y="20" width="160" height="46" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="100" y="40" text-anchor="middle">WorkflowEvaluator</text>
+    <text class="box-sub" x="100" y="56" text-anchor="middle">picks verifier kind</text>
+  </a>
+
+  <a class="box" id="l2" href="mod_evaluators_hybrid_verifier.html">
+    <title>HybridVerifierEvaluator drives the pipeline</title>
+    <rect x="200" y="20" width="170" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="285" y="40" text-anchor="middle">HybridVerifierEvaluator</text>
+    <text class="box-sub" x="285" y="56" text-anchor="middle">evaluator.py</text>
+  </a>
+
+  <a class="box" id="l3" href="../../sources/evaluators/hybrid_verifier/layers.py">
+    <title>ClaimsEvidenceLayer owns claims and scorers</title>
+    <rect x="390" y="20" width="170" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="475" y="40" text-anchor="middle">ClaimsEvidenceLayer</text>
+    <text class="box-sub" x="475" y="56" text-anchor="middle">layers.py</text>
+  </a>
+
+  <a class="box" id="l4" href="mod_core_tools_llm.html">
+    <title>Judge LLM calls through the cached provider</title>
+    <rect x="600" y="20" width="160" height="46" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="680" y="40" text-anchor="middle">judge LLM</text>
+    <text class="box-sub" x="680" y="56" text-anchor="middle">temperature 0.0</text>
+  </a>
+
+  <a class="box" id="l5" href="../../sources/core/workflow_runner.py">
+    <title>Pinned host subprocess runs the scorer</title>
+    <rect x="800" y="20" width="190" height="46" rx="2" fill="rgba(255,181,71,0.10)" stroke="#FFB547"/>
+    <text class="box-label" x="895" y="40" text-anchor="middle">WorkflowRunner</text>
+    <text class="box-sub" x="895" y="56" text-anchor="middle">host subprocess, 60 s</text>
+  </a>
+
+  <path d="M100,70 V470" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 4"/>
+  <path d="M285,70 V470" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 4"/>
+  <path d="M475,70 V470" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 4"/>
+  <path d="M680,70 V470" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 4"/>
+  <path d="M895,70 V470" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 4"/>
+
+  <text class="box-sub" x="200" y="88">time flows down; numbered arrows are calls and returns</text>
+
+  <path class="edge" d="M100,105 H278" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwF)"/>
+  <text class="edge-label" x="189" y="100" text-anchor="middle">1 evaluate(uuid)</text>
+
+  <path class="edge" d="M285,140 H468" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="376" y="135" text-anchor="middle">2 collect(context)</text>
+
+  <path class="edge" d="M475,180 H673" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="574" y="175" text-anchor="middle">3 claims prompt</text>
+
+  <path class="edge" d="M680,215 H482" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="581" y="210" text-anchor="middle">4 8&#8211;12 claims</text>
+
+  <path class="edge" d="M475,250 H673" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="574" y="245" text-anchor="middle">5 digest prompt</text>
+
+  <path class="edge" d="M680,282 H482" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="581" y="277" text-anchor="middle">6 format digests</text>
+
+  <path class="edge" d="M475,315 H673" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="574" y="310" text-anchor="middle">7 scorer prompt</text>
+
+  <path class="edge" d="M475,350 H888" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="681" y="345" text-anchor="middle">8 scorer script</text>
+
+  <path class="edge" d="M895,382 H482" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="688" y="377" text-anchor="middle">9 score JSON line</text>
+
+  <path class="edge" d="M285,416 H468" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="376" y="411" text-anchor="middle">10 revise(dead)</text>
+
+  <path class="edge" d="M100,452 H278" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwF)"/>
+  <text class="edge-label" x="189" y="447" text-anchor="middle">11 scores, gradient</text>
+
+  <text class="box-sub" x="200" y="494">11 returns scores and the textual gradient; reward comes from <tspan style="fill:#BFF6FF">win_rate_reward()</tspan> inside the evaluator</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - call order for one generation. Steps 3, 5 and 7 are one LLM call each (step 7 runs once per claim); step 8 runs the scorer subprocess with <code>cwd = workspace</code>, and step 11 returns the scores plus the gradient.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Package files</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th>Key symbol</th><th class="size">Lines</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td>Exports the evaluator, the layer interface and the reward helpers.</td><td class="sym">HybridVerifierEvaluator</td><td class="size">89</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td>Runs the pipeline for one uuid; writes the artifacts.</td><td class="sym">HybridVerifierEvaluator.evaluate</td><td class="size">645</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td>Default evidence layer: claim lifecycle, scorer build, execution.</td><td class="sym">ClaimsEvidenceLayer.collect</td><td class="size">497</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/aggregation.py">hybrid_verifier/aggregation.py</a></td><td>Variance filter and the pairwise reward modes.</td><td class="sym">win_rate_reward, temporal_winner</td><td class="size">434</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/claims.py">hybrid_verifier/claims.py</a></td><td>Ladder claim extraction, validation and refinement prompts.</td><td class="sym">extract_claims_prompt, validate_claims</td><td class="size">375</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/scorers.py">hybrid_verifier/scorers.py</a></td><td>Scorer prompts, static policy screen, output parsing, launcher.</td><td class="sym">build_launcher, static_violations</td><td class="size">309</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td>Elimination-first gradient and <code>evaluation.txt</code> renderer.</td><td class="sym">build_gradient</td><td class="size">294</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a></td><td>Per-task JSON state: claims, scorers, score vectors.</td><td class="sym">TaskRegistry.load</td><td class="size">274</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/inventory.py">hybrid_verifier/inventory.py</a></td><td>Workspace inventory with CSV and PNG content signals.</td><td class="sym">scan_workspace</td><td class="size">253</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/digest.py">hybrid_verifier/digest.py</a></td><td>One format-digest call per task, cached for the scorer prompts.</td><td class="sym">ensure_digests</td><td class="size">175</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a></td><td>Shared judge LLM, workflow loading and result persistence.</td><td class="sym">BaseEvaluator._save_results</td><td class="size">380</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>Facade that selects the hybrid verifier or the legacy one.</td><td class="sym">WorkflowEvaluator.evaluate</td><td class="size">193</td></tr>
+</tbody>
+</table>
+
+<p class="note">Amber note: the scorer is <b>not</b> sandboxed. It runs as a subprocess of the host interpreter - <code>RuntimeConfig(python_executable=sys.executable, use_pty=False)</code> with the workspace as execution directory (<code>sources/evaluators/hybrid_verifier/evaluator.py::HybridVerifierEvaluator._execute_scorer_script</code>). <code>AGENTS.md</code> states the same exception under Security considerations; only static screening, a read-only contract and the 60 s timeout hold the line.</p>
+
+<p class="note flag">Red note: <code>AGENTS.md</code> says generated workflow code runs through the SmolAgents sandbox "in <code class="path">sources/core/workflow_runner.py</code>", but <code>LocalPythonExecutor</code> appears nowhere in <code>sources/</code> (grep hit only in <code>.venv</code> and the injected template <code class="path">sources/modules/smolagent_factory.py</code>). <code>workflow_runner.py</code> runs a generated script as a subprocess (<code>WorkflowRunner.execute</code>).</p>
+
+<p class="note say">The reward is relative: it compares the current workspace only against previous generations of the same task goal, and the registry file is keyed by <code>sha256(goal + registry_version)</code>.</p>
+
+<details><summary>scorer contract (constants, imports, output)</summary><div class="dbody">
+<pre>ALLOWED_IMPORTS      stdlib + numpy + pandas + PIL          # scorers.py
+_BANNED_SNIPPETS     subprocess, socket, shutil, os.remove, random., ...
+_EXTRA_BANNED        to_csv, savefig, write_text, os.makedirs, ...  (write APIs)
+MAX_CODE_ATTEMPTS    3     # initial + 2 repairs
+launcher prefix      WORKSPACE_ROOT (abs path str), CLAIM (dict)
+stdout contract      exactly one line:
+                     {"claim_id": "...", "score": 0..1, "evidence": "&lt;=40 words"}
+exit code            0; diagnostics on stderr; scores clamped to [0, 1]</pre>
+<p>Static screen: <code>scorers.py::static_violations</code>. Output parse: <code>scorers.py::parse_scorer_output</code>. Launcher: <code>scorers.py::build_launcher</code>. Repair loop: <code>layers.py::ClaimsEvidenceLayer._build_scorer</code> (feedback via <code>scorers.py::feedback_lines</code>).</p>
+</div></details>
+
+<details><summary>key signatures</summary><div class="dbody">
+<pre>HybridVerifierEvaluator.evaluate(uuid: str) -&gt; dict[str, Any]
+HybridVerifierEvaluator._execute_scorer_script(workspace, code, execution_id) -&gt; ExecOutcome
+HybridVerifierEvaluator._build_runner(uuid, workspace) -&gt; WorkflowRunner
+ClaimsEvidenceLayer.collect(context: LayerContext) -&gt; list[LayerScore]
+ClaimsEvidenceLayer.revise(context, dead_claim_ids) -&gt; list[LayerScore]
+TaskRegistry.load(root: Path, goal: str, logger=None) -&gt; TaskRegistry
+TaskRegistry.record_generation(uuid, scores, evidence, reward=None) -&gt; None
+win_rate_reward(now, previous, claims, mode="temporal") -&gt; dict[str, Any]
+temporal_winner(now, prev, claims, mode="temporal") -&gt; tuple[int, dict]
+claim_stats(observed: list[float | None]) -&gt; dict[str, Any]
+build_gradient(...) -&gt; str
+build_evaluation_report(...) -&gt; str</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Reward and configuration</h2>
+<table>
+<thead><tr><th>Field</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td class="sym">hybrid_verifier_num_claims</td><td class="size">10</td><td>Extraction accepts <code>8&#8211;12</code> claims; <code>lo = num - 2</code>.</td></tr>
+<tr><td class="sym">hybrid_verifier_pairwise_mode</td><td class="size">temporal</td><td>Winner decided at the earliest differing stage.</td></tr>
+<tr><td class="sym">hybrid_verifier_reward</td><td class="size">win_rate</td><td><code>win_rate</code> or <code>bradley_terry</code> strengths.</td></tr>
+<tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="size">60</td><td>Subprocess timeout; floor is <code>5 s</code>.</td></tr>
+<tr><td class="sym">hybrid_verifier_refinement_rounds</td><td class="size">2</td><td>Replacement claims per generation; cap 14 total.</td></tr>
+<tr><td class="sym">hybrid_verifier_digest_max_files</td><td class="size">8</td><td>Files sampled by the one format-digest call.</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="size">hybrid</td><td><code>legacy</code> loads the deprecated verifier instead.</td></tr>
+</tbody>
+</table>
+
+<details><summary>pairwise modes and reward maths</summary><div class="dbody">
+<pre>PAIRWISE_MODES      temporal (default), temporal_strict, mean_diff, sign_sum, escalation
+PASS_THRESHOLD      0.5        # a claim passes its rung at score &gt;= 0.5
+MIN_OBS_FOR_VARIANCE 2         # below this, no variance verdict
+reward (win_rate)   (wins + 0.5 * ties) / n_previous
+first generation    fallback = mean claim score over surviving claims
+bradley_terry       sigmoid(beta_now - mean(beta)), ridge 1.0
+cap                 reward = min(reward, *layer gates)   # no gate by default</pre>
+<p>Written per generation: <code>evaluation.txt</code> and <code>textual_gradient.txt</code> under <code>sources/workflows/&lt;uuid&gt;/</code> (<code>_write_artifacts</code>), plus scores under <code>evaluation.verifier</code> (<code>_save_results</code>).</p>
+</div></details>
+
+<details><summary>artifacts written per generation</summary><div class="dbody">
+<pre>evaluation.txt          per-claim scores with stage headers, pass &gt;= 0.5
+textual_gradient.txt    elimination point, losses, wins, transcript, dropped claims
+state_result.json       read by the evaluator (short-circuit when missing)
+tmp/&lt;uuid&gt;/hybrid_registry_&lt;key&gt;.json   claims, cached scorers, score vectors</pre>
+<p>Gradient sections come from <code>gradient.py::build_gradient</code>; the report from <code>gradient.py::build_evaluation_report</code>.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>; all ten files of <code class="path">sources/evaluators/hybrid_verifier/</code>; <code class="path">sources/evaluators/base.py</code>; <code class="path">sources/evaluators/evaluator.py</code>; <code class="path">sources/core/workflow_runner.py</code> (grep + slices); <code class="path">sources/modules/smolagent_factory.py</code> (grep); <code>config.py</code>, <code>config_default.json</code>, <code>main.py</code> (grep); <code>AGENTS.md</code>.</p>
+<p class="skips">Skipped: <code>sources/evaluators/verifier*.py</code>, <code>bs_detection.py</code>, <code>generic.py</code>, <code>scenario.py</code>, <code>grounding.py</code> - deprecated or unrelated verifier channels, covered by <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>; <code class="path">experiments_verifiers/harness/e19b_extract.py</code> and friends - experiment harness the package only ports from, not on the runtime path; <code>.venv/</code>, <code>tmp/</code>, <code>datasets/</code>, <code>webui/</code> - out of scope for this page.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree has uncommitted changes: <code class="path">sources/evaluators/hybrid_verifier/</code> and <code class="path">docs/visual_clone/</code> are untracked at <code>7e8463b</code>, so this page describes the working tree, not the commit.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

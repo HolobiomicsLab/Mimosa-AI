@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/core/selection.py - archive, qd_score, novelty - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<!-- mod_core_selection.html - L2 page: sources/core/selection.py + sources/core/workflow_selection.py.
+     Built by the visual-clone worker "core-evolution". Sources: see footer. -->
+<body data-crumb="Overview > sources > core > selection">
+<div class="wrap">
+
+<h1 class="hud">Selection: archive, qd_score, novelty</h1>
+<p class="intro"><code>SelectionPressure</code> decides which generated workflow survives, and <code>WorkflowSelector</code> draws the parents for the next generation. <code>selection.py</code> holds the four selection modes and the in-memory QD archive; <code>workflow_selection.py</code> turns archive or disk records into <code>WorkflowInfo</code> parents.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel" id="pipeline"><span class="br"></span>
+<h2>Diagram 1 - one QD admission (validate_survivor path)</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1220 360" role="img" aria-label="QD selection pipeline from candidate runs to the archive">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="30" y="30">Entry: validate_survivor() - dispatch on selection_strategy</text>
+
+  <a class="box" id="b1" href="mod_core_evolution_engine.html">
+    <title>Candidate runs come from the evolution loop</title>
+    <rect x="30" y="40" width="240" height="62" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="66" text-anchor="middle">candidates: new_runs</text>
+    <text class="box-sub" x="150" y="84" text-anchor="middle">reward, code, uuid</text>
+  </a>
+
+  <a class="box" id="b2" href="#cards">
+    <title>SelectionPressure._extract_behaviour_descriptor</title>
+    <rect x="330" y="40" width="240" height="62" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="66" text-anchor="middle">_extract_behaviour_descriptor</text>
+    <text class="box-sub" x="450" y="84" text-anchor="middle">selection.py</text>
+  </a>
+
+  <a class="box" id="b3" href="mod_core_evolution_engine.html">
+    <title>code_features.py shim over genotype_embedding.py</title>
+    <rect x="630" y="40" width="240" height="62" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="750" y="66" text-anchor="middle">code_features.py</text>
+    <text class="box-sub" x="750" y="84" text-anchor="middle">genotype_embedding_descriptor</text>
+  </a>
+
+  <a class="box" id="b4" href="#cards">
+    <title>SelectionPressure._compute_novelty</title>
+    <rect x="930" y="40" width="240" height="62" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1050" y="66" text-anchor="middle">_compute_novelty</text>
+    <text class="box-sub" x="1050" y="84" text-anchor="middle">k-NN cosine distance</text>
+  </a>
+
+  <a class="box" id="b5" href="#cards">
+    <title>SelectionPressure._compose_qd_score</title>
+    <rect x="930" y="220" width="240" height="62" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1050" y="246" text-anchor="middle">_compose_qd_score</text>
+    <text class="box-sub" x="1050" y="264" text-anchor="middle">quality + novelty - penalty</text>
+  </a>
+
+  <a class="box" id="b6" href="#cards">
+    <title>SelectionPressure._try_admit</title>
+    <rect x="630" y="220" width="240" height="62" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="750" y="246" text-anchor="middle">_try_admit</text>
+    <text class="box-sub" x="750" y="264" text-anchor="middle">admit gate</text>
+  </a>
+
+  <a class="box" id="b7" href="#cards">
+    <title>SelectionPressure._add_to_archive</title>
+    <rect x="330" y="220" width="240" height="62" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="246" text-anchor="middle">_add_to_archive</text>
+    <text class="box-sub" x="450" y="264" text-anchor="middle">evict lowest qd_score</text>
+  </a>
+
+  <a class="box" id="b8" href="#archive">
+    <title>In-memory population archive of the session</title>
+    <rect x="30" y="220" width="240" height="62" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="246" text-anchor="middle">_archive</text>
+    <text class="box-sub" x="150" y="264" text-anchor="middle">list[PopulationMember]</text>
+  </a>
+
+  <path class="edge" data-from="b1" data-to="b2" d="M270,71 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="64" text-anchor="middle">run.code</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M570,71 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="64" text-anchor="middle">code str</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M870,71 H930" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="900" y="64" text-anchor="middle">unit vector</text>
+
+  <path class="edge" data-from="b4" data-to="b5" d="M1050,102 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1042" y="180" text-anchor="end">novelty, reward</text>
+  <text class="box-sub" x="1060" y="150">k = novelty_k_neighbours</text>
+  <text class="box-sub" x="1060" y="166">novelty_comparison</text>
+
+  <text class="box-sub" x="900" y="196" text-anchor="middle">novelty_weight = 0.25</text>
+  <text class="box-sub" x="900" y="208" text-anchor="middle">length_penalty_lambda = 0.05</text>
+  <text class="box-sub" x="600" y="196" text-anchor="middle">min_improvement_threshold</text>
+  <text class="box-sub" x="600" y="208" text-anchor="middle">admit_threshold = 0.3</text>
+  <text class="box-sub" x="300" y="196" text-anchor="middle">population_size = 16</text>
+  <text class="box-sub" x="300" y="208" text-anchor="middle">max_children = 8</text>
+
+  <path class="edge" data-from="b5" data-to="b6" d="M930,251 H870" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="900" y="244" text-anchor="middle">qd_score</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M630,251 H570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="244" text-anchor="middle">admitted</text>
+  <path class="edge" data-from="b7" data-to="b8" d="M330,251 H270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="244" text-anchor="middle">member</text>
+
+</svg>
+</div>
+<p class="figcap">Diagram 1 - <code>SelectionPressure._validate_open_ended</code> (<code>selection.py:381</code>) runs this chain once per scored generation; row 2 flows right to left. Grey text above the arrows names the <code>Config</code> fields that set each step. A missing embedding returns novelty <code>0.0</code>, never max novelty (<code>_compute_novelty</code>, <code>selection.py:490</code>).</p>
+</div>
+
+<div class="panel" id="archive"><span class="br"></span>
+<h2>Diagram 2 - what one archive entry holds</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 420" role="img" aria-label="tree of the fields of one PopulationMember">
+  <defs>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+  </defs>
+
+  <a class="box" id="r" href="#cards">
+    <title>SelectionPressure._archive holds PopulationMember objects</title>
+    <rect x="350" y="16" width="300" height="48" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="500" y="38" text-anchor="middle">_archive</text>
+    <text class="box-sub" x="500" y="54" text-anchor="middle">list[PopulationMember] on SelectionPressure</text>
+  </a>
+
+  <path d="M500,64 V88" fill="none" stroke="#4D9FFF" stroke-width="1.5"/>
+  <path d="M20,88 H660" fill="none" stroke="#4D9FFF" stroke-width="1.5"/>
+  <path d="M20,88 V366" fill="none" stroke="#4D9FFF" stroke-width="1.5"/>
+  <path d="M340,88 V366" fill="none" stroke="#4D9FFF" stroke-width="1.5"/>
+  <path d="M660,88 V366" fill="none" stroke="#4D9FFF" stroke-width="1.5"/>
+
+  <path d="M20,146 H40" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path d="M20,256 H40" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path d="M20,366 H40" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path d="M340,146 H360" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path d="M340,256 H360" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path d="M340,366 H360" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path d="M660,146 H680" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path d="M660,256 H680" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path d="M660,366 H680" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+
+  <g class="box" id="f1">
+    <title>PopulationMember.iteration</title>
+    <rect x="40" y="120" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="54" y="142">iteration</text>
+    <text class="box-sub" x="54" y="158">int - iteration index</text>
+  </g>
+  <g class="box" id="f2">
+    <title>PopulationMember.reward</title>
+    <rect x="40" y="230" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="54" y="252">reward</text>
+    <text class="box-sub" x="54" y="268">float - capped overall_score</text>
+  </g>
+  <g class="box" id="f3">
+    <title>PopulationMember.cost</title>
+    <rect x="40" y="340" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="54" y="362">cost</text>
+    <text class="box-sub" x="54" y="378">float - cost to produce</text>
+  </g>
+
+  <g class="box" id="f4">
+    <title>PopulationMember.uuid</title>
+    <rect x="360" y="120" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="374" y="142">uuid</text>
+    <text class="box-sub" x="374" y="158">str | None - workflow UUID</text>
+  </g>
+  <g class="box" id="f5">
+    <title>PopulationMember.behaviour_descriptor</title>
+    <rect x="360" y="230" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="374" y="252">behaviour_descriptor</text>
+    <text class="box-sub" x="374" y="268">list[float] - unit-norm embedding</text>
+  </g>
+  <g class="box" id="f6">
+    <title>PopulationMember.genotype_chars</title>
+    <rect x="360" y="340" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="374" y="362">genotype_chars</text>
+    <text class="box-sub" x="374" y="378">int - workflow source length</text>
+  </g>
+
+  <g class="box" id="f7">
+    <title>PopulationMember.novelty_score</title>
+    <rect x="680" y="120" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="694" y="142">novelty_score</text>
+    <text class="box-sub" x="694" y="158">float - mean cosine distance</text>
+  </g>
+  <g class="box" id="f8">
+    <title>PopulationMember.qd_score</title>
+    <rect x="680" y="230" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="694" y="252">qd_score</text>
+    <text class="box-sub" x="694" y="268">(1-w)*quality + w*novelty - penalty</text>
+  </g>
+  <g class="box" id="f9">
+    <title>PopulationMember.created_at</title>
+    <rect x="680" y="340" width="280" height="52" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="694" y="362">created_at</text>
+    <text class="box-sub" x="694" y="378">datetime - wall-clock timestamp</text>
+  </g>
+
+</svg>
+</div>
+<p class="figcap">Diagram 2 - one <code>PopulationMember</code>. The archive is a plain Python list, not a grid: any member can be discarded, and the distance is to the current peer set (<code>_knn_novelty_against_peers</code>, <code>selection.py:610</code>). Field names and defaults come from the dataclass at <code>selection.py:40-66</code>.</p>
+
+<p class="sub">Also held on SelectionPressure (not in the entry)</p>
+<table>
+<thead><tr><th>Field</th><th>Type</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td class="sym">_archive</td><td class="sym">list[PopulationMember]</td><td>Live session population; read by parent draw and archive PCA plot.</td></tr>
+<tr><td class="sym">_previous_descriptors</td><td class="sym">list[list[float]]</td><td>Sliding window of the last <code>novelty_previous_n</code> embeddings for <code>previous_n</code> mode.</td></tr>
+<tr><td class="sym">_n_admit_rejected</td><td class="sym">int</td><td>Counts candidates refused by the admit gate; returned as <code>admit_rejected_total</code>.</td></tr>
+<tr><td class="sym">_last_evicted_uuid</td><td class="sym">str | None</td><td>UUID evicted by the admission in flight; returned as <code>evicted_uuid</code>.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 - archive entry vs persisted row</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 150" role="img" aria-label="archive member compared with the persisted jsonl row">
+  <defs>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+  </defs>
+  <a class="box" id="c1" href="#archive">
+    <title>In-memory dataclass</title>
+    <rect x="30" y="50" width="260" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="160" y="74" text-anchor="middle">PopulationMember</text>
+    <text class="box-sub" x="160" y="92" text-anchor="middle">memory only, per session</text>
+  </a>
+  <a class="box" id="c2" href="#cards">
+    <title>SelectionPressure.validate_survivor returns the fields</title>
+    <rect x="350" y="50" width="200" height="56" rx="2" fill="rgba(0,76,110,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="450" y="74" text-anchor="middle">verdict dict</text>
+    <text class="box-sub" x="450" y="92" text-anchor="middle">adds 10 QD keys</text>
+  </a>
+  <a class="box" id="c3" href="mod_core_evolution_engine.html">
+    <title>evolution_engine._persist_qd_archive</title>
+    <rect x="610" y="50" width="260" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="740" y="74" text-anchor="middle">qd_archive.jsonl</text>
+    <text class="box-sub" x="740" y="92" text-anchor="middle">one row per generation</text>
+  </a>
+  <path class="edge" data-from="c1" data-to="c2" d="M290,78 H350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="320" y="70" text-anchor="middle">admit</text>
+  <path class="edge" data-from="c2" data-to="c3" d="M550,78 H610" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="580" y="70" text-anchor="middle">appends</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - only the <code>verdict</code> dict crosses to disk. <code>_build_qd_archive_entry</code> (<code>evolution_engine.py:1023</code>) picks 14 of the 19 keys; the archive list dies with the process. Written keys: <code>qd_descriptor</code>, <code>qd_score</code>, <code>quality_norm</code>, <code>novelty_norm</code>, <code>novelty_score</code>, <code>is_valid</code>, <code>admit_rejected</code>, <code>archive_size</code>, <code>evicted_uuid</code>.</p>
+</div>
+
+<div class="panel" id="cards"><span class="br"></span>
+<h2>File cards</h2>
+
+<div class="card l2" id="card-selection">
+<h4><a href="../../sources/core/selection.py">sources/core/selection.py</a></h4>
+<p class="role">Scores candidate runs for QD: embeds the genotype, measures k-NN cosine novelty, composes qd_score, admits survivors to an in-memory archive.</p>
+<p class="meta">842 lines &#183; classes: <code>SelectionStrategy</code>, <code>PopulationMember</code>, <code>SelectionPressure</code> &#183; imports <code>code_features.genotype_embedding_descriptor</code> &#183; reads: <code>selection_strategy</code>, <code>population_size</code>, <code>novelty_weight</code> ...</p>
+<details><summary>signatures - sources/core/selection.py</summary><div class="dbody">
+<pre>MAX_CHILDREN_PER_PARENT = 8                        # module constant, line 24
+NOVELTY_ARCHIVE_KNN = "archive_knn"                # line 27
+NOVELTY_PREVIOUS_N = "previous_n"                  # line 28
+
+class SelectionStrategy(Enum)                      # line 31
+  GREEDY = "greedy" | TOURNAMENT = "tournament" | NOVELTY = "novelty" | QUALITY_DIVERSITY = "qd"
+
+@dataclass class PopulationMember                  # line 40
+  iteration: int; reward: float; cost: float; uuid: str | None
+  behaviour_descriptor: list[float]; genotype_chars: int
+  novelty_score: float; qd_score: float; created_at: datetime
+
+class SelectionPressure                            # line 69
+  __init__(config, min_improvement_threshold=0.01, strategy=QUALITY_DIVERSITY,
+           population_size=25, novelty_k_neighbours=10, novelty_weight=0.25,
+           admit_threshold=0.3, max_children=MAX_CHILDREN_PER_PARENT,
+           novelty_comparison=NOVELTY_ARCHIVE_KNN, previous_n=5,
+           length_penalty_baseline_chars=5000, length_penalty_lambda=0.05)
+  validate_survivor(baseline_runs, new_runs, threshold=None) -&gt; dict[str, Any]
+  select_parent(runs, child_counts=None) -&gt; Any
+  select_parents(candidates, n_parents=2, crossover_rate=0.4, child_counts=None) -&gt; tuple[list[Any], bool]
+  archive -&gt; list[PopulationMember]                # property, returns a copy
+  _validate_greedy(baseline_list, new_list, threshold) -&gt; dict
+  _validate_tournament(baseline_list, new_list, threshold) -&gt; dict
+  _validate_open_ended(baseline_list, new_list, threshold) -&gt; dict
+  _extract_behaviour_descriptor(run) -&gt; list[float] | None
+  _compute_novelty(descriptor) -&gt; float
+  _comparison_peers() -&gt; list[list[float]]
+  _record_previous(descriptor) -&gt; None
+  _novelty_range() -&gt; float
+  _try_admit(member, is_valid) -&gt; bool
+  _add_to_archive(member) -&gt; None
+  _refresh_member_metrics() -&gt; None
+  _knn_novelty_against_peers(m) -&gt; float
+  _compose_qd_score(reward, novelty, genotype_chars, novelty_range) -&gt; float
+  _build_result(is_valid, relative_improvement, absolute_improvement,
+                baseline_reward, new_reward, confidence, threshold) -&gt; dict
+  _log_validation(is_valid, relative_improvement, baseline_reward,
+                  new_reward, confidence, threshold) -&gt; None
+
+# module-level helpers
+_safe_attr(obj, attr, default=0.0) -&gt; Any            # line 714
+_mean_reward(runs) -&gt; float                          # line 728
+_best_reward(runs) -&gt; float                          # line 741
+_cosine_distance(a, b) -&gt; float                      # line 754
+_length_penalty(chars, baseline_chars) -&gt; float      # line 776
+_genotype_chars(run) -&gt; int                          # line 792</pre>
+<p>Config fields read by the caller (<code>sources/core/evolution_engine.py:95-106</code>): <code>min_improvement_threshold</code>, <code>selection_strategy</code>, <code>population_size</code>, <code>novelty_k_neighbours</code>, <code>novelty_weight</code>, <code>admit_threshold</code>, <code>novelty_comparison</code>, <code>novelty_previous_n</code>, <code>length_penalty_baseline_chars</code>, <code>length_penalty_lambda</code>. <code>crossover_rate</code> reaches <code>select_parents</code> through <code>EvolutionEngine</code>.</p>
+<p>The module also carries a <code>__main__</code> smoke block (line 799) that asserts the length penalty and the <code>previous_n</code> window; it is not run by the app.</p>
+</div></details>
+</div>
+
+<div class="card l2" id="card-ws">
+<h4><a href="../../sources/core/workflow_selection.py">sources/core/workflow_selection.py</a></h4>
+<p class="role">Discovers on-disk workflow folders, ranks them by task similarity and score, and returns the parents the evolution loop mutates.</p>
+<p class="meta">396 lines &#183; classes: <code>WorkflowSelector</code>, <code>_WorkflowScoreAdapter</code> &#183; imports from <code>selection.py</code>: <code>PopulationMember</code>, <code>SelectionPressure</code> &#183; imports <code>WorkflowInfo</code>, <code>lineage.scan_all</code></p>
+<details><summary>signatures - sources/core/workflow_selection.py</summary><div class="dbody">
+<pre>class _WorkflowScoreAdapter                          # line 17
+  __slots__ = ("workflow_info", "reward")
+  __init__(wf: WorkflowInfo) -&gt; None                 # reward = wf.overall_score
+
+class WorkflowSelector                               # line 40
+  __init__(config: Config) -&gt; None                   # reads config.workflow_dir
+  _get_model()                                       # lazy all-MiniLM-L6-v2, else None
+  _lexical_similarity(a, b) -&gt; float                 # static; Jaccard over word tokens
+  discover_workflows() -&gt; dict[str, WorkflowInfo]
+  cosine_similarity(a, b) -&gt; float
+  sort_similar_workflows(goal, threshold=0.8, debug=False) -&gt; list[WorkflowInfo]
+  sort_workflows_by_score(workflows_info, threshold) -&gt; list[WorkflowInfo]
+  select_best_workflows(goal, threshold_similarity=0.9, threshold_score=0.1) -&gt; list[WorkflowInfo]
+  _rehydrate_workflow_info(uuid) -&gt; WorkflowInfo | None
+  _count_children_on_disk() -&gt; dict[str, int]
+  _select_from_archive(selection_pressure, n_parents, crossover_rate) -&gt; tuple[list[WorkflowInfo], bool]
+  select_parent_workflows(goal, selection_pressure, n_parents=2, crossover_rate=0.1,
+                          threshold_similarity=0.8, threshold_score=0.1) -&gt; tuple[list[WorkflowInfo], bool]</pre>
+<p>Two constructor defaults differ from the call site in <code>evolution_engine.py:299-306</code>: there <code>crossover_rate</code> comes from <code>config.crossover_rate</code>, and the thresholds come from <code>parent_threshold_similarity</code> / <code>parent_threshold_score</code>.</p>
+<p><code>discover_workflows</code> skips folders named with <code>single_agent</code>, folders that fail <code>WorkflowInfo.is_valid()</code>, folders with an empty <code>state_result</code>, and folders with no loadable genotype code.</p>
+</div></details>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 4 - what workflow_selection.py adds</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 600" role="img" aria-label="parent selection paths in workflow_selection.py">
+  <defs>
+    <marker id="arw5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+  </defs>
+
+  <a class="box" id="w1" href="#card-ws">
+    <title>WorkflowSelector.select_parent_workflows</title>
+    <rect x="340" y="20" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="480" y="44" text-anchor="middle">select_parent_workflows</text>
+    <text class="box-sub" x="480" y="62" text-anchor="middle">WorkflowSelector</text>
+  </a>
+
+  <text class="box-sub" x="200" y="110" text-anchor="middle">steady state: _archive populated</text>
+  <text class="box-sub" x="760" y="110" text-anchor="middle">cold start: _archive empty</text>
+
+  <a class="box" id="w2" href="#card-ws">
+    <title>WorkflowSelector._select_from_archive</title>
+    <rect x="60" y="120" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="200" y="144" text-anchor="middle">_select_from_archive</text>
+    <text class="box-sub" x="200" y="162" text-anchor="middle">reads selection_pressure._archive</text>
+  </a>
+  <a class="box" id="w3" href="#card-ws">
+    <title>WorkflowSelector._count_children_on_disk</title>
+    <rect x="60" y="210" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="200" y="234" text-anchor="middle">_count_children_on_disk</text>
+    <text class="box-sub" x="200" y="252" text-anchor="middle">reads lineage.scan_all</text>
+  </a>
+  <a class="box" id="w4" href="#pipeline">
+    <title>SelectionPressure.select_parent</title>
+    <rect x="60" y="300" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="200" y="324" text-anchor="middle">select_parents</text>
+    <text class="box-sub" x="200" y="342" text-anchor="middle">SelectionPressure - shared</text>
+  </a>
+  <a class="box" id="w5" href="#card-ws">
+    <title>WorkflowSelector._rehydrate_workflow_info</title>
+    <rect x="60" y="390" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="200" y="414" text-anchor="middle">_rehydrate_workflow_info</text>
+    <text class="box-sub" x="200" y="432" text-anchor="middle">reads WorkflowInfo</text>
+  </a>
+
+  <a class="box" id="w6" href="#card-ws">
+    <title>WorkflowSelector.discover_workflows</title>
+    <rect x="620" y="120" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="760" y="144" text-anchor="middle">discover_workflows</text>
+    <text class="box-sub" x="760" y="162" text-anchor="middle">scans config.workflow_dir</text>
+  </a>
+  <a class="box" id="w7" href="#card-ws">
+    <title>WorkflowSelector.sort_similar_workflows</title>
+    <rect x="620" y="210" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="760" y="234" text-anchor="middle">sort_similar_workflows</text>
+    <text class="box-sub" x="760" y="252" text-anchor="middle">cosine_similarity 0.8 floor</text>
+  </a>
+  <a class="box" id="w8" href="#card-ws">
+    <title>WorkflowSelector.select_best_workflows</title>
+    <rect x="620" y="300" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="760" y="324" text-anchor="middle">select_best_workflows</text>
+    <text class="box-sub" x="760" y="342" text-anchor="middle">then sort_workflows_by_score</text>
+  </a>
+  <a class="box" id="w9" href="#card-ws">
+    <title>_WorkflowScoreAdapter</title>
+    <rect x="620" y="390" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="760" y="414" text-anchor="middle">_WorkflowScoreAdapter</text>
+    <text class="box-sub" x="760" y="432" text-anchor="middle">reward = overall_score</text>
+  </a>
+
+  <a class="box" id="w10" href="#cards">
+    <title>Return value of select_parent_workflows</title>
+    <rect x="310" y="500" width="340" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="480" y="524" text-anchor="middle">parents for the next generation</text>
+    <text class="box-sub" x="480" y="542" text-anchor="middle">(list[WorkflowInfo], use_crossover)</text>
+  </a>
+
+  <path class="edge" data-from="w1" data-to="w2" d="M340,48 H40 V148 H60" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="190" y="40" text-anchor="middle">archive non-empty</text>
+  <path class="edge" data-from="w1" data-to="w6" d="M620,48 H920 V148 H900" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="770" y="40" text-anchor="middle">archive empty</text>
+
+  <path class="edge" data-from="w2" data-to="w3" d="M200,176 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="208" y="196">child_counts</text>
+  <path class="edge" data-from="w3" data-to="w4" d="M200,266 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="208" y="286">archive members</text>
+  <path class="edge" data-from="w4" data-to="w5" d="M200,356 V390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="208" y="376">member.uuid</text>
+
+  <path class="edge" data-from="w6" data-to="w7" d="M760,176 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="768" y="196">workflow folders</text>
+  <path class="edge" data-from="w7" data-to="w8" d="M760,266 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="768" y="286">sorted workflows</text>
+  <path class="edge" data-from="w8" data-to="w9" d="M760,356 V390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="768" y="376">WorkflowInfo list</text>
+
+  <path class="edge" data-from="w5" data-to="w10" d="M200,446 V470 H420 V500" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw6)"/>
+  <text class="edge-label" x="310" y="462" text-anchor="middle">rehydrated workflows</text>
+  <path class="edge" data-from="w9" data-to="w10" d="M760,446 V470 H540 V500" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw6)"/>
+  <text class="edge-label" x="650" y="462" text-anchor="middle">candidates</text>
+
+</svg>
+</div>
+<p class="figcap">Diagram 4 - two paths into one return value (<code>select_parent_workflows</code>, <code>workflow_selection.py:300</code>). The cold-start path wraps each candidate in <code>_WorkflowScoreAdapter</code> so <code>select_parents</code> can read <code>reward</code> from a <code>WorkflowInfo</code>. Shared with <code>selection.py</code>: <code>PopulationMember</code>, <code>SelectionPressure</code>, <code>select_parents</code>, the <code>_archive</code> list.</p>
+
+<h3>Shared symbols and what the second module adds</h3>
+<table>
+<thead><tr><th>Symbol</th><th>Defined in</th><th>Used by workflow_selection.py as</th></tr></thead>
+<tbody>
+<tr><td class="sym">SelectionPressure</td><td class="sym">selection.py:69</td><td>Receives <code>selection_pressure._archive</code>; its strategy labels the log line.</td></tr>
+<tr><td class="sym">PopulationMember</td><td class="sym">selection.py:40</td><td><code>isinstance</code> check, then <code>member.uuid</code> for rehydration.</td></tr>
+<tr><td class="sym">SelectionPressure.select_parents</td><td class="sym">selection.py:240</td><td>Draws parents; returns <code>(parents, use_crossover)</code>.</td></tr>
+<tr><td class="sym">max_children / child_counts</td><td class="sym">selection.py:83, 186</td><td>Filled from on-disk lineage so a mined parent loses weight.</td></tr>
+<tr><td class="sym">WorkflowSelector (new)</td><td class="sym">workflow_selection.py:40</td><td>Disk discovery, similarity ranking, archive rehydration.</td></tr>
+<tr><td class="sym">_WorkflowScoreAdapter (new)</td><td class="sym">workflow_selection.py:17</td><td>Maps <code>overall_score</code> to <code>reward</code> for the cold-start pool.</td></tr>
+</tbody>
+</table>
+<p><code>WorkflowSelector</code> loads <code>all-MiniLM-L6-v2</code> on the first similarity call, not at startup; when the load fails it falls back to Jaccard word overlap (<code>_lexical_similarity</code>, <code>workflow_selection.py:77</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Selection modes</h2>
+<table>
+<thead><tr><th>selection_strategy</th><th>Validator called</th><th>Decision</th></tr></thead>
+<tbody>
+<tr><td class="sym">greedy</td><td class="sym">_validate_greedy</td><td>Accept when relative improvement beats <code>min_improvement_threshold</code>; parent = best reward.</td></tr>
+<tr><td class="sym">tournament</td><td class="sym">_validate_tournament</td><td>Sample 3 baselines; near-neutral accepted at 50 %, regression at <code>exp(-10*|delta|)</code>.</td></tr>
+<tr><td class="sym">novelty</td><td class="sym">_validate_open_ended</td><td>Archive + qd gate; same code path as the next row.</td></tr>
+<tr><td class="sym">qd (default)</td><td class="sym">_validate_open_ended</td><td>Admit when improving or <code>qd_score &gt; admit_threshold</code>.</td></tr>
+</tbody>
+</table>
+<p><code>novelty</code> and <code>qd</code> are one code path: <code>validate_survivor</code> routes both to <code>_validate_open_ended</code> (<code>selection.py:181</code>) and <code>select_parent</code> treats them together (<code>selection.py:218</code>). Only the <code>strategy</code> string in the result differs. Any unknown strategy value falls back to greedy.</p>
+
+<h3>Elite handling</h3>
+<p>There is no separate elite list. A high-<code>qd_score</code> member stays because <code>_add_to_archive</code> evicts the lowest-<code>qd_score</code> peer when the list exceeds <code>population_size</code> (<code>selection.py:576-591</code>). After every admission, <code>_refresh_member_metrics</code> recomputes <code>novelty_score</code> and <code>qd_score</code> for all members, so an old member's rank can drop without its own evaluation changing.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Config knobs</h2>
+<table>
+<thead><tr><th>Field</th><th>Default in config.py</th><th>Read by</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td class="sym">selection_strategy</td><td class="sym">"qd" (line 131)</td><td class="sym">evolution_engine.py:98</td><td>Picks the validator and parent draw.</td></tr>
+<tr><td class="sym">population_size</td><td class="sym">16 (line 143)</td><td class="sym">evolution_engine.py:99</td><td>Archive capacity; over-capacity evicts lowest qd_score.</td></tr>
+<tr><td class="sym">novelty_weight</td><td class="sym">0.25 (line 145)</td><td class="sym">evolution_engine.py:101</td><td>The <code>w</code> in qd_score; 0 is pure quality, 1 pure novelty.</td></tr>
+<tr><td class="sym">novelty_k_neighbours</td><td class="sym">16 (line 144)</td><td class="sym">evolution_engine.py:100</td><td>k for k-NN novelty in <code>archive_knn</code> mode.</td></tr>
+<tr><td class="sym">novelty_comparison</td><td class="sym">"archive_knn" (line 136)</td><td class="sym">evolution_engine.py:103</td><td>Peer set: whole archive, or the recent window.</td></tr>
+<tr><td class="sym">novelty_previous_n</td><td class="sym">16 (line 137)</td><td class="sym">evolution_engine.py:104</td><td>Window size for <code>previous_n</code> mode.</td></tr>
+<tr><td class="sym">admit_threshold</td><td class="sym">0.3 (line 146)</td><td class="sym">evolution_engine.py:102</td><td>Admit when qd_score clears 0.3.</td></tr>
+<tr><td class="sym">min_improvement_threshold</td><td class="sym">0.01 (line 142)</td><td class="sym">evolution_engine.py:97</td><td>Relative-improvement bar for the greedy part of the gate.</td></tr>
+<tr><td class="sym">length_penalty_baseline_chars</td><td class="sym">8000 (line 139)</td><td class="sym">evolution_engine.py:105</td><td>Penalty grows above 8 000 characters of genotype source.</td></tr>
+<tr><td class="sym">length_penalty_lambda</td><td class="sym">0.05 (line 140)</td><td class="sym">evolution_engine.py:106</td><td>Weight of the penalty subtracted from qd_score.</td></tr>
+<tr><td class="sym">crossover_rate</td><td class="sym">0.4 (line 149)</td><td class="sym">evolution_engine.py:295</td><td>Probability of crossover over mutation for the parent draw.</td></tr>
+</tbody>
+</table>
+<details><summary>formula and defaults in context</summary><div class="dbody">
+<blockquote>qd_score = (1 - novelty_weight) * quality_norm + novelty_weight * novelty_norm - length_penalty_lambda * length_penalty</blockquote>
+<p>Path: <code class="path">sources/core/selection.py</code> lines 620-635 (<code>_compose_qd_score</code>). <code>quality_norm = min(max(reward, 0), 1)</code>; <code>novelty_norm = min(novelty / novelty_range, 1)</code>; <code>length_penalty = clip((chars - 8000) / 8000, 0, 1)</code> (<code>_length_penalty</code>, line 776).</p>
+<p>Class-level constructor defaults differ from the Config fields: <code>population_size=25</code>, <code>novelty_k_neighbours=10</code>, <code>admit_threshold=0.3</code>, <code>previous_n=5</code>, <code>length_penalty_baseline_chars=5000</code> (<code>selection.py:83-107</code>). The call in <code>evolution_engine.py:95</code> always passes the Config values, so the constructor defaults only apply to direct users such as <code class="path">tests/selection_test.py</code>.</p>
+<p>Novelty value range: <code>_cosine_distance</code> returns <code>1 - cosine_similarity</code> in <code>[0, 2]</code>, and returns the neutral <code>1.0</code> when either vector is empty or the shapes differ (<code>selection.py:754</code>).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and readers</h2>
+<table>
+<thead><tr><th>Caller</th><th>Calls</th><th>What it does with the result</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">evolution_engine.py</a>:563</td><td class="sym">validate_survivor</td><td>Builds <code>SelectionLog</code>, persists the qd verdict row, refreshes the archive plot.</td></tr>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">evolution_engine.py</a>:299</td><td class="sym">select_parent_workflows</td><td>Passes parents and <code>use_crossover</code> to the variation step.</td></tr>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">evolution_engine.py</a>:962</td><td class="sym">SelectionPressure.archive</td><td>Reads behaviour descriptors for the PCA projection.</td></tr>
+<tr><td class="sym"><a href="area_utils.html">archive_projection.py</a>:120</td><td class="sym">render_archive_pca</td><td>Reads <code>member.behaviour_descriptor</code> (<code>_descriptor_matrix</code>, line 64) and writes <code>archive_pca.png</code>.</td></tr>
+<tr><td class="sym"><a href="mod_core_planner.html">planner.py</a>:751</td><td class="sym">select_best_workflows</td><td>Reuses prior workflows as grounding context for plan steps.</td></tr>
+</tbody>
+</table>
+<p>Tests that cover these modules: <code class="path"><a href="../../tests/selection_test.py">tests/selection_test.py</a></code> (8 test functions: admission, rejection, capacity eviction, length penalty, <code>previous_n</code>, cosine helpers, capped reward). <code><a href="../../tests/planner_json_extraction_test.py">tests/planner_json_extraction_test.py</a>:114</code> stubs the <code>WorkflowSelector</code> import path only.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Docs versus code</h2>
+<table>
+<thead><tr><th>Doc claim</th><th>Code</th></tr></thead>
+<tbody>
+<tr><td class="sym">docs/DEVELOPER_GUIDE.md:283 - <code>MAX_CHILDREN_PER_PARENT = 2</code></td><td class="sym">selection.py:24 - <code>= 8</code></td></tr>
+<tr><td class="sym">docs/concepts/evolution-engine.md:66 - <code>population_size = 20</code></td><td class="sym">config.py:143 - <code>16</code></td></tr>
+<tr><td class="sym">docs/concepts/evolution-engine.md:76 - <code>k = 15</code></td><td class="sym">config.py:144 - <code>16</code></td></tr>
+<tr><td class="sym">docs/concepts/evolution-engine.md:68 - qd_score without penalty</td><td class="sym">selection.py:634 - subtracts <code>lambda * length_penalty</code></td></tr>
+</tbody>
+</table>
+<p class="note flag">Red note: the three numeric claims above contradict the code at commit <code>7e8463b</code>; the qd_score formula in both docs omits the <code>- lambda * length_penalty</code> term that <code>_compose_qd_score</code> applies.</p>
+<p class="note">Amber note: <code>config_default.json</code> ships <code>crossover_rate</code> 0.25 while <code>config.py</code> defaults to 0.4, and the <code>getattr</code> fallbacks in <code>evolution_engine.py:99-104</code> (50, 15, 5) differ from the Config defaults they normally read.</p>
+<p class="note say">Why it matters: qd_score keeps a low-reward but differently-written workflow alive, so reward alone does not decide which code survives.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Related pages</h2>
+<table>
+<thead><tr><th>Page</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="area_sources_core.html">area_sources_core.html</a></td><td>Parent L1 page for this module.</td></tr>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a></td><td>Owns the loop that calls <code>validate_survivor</code> and writes <code>qd_archive.jsonl</code>.</td></tr>
+<tr><td class="sym"><a href="mod_core_variation.html">mod_core_variation.html</a></td><td>Consumes the parents and the <code>use_crossover</code> flag.</td></tr>
+<tr><td class="sym"><a href="mod_core_lineage.html">mod_core_lineage.html</a></td><td>Writes the parent records <code>_count_children_on_disk</code> reads.</td></tr>
+<tr><td class="sym"><a href="flow_evolution_loop.html">flow_evolution_loop.html</a></td><td>Shows selection in time order inside one generation.</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/core/selection.py</code> (842 lines), <code class="path">sources/core/workflow_selection.py</code> (396 lines), <code>config.py</code> (selection block lines 131-149, 507-545), <code>config_default.json</code>, <code class="path">sources/core/evolution_engine.py</code> (lines 90-106, 285-320, 545-600, 940-985, 1023-1090), <code class="path">sources/core/schema.py</code> (<code>IndividualRun</code>, <code>SelectionLog</code>), <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/utils/archive_projection.py</code>, <code class="path">tests/selection_test.py</code>, <code class="path">docs/DEVELOPER_GUIDE.md</code>, <code class="path">docs/concepts/evolution-engine.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/core/genotype_embedding.py</code> and <code>code_features.py</code> internals (chunking, backends) because the genotype page covers them; only the descriptor contract matters here. Skipped <code class="path">sources/core/single_agent_factory.py</code> and <code>orchestrator.py</code> because they do not call selection. Skipped the <code>__main__</code> smoke blocks in both files beyond noting they exist. Skipped <code class="path">sources/workflows/</code>, <code>run_notes/</code>, <code>runs_capsule/</code> because they are runtime data (Tier D for this page).</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (53 modified paths); <code>config.py</code> was reformatted but its selection values are unchanged, and neither <code>selection.py</code> nor <code>workflow_selection.py</code> was modified.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

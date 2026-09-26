@@ -30,10 +30,12 @@ directly, instead of inferring it from a proxy.
 > one slot per registered source letter `a`–`g`; the module is now
 > deprecated)
 > and, before that, from a structural descriptor `[n_agents, n_edges,
-> n_branches, prompt_chars]`. The failure fingerprint is still computed
-> and persisted by the verifier as a diagnostic (see
+> n_branches, prompt_chars]`. The `failure_fingerprint` key is still
+> written by the verifier as a diagnostic (see
 > [`concepts/evaluation-pipeline.md`](../concepts/evaluation-pipeline.md#failure-fingerprint-diagnostic)),
-> but it no longer feeds novelty. The structural descriptor is gone.
+> but it no longer feeds novelty — and under the hybrid verifier it
+> holds a neutral placeholder (only the deprecated legacy verifier
+> computed real pass rates). The structural descriptor is gone.
 
 ## The signal: an embedding of the workflow code
 

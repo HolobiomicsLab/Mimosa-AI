@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_gradient_duel.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e24_gradient_duel.py">
+<div class="wrap">
+<h1 class="hud">e24_gradient_duel.py</h1>
+<p class="intro">This file is E24 Phase 4: it writes one measured-facts gradient per generation and then judges five gradient channels against each other with the E16v2 instrument. The gradient text holds only execution facts — re-execution status, what diverged, and the verifier-owned holdout metric against the group field — never SR, VER or reward. It runs by hand: <code>uv run python experiments_verifiers/harness/e24_gradient_duel.py</code> (entry point <code>main()</code> L237).</p>
+
+<div id="legend" data-auto></div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 — the job: ledgers to gradient files, gradients to a five-side duel</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 476" role="img" aria-label="e24_gradient_duel.py: ledgers feed write_gradients, the gradient files feed build_quintuples, five judge sides are compared and the duel json and md are written">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="iLed">
+    <rect x="20" y="40" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135.0" y="60" text-anchor="middle">reexec + holdout ledgers</text>
+    <text class="box-sub" x="135.0" y="75" text-anchor="middle">L146, L148</text>
+  </g>
+  <g class="box" id="iPop">
+    <rect x="20" y="140" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135.0" y="160" text-anchor="middle">_e16_population.json</text>
+    <text class="box-sub" x="135.0" y="175" text-anchor="middle">E16.POP_JSON L186</text>
+  </g>
+  <g class="box" id="gW">
+    <rect x="300" y="30" width="270" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435.0" y="50" text-anchor="middle">write_gradients L144</text>
+    <text class="box-sub" x="435.0" y="65" text-anchor="middle">one file per generation L175</text>
+    <text class="box-sub" x="435.0" y="80" text-anchor="middle">group-field rank L165</text>
+  </g>
+  <g class="box" id="gH">
+    <rect x="300" y="150" width="270" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435.0" y="170" text-anchor="middle">gradient sections</text>
+    <text class="box-sub" x="435.0" y="185" text-anchor="middle">outputs_block L62, broke_block L77</text>
+    <text class="box-sub" x="435.0" y="200" text-anchor="middle">holdout_block L87, advice_for L111</text>
+  </g>
+  <g class="box" id="gT">
+    <rect x="300" y="270" width="270" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435.0" y="290" text-anchor="middle">GRAD_TMPL L37</text>
+    <text class="box-sub" x="435.0" y="305" text-anchor="middle">status, outputs, divergence</text>
+    <text class="box-sub" x="435.0" y="320" text-anchor="middle">holdout metric, direction</text>
+  </g>
+  <g class="box" id="gFiles">
+    <rect x="610" y="30" width="250" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="735.0" y="50" text-anchor="middle">E24_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</text>
+    <text class="box-sub" x="735.0" y="65" text-anchor="middle">148 files L175</text>
+  </g>
+  <g class="box" id="gQ">
+    <rect x="610" y="150" width="250" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735.0" y="170" text-anchor="middle">build_quintuples L183</text>
+    <text class="box-sub" x="735.0" y="185" text-anchor="middle">e24 joins e19 L207</text>
+    <text class="box-sub" x="735.0" y="200" text-anchor="middle">drops counter L203</text>
+  </g>
+  <g class="box" id="gJ">
+    <rect x="610" y="270" width="250" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735.0" y="290" text-anchor="middle">judge_with_text L220</text>
+    <text class="box-sub" x="735.0" y="305" text-anchor="middle">E16.judge_messages L222</text>
+    <text class="box-sub" x="735.0" y="320" text-anchor="middle">E16._llm L225</text>
+  </g>
+  <g class="box" id="gS">
+    <rect x="900" y="30" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1035.0" y="50" text-anchor="middle">E16 population item</text>
+    <text class="box-sub" x="1035.0" y="65" text-anchor="middle">gold, eval program, state</text>
+    <text class="box-sub" x="1035.0" y="80" text-anchor="middle">owned by E16</text>
+  </g>
+  <g class="box" id="gStats">
+    <rect x="900" y="150" width="270" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1035.0" y="170" text-anchor="middle">paired L276, stats L302</text>
+    <text class="box-sub" x="1035.0" y="185" text-anchor="middle">cluster bootstrap L290</text>
+    <text class="box-sub" x="1035.0" y="200" text-anchor="middle">cache hits L317</text>
+  </g>
+  <g class="box" id="gOut">
+    <rect x="900" y="270" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1035.0" y="290.0" text-anchor="middle">duel json and md</text>
+    <text class="box-sub" x="1035.0" y="305.0" text-anchor="middle">stats, pairs, calls L345</text>
+    <text class="box-sub" x="1035.0" y="305" text-anchor="middle">stats, pairs, calls</text>
+    <text class="box-sub" x="1035.0" y="320" text-anchor="middle">_write_md L351</text>
+  </g>
+  <path class="edge dashed-edge" data-from="iLed" data-to="gW" d="M250,75 H275 V73 H300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="272" y="66" text-anchor="end">facts L146</text>
+  <path class="edge dashed-edge" data-from="iPop" data-to="gQ" d="M250,175 H290 V193 H610" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="470" y="168" text-anchor="middle">population L186</text>
+  <path class="edge" data-from="gT" data-to="gW" d="M300,290 H280 V130 H310 V116" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="272" y="255" text-anchor="end">template L168</text>
+  <path class="edge" data-from="gH" data-to="gW" d="M435,150 V116" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="446" y="140" text-anchor="start">blocks L172</text>
+  <path class="edge" data-from="gW" data-to="gFiles" d="M570,73 H610" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="590" y="65" text-anchor="middle">write L175</text>
+  <path class="edge" data-from="gFiles" data-to="gQ" d="M735,116 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="745" y="138" text-anchor="start">read L194</text>
+  <path class="edge" data-from="gQ" data-to="gJ" d="M735,236 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="745" y="258" text-anchor="start">gradient text L248</text>
+  <path class="edge" data-from="gS" data-to="gJ" d="M1035,116 V140 H860 V290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="132" text-anchor="middle">item L250</text>
+  <path class="edge" data-from="gJ" data-to="gStats" d="M860,313 H900" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="880" y="305" text-anchor="middle">judgment L250</text>
+  <path class="edge" data-from="gStats" data-to="gOut" d="M1035,236 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="895" y="272" text-anchor="end">json L345</text>
+  <text class="box-sub" x="20" y="466">solid = call  |  dashed = reads / writes  |  11 boxes. Gradient text never contains SR, VER or reward.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 — <code>write_gradients</code> L144 runs first and needs no network; the judge calls happen once per pair and side, in a pool of 10 L266. Gradient layout: <code>results/E24_bt_gradients/&lt;campaign&gt;__&lt;task&gt;/&lt;uuid&gt;.txt</code> L156&#8211;L175.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 — data flow: two ledgers and the E16 population in; files and json out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1110 470" role="img" aria-label="e24_gradient_duel.py data flow: two E24 ledgers and the E16 population go in; gradient files, the duel json and md, and returned values come out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="v1">
+    <rect x="20" y="40" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="60" text-anchor="middle">reexec ledger L147</text>
+    <text class="box-sub" x="140.0" y="75" text-anchor="middle">status, problems, runtime_s</text>
+  </g>
+  <g class="box" id="v2">
+    <rect x="20" y="130" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="150" text-anchor="middle">holdout ledger L148</text>
+    <text class="box-sub" x="140.0" y="165" text-anchor="middle">metric_value, status, reason</text>
+  </g>
+  <g class="box" id="v3">
+    <rect x="20" y="220" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="240" text-anchor="middle">_e16_population.json L186</text>
+    <text class="box-sub" x="140.0" y="255" text-anchor="middle">tier, SR, reward, gold</text>
+  </g>
+  <g class="box" id="vmid">
+    <rect x="320" y="110" width="300" height="140" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="134" text-anchor="middle">e24_gradient_duel.py</text>
+    <text class="box-sub" x="470.0" y="149" text-anchor="middle">379 lines, no Config field</text>
+    <text class="box-sub" x="470.0" y="164" text-anchor="middle">reads two E24 ledgers</text>
+    <text class="box-sub" x="470.0" y="179" text-anchor="middle">e19, e18, e15, ver sides cached</text>
+  </g>
+  <g class="box" id="o1">
+    <rect x="680" y="30" width="400" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="880.0" y="50" text-anchor="middle">E24_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</text>
+    <text class="box-sub" x="880.0" y="65" text-anchor="middle">one measured-facts gradient L175</text>
+  </g>
+  <g class="box" id="o2">
+    <rect x="680" y="140" width="400" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="880.0" y="160" text-anchor="middle">E24_gradient_duel_2026-09-24.json</text>
+    <text class="box-sub" x="880.0" y="175" text-anchor="middle">stats, pairs, calls L345</text>
+  </g>
+  <g class="box" id="o3">
+    <rect x="680" y="250" width="400" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="880.0" y="270" text-anchor="middle">E24_gradient_duel_2026-09-24.md</text>
+    <text class="box-sub" x="880.0" y="285" text-anchor="middle">two tables L375</text>
+  </g>
+  <g class="box" id="o4">
+    <rect x="680" y="360" width="400" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="880.0" y="380" text-anchor="middle">values returned to main</text>
+    <text class="box-sub" x="880.0" y="395" text-anchor="middle">n files L177 · quads, drops L217</text>
+    <text class="box-sub" x="880.0" y="410" text-anchor="middle">judgment dict L228</text>
+  </g>
+  <path class="edge dashed-edge" data-from="v1" data-to="vmid" d="M260,75 H295 V140 H320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="296" y="132" text-anchor="end">facts L147</text>
+  <path class="edge dashed-edge" data-from="v2" data-to="vmid" d="M260,165 H320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="295" y="157" text-anchor="middle">metric L148</text>
+  <path class="edge dashed-edge" data-from="v3" data-to="vmid" d="M260,255 H305 V200 H320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="307" y="196" text-anchor="end">items L186</text>
+  <path class="edge dashed-edge" data-from="vmid" data-to="o1" d="M620,140 H650 V70 H680" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="652" y="132" text-anchor="end">write L175</text>
+  <path class="edge dashed-edge" data-from="vmid" data-to="o2" d="M620,180 H680" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="650" y="172" text-anchor="middle">write L345</text>
+  <path class="edge dashed-edge" data-from="vmid" data-to="o3" d="M620,210 H650 V290 H680" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="652" y="282" text-anchor="end">write L346</text>
+  <path class="edge dashed-edge" data-from="vmid" data-to="o4" d="M620,230 H660 V400 H680" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="662" y="392" text-anchor="end">return L217</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 — config fields read: none. Constants read: <code>CAP_USD</code> 3.0 L34, <code>SIDES</code> L35, <code>E16.MODEL</code> L323. Returned values: the file count L177, the pair map plus drops L217, the judgment dict L228&#8211;L232.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 — logic: how one direction sentence is chosen for the next mutation</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1060 568" role="img" aria-label="e24_gradient_duel.py logic: advice_for picks one direction sentence from the re-execution status and the holdout metric">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="d1">
+    <rect x="20" y="40" width="240" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140.0" y="60" text-anchor="middle">advice_for L111</text>
+  </g>
+  <g class="box" id="d2">
+    <rect x="300" y="40" width="260" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="430.0" y="60" text-anchor="middle">which status? L113</text>
+  </g>
+  <g class="box" id="o1">
+    <rect x="600" y="20" width="440" height="56" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="820.0" y="40" text-anchor="middle">no_entry_script: script first L114</text>
+  </g>
+  <g class="box" id="o2">
+    <rect x="600" y="90" width="440" height="56" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="820.0" y="110" text-anchor="middle">crash: fix the failure L117</text>
+  </g>
+  <g class="box" id="o3">
+    <rect x="600" y="160" width="440" height="56" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="820.0" y="180" text-anchor="middle">timeout: cut runtime L119</text>
+  </g>
+  <g class="box" id="o4">
+    <rect x="600" y="230" width="440" height="56" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="820.0" y="250" text-anchor="middle">divergent: pin seeds L122</text>
+  </g>
+  <g class="box" id="d3">
+    <rect x="300" y="340" width="260" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="430.0" y="360" text-anchor="middle">holdout metric present? L126</text>
+  </g>
+  <g class="box" id="o5">
+    <rect x="600" y="330" width="440" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="820.0" y="350" text-anchor="middle">modelling is the lever L129</text>
+  </g>
+  <g class="box" id="d4">
+    <rect x="300" y="420" width="260" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="430.0" y="440" text-anchor="middle">holdout row at all? L132</text>
+  </g>
+  <g class="box" id="o6">
+    <rect x="600" y="400" width="440" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="820.0" y="420" text-anchor="middle">make the output joinable L135</text>
+  </g>
+  <g class="box" id="o7">
+    <rect x="600" y="470" width="440" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="820.0" y="490" text-anchor="middle">keep deliverable fidelity L139</text>
+  </g>
+  <path class="edge" data-from="d1" data-to="d2" d="M260,72 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="280" y="64" text-anchor="middle">facts in</text>
+  <path class="edge" data-from="d2" data-to="o1" d="M560,60 H580 V48 H600" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="580" y="40" text-anchor="middle">no_entry</text>
+  <path class="edge" data-from="d2" data-to="o2" d="M560,72 H570 V118 H600" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="572" y="110" text-anchor="end">crash</text>
+  <path class="edge" data-from="d2" data-to="o3" d="M560,84 H575 V188 H600" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="577" y="180" text-anchor="end">timeout</text>
+  <path class="edge" data-from="d2" data-to="o4" d="M560,96 H580 V258 H600" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="582" y="250" text-anchor="end">divergent</text>
+  <path class="edge" data-from="d2" data-to="d3" d="M430,104 V340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="300" text-anchor="start">clean re-run</text>
+  <path class="edge" data-from="d3" data-to="o5" d="M560,372 H600" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="580" y="364" text-anchor="middle">yes</text>
+  <path class="edge" data-from="d3" data-to="d4" d="M430,404 V420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="414" text-anchor="start">no</text>
+  <path class="edge" data-from="d4" data-to="o6" d="M560,440 H580 V428 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="580" y="420" text-anchor="middle">row, no metric</text>
+  <path class="edge" data-from="d4" data-to="o7" d="M560,452 H580 V498 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="582" y="490" text-anchor="middle">no row</text>
+  <text class="box-sub" x="20" y="560">lane 1: advice_for L111 to L142, the text pushed into every gradient file  |  lane 2 (same file): holdout_block L87 returns "not admissible" when SPLIT_SPECS has no gid L89</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 — <code>advice_for</code> L111 tests the re-execution status first, then the holdout metric, and returns one sentence; the five measured side values on disk are relevance 0.298 for e24 against 0.627 for e19, and hallucination rate 0.106 against 0.252 (my computation, <code class="path">results/E24_gradient_duel_2026-09-24.json</code> keys <code>stats.mean_relevance_e24</code> and <code>stats.hallucination_rate_e24</code>).</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>config</td><td class="sym">nothing</td><td>no <code>Config</code> import L23&#8211;L27</td><td>the judge model comes from E16 L323</td><td class="size">L34</td></tr>
+<tr><td>reads</td><td class="sym">reexec ledger</td><td><code>C.REEXEC_LEDGER</code> L147</td><td>status, exit_code, runtime_s, outputs, problems</td><td class="size">L147</td></tr>
+<tr><td>reads</td><td class="sym">holdout ledger</td><td><code>C.HOLDOUT_LEDGER</code> L148</td><td>metric_value, status, reason per generation</td><td class="size">L148</td></tr>
+<tr><td>reads</td><td class="sym">E24_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</td><td><code>E24_DIR</code> L31, globbed L194</td><td>the e24 side text of every pair</td><td class="size">L194</td></tr>
+<tr><td>reads</td><td class="sym">E19_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</td><td><code>E19_DIR</code> L30</td><td>required partner of each pair, else drop</td><td class="size">L207&#8211;L213</td></tr>
+<tr><td>reads</td><td class="sym">E18_bt_gradients, E15_bt_gradients</td><td>paths built from the e19 pair L254&#8211;L255</td><td>two more sides, cache-served</td><td class="size">L254</td></tr>
+<tr><td>reads</td><td class="sym">_e16_population.json</td><td><code>E16.POP_JSON</code> L186</td><td>tier, SR, reward and the judge item text</td><td class="size">L186</td></tr>
+<tr><td>reads</td><td class="sym">gold, eval program, state</td><td>inside the E16 item, read by <code>E16.judge_messages</code> L222</td><td>judge input only, evaluation side</td><td class="size">L222</td></tr>
+<tr><td>writes</td><td class="sym">E24_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</td><td><code>E24_DIR / gid / f"{uuid}.txt"</code> L175</td><td>148 gradient files, one per generation</td><td class="size">L175</td></tr>
+<tr><td>writes</td><td class="sym">E24_gradient_duel_2026-09-24.json</td><td><code>OUT_JSON</code> L32, written L345</td><td>stats, pairs, population, calls</td><td class="size">L345</td></tr>
+<tr><td>writes</td><td class="sym">E24_gradient_duel_2026-09-24.md</td><td><code>OUT_MD</code> L33, written by <code>_write_md</code> L375</td><td>side table plus paired deltas</td><td class="size">L375</td></tr>
+<tr><td>writes</td><td class="sym">E16 judge cache</td><td>appended inside <code>E16._llm</code> L225</td><td>cache hits counted per side L317</td><td class="size">L317</td></tr>
+<tr><td>state</td><td class="sym">nothing</td><td>no state file</td><td>every run rewrites all gradients and the report</td><td class="size">L144</td></tr>
+</tbody>
+</table>
+<p class="note">Recorded on disk, my computation: 148 gradient files under <code class="path">results/E24_bt_gradients/</code>; the duel json <code>population</code> says 123 paired generations over 19 groups with 25 drops (<code>no_population_join</code>); <code>calls.e24_side_new</code> is 123 and every other side is 0 because those calls were cache hits; new call cost 0.2269 USD against a 3.0 USD cap L341&#8211;L343.</p><p class="note say">The five sides share one prompt: only the gradient text differs L223. The e24 side is judged fresh, the e19 side is judged the same way, and the e18, e15 and ver sides come from the E16 cache L252&#8211;L263.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>10 top-level callables and 2 nested functions &#8212; signatures and roles</summary><div class="dbody">
+<pre>_fmt(x, nd=3) -&gt; str                                        L56   number to text, em dash for None
+outputs_block(row: dict) -&gt; str                             L62   regenerated vs frozen, per output
+broke_block(row: dict) -&gt; str                               L77   crash tail or divergence detail
+holdout_block(hrow, gid, field) -&gt; str                      L87   metric, group field, rank
+advice_for(row: dict, hrow: dict | None) -&gt; str             L111  one direction sentence per status
+write_gradients() -&gt; int                                    L144  one gradient file per generation
+build_quintuples()                                          L183  join e24 with e19, drop the rest
+judge_with_text(item, grad_text, role)                      L220  E16 prompt with the text swapped
+main() -&gt; None                                              L237  gradients, duel, stats, two writes
+  one(k) -&gt; dict                                            L246  judge one pair on the five sides
+  paired(side_x, side_y, field, boot=999, seed=0)           L276  cluster-bootstrap delta
+_write_md(out) -&gt; None                                      L351  the markdown summary</pre>
+<p>Module constants: <code>TODAY</code> L29, <code>E19_DIR = EV19</code> L30, <code>E24_DIR</code> L31, <code>OUT_JSON</code> L32, <code>OUT_MD</code> L33,
+<code>CAP_USD = 3.0</code> L34, <code>SIDES</code> (five channels) L35, the gradient template <code>GRAD_TMPL</code> L37&#8211;L54.</p>
+<p>Imports: <code>collections</code>, <code>json</code>, <code>sys</code>, <code>ThreadPoolExecutor</code>, <code>Path</code> L17&#8211;L21; <code>numpy</code> L23;
+<code>e16_gradient_audit as E16</code> L26 with <code>sys.path.insert</code> L25; <code>e24_common as C</code> L27. The judge call is a thread pool of 10 workers L266.</p>
+<p>Report keys: <code>experiment</code>, <code>date</code>, <code>model</code>, <code>instrument</code>, <code>provenance_note</code>, <code>population</code>,
+<code>stats</code>, <code>pairs</code>, <code>calls</code> L321&#8211;L343.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e16_gradient_audit.py">harness/e16_gradient_audit.py</a></td><td class="sym">imported as <code>E16</code> L26</td><td class="sym">judge_messages L222 · _llm L225 · parse_judgment L227 · POP_JSON L186</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_common.py">harness/e24_common.py</a></td><td class="sym">imported as <code>C</code> L27</td><td class="sym">GRAD_ROOT L31 · SPLIT_SPECS L89 · load_jsonl L147 · load_arena L145</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_eval.py">harness/e24_eval.py</a></td><td class="sym">reads its output, no import</td><td class="sym"><code>DUEL_JSON</code> L40, read L329</td></tr>
+<tr><td class="sym">command line</td><td class="sym"><code>uv run python experiments_verifiers/harness/e24_gradient_duel.py</code> L21</td><td class="sym">main L237</td></tr>
+<tr><td class="sym">tests/</td><td class="sym">no test found</td><td class="sym">grep of <code>tests/</code> for <code>e24</code> returns nothing</td></tr>
+<tr><td class="sym">importer of this file</td><td class="sym">no importer found</td><td class="sym">grep of the repo finds only this file and the clone pages</td></tr>
+</tbody>
+</table>
+<p>The experiment page is <a href="exp_e24_gradient_duel.html">exp_e24_gradient_duel.html</a>; the instrument it borrows is <a href="file_harness_e16_gradient_audit.html">file_harness_e16_gradient_audit.html</a>.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e24_gradient_duel.html">exp_e24_gradient_duel.html</a>, <a href="exp_index.html">exp_index.html</a>, <a href="file_harness_e16_gradient_audit.html">file_harness_e16_gradient_audit.html</a>, <a href="file_harness_e24_eval.html">file_harness_e24_eval.html</a>, <a href="file_index.html">file digest index</a></p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_gradient_duel.py</code> (379 lines, whole file); the output file <code class="path">results/E24_gradient_duel_2026-09-24.json</code> (keys <code>stats</code>, <code>population</code>, <code>calls</code>); one gradient file <code class="path">results/E24_bt_gradients/chemistry_iterative_v4_flash__clintox_multitask_nn_predictions_clintox_nn/20260917_224312_b62ea02c.txt</code> (header only); file count from <code class="path">results/E24_bt_gradients/**/*.txt</code>; the interface names of <code class="path">e16_gradient_audit.py</code> (<code>judge_messages</code>, <code>_llm</code>, <code>parse_judgment</code>, <code>gradient_text</code>, <code>POP_JSON</code>) by grep; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p class="skips">Skipped, with reason: <code>.env</code> and <code>experiments_verifiers/.env</code> (never opened; the call <code>E16._load_env()</code> L238 reads them, and its behaviour is left to the E16 page); the bodies of <code class="path">e16_gradient_audit.py</code> (a different file, cited by name and line only); the 148 gradient file bodies beyond one header; <code class="path">results/_e16_judge_cache.jsonl</code> and <code class="path">results/E16_*.json</code> (E16 evidence); the gold and eval files that the judge reads through E16. No judge call, no script and no pytest was run.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

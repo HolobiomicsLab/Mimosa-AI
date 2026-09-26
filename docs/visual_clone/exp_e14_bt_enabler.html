@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e14_bt_enabler - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e14_bt_enabler">
+<div class="wrap">
+
+<h1 class="hud">e14_bt_enabler &mdash; BT arena and tournament choice</h1>
+<p class="intro">E14 asked which frozen campaign groups can be re-judged by pairwise preference, and which pairing design is worth its call budget. It joined the run-notes manifest to the live snapshot folders, then simulated seven pairing designs over 360 cells. The pair plan it wrote is the input the <a href="exp_e15_bt_pilot.html">E15 pilot</a> executed and the <a href="exp_e15_bt_eval.html">E15 evaluation</a> scored.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 340" role="img" aria-label="e14_bt_enabler stages and artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="h">
+    <title>Hypothesis: a paid pairwise tournament can rank generations better than the recorded reward</title>
+    <rect x="30" y="20" width="165" height="54" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="112" y="44" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="112" y="60" text-anchor="middle">pairs can rank generations</text>
+  </g>
+
+  <a class="box" id="bLoad" href="../../experiments_verifiers/harness/e14_bt_enabler.py">
+    <title>load_population() joins manifest rows to snapshot dirs and builds the inventory</title>
+    <rect x="255" y="20" width="185" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="347" y="44" text-anchor="middle">load_population()</text>
+    <text class="box-sub" x="347" y="60" text-anchor="middle">join uuid, inventory</text>
+  </a>
+
+  <a class="box" id="bSim" href="../../experiments_verifiers/harness/e14_bt_enabler.py">
+    <title>run_simulator() runs 360 cells through simulate_group and calibrate_sr</title>
+    <rect x="500" y="20" width="190" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="595" y="44" text-anchor="middle">run_simulator()</text>
+    <text class="box-sub" x="595" y="60" text-anchor="middle">360 cells, 200 sims</text>
+  </a>
+
+  <a class="box" id="bCost" href="../../experiments_verifiers/harness/e14_bt_enabler.py">
+    <title>cost_projection() measures real prompt sizes and prices the plan</title>
+    <rect x="750" y="20" width="190" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="845" y="44" text-anchor="middle">cost_projection()</text>
+    <text class="box-sub" x="845" y="60" text-anchor="middle">tiktoken, live pricing</text>
+  </a>
+
+  <a class="box" id="iMan" href="../../experiments_verifiers/data/manifest_run_notes.json">
+    <title>data/manifest_run_notes.json - 1104 generation rows</title>
+    <rect x="30" y="120" width="165" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="144" text-anchor="middle">manifest_run_notes.json</text>
+    <text class="box-sub" x="112" y="160" text-anchor="middle">1104 rows, 207 groups</text>
+  </a>
+
+  <a class="box" id="iSnap" href="../../experiments_verifiers/workspace_artefacts/snapshots">
+    <title>workspace_artefacts/snapshots/ - 148 alive per-generation workspaces</title>
+    <rect x="30" y="190" width="165" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="214" text-anchor="middle">snapshots/</text>
+    <text class="box-sub" x="112" y="230" text-anchor="middle">148 alive workspaces</text>
+  </a>
+
+  <a class="box" id="iLab" href="../../experiments_verifiers/data/verifier_claims_sane.jsonl">
+    <title>data/verifier_claims_sane.jsonl labels, and datasets/ScienceAgentBench/gold_programs</title>
+    <rect x="30" y="260" width="165" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="284" text-anchor="middle">claims + gold</text>
+    <text class="box-sub" x="112" y="300" text-anchor="middle">SR labels, gold stems</text>
+  </a>
+
+  <a class="box" id="bRec" href="../../experiments_verifiers/harness/e14_bt_enabler.py">
+    <title>design_recommendation() picks the best design per group size</title>
+    <rect x="500" y="130" width="190" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="595" y="154" text-anchor="middle">design_recommendation()</text>
+    <text class="box-sub" x="595" y="170" text-anchor="middle">best design per n</text>
+  </a>
+
+  <a class="box" id="bPlan" href="../../experiments_verifiers/harness/e14_bt_enabler.py">
+    <title>build_plan() writes the per-group judging order and validate_plan() asserts it</title>
+    <rect x="750" y="130" width="190" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="845" y="154" text-anchor="middle">build_plan()</text>
+    <text class="box-sub" x="845" y="170" text-anchor="middle">19 groups, 667 pairs</text>
+  </a>
+
+  <a class="box" id="oMd" href="../../experiments_verifiers/results/E14_bt_enabler_2026-09-23.md">
+    <title>results/E14_bt_enabler_2026-09-23.json and .md - the numbers of record</title>
+    <rect x="500" y="250" width="200" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="600" y="274" text-anchor="middle">enabler JSON + MD</text>
+    <text class="box-sub" x="600" y="290" text-anchor="middle">numbers of record</text>
+  </a>
+
+  <a class="box" id="oPlan" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>results/E14_bt_population.json - the pair plan E15 reads</title>
+    <rect x="750" y="250" width="190" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="845" y="274" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="845" y="290" text-anchor="middle">plan that E15 reads</text>
+  </a>
+
+  <path class="edge" data-from="h" data-to="bLoad" d="M195,47 H255" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="40" text-anchor="middle">drives</text>
+  <path class="edge dashed-edge" data-from="iMan" data-to="bLoad" d="M195,147 L255,50" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="198" y="112" text-anchor="start">reads rows</text>
+  <path class="edge dashed-edge" data-from="iSnap" data-to="bLoad" d="M195,217 L255,58" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="198" y="184" text-anchor="start">lists files</text>
+  <path class="edge dashed-edge" data-from="iLab" data-to="bLoad" d="M195,287 L255,66" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="198" y="254" text-anchor="start">labels, gold</text>
+
+  <path class="edge" data-from="bLoad" data-to="bSim" d="M440,47 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="40" text-anchor="middle">reward pool</text>
+  <path class="edge" data-from="bLoad" data-to="bCost" d="M347,20 V12 H845 V20" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="596" y="10" text-anchor="middle">population</text>
+
+  <path class="edge" data-from="bSim" data-to="bRec" d="M595,74 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="106" text-anchor="start">cells</text>
+  <path class="edge" data-from="bRec" data-to="bPlan" d="M690,157 H750" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="150" text-anchor="middle">design picks</text>
+  <path class="edge dashed-edge" data-from="bRec" data-to="oMd" d="M520,184 V250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="530" y="221" text-anchor="start">recommended</text>
+  <path class="edge dashed-edge" data-from="bPlan" data-to="oPlan" d="M845,184 V250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="855" y="221" text-anchor="start">plan</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. Purple = hypothesis, mint pills = functions of the script, dashed grey = inputs on disk, cyan = written artifacts. <code>load_population()</code> feeds both <code>run_simulator()</code> and <code>cost_projection()</code>; the cells go to <code>design_recommendation()</code>, then <code>build_plan()</code>. Two stages are named in the card but not drawn, to hold the box count: <code>real_group_replay()</code> (line 715) and <code>validate_plan()</code> (line 1167).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e14_bt_enabler.py">experiments_verifiers/harness/e14_bt_enabler.py</a></h4>
+<p class="role">Maps BT-eligible groups from the manifest and live snapshots, simulates pairing designs, projects judging cost, writes the pair plan. Zero API calls.</p>
+<p class="meta">1 488 lines &#183; entry: <code>main()</code> (line 1192) &#183; no CLI arguments &#183; writes 3 files</p>
+<details><summary>stages, line numbers, entry point</summary><div class="dbody">
+<pre>load_population()            line 114   join_snap / inventory / gold_for nested
+check_reproduction(claims)   line 262   asserts the cycle-1 targets
+bt_fit(w_idx, l_idx, ...)    line 292   BT MMLE used by the simulator
+simulate_group(...)          line 349   one group draw per design
+calibrate_sr(...)            line 530   fits alpha, c to a target pair AUC
+run_simulator(reward_pool)   line 585   360 cells, 200 sims each
+real_group_replay(pop)       line 715   real SR + reward, rho 0.5 and 0.9
+fetch_pricing()              line 756   OpenRouter models endpoint, fallback dict
+build_prompt(goal, a, b)     line 913   the prompt E15 reuses
+mean_image_tokens(...)       line 937   image token estimate per PNG-bearing gen
+cost_projection(pop, ...)    line 956   per-call and per-group cost
+design_recommendation(cells) line 1009  best design per group size
+build_plan(...)              line 1032  the pair plan (19 groups, 667 pairs)
+validate_plan(plan)          line 1167  json round-trip + path existence
+main()                       line 1192  runs all five stages in order</pre>
+<p>Run command, from the module docstring (line 30): <code>uv run python experiments_verifiers/harness/e14_bt_enabler.py</code>. There is no argparse, so there are no CLI arguments; <code>main()</code> reads no <code>sys.argv</code>.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path (with code cite)</th></tr></thead>
+<tbody>
+<tr><td>1104 generation rows, 207 groups</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/data/manifest_run_notes.json</code> :: load_population, line 115</td></tr>
+<tr><td>148 alive per-generation workspaces</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/workspace_artefacts/snapshots/</code> :: inventory, line 141</td></tr>
+<tr><td>SR labels, 565 usable rows</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/data/verifier_claims_sane.jsonl</code> :: load_population, line 128</td></tr>
+<tr><td>Gold program stems, 102 files</td><td>&mdash;</td><td class="sym"><code class="path">datasets/ScienceAgentBench/gold_programs/</code> :: gold_for, line 134</td></tr>
+<tr><td>Live model prices (no key, public)</td><td>&mdash;</td><td class="sym"><code>OR_PRICING_URL</code> :: fetch_pricing, line 756</td></tr>
+<tr><td>&mdash;</td><td>Numbers of record, 90 521 lines</td><td class="sym"><code class="path">experiments_verifiers/results/E14_bt_enabler_2026-09-23.json</code> :: line 1352</td></tr>
+<tr><td>&mdash;</td><td>Human report, 110 lines</td><td class="sym"><code class="path">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md</code> :: line 1484</td></tr>
+<tr><td>&mdash;</td><td>Pair plan, 19 groups, 667 pairs</td><td class="sym"><code class="path">experiments_verifiers/results/E14_bt_population.json</code> :: line 1227</td></tr>
+</tbody>
+</table>
+<p class="note">The script uses <code>datetime.date.today()</code> for its output names (line 51). Re-running it on another day writes new <code>E14_bt_enabler_&lt;date&gt;</code> files; <code>E14_bt_population.json</code> keeps its fixed name and would be overwritten.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; P(best@1) per group size</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="P(best at rank 1) by group size">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <path class="edge" d="M56,250 H870" fill="none" stroke="#1B4B6B" stroke-width="1.25"/>
+  <path class="edge dashed-edge" d="M56,250.0 H870" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="253.0" text-anchor="end">0</text>
+  <path class="edge dashed-edge" d="M56,193.2 H870" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="196.2" text-anchor="end">0.25</text>
+  <path class="edge dashed-edge" d="M56,136.5 H870" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="139.5" text-anchor="end">0.5</text>
+  <path class="edge dashed-edge" d="M56,79.7 H870" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="82.7" text-anchor="end">0.75</text>
+  <rect x="70" y="74.1" width="60" height="175.9" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="100" y="68.1" text-anchor="middle">0.775</text>
+  <text class="box-sub" x="100" y="266" text-anchor="middle">n=2</text>
+  <rect x="150" y="90.0" width="60" height="160.0" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="180" y="84.0" text-anchor="middle">0.705</text>
+  <text class="box-sub" x="180" y="266" text-anchor="middle">n=3</text>
+  <rect x="230" y="103.6" width="60" height="146.4" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="260" y="97.6" text-anchor="middle">0.645</text>
+  <text class="box-sub" x="260" y="266" text-anchor="middle">n=4</text>
+  <rect x="310" y="99.0" width="60" height="151.0" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="340" y="93.0" text-anchor="middle">0.665</text>
+  <text class="box-sub" x="340" y="266" text-anchor="middle">n=5</text>
+  <rect x="390" y="124.0" width="60" height="126.0" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="420" y="118.0" text-anchor="middle">0.555</text>
+  <text class="box-sub" x="420" y="266" text-anchor="middle">n=6</text>
+  <rect x="470" y="132.0" width="60" height="118.0" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="500" y="126.0" text-anchor="middle">0.520</text>
+  <text class="box-sub" x="500" y="266" text-anchor="middle">n=8</text>
+  <rect x="550" y="120.6" width="60" height="129.4" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="580" y="114.6" text-anchor="middle">0.570</text>
+  <text class="box-sub" x="580" y="266" text-anchor="middle">n=10</text>
+  <rect x="630" y="133.1" width="60" height="116.9" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="660" y="127.1" text-anchor="middle">0.515</text>
+  <text class="box-sub" x="660" y="266" text-anchor="middle">n=12</text>
+  <rect x="710" y="144.4" width="60" height="105.6" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="740" y="138.4" text-anchor="middle">0.465</text>
+  <text class="box-sub" x="740" y="266" text-anchor="middle">n=14</text>
+  <rect x="790" y="142.2" width="60" height="107.8" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="820" y="136.2" text-anchor="middle">0.475</text>
+  <text class="box-sub" x="820" y="266" text-anchor="middle">n=16</text>
+  <text class="box-sub" x="56" y="284" text-anchor="start">group size n - recommended design per n, headline cell pi=0.75, b=0.1, rho=0.5</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the recommended design per group size, headline simulator cell (judge accuracy 0.75, order bias 0.1, latent-reward correlation 0.5). Every value is labeled in the chart. Bar labels are the group size; the recommended design is <code>elim_seed</code> at n=2, <code>swiss4</code> at n=6 and <code>rr2</code> everywhere else. The score falls as the group grows: 0.775 at n=2, 0.645 at n=4, 0.475 at n=16.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>BT-eligible groups (>=2 alive snapshots)</td><td class="size">19</td><td class="sym">E14_bt_enabler_2026-09-23.json line 26, <code>population.groups_eligible_ge2_alive</code></td></tr>
+<tr><td>Contrast groups, manifest SR view</td><td class="size">9</td><td class="sym">same file line 27, key <code>contrast_groups_manifest_sr</code></td></tr>
+<tr><td>Groups with no alive artifact</td><td class="size">188</td><td class="sym">same file line 23, key <code>groups_no_alive_artifacts</code></td></tr>
+<tr><td>P(best@1), n=4, rr2, 12 calls</td><td class="size">0.645</td><td class="sym">same file line 90443, <code>design_recommendations_by_n["4"].p1</code></td></tr>
+<tr><td>P(best@1), n=8, rr2, 56 calls</td><td class="size">0.52</td><td class="sym">same file line 90467, <code>design_recommendations_by_n["8"].p1</code></td></tr>
+<tr><td>P(best@1), n=16, rr2, 240 calls</td><td class="size">0.475</td><td class="sym">same file line 90499, <code>design_recommendations_by_n["16"].p1</code></td></tr>
+<tr><td>Median pair prompt</td><td class="size">9 721 tokens</td><td class="sym">same file line 90230, <code>cost_projection.median_prompt_tokens</code></td></tr>
+<tr><td>Projected cost, full rr2 on 19 groups</td><td class="size">$22.07</td><td class="sym">same file line 90395, <code>cost_projection.total_full_rr2_usd</code></td></tr>
+<tr><td>Simulated cells</td><td class="size">360 (+ strong cells)</td><td class="sym">same file lines 309-338, <code>simulator.grids</code></td></tr>
+<tr><td>Artifact files checked by the plan validator</td><td class="size">1 041</td><td class="sym">same file line 90509, <code>pair_plan_validation</code></td></tr>
+</tbody>
+</table>
+<p class="note say">The 0.52 at n=8 sits above the reward-argmax reference of 0.24 for the same cell (MD line 6). The E15 evaluation found the live pilot did not reproduce that gap; see <a href="exp_e15_bt_eval.html">exp_e15_bt_eval.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>8 quotes from E14_bt_enabler_2026-09-23.md and .json</summary><div class="dbody">
+<blockquote>**Population**: 207 (campaign,task) groups in manifest_run_notes; **19 BT-eligible** (&gt;=2 alive snapshot artifacts; chemistry_iterative_v4_flash + run_1 only), **9 contrast** (&gt;=1 SR-true AND &gt;=1 SR-false; 8 under claims-sane labels).</blockquote>
+<p class="sub">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md line 5</p>
+
+<blockquote>**Design recommendation**: full 2x-swapped round-robin (rr2) for every eligible group &mdash; n=4: rr2 @12c P(best@1)=0.65; n=8: rr2 @56c P(best@1)=0.52; n=16: rr2 @240c P(best@1)=0.47 (reward-argmax reference 0.24 at n=8); active uncertainty-greedy pairing (0.30) and Swiss r4 (0.39) TRAIL rr1/rr2 at equal budget, and rr2 across all 19 groups costs only ~1584 calls &asymp; $22 &mdash; no budget reason to economize at these group sizes</blockquote>
+<p class="sub">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md line 6</p>
+
+<blockquote>**Cost**: full 2x-swapped RR over all eligible groups = **$22.07** (~1584 calls); recommended budgets total **$22.07** (1585 calls).</blockquote>
+<p class="sub">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md line 7</p>
+
+<blockquote>Pair plan for E15: <code>experiments_verifiers/results/E14_bt_population.json</code> &mdash; validated (json round-trip; every referenced path exists; 1041 artifact files checked).</blockquote>
+<p class="sub">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md line 8</p>
+
+<blockquote>1104 generation rows / 207 groups; 202 with &gt;=2 generations; 188 groups have zero alive artifacts (ALL asb / chem_iter2 / oneshot snapshots are dead on disk).</blockquote>
+<p class="sub">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md line 12</p>
+
+<blockquote>| 4 | rr2 | 12 | 0.65 [0.58] | 0.65 | 0.591 |</blockquote>
+<p class="sub">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md line 50, columns: n | recommended | calls | P(best@1) [lo95] | best-in-cell | SR-sep</p>
+
+<blockquote>Measured pair prompts under the operator-approved preview policy (goal + both enriched inventories + prioritized previews, 16 KiB text cap/candidate): median **9721 tokens** over 6 real pairs (tiktoken cl100k_base).</blockquote>
+<p class="sub">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md line 89</p>
+
+<blockquote>"asb campaigns have NO alive snapshot artifacts (only chemistry_iterative_v4_flash + run_1 survive on disk): 19 of E10's 29 contrast tasks (the asb ones) are NOT BT-eligible; E15's contrast readout rests on 9 groups (8 under claims-sane-only labels)"</blockquote>
+<p class="sub">experiments_verifiers/results/E14_bt_enabler_2026-09-23.json line 90514, <code>gaps[0]</code></p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e14_bt_enabler.py</code> (1 488 lines), <code class="path">experiments_verifiers/results/E14_bt_enabler_2026-09-23.json</code>, <code class="path">experiments_verifiers/results/E14_bt_enabler_2026-09-23.md</code>, <code class="path">experiments_verifiers/results/E14_bt_population.json</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>, <code class="path">docs/visual_clone/_reference.html</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> (never opened, per instruction). <code class="path">experiments_verifiers/workspace_artefacts/snapshots/</code> contents and <code class="path">datasets/ScienceAgentBench/gold_programs/</code> contents were not read line by line - only their paths and counts appear here, all taken from the results JSON. <code class="path">experiments_verifiers/REPORT_*.html</code> and <code class="path">experiments_verifiers/PREV_VERIFIER_ARCHITECTURE.md</code> were not read; they cover other experiments. The E14 simulator grid cells themselves (90 000+ JSON lines) and the 19 per-group entries of <code class="path">E14_bt_population.json</code> were read only at the keys cited above, not in full.</p>
+<p>Volatility: experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

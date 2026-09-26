@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E19c seven-channel gradient duel - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e19c_gradient_duel">
+<div class="wrap">
+
+<h1 class="hud">E19c RATCHET &mdash; seven-channel gradient duel</h1>
+<p class="intro">Does the ladder's elimination-point-first gradient give better feedback than the six earlier feedback channels? <code>e19c_gradient_duel.py</code> judges every E19c gradient with the E16v2 instrument, side by side with the cached gradients of E19b, E19, E18, E15, E24 and the recorded verifier. It writes one JSON and one markdown with the paired deltas.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis to artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="gradient duel join, judging and outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="h5">
+    <title>Hypothesis: elimination-point-first feedback reads as more relevant</title>
+    <rect x="10" y="180" width="150" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="85" y="206" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="85" y="224" text-anchor="middle">feedback better?</text>
+    <text class="box-sub" x="85" y="238" text-anchor="middle">same judge prompt</text>
+  </g>
+
+  <a class="box" id="x1" href="../../experiments_verifiers/results/E19c_bt_gradients">
+    <title>E19c gradient texts, 148 files, label-free transcripts</title>
+    <rect x="205" y="50" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="300" y="76" text-anchor="middle">E19c_bt_gradients/</text>
+    <text class="box-sub" x="300" y="92" text-anchor="middle">148 gradient texts</text>
+  </a>
+
+  <a class="box" id="x2" href="../../experiments_verifiers/harness/e16_gradient_audit.py">
+    <title>E16 population JSON plus the shared judge cache</title>
+    <rect x="205" y="310" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="300" y="336" text-anchor="middle">E16 population, cache</text>
+    <text class="box-sub" x="300" y="352" text-anchor="middle">gold rows, cached calls</text>
+  </a>
+
+  <a class="box" id="y1" href="../../experiments_verifiers/harness/e19c_gradient_duel.py">
+    <title>build_join pairs every E19c gradient with its six siblings (line 42)</title>
+    <rect x="460" y="10" width="185" height="52" rx="14" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="552" y="32" text-anchor="middle">build_join()</text>
+    <text class="box-sub" x="552" y="48" text-anchor="middle">7 texts per uuid</text>
+  </a>
+
+  <a class="box" id="y2" href="../../experiments_verifiers/harness/e19c_gradient_duel.py">
+    <title>judge_with_text swaps only the gradient text in the E16 prompt (line 79)</title>
+    <rect x="460" y="92" width="185" height="52" rx="14" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="552" y="114" text-anchor="middle">judge_with_text()</text>
+    <text class="box-sub" x="552" y="130" text-anchor="middle">6 sides, 1 new</text>
+  </a>
+
+  <a class="box" id="y3" href="../../experiments_verifiers/harness/e16_gradient_audit.py">
+    <title>E16.parse_judgment reads the two-axis verdict (e19c_gradient_duel line 86)</title>
+    <rect x="460" y="174" width="185" height="52" rx="14" fill="rgba(60,240,210,0.10)" stroke="#3CF0D2"/>
+    <text class="box-label" x="552" y="196" text-anchor="middle">parse_judgment()</text>
+    <text class="box-sub" x="552" y="212" text-anchor="middle">relevance, flags</text>
+  </a>
+
+  <a class="box" id="y4" href="../../experiments_verifiers/harness/e19c_gradient_duel.py">
+    <title>paired bootstraps the delta over task groups, 999 draws (line 121)</title>
+    <rect x="460" y="256" width="185" height="52" rx="14" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="552" y="278" text-anchor="middle">paired()</text>
+    <text class="box-sub" x="552" y="294" text-anchor="middle">x minus y, CI95</text>
+  </a>
+
+  <a class="box" id="y5" href="../../experiments_verifiers/harness/e19c_gradient_duel.py">
+    <title>_write_md renders the side table and the paired deltas (line 202)</title>
+    <rect x="460" y="338" width="185" height="52" rx="14" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="552" y="360" text-anchor="middle">_write_md()</text>
+    <text class="box-sub" x="552" y="376" text-anchor="middle">side table, deltas</text>
+  </a>
+
+  <a class="box" id="z1" href="../../experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json">
+    <title>Every judged row plus the aggregate statistics</title>
+    <rect x="700" y="50" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="76" text-anchor="middle">E19c_gradient_duel.json</text>
+    <text class="box-sub" x="795" y="92" text-anchor="middle">123 rows, 798 KB</text>
+  </a>
+
+  <a class="box" id="z2" href="../../experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md">
+    <title>Written report with the seven sides and paired deltas</title>
+    <rect x="700" y="180" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="206" text-anchor="middle">E19c_gradient_duel.md</text>
+    <text class="box-sub" x="795" y="222" text-anchor="middle">7 sides, 6 comparisons</text>
+  </a>
+
+  <a class="box" id="z3" href="../../experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json">
+    <title>Call ledger: 123 new judge calls, the other 738 cells are cache hits</title>
+    <rect x="700" y="310" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="336" text-anchor="middle">calls block</text>
+    <text class="box-sub" x="795" y="352" text-anchor="middle">123 new, others cached</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="h5" data-to="x1" d="M160,200 L205,78" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="h5" data-to="x2" d="M160,232 L205,338" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="172" y="150" text-anchor="start">reads</text>
+
+  <path class="edge" data-from="x1" data-to="y1" d="M395,78 L460,38" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="x2" data-to="y1" d="M395,338 L460,46" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="428" y="180" text-anchor="middle">joins by uuid</text>
+
+  <path class="edge" data-from="y1" data-to="y2" d="M552,62 V92" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="82" text-anchor="start">7 texts</text>
+  <path class="edge" data-from="y2" data-to="y3" d="M552,144 V174" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="164" text-anchor="start">judge text</text>
+  <path class="edge" data-from="y3" data-to="y4" d="M552,226 V256" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="246" text-anchor="start">verdicts</text>
+  <path class="edge" data-from="y4" data-to="y5" d="M552,308 V338" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="328" text-anchor="start">stats</text>
+
+  <path class="edge" data-from="y5" data-to="z1" d="M645,360 L700,78" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="y5" data-to="z2" d="M645,368 L700,208" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="y5" data-to="z3" d="M645,376 L700,338" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="672" y="440" text-anchor="middle">writes</text>
+</svg>
+</div>
+<p class="figcap">11 boxes. Cyan = a function of <a href="../../experiments_verifiers/harness/e19c_gradient_duel.py">experiments_verifiers/harness/e19c_gradient_duel.py</a>, teal = the instrument <a href="../../experiments_verifiers/harness/e16_gradient_audit.py">harness/e16_gradient_audit.py</a>, steel = data. Gold enters only as a judge input; the E19c gradients themselves are label-free transcripts (script docstring L11&ndash;12, results MD L3).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card steel">
+<h4><a href="../../experiments_verifiers/harness/e19c_gradient_duel.py">experiments_verifiers/harness/e19c_gradient_duel.py</a></h4>
+<p class="role">Joins each E19c gradient with six sibling gradients, judges all seven with one prompt, and bootstraps the paired deltas.</p>
+<p class="meta">246 lines (<code>wc -l</code>) &#183; entry: <code>main()</code> L95, guard L245 &#183; CLI arguments: none found (no <code>argparse</code> import) &#183; cap <code>CAP_USD = 2.0</code> L37</p>
+<details><summary>signatures, sides, judge model</summary><div class="dbody">
+<pre>build_join() -&gt; tuple                    # L42, (campaign, task, uuid8) key
+judge_with_text(item, grad_text, role)   # L79
+main()                                   # L95
+one(k)                                   # L102, 6 judged sides + cached ver
+paired(side_x, side_y, field, boot=999, seed=0)   # L121
+_write_md(out)                           # L202</pre>
+<p>Sides: <code>SIDES = ("e19c", "e19b", "e19", "e18", "e15", "e24", "ver")</code> (L39). Judge model comes from the instrument, <code>openrouter/deepseek/deepseek-v4.1-flash</code> (results JSON L4). Axes compared: <code>gold_relevance</code>, <code>alignment_signed</code>, <code>hallucination_flag</code> (L150). The script prints the drops counter when the join misses (L98).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What</th><th>Detail</th><th>Path and code cite</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td>E19c gradient texts</td><td class="sym">results/E19c_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt &#183; L30, L53</td></tr>
+<tr><td>reads</td><td>six sibling gradient trees</td><td class="sym">E19b_bt_gradients_v2, E19, E18, E15, E24 &#183; L30&ndash;34</td></tr>
+<tr><td>reads</td><td>E16 population and judge cache</td><td class="sym">harness/e16_gradient_audit.py &#183; L26, L44</td></tr>
+<tr><td>calls</td><td>judge model, one prompt, 123 new calls</td><td class="sym"><code>E16._llm</code> L84 &#183; json L18571</td></tr>
+<tr><td>writes</td><td>per-row judge results and stats</td><td class="sym">results/E19c_gradient_duel_2026-09-25.json &#183; L35, L192</td></tr>
+<tr><td>writes</td><td>seven-side report</td><td class="sym">results/E19c_gradient_duel_2026-09-25.md &#183; L36, L242</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; mean gold relevance per channel</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 842 320" role="img" aria-label="bar chart of measured values">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <line x1="64" y1="250.0" x2="804" y2="250.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="254.0" text-anchor="end">0</text>
+  <line x1="64" y1="197.5" x2="804" y2="197.5" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="201.5" text-anchor="end">0.2</text>
+  <line x1="64" y1="145.0" x2="804" y2="145.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="149.0" text-anchor="end">0.4</text>
+  <line x1="64" y1="92.5" x2="804" y2="92.5" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="96.5" text-anchor="end">0.6</text>
+  <line x1="64" y1="40.0" x2="804" y2="40.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="44.0" text-anchor="end">0.8</text>
+  <rect x="80" y="104.8" width="64" height="145.2" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+  <text class="box-label" x="112" y="97.8" text-anchor="middle">0.553</text>
+  <text class="box-sub" x="112" y="267" text-anchor="middle">e19c</text>
+  <rect x="188" y="73.6" width="64" height="176.4" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="220" y="66.6" text-anchor="middle">0.672</text>
+  <text class="box-sub" x="220" y="267" text-anchor="middle">e19b</text>
+  <rect x="296" y="85.4" width="64" height="164.6" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="328" y="78.4" text-anchor="middle">0.627</text>
+  <text class="box-sub" x="328" y="267" text-anchor="middle">e19</text>
+  <rect x="404" y="111.9" width="64" height="138.1" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="436" y="104.9" text-anchor="middle">0.526</text>
+  <text class="box-sub" x="436" y="267" text-anchor="middle">e18</text>
+  <rect x="512" y="141.1" width="64" height="108.9" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="544" y="134.1" text-anchor="middle">0.415</text>
+  <text class="box-sub" x="544" y="267" text-anchor="middle">e15</text>
+  <rect x="620" y="171.8" width="64" height="78.2" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="652" y="164.8" text-anchor="middle">0.298</text>
+  <text class="box-sub" x="652" y="267" text-anchor="middle">e24</text>
+  <rect x="728" y="100.9" width="64" height="149.1" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="760" y="93.9" text-anchor="middle">0.568</text>
+  <text class="box-sub" x="760" y="267" text-anchor="middle">ver</text>
+  <text class="edge-label" x="421" y="292" text-anchor="middle">123 paired generations</text>
+</svg>
+</div>
+<p class="figcap">Chart &mdash; mean gold relevance judged by the E16v2 instrument over 123 paired generations. Cyan = the E19c production ladder gradient, grey = a comparison channel. Values from <code class="path">results/E19c_gradient_duel_2026-09-25.json</code> L377&ndash;420 and <code class="path">results/E19c_gradient_duel_2026-09-25.md</code> L7&ndash;15.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file and line</th></tr></thead>
+<tbody>
+<tr><td>population</td><td>123 generations, 19 groups</td><td class="sym">_duel.json L8&ndash;10</td></tr>
+<tr><td>dropped for missing join</td><td>25</td><td class="sym">_duel.json L11</td></tr>
+<tr><td>e19c relevance</td><td>0.553</td><td class="sym">_duel.json L377</td></tr>
+<tr><td>e19c hallucination rate</td><td>0.561</td><td class="sym">_duel.json L378</td></tr>
+<tr><td>e19b relevance</td><td>0.672</td><td class="sym">_duel.json L384</td></tr>
+<tr><td>e19 relevance</td><td>0.627</td><td class="sym">_duel.json L391</td></tr>
+<tr><td>delta e19c minus e19b, relevance</td><td>-0.119 [-0.223, -0.014]</td><td class="sym">_duel.md L21</td></tr>
+<tr><td>delta e19c minus e19, hallucination</td><td>+0.309 [+0.111, +0.500]</td><td class="sym">_duel.md L26</td></tr>
+<tr><td>delta e19c minus e24, relevance</td><td>+0.255 [+0.157, +0.358]</td><td class="sym">_duel.md L33</td></tr>
+<tr><td>new judge calls</td><td>123 new; six other sides cached</td><td class="sym">_duel.json L18570&ndash;18577</td></tr>
+<tr><td>new-call cost</td><td>0.3084 USD of 2.00 USD</td><td class="sym">_duel.json L18578&ndash;18579</td></tr>
+</tbody>
+</table>
+<p class="sub">My computation: 123 rows x 6 cache-served sides = 738 of the 861 judged cells need no new call; the JSON calls block lists 0 new calls on all six comparison sides.</p>
+<p class="note flag">Red: on gold relevance the E19c ladder gradient (-0.119, CI excludes 0) scores below E19b and its hallucination rate is second highest of the seven channels (0.561, behind ver at 0.585). The one clear win is against E24 (relevance +0.255, hallucination +0.455).</p>
+<p class="note">Amber: 25 E19c gradients were dropped because the E16 population has no matching (campaign, task, uuid8) row, so the duel covers 123 of the 148 written gradients (json L11).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim excerpt</h2>
+<details><summary>the seven-side table and the two headline deltas</summary><div class="dbody">
+<p>Path: <code class="path">experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md</code> L3, L7&ndash;15 and L21&ndash;26.</p>
+<blockquote>All numbers `my computation`; E16 v2 instrument, identical judge prompt for all seven gradient types (only the gradient text differs); n=123 paired generations.<br>
+| e19c | 0.553 | 0.561 | {'away': 25, 'toward': 74, 'unsure': 24} |<br>
+| e19b | 0.672 | 0.415 | {'away': 19, 'unsure': 15, 'toward': 89} |<br>
+| e19  | 0.627 | 0.252 | {'toward': 81, 'unsure': 18, 'away': 24} |<br>
+| ver  | 0.568 | 0.585 | {'toward': 72, 'away': 37, 'unsure': 14} |<br>
+| e19c &minus; e19b | gold_relevance | -0.119 | [-0.223,-0.014] | 123 | 32/76/15 |<br>
+| e19c &minus; e19 | hallucination_flag | +0.309 | [+0.111,+0.500] | 123 | 45/7/71 |<br>
+Cost: $0.3084 new calls (all six non-e19c sides are cache hits from the v1/v2/E24 duels).</blockquote>
+<p>Four of the seven side rows and two of the eighteen paired-delta rows are quoted. The elisions drop whole lines only, table padding is normalised, and no value is altered. The file is read-only evidence.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19c_gradient_duel.py</code> (all 246 lines), <code class="path">experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md</code> (all 53 lines), <code class="path">experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json</code> (population, stats and calls blocks), <code class="path">experiments_verifiers/results/E19c_ratchet_2026-09-25.md</code> (duel summary table L128&ndash;146), <code class="path">experiments_verifiers/harness/e16_gradient_audit.py</code> (function names only), <code class="path">experiments_verifiers/README.md</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">results/E19c_bt_gradients/**</code> (148 texts &mdash; read as a directory listing, not quoted); the 123 judge rows inside the duel JSON <code>pairs</code> array (L422&ndash;18569, 798 KB &mdash; aggregate stats quoted instead); <code class="path">results/_e16_judge_cache.jsonl</code> (source of the cache hits, not opened); <code class="path">experiments_verifiers/.env</code> (never opened, by rule); <code class="path">datasets/ScienceAgentBench/**</code> (gold program files are not read here; the instrument holds the gold text it needs); the script was not run, by rule.</p>
+<p class="skips">experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

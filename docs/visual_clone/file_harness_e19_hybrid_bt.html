@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19_hybrid_bt.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; experiments_verifiers/harness &gt; e19_hybrid_bt.py">
+<div class="wrap">
+
+<h1 class="hud">e19_hybrid_bt.py</h1>
+<p class="intro">The E19 driver: it extracts 3&#8211;7 key claims per task group, writes one deterministic scoring script per claim, executes that script on every candidate workspace, and drops claims that vary nowhere. It has seven subcommands and a hard cost cap, and it owns the four E19 ledgers. Run with <code>uv run python experiments_verifiers/harness/e19_hybrid_bt.py status|pilot|extract|score|run|det|verify</code>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 400" role="img" aria-label="e19_hybrid_bt stages: cli, env and cost, llm calls, phase A, phase B build, execute, ledgers, variance filter, pilot gate">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="b1" href="#panel-logic">
+    <title>argparse with seven subcommands and a dispatch table</title>
+    <rect x="20" y="25" width="210" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="125" y="47" text-anchor="middle">main + argparse</text>
+    <text class="box-sub" x="125" y="62" text-anchor="middle">L1024 &#183; 7 subcommands</text>
+    <text class="box-sub" x="125" y="76" text-anchor="middle">dispatch dict L1035</text>
+  </a>
+
+  <a class="box" id="b2" href="#panel-reads">
+    <title>Environment load and the spend counter restored from the cost ledger</title>
+    <rect x="260" y="25" width="210" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="365" y="47" text-anchor="middle">env + spend</text>
+    <text class="box-sub" x="365" y="62" text-anchor="middle">_load_env L158 &#183; load_spent L171</text>
+    <text class="box-sub" x="365" y="76" text-anchor="middle">SPENT set in main L1033</text>
+  </a>
+
+  <a class="box" id="b3" href="#panel-logic">
+    <title>One litellm call with a watchdog, six attempts, a cost ledger row and the hard cap</title>
+    <rect x="500" y="25" width="210" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="605" y="47" text-anchor="middle">_call_llm</text>
+    <text class="box-sub" x="605" y="62" text-anchor="middle">L200 &#183; watchdog L185</text>
+    <text class="box-sub" x="605" y="76" text-anchor="middle">cap check L209 &#183; ledger L233</text>
+  </a>
+
+  <a class="box" id="b4" href="#panel-symbols">
+    <title>Builds the Phase A prompt: richest workspace, union inventory, deliverable previews</title>
+    <rect x="740" y="25" width="220" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="850" y="47" text-anchor="middle">Phase A inputs</text>
+    <text class="box-sub" x="850" y="62" text-anchor="middle">most_complete_workspace L299</text>
+    <text class="box-sub" x="850" y="76" text-anchor="middle">union_inventory L316 &#183; previews L339</text>
+  </a>
+
+  <a class="box" id="b5" href="#panel-logic">
+    <title>Phase A: one call per group, validated to 3-7 claims, written to the claims ledger</title>
+    <rect x="20" y="145" width="210" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="125" y="167" text-anchor="middle">run_extract</text>
+    <text class="box-sub" x="125" y="182" text-anchor="middle">L470 &#183; valid_claims L443</text>
+    <text class="box-sub" x="125" y="196" text-anchor="middle">2 attempts max</text>
+  </a>
+
+  <a class="box" id="b6" href="#panel-logic">
+    <title>Phase B: one call per claim writes a scoring script; failures go to a repair prompt</title>
+    <rect x="260" y="145" width="210" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="365" y="167" text-anchor="middle">run_claim_scorer</text>
+    <text class="box-sub" x="365" y="182" text-anchor="middle">L632 &#183; repair L574</text>
+    <text class="box-sub" x="365" y="196" text-anchor="middle">3 attempts, best kept L686</text>
+  </a>
+
+  <a class="box" id="b7" href="#panel-logic">
+    <title>Executes a scorer in a fresh temp cwd with a stripped environment and a 60 s limit</title>
+    <rect x="500" y="145" width="210" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="605" y="167" text-anchor="middle">execute_scorer</text>
+    <text class="box-sub" x="605" y="182" text-anchor="middle">L607 &#183; subprocess L616</text>
+    <text class="box-sub" x="605" y="196" text-anchor="middle">parse_scorer_output L583</text>
+  </a>
+
+  <a class="box" id="b8" href="#panel-reads">
+    <title>Four resumable JSONL ledgers plus the done-key sets that make every phase restartable</title>
+    <rect x="740" y="145" width="220" height="62" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="850" y="167" text-anchor="middle">ledgers</text>
+    <text class="box-sub" x="850" y="182" text-anchor="middle">append_line L261 &#183; done sets L272</text>
+    <text class="box-sub" x="850" y="196" text-anchor="middle">fill_missing_scores L729</text>
+  </a>
+
+  <a class="box" id="b9" href="#panel-logic">
+    <title>Drops claims with no observation or zero variance across the group</title>
+    <rect x="20" y="265" width="210" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="125" y="287" text-anchor="middle">variance filter</text>
+    <text class="box-sub" x="125" y="302" text-anchor="middle">claim_stats L284</text>
+    <text class="box-sub" x="125" y="316" text-anchor="middle">surviving_claims L825</text>
+  </a>
+
+  <a class="box" id="b10" href="#panel-logic">
+    <title>Five pilot gates, the determinism re-runs and the status print</title>
+    <rect x="260" y="265" width="450" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="485" y="287" text-anchor="middle">gates and checks</text>
+    <text class="box-sub" x="485" y="302" text-anchor="middle">eval_pilot_gate L846 (all_pass L886) &#183; cmd_det L943</text>
+    <text class="box-sub" x="485" y="316" text-anchor="middle">cmd_status L996 &#183; cmd_verify L1017</text>
+  </a>
+
+  <a class="box" id="b11" href="#panel-logic">
+    <title>Every command ends on the snapshot guard assertion</title>
+    <rect x="740" y="265" width="220" height="62" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="850" y="287" text-anchor="middle">snapshot guard</text>
+    <text class="box-sub" x="850" y="302" text-anchor="middle">baseline L898 &#183; verify L902</text>
+    <text class="box-sub" x="850" y="316" text-anchor="middle">assert at L903, L919, L935, L992, L1021</text>
+  </a>
+
+  <path class="edge" data-from="b1" data-to="b2" d="M230,56 H260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="245" y="48" text-anchor="middle">starts run</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M470,56 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="485" y="48" text-anchor="middle">spent total</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M850,87 V120 H125 V145" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="112" text-anchor="middle">goal + inventory</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M230,176 H260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="245" y="168" text-anchor="middle">claim JSON</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M470,176 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="485" y="168" text-anchor="middle">code string</text>
+  <path class="edge" data-from="b7" data-to="b8" d="M710,176 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="725" y="168" text-anchor="middle">score rows</text>
+  <path class="edge dotted-edge" data-from="b3" data-to="b6" d="M605,87 V120 H400 V145" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="134" text-anchor="middle">one call per claim</text>
+
+  <path class="edge" data-from="b8" data-to="b9" d="M850,207 V235 H125 V265" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="480" y="230" text-anchor="middle">score ledgers</text>
+  <path class="edge" data-from="b9" data-to="b10" d="M230,296 H260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="245" y="288" text-anchor="middle">surviving claims</text>
+  <path class="edge" data-from="b10" data-to="b11" d="M710,296 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="725" y="288" text-anchor="middle">then assert</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 11 boxes: the control lane (main, env, LLM calls), the Phase A inputs and the two generation phases, the ledgers, then the filters, gates and the guard. Phase C and Phase D live in <a href="file_harness_e19_bt_eval.html">e19_bt_eval.py</a>; the gradient duel lives in <a href="file_harness_e19_gradient_duel.html">e19_gradient_duel.py</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in and out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 360" role="img" aria-label="Files and ledgers read and written by e19_hybrid_bt">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1" href="#panel-reads">
+    <title>Pair plan and the per-task goals</title>
+    <rect x="20" y="20" width="250" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="40" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="145" y="56" text-anchor="middle">E18.load_plan L893 &#183; goals L894</text>
+    <text class="box-sub" x="145" y="71" text-anchor="middle">E18.enrich_inventories L893</text>
+  </a>
+
+  <a class="box" id="d2" href="#panel-reads">
+    <title>Candidate snapshot trees, opened read-only</title>
+    <rect x="20" y="98" width="250" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="118" text-anchor="middle">snapshot_path per generation</text>
+    <text class="box-sub" x="145" y="134" text-anchor="middle">REPO / x["snapshot_path"] L635</text>
+    <text class="box-sub" x="145" y="149" text-anchor="middle">also L742 and L971</text>
+  </a>
+
+  <a class="box" id="d3" href="#panel-reads">
+    <title>Resume: the ledgers are read back to know what is already done</title>
+    <rect x="20" y="176" width="250" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="196" text-anchor="middle">E19_claims / scorers / scores</text>
+    <text class="box-sub" x="145" y="212" text-anchor="middle">_e19_determinism &#183; cost ledger</text>
+    <text class="box-sub" x="145" y="227" text-anchor="middle">load_jsonl L266 &#183; done sets L272&#8211;281</text>
+    <text class="box-sub" x="145" y="242" text-anchor="middle">load_spent L171</text>
+  </a>
+
+  <a class="box" id="d4" href="#panel-reads">
+    <title>Constants instead of Config fields; the API key comes from the environment</title>
+    <rect x="20" y="268" width="250" height="76" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="288" text-anchor="middle">no config field read</text>
+    <text class="box-sub" x="145" y="304" text-anchor="middle">MODEL_TEXT L79 &#183; HARD_CAP_USD 15.0 L86</text>
+    <text class="box-sub" x="145" y="319" text-anchor="middle">SUBPROC_TIMEOUT 60 L85 &#183; N_GROUPS 19 L88</text>
+    <text class="box-sub" x="145" y="334" text-anchor="middle">_load_env L158 reads the key environment</text>
+  </a>
+
+  <a class="box" id="d5" href="#panel-symbols">
+    <title>Seven subcommands, one dispatch table</title>
+    <rect x="370" y="150" width="200" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470" y="172" text-anchor="middle">main()</text>
+    <text class="box-sub" x="470" y="188" text-anchor="middle">L1024 &#183; returns nothing</text>
+  </a>
+
+  <a class="box" id="d6" href="#panel-reads">
+    <title>One append-only JSONL line per claim set, scorer, score cell and determinism check</title>
+    <rect x="660" y="20" width="300" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="810" y="40" text-anchor="middle">E19_claims / E19_scorers</text>
+    <text class="box-sub" x="810" y="56" text-anchor="middle">E19_scores / _e19_determinism (.jsonl)</text>
+    <text class="box-sub" x="810" y="71" text-anchor="middle">appends L310, L701, L704, L745, L982</text>
+    <text class="box-sub" x="810" y="86" text-anchor="middle">19 / 114 / 870 / 6 lines</text>
+  </a>
+
+  <a class="box" id="d7" href="#panel-reads">
+    <title>Cost ledger: one row per LLM call, summed by load_spent</title>
+    <rect x="660" y="112" width="300" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="810" y="132" text-anchor="middle">E19_bt_cost_ledger_2026-09-23.jsonl</text>
+    <text class="box-sub" x="810" y="148" text-anchor="middle">append L233&#8211;235 &#183; 188 lines on disk</text>
+  </a>
+
+  <a class="box" id="d8" href="#panel-reads">
+    <title>Pilot gate record with the five booleans and the per-group table</title>
+    <rect x="660" y="190" width="300" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="810" y="210" text-anchor="middle">_e19_pilot_2026-09-23.json</text>
+    <text class="box-sub" x="810" y="226" text-anchor="middle">written L906 (not rewritten elsewhere)</text>
+  </a>
+
+  <a class="box" id="d9" href="#panel-reads">
+    <title>Temp directories per execution and per command, removed in finally blocks</title>
+    <rect x="660" y="268" width="300" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="810" y="288" text-anchor="middle">tempdirs</text>
+    <text class="box-sub" x="810" y="304" text-anchor="middle">score_claim.py written L611</text>
+    <text class="box-sub" x="810" y="319" text-anchor="middle">e19_pilot_ L901 &#183; e19_exec_ L926 &#183; e19_det_ L962</text>
+    <text class="box-sub" x="810" y="334" text-anchor="middle">removed L627, L933, L990</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d5" d="M270,51 H330 V170 H370" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="290" y="86" text-anchor="start">reads L893</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d5" d="M270,129 H370" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="151" text-anchor="start">reads</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="d5" d="M270,214 H330 V190 H370" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="290" y="228" text-anchor="start">resume</text>
+  <path class="edge" data-from="d4" data-to="d5" d="M270,306 H310 V200 H370" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="290" y="316" text-anchor="start">constants</text>
+  <path class="edge dashed-edge" data-from="d5" data-to="d6" d="M570,150 H620 V58 H660" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="600" y="104" text-anchor="start">appends</text>
+  <path class="edge dashed-edge" data-from="d5" data-to="d7" d="M570,155 H660" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="620" y="148" text-anchor="middle">appends</text>
+  <path class="edge dashed-edge" data-from="d5" data-to="d8" d="M570,170 H620 V220 H660" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="600" y="238" text-anchor="start">writes</text>
+  <path class="edge dashed-edge" data-from="d5" data-to="d9" d="M470,210 V306 H660" fill="none" stroke="#4D9FFF" stroke-width="1.2" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="510" y="300" text-anchor="start">temp cwd</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; 9 boxes. On-disk line counts read with <code>wc -l</code>: <code>E19_claims</code> 19, <code>E19_scorers</code> 114, <code>E19_scores</code> 870, <code>_e19_determinism</code> 6, cost ledger 188. Every ledger is append-only, so a re-run skips finished work through the done sets (L272&#8211;281).</p>
+</div>
+
+<div class="panel" id="panel-logic"><span class="br"></span>
+<h2>Diagram 3 &mdash; retry loops and decision rules</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 400" role="img" aria-label="Retry and stop rules in e19_hybrid_bt">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="r1" href="#panel-logic">
+    <title>Before every call: is the spend at the hard cap?</title>
+    <rect x="20" y="20" width="290" height="58" rx="12" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="165" y="42" text-anchor="middle">SPENT usd &gt;= 15.0?</text>
+    <text class="box-sub" x="165" y="60" text-anchor="middle">yes &#8594; StopRun, exit code 2 (L212, L1040)</text>
+  </a>
+
+  <a class="box" id="r2" href="#panel-logic">
+    <title>Empty or truncated answer: retry with double max_tokens, twice</title>
+    <rect x="20" y="98" width="290" height="58" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="165" y="120" text-anchor="middle">empty content or finish length?</text>
+    <text class="box-sub" x="165" y="138" text-anchor="middle">attempt &lt; 2 &#8594; max_tokens x2 (L239&#8211;242)</text>
+  </a>
+
+  <a class="box" id="r3" href="#panel-logic">
+    <title>Any transport or model error: sleep and retry, up to six attempts</title>
+    <rect x="20" y="176" width="290" height="58" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="165" y="198" text-anchor="middle">for attempt in range(6)</text>
+    <text class="box-sub" x="165" y="216" text-anchor="middle">sleep min(45, 3 * 2^attempt) (L254)</text>
+  </a>
+
+  <a class="box" id="r4" href="#panel-logic">
+    <title>Claim JSON contract: 3-7 claims, unique ids, three required text fields</title>
+    <rect x="20" y="254" width="290" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="165" y="276" text-anchor="middle">valid_claims returns an error?</text>
+    <text class="box-sub" x="165" y="294" text-anchor="middle">yes &#8594; one repair call (L478&#8211;484)</text>
+  </a>
+
+  <a class="box" id="r5" href="#panel-logic">
+    <title>Scorer code must come from a fenced block</title>
+    <rect x="360" y="20" width="290" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="505" y="42" text-anchor="middle">parse_code found code?</text>
+    <text class="box-sub" x="505" y="60" text-anchor="middle">no &#8594; repair prompt (L661&#8211;665)</text>
+  </a>
+
+  <a class="box" id="r6" href="#panel-logic">
+    <title>Static screen: the E18 list plus this file's write-API bans</title>
+    <rect x="360" y="98" width="290" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="505" y="120" text-anchor="middle">static_violations_scorer empty?</text>
+    <text class="box-sub" x="505" y="138" text-anchor="middle">no &#8594; repair with the list (L666&#8211;672)</text>
+  </a>
+
+  <a class="box" id="r7" href="#panel-logic">
+    <title>A scorer is accepted when it parses on every workspace of the group</title>
+    <rect x="360" y="176" width="290" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="505" y="198" text-anchor="middle">n_ok == workspaces?</text>
+    <text class="box-sub" x="505" y="216" text-anchor="middle">yes &#8594; break (L689&#8211;690)</text>
+  </a>
+
+  <a class="box" id="r8" href="#panel-logic">
+    <title>Claim survival: no observation or zero variance means dropped</title>
+    <rect x="360" y="254" width="290" height="58" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="505" y="276" text-anchor="middle">observed and variance &gt; 0?</text>
+    <text class="box-sub" x="505" y="294" text-anchor="middle">no &#8594; all_fail / zero_variance (L287&#8211;293)</text>
+  </a>
+
+  <a class="box" id="r9" href="#panel-logic">
+    <title>Pilot gates must all hold before the full run is allowed</title>
+    <rect x="700" y="176" width="260" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="830" y="198" text-anchor="middle">all five gates pass?</text>
+    <text class="box-sub" x="830" y="216" text-anchor="middle">3-7 claims, 2+ kept, 0.80 ok,</text>
+  </a>
+
+  <a class="box" id="r10" href="#panel-logic">
+    <title>No snapshot mutation is tolerated: the guard asserts after each command</title>
+    <rect x="700" y="254" width="260" height="58" rx="12" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="830" y="276" text-anchor="middle">mutated_dirs empty?</text>
+    <text class="box-sub" x="830" y="294" text-anchor="middle">no &#8594; AssertionError (L903)</text>
+  </a>
+
+  <path class="edge" data-from="r1" data-to="r2" d="M165,78 V98" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="175" y="94" text-anchor="start">no</text>
+  <path class="edge" data-from="r2" data-to="r3" d="M165,156 V176" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="175" y="172" text-anchor="start">then</text>
+  <path class="edge" data-from="r3" data-to="r4" d="M165,234 V254" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="175" y="250" text-anchor="start">answer</text>
+  <path class="edge" data-from="r4" data-to="r5" d="M310,283 H335 V49 H360" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="340" y="170" text-anchor="middle">claims</text>
+  <path class="edge" data-from="r5" data-to="r6" d="M505,78 V98" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="515" y="94" text-anchor="start">yes</text>
+  <path class="edge" data-from="r6" data-to="r7" d="M505,156 V176" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="515" y="172" text-anchor="start">clean</text>
+  <path class="edge" data-from="r7" data-to="r8" d="M505,234 V254" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="515" y="250" text-anchor="start">score cells</text>
+  <path class="edge" data-from="r8" data-to="r9" d="M650,283 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="675" y="275" text-anchor="middle">kept</text>
+  <path class="edge" data-from="r9" data-to="r10" d="M830,234 V254" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="840" y="250" text-anchor="start">yes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; 10 boxes: the two retry loops (<code>_call_llm</code> L204&#8211;255, <code>run_claim_scorer</code> L641&#8211;693), the two contract checks (claims L244&#8211;268, code screen L141&#8211;149), the acceptance test (L689), the survival rule (L284&#8211;293; drop reasons L287&#8211;293), the five pilot gates (L874&#8211;888) and the guard assertion. The loop arrows are the retries inside each <code>for attempt</code> block.</p>
+</div>
+
+<div class="panel" id="panel-reads"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">read</td><td class="sym">E14_bt_population.json</td><td class="sym">PLAN_PATH L71; E18.load_plan L893</td><td>Groups, gens, judging order</td></tr>
+<tr><td class="sym">read</td><td class="sym">per-task goals</td><td class="sym">E18.load_goals L894</td><td>First block of both prompts</td></tr>
+<tr><td class="sym">read</td><td class="sym">candidate snapshots</td><td class="sym">L635, L742, L971</td><td>Read-only workspaces for scorer runs</td></tr>
+<tr><td class="sym">read</td><td class="sym">E19_claims/scorers/scores/determinism</td><td class="sym">load_jsonl L266; done sets L272&#8211;281</td><td>Resume: skip finished groups, claims, cells</td></tr>
+<tr><td class="sym">read</td><td class="sym">E19_bt_cost_ledger_2026-09-23.jsonl</td><td class="sym">load_spent L171&#8211;177</td><td>Spend carried across commands</td></tr>
+<tr><td class="sym">write</td><td class="sym">E19_claims_2026-09-23.jsonl</td><td class="sym">append L310</td><td>Verified 3&#8211;7 claims per group</td></tr>
+<tr><td class="sym">write</td><td class="sym">E19_scorers_2026-09-23.jsonl</td><td class="sym">append L701, L725</td><td>Winning script, attempts, cost</td></tr>
+<tr><td class="sym">write</td><td class="sym">E19_scores_2026-09-23.jsonl</td><td class="sym">append L704, L745</td><td>One row per (claim, generation)</td></tr>
+<tr><td class="sym">write</td><td class="sym">E19_bt_cost_ledger_2026-09-23.jsonl</td><td class="sym">append L233&#8211;235</td><td>One row per LLM call</td></tr>
+<tr><td class="sym">write</td><td class="sym">_e19_determinism_2026-09-23.jsonl</td><td class="sym">append L982&#8211;987</td><td>Double re-run equality per scorer</td></tr>
+<tr><td class="sym">write</td><td class="sym">_e19_pilot_2026-09-23.json</td><td class="sym">L906</td><td>Pilot gates and per-group table</td></tr>
+<tr><td class="sym">write</td><td class="sym">tempdirs + <code>score_claim.py</code></td><td class="sym">L609&#8211;611, removed L627</td><td>Fresh cwd per scorer execution</td></tr>
+<tr><td class="sym">config</td><td class="sym">none</td><td class="sym">no <code>config.py</code> import</td><td>Constants instead: L79&#8211;112</td></tr>
+<tr><td class="sym">state</td><td class="sym">none</td><td class="sym">no LangGraph import</td><td>Module dicts <code>SPENT</code> L122, <code>STOP</code> L123</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the same script scores every workspace of a group, so a score difference comes from the artifact, not from a new judge draw.</p>
+<p class="note">Amber: <code>_load_env</code> (L158&#8211;165) copies variables out of the key files into <code>os.environ</code>, while <code>execute_scorer</code> (L612&#8211;613) passes a stripped environment to the child process, so the scorer script never sees the key.</p>
+<p class="note flag">Red mismatch: on disk <code class="path">experiments_verifiers/results/_e19_pilot_2026-09-23.json</code> has <code>all_pass: false</code> and <code>gate_2_surviving_all: false</code> (<code>drugex_vis</code> kept 1 claim), while the same file also carries keys this file never writes &mdash; <code>gate_verdict_strict</code>, <code>failed_criteria</code>, <code>passed_criteria</code>, <code>operator_decision_2026_09_24</code>, <code>history</code>. The record was extended after the run, so <code>all_pass</code> alone does not describe the decision that was taken. <a href="file_harness_e19_bt_eval.html">e19_bt_eval.py</a> reads that extended record at L556&#8211;558.</p>
+</div>
+
+<div class="panel" id="panel-symbols"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>every class, method and top-level function (2 classes, 38 functions)</summary><div class="dbody">
+<pre>class StopRun(Exception)                                   # hard-cap abort signal (L126)
+class CallFailed(Exception)                               # one call exhausted retries (L130)
+
+gid_of(group: dict) -&gt; str                                # "campaign__task" group id (L137)
+static_violations_scorer(code: str) -&gt; list[str]          # E18 screen + write-API bans (L141)
+_load_env()                                               # copy key env vars (L158)
+load_spent() -&gt; float                                     # sum the cost ledger (L171)
+_completion_with_watchdog(kw: dict)                       # litellm call, 150 s wall clock (L185)
+_call_llm(model, messages, max_tokens, role, meta, temperature=0.0) -&gt; tuple[str, dict]  # one call + retries (L200)
+append_line(path: Path, lock: threading.Lock, rec: dict)   # locked jsonl append (L261)
+load_jsonl(path: Path) -&gt; list[dict]                      # read jsonl or empty (L266)
+claims_done() -&gt; set[str]                                 # groups already extracted (L272)
+scorers_done() -&gt; set[tuple[str, str]]                    # (group, claim) scorers done (L276)
+scores_done() -&gt; set[tuple[str, str, str]]                # (group, claim, uuid8) done (L280)
+claim_stats(scores: list[dict], n_gens: int) -&gt; dict       # variance + drop decision (L284)
+most_complete_workspace(group: dict) -&gt; dict              # preview source workspace (L299)
+ws_rel(path: str) -&gt; str                                  # path relative to workspace root (L309)
+union_inventory(group: dict) -&gt; str                       # paths with presence counts (L316)
+deliverable_previews(gen: dict, max_files: int = 3) -&gt; str # preview blocks within a byte cap (L339)
+extract_messages(goal: str, group: dict) -&gt; list[dict]    # Phase A prompt (L434)
+valid_claims(obj) -&gt; tuple[list[dict], str | None]        # enforce 3-7 claim contract (L443)
+run_extract(group: dict, goal: str) -&gt; dict               # Phase A for one group (L470)
+scorer_messages(goal: str, claim: dict, union: str)       # Phase B prompt (L568)
+repair_messages(feedback: str, prev_code: str)            # repair prompt (L574)
+parse_scorer_output(stdout: str)                          # one JSON line -&gt; score dict (L583)
+execute_scorer(code: str, ws_root: str, claim: dict, tmp_root: Path) -&gt; dict  # run in temp cwd (L607)
+run_claim_scorer(group, goal, claim, tmp_root) -&gt; dict     # build, test, record (L632)
+run_claim_scorer_safe(group, goal, claim, tmp_root) -&gt; dict # CallFailed to failed record (L715)
+fill_missing_scores(plan_groups: list[dict], tmp_root) -&gt; int  # re-run lost cells (L729)
+do_extract(groups: list[dict], goals: dict, workers: int)  # threaded Phase A (L759)
+do_score(groups: list[dict], goals: dict, workers: int, tmp_root: Path)  # threaded Phase B (L784)
+surviving_claims(n_gens_by_gid: dict[str, int]) -&gt; dict[str, list[dict]]  # kept claims per group (L825)
+eval_pilot_gate(pilot_gids: list[str]) -&gt; dict             # five gates + table (L846)
+cmd_pilot(args)                                           # pilot command (L892)
+cmd_extract(args)                                         # extract command (L913)
+cmd_score(args)                                           # score command, fills gaps (L922)
+cmd_run(args)                                             # extract then score (L938)
+cmd_det(args)                                             # 5% double re-runs (L943)
+cmd_status(args)                                          # ledger counters (L996)
+cmd_verify(args)                                          # baseline plus verify (L1017)
+main()                                                    # argparse, dispatch, StopRun exit (L1024)</pre>
+<p>Module constants: <code>EV</code> L63, <code>REPO</code> L64, <code>TODAY</code> L69, <code>RUN_DATE</code> L70, <code>PLAN_PATH</code> L71, <code>CLAIMS</code> L72, <code>SCORERS</code> L73, <code>SCORES</code> L74, <code>COST_LEDGER</code> L75, <code>DETS</code> L76, <code>PILOT_JSON</code> L77, <code>MODEL_TEXT</code> L79, <code>E19_SEED</code> L81, <code>DET_FRAC = 0.05</code> L82, <code>MAX_CODE_ATTEMPTS = 3</code> L83, <code>MAX_EXTRACT_ATTEMPTS = 2</code> L84, <code>SUBPROC_TIMEOUT = 60</code> L85, <code>HARD_CAP_USD = 15.0</code> L86, <code>PILOT_COST_GATE = 1.0</code> L87, <code>N_GROUPS = 19</code> L88, <code>PILOT_GROUPS</code> L92&#8211;96, <code>EXTRA_BANNED</code> L103, <code>EXTRA_BANNED_RE</code> L106, <code>UNION_LINE_CAP = 300</code> L109, <code>PREVIEW_TOTAL_CAP = 14 * 1024</code> L110, <code>CLAIM_CATEGORIES</code> L112, six locks L115&#8211;120, <code>SPENT</code> L122, <code>STOP</code> L123, <code>GUARD = E18.SnapshotGuard()</code> L152, <code>PRICING</code> L168, <code>CALL_HARD_TIMEOUT = 150</code> L182, <code>EXTRACT_TEMPLATE</code> L390, <code>SCORER_TEMPLATE</code> L515, <code>REPAIR_TEMPLATE</code> L546.</p>
+<p>Imports: stdlib (<code>argparse</code>, <code>datetime</code>, <code>json</code>, <code>math</code>, <code>os</code>, <code>random</code>, <code>re</code>, <code>shutil</code>, <code>statistics</code>, <code>subprocess</code>, <code>sys</code>, <code>tempfile</code>, <code>threading</code>, <code>time</code>, <code>Counter</code>, <code>ThreadPoolExecutor</code>), then <code>e14_bt_enabler as E14</code> L66 and <code>e18_scripted_bt as E18</code> L67; <code>litellm</code> is imported inside <code>_completion_with_watchdog</code> at L188.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>Kind</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td class="sym">e19_bt_eval.py</td><td>import</td><td><code>import e19_hybrid_bt as E19H</code> L35; ledgers, constants, <code>claim_stats</code> (L264, L540, L571, L607)</td></tr>
+<tr><td class="sym">e19_cascade_analysis.py</td><td>import</td><td>L37; <code>E19H.SCORES</code>, <code>E19H.CLAIMS</code>, <code>claim_stats</code></td></tr>
+<tr><td class="sym">e19_gradient_duel.py</td><td>import</td><td>L24; only <code>HARD_CAP_USD</code> at L180</td></tr>
+<tr><td class="sym">e19b_extract.py</td><td>import</td><td>L54; reuses <code>_completion_with_watchdog</code>, prompts, <code>union_inventory</code>, <code>execute_scorer</code>, <code>append_line</code></td></tr>
+<tr><td class="sym">e19b_eval.py</td><td>import</td><td>L31; <code>GUARD</code>, <code>load_jsonl</code>, <code>COST_LEDGER</code></td></tr>
+<tr><td class="sym">e19b_dryrun.py</td><td>import</td><td>L39; <code>load_jsonl</code> and the <code>claim_stats</code> semantics</td></tr>
+<tr><td class="sym">its own __main__</td><td>entry</td><td>argparse dispatch L1024&#8211;1040; subcommands named in the module docstring L34&#8211;41</td></tr>
+<tr><td class="sym">e14_bt_enabler.py / e18_scripted_bt.py</td><td>callee</td><td>Preview policy, plan loading, execution guards, <code>parse_code</code>, <code>static_violations</code></td></tr>
+<tr><td class="sym">tests/</td><td>tests</td><td>unknown &mdash; no test in <code>tests/</code> mentions this file (grep)</td></tr>
+<tr><td class="sym">exp_e19_hybrid_bt.html</td><td>docs</td><td><a href="exp_e19_hybrid_bt.html">Experiment page</a> for the run this driver produced</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+<p class="sub">Batch: <a href="file_index.html">file_index.html</a> &#183; <a href="file_harness_e18_symmetric.html">e18_symmetric</a> &#183; <a href="file_harness_e19_bt_eval.html">e19_bt_eval</a> &#183; <a href="file_harness_e19_cascade_analysis.html">e19_cascade_analysis</a> &#183; <a href="file_harness_e19_gradient_duel.html">e19_gradient_duel</a> &#183; <a href="file_harness_e19_hybrid_bt.html">e19_hybrid_bt</a></p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19_hybrid_bt.py</code> (all 1 044 lines), <code class="path">experiments_verifiers/harness/e14_bt_enabler.py</code> (symbol names only: <code>read_text_head</code> L783, <code>count_newlines</code> L791, <code>SCRIPT_EXTS</code> L833, <code>HELPER_RE</code> L834), <code class="path">experiments_verifiers/harness/e18_scripted_bt.py</code> (symbol names only), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>. On-disk line counts from <code>wc -l</code> on the four ledgers. Related pages: <a href="exp_e19_hybrid_bt.html">exp_e19_hybrid_bt.html</a>, <a href="file_harness_e19_bt_eval.html">file_harness_e19_bt_eval.html</a>, <a href="file_harness_e19_gradient_duel.html">file_harness_e19_gradient_duel.html</a>, <a href="file_harness_e19_cascade_analysis.html">file_harness_e19_cascade_analysis.html</a>, <a href="exp_e19b_extract.html">exp_e19b_extract.html</a>, <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> and the key files (never opened, build rule); the prompt template bodies beyond their first lines; the pilot and determinism record contents (only key names from the code are cited); <code class="path">EXPERIMENTS.md</code> and <code class="path">README.md</code> in <code>experiments_verifiers/</code>. No application run, no experiment run and no pytest run, by the build rules.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

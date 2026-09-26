@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>audits/ - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > audits > report map">
+<div class="wrap">
+
+<h1 class="hud">audits/ &mdash; which report answers what</h1>
+<p class="intro">Ten files and three subfolders sit in <code>audits/</code> (35 files, 8.4 MB), written between 2026-09-06 and 2026-09-23. Each answers a different question about the verifier-driven evolution loop and the ScienceAgentBench chemistry runs. This page maps the families, the sizes, and the evidence each report reads.</p>
+
+<div id="legend" data-auto></div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; map of the reports</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 245" role="img" aria-label="Map of audit report families">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <a class="box" href="../../audits/chemistry_10_iterative_detailled.html">
+    <title>Runs the campaign: reward vs benchmark per evolution slot.</title>
+    <rect x="10" y="40" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="95" y="74" text-anchor="middle">Campaign dossiers</text>
+    <text class="box-sub" x="95" y="92" text-anchor="middle">3 files: run_1, run_3</text>
+  </a>
+  <a class="box" href="../../audits/chemistry_10_steering_report.html">
+    <title>Compares verifier steering across three campaign modes.</title>
+    <rect x="192" y="40" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="277" y="74" text-anchor="middle">Steering cross-run</text>
+    <text class="box-sub" x="277" y="92" text-anchor="middle">run_1 vs run_2 vs run_3</text>
+  </a>
+  <a class="box" href="../../audits/chemistry_gradient_detailled_steering_transitions/index.html">
+    <title>One card per consecutive generation pair, five blocks each.</title>
+    <rect x="374" y="40" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="459" y="74" text-anchor="middle">Task transitions</text>
+    <text class="box-sub" x="459" y="92" text-anchor="middle">11 files, slot pairs</text>
+  </a>
+  <a class="box" href="../../audits/explainers_per_task/compound_filter_iterative_sr_explainer.html">
+    <title>Explains one task SR pass or failure in plain words.</title>
+    <rect x="556" y="40" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="641" y="74" text-anchor="middle">Task explainers</text>
+    <text class="box-sub" x="641" y="92" text-anchor="middle">6 files, one task each</text>
+  </a>
+  <a class="box" href="../../audits/ScienceAgentBench_chemistry_explained.html">
+    <title>Plain-language tour of every chemistry benchmark task.</title>
+    <rect x="738" y="40" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="823" y="74" text-anchor="middle">Task primer</text>
+    <text class="box-sub" x="823" y="92" text-anchor="middle">20 chemistry tasks</text>
+  </a>
+  <a class="box" href="../../audits/chemistry_mode_matrix.html">
+    <title>Grid of mode x task is_success cells.</title>
+    <rect x="10" y="145" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="95" y="179" text-anchor="middle">Mode matrix</text>
+    <text class="box-sub" x="95" y="197" text-anchor="middle">5 modes x 20 tasks</text>
+  </a>
+  <a class="box" href="../../audits/chemistry_10_alignement_claims_vs_gold.html">
+    <title>Rates each verifier claim against the benchmark gold.</title>
+    <rect x="192" y="145" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="277" y="179" text-anchor="middle">Claim vs gold</text>
+    <text class="box-sub" x="277" y="197" text-anchor="middle">243 claims rated 0-10</text>
+  </a>
+  <a class="box" href="../../audits/sab_verifier_gap_report.html">
+    <title>Compares the Mimosa verifier objective with 102 SAB graders.</title>
+    <rect x="374" y="145" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#3CF0D2"/>
+    <text class="box-label" x="459" y="179" text-anchor="middle">SAB gap analysis</text>
+    <text class="box-sub" x="459" y="197" text-anchor="middle">report + JSON census</text>
+  </a>
+  <a class="box" href="../../audits/verifier_system_report.md">
+    <title>Reads the verifier code and quotes every prompt.</title>
+    <rect x="556" y="145" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="641" y="179" text-anchor="middle">Verifier code report</text>
+    <text class="box-sub" x="641" y="197" text-anchor="middle">static code reading</text>
+  </a>
+  <a class="box" href="../../audits/reward_signal_analysis/reward_vs_groundtruth_publication.png">
+    <title>Charts reward against ground-truth ablation metrics.</title>
+    <rect x="738" y="145" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#3CF0D2"/>
+    <text class="box-label" x="823" y="179" text-anchor="middle">Reward-signal charts</text>
+    <text class="box-sub" x="823" y="197" text-anchor="middle">scripts + PNG and PDF</text>
+  </a>
+  <text class="box-sub" x="10" y="238">cyan = report reads artifacts &middot; aqua = gap analysis and charts &middot; steel = code-reading report</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - ten report families; every box links to the report or to the family index. Family lists are in the table below.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; evidence the reports read</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 860 310" role="img" aria-label="Evidence sources read by the audit reports">
+  <defs>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect x="20" y="120" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+  <text class="box-label" x="105" y="154" text-anchor="middle">audit reports</text>
+  <text class="box-sub" x="105" y="172" text-anchor="middle">13 files in audits/</text>
+  <path class="edge" d="M190,159 H265" fill="none" stroke="#5E8CA3" stroke-width="1.25"/>
+  <path class="edge" d="M265,32 V272" fill="none" stroke="#5E8CA3" stroke-width="1.25"/>
+  <rect x="340" y="14" width="500" height="36" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <text class="box-label" x="352" y="30">run_notes/</text>
+  <text class="box-sub" x="352" y="44">campaign records: rewards, ablations</text>
+  <path class="edge dashed-edge" d="M265,32 H340" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <rect x="340" y="62" width="500" height="36" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <text class="box-label" x="352" y="78">sources/workflows/</text>
+  <text class="box-sub" x="352" y="92">genotypes, gradients, per-slot folders</text>
+  <path class="edge dashed-edge" d="M265,80 H340" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <rect x="340" y="110" width="500" height="36" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <text class="box-label" x="352" y="126">runs_capsule/</text>
+  <text class="box-sub" x="352" y="140">final workspace, evaluation_results.json</text>
+  <path class="edge dashed-edge" d="M265,128 H340" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <rect x="340" y="158" width="500" height="36" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <text class="box-label" x="352" y="174">/tmp/mimosa_run_*</text>
+  <text class="box-sub" x="352" y="188">per-round run workspace, volatile</text>
+  <path class="edge dashed-edge" d="M265,176 H340" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <rect x="340" y="206" width="500" height="36" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <text class="box-label" x="352" y="222">datasets/.../eval_programs/</text>
+  <text class="box-sub" x="352" y="236">graders + gold_programs, gold_results, rubrics</text>
+  <path class="edge dashed-edge" d="M265,224 H340" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <rect x="340" y="254" width="500" height="36" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <text class="box-label" x="352" y="270">datasets/ScienceAgentBench.csv</text>
+  <text class="box-sub" x="352" y="284">instance rows, 102 tasks</text>
+  <path class="edge dashed-edge" d="M265,272 H340" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="196" y="152">reads</text>
+  <text class="box-sub" x="340" y="304">dashed = reads data on disk; the run workspaces are volatile and may be gone</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - evidence folders the reports cite. Counts of mentions across all reports: <code>sources/workflows</code> 857, <code>eval_programs</code> 419, <code>/tmp/mimosa_run_</code> 353, <code>run_notes</code> 318, <code>runs_capsule</code> 109 (my computation, grep count).</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Chart &mdash; size of each top-level report</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="Bar chart of report sizes in KB">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <text class="box-sub" x="300" y="46" text-anchor="end">chemistry_vulgarized_report.html</text>
+  <rect x="310" y="34" width="518" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="834" y="46">2392 KB</text>
+  <text class="box-sub" x="300" y="72" text-anchor="end">chemistry_10_iterative_detailled.html</text>
+  <rect x="310" y="60" width="262" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="578" y="72">1211 KB</text>
+  <text class="box-sub" x="300" y="98" text-anchor="end">iterative_5_tasks_readable_report.html</text>
+  <rect x="310" y="86" width="145" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="461" y="98">671 KB</text>
+  <text class="box-sub" x="300" y="124" text-anchor="end">chemistry_10_alignement_claims_vs_gold.html</text>
+  <rect x="310" y="112" width="93" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="409" y="124">431 KB</text>
+  <text class="box-sub" x="300" y="150" text-anchor="end">chemistry_10_steering_report.html</text>
+  <rect x="310" y="138" width="80" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="396" y="150">368 KB</text>
+  <text class="box-sub" x="300" y="176" text-anchor="end">sab_verifier_gap_report.html</text>
+  <rect x="310" y="164" width="54" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="370" y="176">251 KB</text>
+  <text class="box-sub" x="300" y="202" text-anchor="end">sab_verifier_gap_data.json</text>
+  <rect x="310" y="190" width="38" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="354" y="202">175 KB</text>
+  <text class="box-sub" x="300" y="228" text-anchor="end">verifier_system_report.md</text>
+  <rect x="310" y="216" width="18" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="334" y="228">82 KB</text>
+  <text class="box-sub" x="300" y="254" text-anchor="end">ScienceAgentBench_chemistry_explained.html</text>
+  <rect x="310" y="242" width="15" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="331" y="254">71 KB</text>
+  <text class="box-sub" x="300" y="280" text-anchor="end">chemistry_mode_matrix.html</text>
+  <rect x="310" y="268" width="9" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="edge-label" x="325" y="280">43 KB</text>
+
+  <text class="box-sub" x="310" y="296">horizontal bar = file size in KB, linear scale, max 2400 KB</text>
+</svg>
+</div>
+<p class="figcap">Chart - file sizes from <code>ls -l audits/</code>, 2026-10-02 (my computation). Sizes scale linearly; the largest file is 56 times the smallest.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Reports &mdash; size, question, link</h2>
+<table>
+<thead><tr><th>Report</th><th class="size">Size</th><th>One-line purpose</th><th>Link</th></tr></thead>
+<tbody>
+<tr><td class="sym"><code class="path">ScienceAgentBench_chemistry_explained.html</code></td><td class="size">71 KB</td><td>What does each chemistry benchmark task ask?</td><td><a href="../../audits/ScienceAgentBench_chemistry_explained.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">chemistry_10_alignement_claims_vs_gold.html</code></td><td class="size">431 KB</td><td>Is each verifier claim aligned with the gold?</td><td><a href="../../audits/chemistry_10_alignement_claims_vs_gold.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">chemistry_10_iterative_detailled.html</code></td><td class="size">1.2 MB</td><td>run_3 dossier: what did evolution change per slot?</td><td><a href="../../audits/chemistry_10_iterative_detailled.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">chemistry_10_steering_report.html</code></td><td class="size">368 KB</td><td>How did steering differ in run_1, run_2, run_3?</td><td><a href="../../audits/chemistry_10_steering_report.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">chemistry_vulgarized_report.html</code></td><td class="size">2.3 MB</td><td>Reader edition: did a higher self-score mean better science?</td><td><a href="../../audits/chemistry_vulgarized_report.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">iterative_5_tasks_readable_report.html</code></td><td class="size">671 KB</td><td>run_1 audit: reward against benchmark grade, per slot</td><td><a href="../../audits/iterative_5_tasks_readable_report.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">chemistry_mode_matrix.html</code></td><td class="size">43 KB</td><td>Which mode x task cells passed is_success?</td><td><a href="../../audits/chemistry_mode_matrix.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">sab_verifier_gap_data.json</code></td><td class="size">175 KB</td><td>Census of 102 tasks: grader bars, verifier coverage, verdicts</td><td><a href="../../audits/sab_verifier_gap_data.json">open</a></td></tr>
+<tr><td class="sym"><code class="path">sab_verifier_gap_report.html</code></td><td class="size">251 KB</td><td>Where do the Mimosa verifier and the SAB graders diverge?</td><td><a href="../../audits/sab_verifier_gap_report.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">verifier_system_report.md</code></td><td class="size">82 KB</td><td>How does the verifier work, stage by stage?</td><td><a href="../../audits/verifier_system_report.md">open</a></td></tr>
+<tr><td class="sym"><code class="path">chemistry_gradient_detailled_steering_transitions/</code></td><td class="size">1.7 MB &#183; 11 files</td><td>Between two generations, what did the loop do?</td><td><a href="../../audits/chemistry_gradient_detailled_steering_transitions/index.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">explainers_per_task/</code></td><td class="size">236 KB &#183; 6 files</td><td>Why did this one task pass or fail SR?</td><td><a href="../../audits/explainers_per_task/compound_filter_iterative_sr_explainer.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">reward_signal_analysis/</code></td><td class="size">1.0 MB &#183; 8 files</td><td>Does reward track the ground-truth ablation metrics?</td><td><a href="../../audits/reward_signal_analysis/reward_vs_groundtruth_publication.png">open</a></td></tr>
+</tbody>
+</table>
+<p class="sub">AGENTS.md: audit reports are single-file offline HTML in <code>audits/</code>. Checked on 2026-10-02: no report has an <code>src=</code> or <code>href=</code> to an external asset; two reports quote an external URL as plain text only.</p>
+<p class="sub">Related clone pages: <a href="data_runs.html">data_runs.html</a> (the runtime folders these reports quote) and <a href="flow_verification.html">flow_verification.html</a> (how the verifier runs).</p>
+<p class="sub">35 files, 8.4 MB total, dates 2026-09-06 to 2026-09-23 (my computation from <code>ls -l</code> and <code>du</code>).</p>
+
+<p class="note say"><code>audits/</code> is read-only evidence: AGENTS.md says never modify, move, or delete anything inside an audit folder.</p>
+<p class="note">Amber note: every report is a dated snapshot; the <code>/tmp/mimosa_run_*</code> workspaces it quotes are volatile and may already be gone.</p>
+<p class="note flag">Red note: <code class="path">audits/reward_signal_analysis/analyze_reward_correlations.py</code> reads <code>../../run_iterative_1/*.json</code>, a path that no longer exists; the campaign records now live under <code>run_notes/</code>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full file list</h2>
+<details><summary>chemistry_gradient_detailled_steering_transitions/ &mdash; 11 files</summary><div class="dbody">
+<pre>index.html                     17 KB  family index, 59 transition cards
+charge_density_difference.html 223 KB   plot_phonon_band_structure.html 409 KB
+clintox_nn.html                173 KB   predict_bulk_modulus.html        60 KB
+compound_filter.html           155 KB   ligand_fingerprint.html          47 KB
+drugex_vis.html                173 KB   mat_feature_select.html         122 KB
+factors_correlations.html      159 KB   papyrus_filtering.html          151 KB</pre>
+<p class="sub">Each file gives five blocks per generation pair: gradient, directive, verdict delta, genotype diff, outputs delta.</p>
+</div></details>
+<details><summary>explainers_per_task/ &mdash; 6 files</summary><div class="dbody">
+<pre>bulk_sr_explainer.html                       28 KB
+clintox_sr_explainer.html                    44 KB
+compound_filter_iterative_sr_explainer.html  90 KB  iterative v4-flash
+compound_filter_sr_explainer.html            22 KB
+factors_sr_explainer.html                    19 KB
+mat_sr_explainer.html                        21 KB</pre>
+</div></details>
+<details><summary>reward_signal_analysis/ &mdash; 8 files</summary><div class="dbody">
+<pre>analyze_evolution_index.py           does more iterations mean more success?
+analyze_reward_correlations.py       reward vs VER/SR/CBS correlation
+analyze_reward_publication.py        publication-ready versions of the charts
+evolution_index_vs_metrics.png/.pdf  28 KB / 288 KB
+reward_vs_groundtruth_correlations.png  224 KB
+reward_vs_groundtruth_publication.png/.pdf  385 KB / 72 KB</pre>
+<p class="sub">Scripts write the PNG and PDF charts. Chart set last written 2026-09-06.</p>
+</div></details>
+<details><summary>sab_verifier_gap_data.json &mdash; top-level keys</summary><div class="dbody">
+<pre>_provenance      date, mimosa_commit 7e8463b, csv, method, report
+tasks            102 entries: verdict, raw scout note
+census           102 entries: family, output path, goal, eval, gold_prog, rubric
+batch_patterns   18 entries
+scout_assignment 102 entries</pre>
+<p class="sub">Read with <code>json.load</code>; 175 KB. Reports read it; no code in <code>sources/</code> does (grep for the file name found none).</p>
+</div></details>
+</div>
+<footer>
+<p>Sources read: <code>audits/</code> listing and sizes (<code>ls -R</code>, <code>ls -l</code>, <code>du -sh</code>), <code>&lt;title&gt;</code> and first heading or TL;DR of every HTML report, full text of <code class="path">audits/verifier_system_report.md</code> headings and TL;DR, top-level keys of <code class="path">audits/sab_verifier_gap_data.json</code>, first lines of the three scripts in <code class="path">audits/reward_signal_analysis/</code>, <code>AGENTS.md</code>, <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>.</p>
+<p class="skips">Skipped: report bodies of the big HTML files (only title, heading, TL;DR read - Tier C method) &#183; <code>evolution_index_vs_metrics.pdf</code> and <code>reward_vs_groundtruth_publication.pdf</code> (binary, no text read; PNG twins listed instead) &#183; <code class="path">audits/.DS_Store</code> (macOS system file) &#183; per-task transition HTML bodies (same five-block template, described once) &#183; chemical-correctness verdicts (out of scope; reports say the same).</p>
+<p>Working tree had uncommitted changes at build time (<code>git status --porcelain</code> lists modified files such as <code class="path">docs/DEVELOPER_GUIDE.md</code>); this page describes the tree as found on disk. Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

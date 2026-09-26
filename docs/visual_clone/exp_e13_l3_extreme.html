@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e13_l3_extreme - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e13_l3_extreme">
+<div class="wrap">
+
+<h1 class="hud">e13_l3_extreme &mdash; manifold and capacity study</h1>
+<p class="intro">E13 asked whether the linear claim readout (L3) leaves structure unused: a deeper claim manifold, set attention, hashed pairwise terms, soft judge targets, base rates, or goal conditioning. Five arms answered it on cached embeddings, with no LLM calls. Nothing beat L3 by more than the +0.02 gate, two FiLM arms passed the numeric gate but shipped the same 35 tasks as the recorded reward.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stage functions, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 600" role="img" aria-label="E13 design: hypothesis, frozen inputs, five arm stages, replay and report">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="h1">
+    <title>Hypothesis: claim structure beyond linear L3 can raise AUC</title>
+    <rect x="20" y="20" width="250" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="44" text-anchor="middle">hypothesis: deeper manifold beats linear</text>
+    <text class="box-sub" x="145" y="60" text-anchor="middle">gate: AUC delta &ge; +0.02</text>
+  </g>
+
+  <a class="box" id="i1" href="../../experiments_verifiers/data/verifier_claims_sane.jsonl">
+    <title>Claim verdict rows, sane and E5-anchor universes</title>
+    <rect x="300" y="20" width="300" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="450" y="44" text-anchor="middle">verifier_claims*.jsonl</text>
+    <text class="box-sub" x="450" y="60" text-anchor="middle">607 anchor rows, 565 sane rows</text>
+  </a>
+
+  <a class="box" id="i2" href="../../experiments_verifiers/harness/e13_common.py">
+    <title>run_notes give goals, SR_message and generation order; eval programs give thresholds</title>
+    <rect x="630" y="20" width="350" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="805" y="44" text-anchor="middle">run_notes + eval_programs</text>
+    <text class="box-sub" x="805" y="60" text-anchor="middle">goals, SR_message, thresholds</text>
+  </a>
+
+  <a class="box" id="f0" href="../../experiments_verifiers/harness/e13_l3_extreme.py">
+    <title>stage_reproduce L43 recomputes the L3 anchor and asserts 0.753</title>
+    <rect x="20" y="120" width="220" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="146" text-anchor="middle">stage_reproduce()</text>
+    <text class="box-sub" x="130" y="164" text-anchor="middle">asserts L3 = 0.753</text>
+  </a>
+
+  <a class="box" id="fa" href="../../experiments_verifiers/harness/e13_l3_extreme.py">
+    <title>stage_a L176: k-means blocks and k-NN smoothing of L3 scores</title>
+    <rect x="20" y="220" width="220" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="242" text-anchor="middle">stage_a()</text>
+    <text class="box-sub" x="130" y="258" text-anchor="middle">k-means blocks, k-NN smoothing</text>
+  </a>
+
+  <a class="box" id="fb" href="../../experiments_verifiers/harness/e13_l3_extreme.py">
+    <title>stage_b L384: DeepSets, one SAB block, Rademacher-hashed pairwise features</title>
+    <rect x="20" y="290" width="220" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="312" text-anchor="middle">stage_b()</text>
+    <text class="box-sub" x="130" y="328" text-anchor="middle">DeepSets, SAB, hashed pairs</text>
+  </a>
+
+  <a class="box" id="fc" href="../../experiments_verifiers/harness/e13_l3_extreme.py">
+    <title>stage_c L601: parses SR_message into a continuous judge margin and soft targets</title>
+    <rect x="20" y="360" width="220" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="382" text-anchor="middle">stage_c()</text>
+    <text class="box-sub" x="130" y="398" text-anchor="middle">soft targets, reliability weights</text>
+  </a>
+
+  <a class="box" id="fd" href="../../experiments_verifiers/harness/e13_l3_extreme.py">
+    <title>stage_d L738: adds global and within-task claim base rates</title>
+    <rect x="20" y="430" width="220" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="452" text-anchor="middle">stage_d()</text>
+    <text class="box-sub" x="130" y="468" text-anchor="middle">global + history base rates</text>
+  </a>
+
+  <a class="box" id="fe" href="../../experiments_verifiers/harness/e13_l3_extreme.py">
+    <title>stage_e L870: FiLM conditioning on the cached goal embedding, plus a head-tail re-encode</title>
+    <rect x="20" y="500" width="220" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="522" text-anchor="middle">stage_e()</text>
+    <text class="box-sub" x="130" y="538" text-anchor="middle">FiLM on goal, head+tail</text>
+  </a>
+
+  <a class="box" id="fr" href="../../experiments_verifiers/harness/e13_l3_extreme.py">
+    <title>stage_replay L1162 re-scores only the gate winners under the E9 protocol</title>
+    <rect x="380" y="360" width="200" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="480" y="386" text-anchor="middle">stage_replay()</text>
+    <text class="box-sub" x="480" y="404" text-anchor="middle">E9 pick over 93 asb tasks</text>
+  </a>
+
+  <a class="box" id="fp" href="../../experiments_verifiers/harness/e13_l3_extreme.py">
+    <title>stage_report L1260 compiles the markdown report from the JSON arms</title>
+    <rect x="640" y="360" width="200" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="740" y="386" text-anchor="middle">stage_report()</text>
+    <text class="box-sub" x="740" y="404" text-anchor="middle">compiles the MD</text>
+  </a>
+
+  <a class="box" id="o1" href="../../experiments_verifiers/results/E13_l3_extreme_2026-09-23.json">
+    <title>One JSON and one MD hold every arm report, gate and runtime</title>
+    <rect x="640" y="480" width="200" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="740" y="506" text-anchor="middle">E13_l3_extreme.json</text>
+    <text class="box-sub" x="740" y="524" text-anchor="middle">arms, gate, runtimes, + .md</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="h1" data-to="f0" d="M90,76 V120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="98" y="102" text-anchor="start">anchor spec</text>
+  <path class="edge dashed-edge" data-from="i1" data-to="f0" d="M350,76 L180,120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="188" y="100" text-anchor="start">reads claims</text>
+  <path class="edge dashed-edge" data-from="i2" data-to="f0" d="M760,76 L215,120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="480" y="104" text-anchor="middle">reads notes</text>
+
+  <path class="edge" data-from="f0" data-to="fa" d="M130,180 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="f0" data-to="fb" d="M130,180 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="f0" data-to="fc" d="M130,180 V360" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="f0" data-to="fd" d="M130,180 V430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="f0" data-to="fe" d="M130,180 V500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="138" y="205" text-anchor="start">L3 anchor scores</text>
+
+  <path class="edge" data-from="fa" data-to="fr" d="M240,245 L380,380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fb" data-to="fr" d="M240,315 L380,387" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fc" data-to="fr" d="M240,385 H380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fd" data-to="fr" d="M240,455 L380,393" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fe" data-to="fr" d="M240,525 L380,400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="340" text-anchor="middle">paired reports</text>
+
+  <path class="edge" data-from="fr" data-to="fp" d="M580,390 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="610" y="382" text-anchor="middle">gate winners</text>
+  <path class="edge" data-from="fp" data-to="o1" d="M740,420 V480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="748" y="452" text-anchor="start">writes artifacts</text>
+  <text class="box-sub" x="20" y="592">12 boxes &#183; solid = call &#183; dashed = reads/writes &#183; rounded = function &#183; stages run in this order: reproduce a b c d e replay report</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>12 boxes</code>. Stage symbols and line numbers in <code class="path">../../experiments_verifiers/harness/e13_l3_extreme.py</code>: <code>stage_reproduce</code> L43, <code>stage_a</code> L176, <code>stage_b</code> L384, <code>stage_c</code> L601, <code>stage_d</code> L738, <code>stage_e</code> L870, <code>stage_replay</code> L1162, <code>stage_report</code> L1260, dispatched by the <code>STAGES</code> dict at L1428 and <code>main()</code> at L1432. Only the two gate winners reach <code>stage_replay</code> (winners at L1192, loop at L1237); arm b re-fits its four models with a torch training loop instead of an inner-CV grid. The study reuses <a href="exp_e13_common.html">e13_common.py</a> for every fold and statistic, and Arm c reads <code>SR_message</code> from <code>run_notes/</code> plus thresholds parsed from <code>datasets/ScienceAgentBench/eval_programs/*.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e13_l3_extreme.py">experiments_verifiers/harness/e13_l3_extreme.py</a></h4>
+<p class="role">Runs the five E13 arms, re-scores the gate winners under the E9 replay, and compiles the report; each stage writes into one shared JSON.</p>
+<p class="meta">1 444 lines &#183; 32 top-level functions, 2 torch classes (DeepSets, SetAttn) &#183; entry <code>main()</code> L1432 &#183; CLI: stage names, default <code>reproduce</code> &#183; imports torch, sklearn, e5_common</p>
+<details><summary>CLI contract, stage symbols, constants, sizes</summary><div class="dbody">
+<pre>Usage: uv run python experiments_verifiers/harness/e13_l3_extreme.py reproduce a b c d e replay report
+
+main()                    # L1432  loops over sys.argv[1:] or ["reproduce"]
+STAGES                    # L1428  {"reproduce","a","b","c","d","e","replay","report"}
+                          #        an unknown name raises SystemExit
+stage_reproduce(out)      # L43    L3 anchor; asserts abs(auc - 0.753) &lt; 5e-3 (L52)
+stage_a(out)              # L176   K_GRID [2,4,8,16] L78, MIN_BLOCK_SUPPORT 30 L79
+stage_b(out)              # L384   40 seeds, build_tokens L280, train_torch L305
+stage_c(out)              # L601   build_eval_map L474, classify_message L505, soft_targets L554
+stage_d(out)              # L738   global freq + within-task history
+stage_e(out)              # L870   headtail_encode L828, film_loto L848
+stage_replay(out)         # L1162  _fit_* scorers L976-1160 for the winners only
+stage_report(out)         # L1260  writes K.OUT_MD
+T0 = time.time()          # L36    per-stage runtime recorded in out["runtimes"]</pre>
+<p>JSON keys: <code>experiment</code>, <code>date</code>, <code>computation</code>, <code>llm_calls</code>, <code>arms</code>, <code>runtimes</code>, <code>gate</code>, <code>environment</code>. Stage runtimes (seconds): reproduce 6.3, a 94.2, b 113.5, c 252.8, d 261.9, e 22.6, replay 1.3, report 1.3 (E13 JSON L8959&ndash;8969).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>MiniLM claim vectors plus names</td><td>&mdash;</td><td class="sym"><a href="../../experiments_verifiers/results/_cache_e5_embeddings.npz">results/_cache_e5_embeddings.npz</a></td></tr>
+<tr><td>128 task-goal vectors</td><td>&mdash;</td><td class="sym"><a href="../../experiments_verifiers/results/_cache_e10_goal_emb.npz">results/_cache_e10_goal_emb.npz</a></td></tr>
+<tr><td>threshold and figure rules for arm c</td><td>&mdash;</td><td class="sym">datasets/ScienceAgentBench/eval_programs/*.py</td></tr>
+<tr><td>goal, order, ablations, SR_message</td><td>&mdash;</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td></tr>
+<tr><td>&mdash;</td><td>head+tail goal vectors (once)</td><td class="sym"><a href="../../experiments_verifiers/results/_cache_e13_goal_headtail_2026-09-23.npz">results/_cache_e13_goal_headtail_2026-09-23.npz</a></td></tr>
+<tr><td>the existing arm reports</td><td>arms, gate, environment</td><td class="sym"><a href="../../experiments_verifiers/results/E13_l3_extreme_2026-09-23.json">results/E13_l3_extreme_2026-09-23.json</a></td></tr>
+<tr><td>&mdash;</td><td>the report</td><td class="sym"><a href="../../experiments_verifiers/results/E13_l3_extreme_2026-09-23.md">results/E13_l3_extreme_2026-09-23.md</a></td></tr>
+</tbody>
+</table>
+<p class="sub">Reads cite <code>build_eval_map</code> L474&ndash;494 (<code>glob</code> over <code>datasets/ScienceAgentBench/eval_programs/*.py</code>), <code>headtail_encode</code> L828&ndash;846, <code>np.load</code> at L832, L880, L1147. The write is <code>K.OUT_MD.write_text</code> at L1424 plus <code>K.save_results</code> after every stage (L1439).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; arm AUC deltas and the replay</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 260" role="img" aria-label="Bar chart of pooled AUC delta versus L3 for the twelve E13 arms">
+  <defs><filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <text x="20" y="22" font-size="11" fill="#8FB8C9">Pooled AUC delta versus linear L3 per arm (zero line = L3; green = passed the +0.02 gate)</text>
+  <path d="M70,86.5 H920.0" fill="none" stroke="#1B4B6B" stroke-width="1.2"/>
+  <rect x="83.5" y="86.5" width="43.9" height="53.6" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="105.4" y="150.0" text-anchor="middle" font-size="9.5">-0.0607</text>
+  <text x="105.4" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">a.piecewise</text>
+  <rect x="154.3" y="76.6" width="43.9" height="9.9" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="176.2" y="72.6" text-anchor="middle" font-size="9.5">+0.0112</text>
+  <text x="176.2" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">a.knn</text>
+  <rect x="225.1" y="86.5" width="43.9" height="116.6" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="247.1" y="213.1" text-anchor="middle" font-size="9.5">-0.1322</text>
+  <text x="247.1" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">c.soft_rw</text>
+  <rect x="296.0" y="86.5" width="43.9" height="78.4" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="317.9" y="174.9" text-anchor="middle" font-size="9.5">-0.0889</text>
+  <text x="317.9" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">c.best_mode</text>
+  <rect x="366.8" y="86.5" width="43.9" height="17.5" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="388.8" y="113.9" text-anchor="middle" font-size="9.5">-0.0198</text>
+  <text x="388.8" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">d.l3+glob</text>
+  <rect x="437.6" y="86.5" width="43.9" height="19.7" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="459.6" y="116.1" text-anchor="middle" font-size="9.5">-0.0223</text>
+  <text x="459.6" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">d.l3+hist</text>
+  <rect x="508.5" y="67.0" width="43.9" height="19.5" fill="#39FF88" stroke="#39FF88" fill-opacity="0.22"/>
+  <text x="530.4" y="63.0" text-anchor="middle" font-size="9.5">+0.0221</text>
+  <text x="530.4" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">e.film_cached</text>
+  <rect x="579.3" y="66.8" width="43.9" height="19.7" fill="#39FF88" stroke="#39FF88" fill-opacity="0.22"/>
+  <text x="601.2" y="62.8" text-anchor="middle" font-size="9.5">+0.0223</text>
+  <text x="601.2" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">e.film_headtail</text>
+  <rect x="650.1" y="86.5" width="43.9" height="34.9" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="672.1" y="131.4" text-anchor="middle" font-size="9.5">-0.0396</text>
+  <text x="672.1" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">b.deepsets</text>
+  <rect x="721.0" y="86.5" width="43.9" height="39.5" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="742.9" y="136.0" text-anchor="middle" font-size="9.5">-0.0448</text>
+  <text x="742.9" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">b.set_attn</text>
+  <rect x="791.8" y="86.5" width="43.9" height="85.2" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="813.8" y="181.7" text-anchor="middle" font-size="9.5">-0.0966</text>
+  <text x="813.8" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">b.hashed</text>
+  <rect x="862.6" y="86.5" width="43.9" height="17.9" fill="#FF4D6A" stroke="#FF4D6A" fill-opacity="0.22"/>
+  <text x="884.6" y="114.4" text-anchor="middle" font-size="9.5">-0.0203</text>
+  <text x="884.6" y="224.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">b.hashed+l3</text>
+  <text x="70" y="240" font-size="9" fill="#4F7486">Source: results/E13_l3_extreme_2026-09-23.md lines 9-20, and the same values in the JSON under arms.*</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the twelve deltas on the gate table. Green bars are the two FiLM arms that passed the numeric gate; both were re-scored and shipped the same pick count as the recorded reward, so the pass is a between-task calibration effect, not a picking gain.</p>
+
+<table>
+<thead><tr><th>Arm</th><th class="size">&Delta;AUC vs L3</th><th class="size">CI lo</th><th>Gate</th></tr></thead>
+<tbody>
+<tr><td class="sym">a_geometry.piecewise_kmeans</td><td class="size">-0.0607</td><td class="size">-0.1007</td><td><span class="chip err">no</span> R&sup2; of w by k=8 clusters 0.6356</td></tr>
+<tr><td class="sym">a_geometry.knn_smoothing</td><td class="size">+0.0112</td><td class="size">-0.0307</td><td><span class="chip err">no</span></td></tr>
+<tr><td class="sym">c_noise_first.soft_rw</td><td class="size">-0.1322</td><td class="size">-0.2009</td><td><span class="chip err">no</span></td></tr>
+<tr><td class="sym">c_noise_first.best_mode</td><td class="size">-0.0889</td><td class="size">-0.1487</td><td><span class="chip err">no</span> best mode rw_only 0.6171</td></tr>
+<tr><td class="sym">d_base_rates.l3_plus_glob</td><td class="size">-0.0198</td><td class="size">-0.0571</td><td><span class="chip err">no</span></td></tr>
+<tr><td class="sym">d_base_rates.l3_plus_hist</td><td class="size">-0.0223</td><td class="size">-0.0624</td><td><span class="chip err">no</span></td></tr>
+<tr><td class="sym">e_goal_conditioning.film_cached</td><td class="size">+0.0221</td><td class="size">+0.0005</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td class="sym">e_goal_conditioning.film_headtail</td><td class="size">+0.0223</td><td class="size">+0.0006</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td class="sym">b_set_attention.deepsets</td><td class="size">-0.0396</td><td class="size">-0.0589</td><td><span class="chip err">no</span> 102 817 params</td></tr>
+<tr><td class="sym">b_set_attention.set_attention</td><td class="size">-0.0448</td><td class="size">-0.0589</td><td><span class="chip err">no</span> 112 321 params</td></tr>
+<tr><td class="sym">b_set_attention.hashed_pairwise</td><td class="size">-0.0966</td><td class="size">-0.1239</td><td><span class="chip err">no</span> 285 params</td></tr>
+<tr><td class="sym">b_set_attention.hashed_pairwise_plus_l3</td><td class="size">-0.0203</td><td class="size">-0.0333</td><td><span class="chip err">no</span> 669 params</td></tr>
+</tbody>
+</table>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>L3 LOTO AUC-SR anchor (E5 target 0.753)</td><td class="size">0.7531</td><td class="sym">results/E13_l3_extreme_2026-09-23.json L12</td></tr>
+<tr><td>Sane-universe L3 LOTO AUC-SR</td><td class="size">0.7241</td><td class="sym">same file, L22</td></tr>
+<tr><td>L3b hard baseline, sane LOTO</td><td class="size">0.7060</td><td class="sym">same file, L7387</td></tr>
+<tr><td>FiLM cached / head+tail pooled AUC</td><td class="size">0.7753 / 0.7754</td><td class="sym">same file, L8767 and L8857</td></tr>
+<tr><td>Arm-b L3 baselines on 40 seeds</td><td class="size">0.7628 inner-CV, 0.7351 fixed C</td><td class="sym">E13_l3_extreme_2026-09-23.md L40</td></tr>
+<tr><td>Goal-only probe AUC</td><td class="size">0.6590</td><td class="sym">E13_...json L8946</td></tr>
+<tr><td>Goal units over the 256-token window</td><td class="size">123 of 128</td><td class="sym">same file, L7857</td></tr>
+<tr><td>Replay: recorded reward / uniform ships</td><td class="size">35 / 36 of 93</td><td class="sym">same file, L9053 and L9065</td></tr>
+<tr><td>Replay: film_cached / film_headtail ships</td><td class="size">35 / 35 of 93</td><td class="sym">same file, L9081 and L9093</td></tr>
+<tr><td>Replay: oracle winnable tasks</td><td class="size">40 of 93</td><td class="sym">same file, L9059</td></tr>
+<tr><td>VER shipped by the two FiLM arms</td><td class="size">81 vs 83 for the baselines</td><td class="sym">same file, L9083</td></tr>
+<tr><td>LLM API calls in the whole experiment</td><td class="size">0</td><td class="sym">same file, L9118</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: two arms cleared the numeric gate and still moved no pick, so between-task AUC and within-task picking are separate questions. That result is what closed the capacity line and pointed E14 at a tournament instead.</p>
+<p class="note flag">Mismatch to state: the gate rule compares pooled AUC and a cluster-bootstrap CI, while the acceptance test is the E9 replay pick count. Both FiLM arms pass the first and tie the second, so the gate and the acceptance test do not agree on this pair of arms (md L22).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>8 key lines from the E13 result files</summary><div class="dbody">
+<blockquote>**Numerical gate passed by ['e_goal_conditioning.film_cached', 'e_goal_conditioning.film_headtail']** &mdash; but the pass is a between-task calibration artifact, and the acceptance replay resolves it: E9-protocol SR shipped {'e_goal_conditioning.film_cached': 35, 'e_goal_conditioning.film_headtail': 35} vs recorded reward 35 (uniform 36, oracle 40) &mdash; **zero picking delta**.</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E13_l3_extreme_2026-09-23.md</code> line 22 (quoted to the end of the sentence; the em dashes are in the source).</p>
+<blockquote>L3 anchor reproduced at LOTO auc_sr = **0.7531** (E5 target 0.753; asserted before any comparison). Sane-universe L3 LOTO = 0.7241.</blockquote>
+<p class="sub">Same file, line 26.</p>
+<blockquote>| a_geometry.piecewise_kmeans | -0.0607 | -0.1007 | no |
+| a_geometry.knn_smoothing | +0.0112 | -0.0307 | no |</blockquote>
+<p class="sub">Same file, lines 9&ndash;10 (the gate table runs L7&ndash;L20).</p>
+<blockquote>| e_goal_conditioning.film_cached | +0.0221 | +0.0005 | PASS |</blockquote>
+<p class="sub">Same file, line 15.</p>
+<blockquote>- manifold quantification: R² of learned w(c) explained by k=8 claim clusters = 0.6356; 2-D UMAP colored by w(c) &rarr; `E13_umap_claims_2026-09-23.png`</blockquote>
+<p class="sub">Same file, line 33 (the R&sup2; is the source of the note on the piecewise row above).</p>
+<blockquote> "pooled_auc_arm": 0.7752718485702779,</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E13_l3_extreme_2026-09-23.json</code> line 8767, inside <code>arms.e_goal_conditioning.film_cached_paired_vs_l3</code>.</p>
+<blockquote> "n_units_over_256_tokens": 123,</blockquote>
+<p class="sub">Same file, line 7857, inside the prefix-domination diagnosis.</p>
+<blockquote> "rule": "LOTO arms: pooled AUC delta &gt;= +0.02 with cluster-bootstrap CI excluding 0; arm b: mean paired seed delta &gt;= +0.02 with t CI excluding 0",</blockquote>
+<p class="sub">Same file, line 8971, under <code>gate</code>. The same string is built in <code>e13_l3_extreme.py</code> L1193&ndash;1194.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e13_l3_extreme.py</code> (1 444 lines: stages, scorers, gate rule, report body), <code class="path">experiments_verifiers/harness/e13_common.py</code> (255 lines, the shared fold and statistics layer), <code class="path">experiments_verifiers/results/E13_l3_extreme_2026-09-23.md</code> (80 lines), <code class="path">experiments_verifiers/results/E13_l3_extreme_2026-09-23.json</code> (9 120 lines, read by <code>json.load</code> and by line), <code class="path">experiments_verifiers/results/_cache_e5_embeddings.npz</code> (key shapes only: 2 480 names, 384-d), <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code> (codename table: E13 = NEO), <code class="path">experiments_verifiers/harness/e5_common.py</code> and <code class="path">e9_deployment.py</code> for the reused metrics. Line counts from <code>wc -l</code>; the 12 deltas are quoted, not recomputed.</p>
+<p class="skips">Skipped, with reason: <code>experiments_verifiers/.env</code> (key material, never opened); <code>results/E19_claims_2026-09-23.jsonl</code>, <code>E19_scores_2026-09-23.jsonl</code> and every E14+ result (later experiments, other pages); the arm-c scorer-code archives (the sibling harnesses own them); the per-fold and per-seed arrays inside the JSON (thousands of rows; the aggregate lines are quoted instead); <code>harness/e5b_splits.py</code> (imported by <code>stage_b</code> at L385, its own page is out of scope); <code>results/E13_umap_claims_2026-09-23.png</code> (owned by <a href="exp_e13_umap.html">exp_e13_umap.html</a>; only its size is cited there); no experiment, application, or pytest run, per the build rules.</p>
+<p>experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

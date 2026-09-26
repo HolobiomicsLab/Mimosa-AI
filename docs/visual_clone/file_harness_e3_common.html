@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e3_common.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e3_common.py">
+<div class="wrap">
+<h1 class="hud">e3_common.py</h1>
+<p class="intro">This file is the E3 shared harness: it loads the frozen population, builds bounded workspace evidence packets, and wraps litellm in a disk-cached async client. It has no command line; the three E3 runners and the judge module import it as <code>C</code>. The evidence budget (10 files, 2 KB heads, 24 000 characters) is what keeps every judge prompt small L113&#8211;L114.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what e3_common.py does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 400" role="img" aria-label="e3_common.py: callers feed load_population and the evidence packet builders; LLMClient.complete caches litellm calls; extract_json parses replies">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="bCall">
+    <title>Importers: the three E3 runners and the scorer module</title>
+    <rect x="20" y="25" width="250" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="51" text-anchor="middle">E3 runners + judge</text>
+    <text class="box-sub" x="145" y="66" text-anchor="middle">e3_run L26 · e3_run2 L30</text>
+    <text class="box-sub" x="145" y="81" text-anchor="middle">e3_md L10 · llm_judge_ensemble L19</text>
+  </g>
+  <g class="box" id="bPop">
+    <title>load_population L31</title>
+    <rect x="305" y="25" width="200" height="74" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="405" y="51" text-anchor="middle">load_population</text>
+    <text class="box-sub" x="405" y="66" text-anchor="middle">L31 · filter rows L35</text>
+    <text class="box-sub" x="405" y="81" text-anchor="middle">returns list[dict] L54</text>
+  </g>
+  <g class="box" id="bEvid">
+    <title>build_evidence L98</title>
+    <rect x="540" y="25" width="230" height="74" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="655" y="51" text-anchor="middle">build_evidence</text>
+    <text class="box-sub" x="655" y="66" text-anchor="middle">L98 · listing + previews</text>
+    <text class="box-sub" x="655" y="81" text-anchor="middle">budget 24 000 L113</text>
+  </g>
+  <g class="box" id="bIn">
+    <title>Read-only inputs</title>
+    <rect x="810" y="25" width="290" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="955" y="51" text-anchor="middle">frozen inputs</text>
+    <text class="box-sub" x="955" y="66" text-anchor="middle">manifest.json L34</text>
+    <text class="box-sub" x="955" y="81" text-anchor="middle">snapshots under workspace_artefacts L18</text>
+  </g>
+  <g class="box" id="bList">
+    <title>build_listing L76</title>
+    <rect x="20" y="144" width="185" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="112" y="176" text-anchor="middle">build_listing</text>
+    <text class="box-sub" x="112" y="190" text-anchor="middle">L76 · cap 200 L87</text>
+  </g>
+  <g class="box" id="bHelp">
+    <title>Small readers</title>
+    <rect x="235" y="144" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="350" y="168" text-anchor="middle">helpers</text>
+    <text class="box-sub" x="350" y="183" text-anchor="middle">_safe_read_head L57</text>
+    <text class="box-sub" x="350" y="198" text-anchor="middle">image_info L66 · goal_files L92</text>
+  </g>
+  <g class="box" id="bOnly">
+    <title>build_listing_only L136</title>
+    <rect x="500" y="144" width="250" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="625" y="176" text-anchor="middle">build_listing_only</text>
+    <text class="box-sub" x="625" y="190" text-anchor="middle">L136 · paths and sizes only</text>
+  </g>
+  <g class="box" id="bJson">
+    <title>extract_json L246</title>
+    <rect x="790" y="144" width="310" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="945" y="176" text-anchor="middle">extract_json</text>
+    <text class="box-sub" x="945" y="190" text-anchor="middle">L246 · first complete { } block</text>
+  </g>
+  <g class="box" id="bComplete">
+    <title>LLMClient.complete L203</title>
+    <rect x="20" y="264" width="250" height="80" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="145" y="293" text-anchor="middle">LLMClient.complete</text>
+    <text class="box-sub" x="145" y="308" text-anchor="middle">L203 · cache hit, else call</text>
+    <text class="box-sub" x="145" y="323" text-anchor="middle">3x token retry L226</text>
+  </g>
+  <g class="box" id="bRaw">
+    <title>_raw L181</title>
+    <rect x="305" y="264" width="200" height="80" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="405" y="293" text-anchor="middle">_raw</text>
+    <text class="box-sub" x="405" y="308" text-anchor="middle">L181 · usage slot L195</text>
+    <text class="box-sub" x="405" y="323" text-anchor="middle">temperature 0 L184</text>
+  </g>
+  <g class="box" id="bLite">
+    <title>provider call</title>
+    <rect x="540" y="264" width="230" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="655" y="293" text-anchor="middle">litellm.acompletion</text>
+    <text class="box-sub" x="655" y="308" text-anchor="middle">L183 · num_retries 3</text>
+    <text class="box-sub" x="655" y="323" text-anchor="middle">timeout 300 L186</text>
+  </g>
+  <g class="box" id="bCache">
+    <title>disk cache</title>
+    <rect x="810" y="264" width="290" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="955" y="293" text-anchor="middle">E3_llm_cache.json</text>
+    <text class="box-sub" x="955" y="308" text-anchor="middle">loaded L173 · written L237</text>
+    <text class="box-sub" x="955" y="323" text-anchor="middle">tmp then replace L240</text>
+  </g>
+  <path class="edge" data-from="bCall" data-to="bPop" d="M270,62 H305" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="287" y="54" text-anchor="middle">C.load_population L40</text>
+  <path class="edge" data-from="bCall" data-to="bComplete" d="M60,99 V264" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="66" y="182" text-anchor="start">C.LLMClient L426</text>
+  <path class="edge" data-from="bCall" data-to="bJson" d="M250,99 V122 H945 V144" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="116" text-anchor="middle">extract_json L224</text>
+  <path class="edge" data-from="bCall" data-to="bOnly" d="M270,88 C300,118 560,120 620,144" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="430" y="112" text-anchor="middle">build_listing_only L220</text>
+  <path class="edge dashed-edge" data-from="bIn" data-to="bPop" d="M950,25 V12 H405 V25" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="660" y="9" text-anchor="middle">manifest rows L34</text>
+  <path class="edge dashed-edge" data-from="bIn" data-to="bEvid" d="M810,62 H770" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="790" y="54" text-anchor="middle">snapshot files L116</text>
+  <path class="edge" data-from="bEvid" data-to="bList" d="M560,99 C510,118 430,124 400,144" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="134" text-anchor="middle">calls L101</text>
+  <path class="edge" data-from="bEvid" data-to="bHelp" d="M655,99 C645,118 620,128 605,144" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="120" text-anchor="start">calls L105 to L125</text>
+  <path class="edge" data-from="bOnly" data-to="bList" d="M690,214 V240 H112 V214" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="236" text-anchor="middle">calls L137</text>
+  <path class="edge" data-from="bComplete" data-to="bRaw" d="M270,304 H305" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="287" y="296" text-anchor="middle">calls L215</text>
+  <path class="edge" data-from="bRaw" data-to="bLite" d="M505,304 H540" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="522" y="296" text-anchor="middle">calls L183</text>
+  <path class="edge dashed-edge" data-from="bComplete" data-to="bCache" d="M145,344 V362 H955 V344" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="550" y="376" text-anchor="middle">save L218</text>
+
+  <text class="box-sub" x="20" y="396">solid = call  |  dashed = reads / writes  |  dotted = import only  |  12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; three sections share one file: population loading L31, the evidence packet L98, and the cached LLM client L166. The callers at left import the module as <code>C</code> and pick the pieces they need.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: frozen inputs in, rows and cached text out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 290" role="img" aria-label="e3_common.py data flow: manifest, snapshots and .env keys in; returned values and one cache file out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="f1">
+    <title>Frozen input</title>
+    <rect x="20" y="30" width="230" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="56" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="135" y="71" text-anchor="middle">rows read L34</text>
+    <text class="box-sub" x="135" y="86" text-anchor="middle">goal from note_file L42</text>
+  </g>
+  <g class="box" id="f2">
+    <title>Frozen input</title>
+    <rect x="20" y="180" width="230" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="206" text-anchor="middle">snapshots</text>
+    <text class="box-sub" x="135" y="221" text-anchor="middle">workspace_artefacts/snapshots L18</text>
+    <text class="box-sub" x="135" y="236" text-anchor="middle">opened read-only L116</text>
+  </g>
+  <g class="box" id="f3">
+    <title>Key file, not quoted here</title>
+    <rect x="290" y="180" width="230" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="405" y="206" text-anchor="middle">REPO/.env</text>
+    <text class="box-sub" x="405" y="221" text-anchor="middle">load_dotenv L154</text>
+    <text class="box-sub" x="405" y="236" text-anchor="middle">os.environ.setdefault L163</text>
+  </g>
+  <g class="box" id="fmid">
+    <title>The three sections</title>
+    <rect x="290" y="30" width="300" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="440" y="66" text-anchor="middle">module functions</text>
+    <text class="box-sub" x="440" y="82" text-anchor="middle">load_population L31 · build_evidence L98</text>
+    <text class="box-sub" x="440" y="96" text-anchor="middle">complete L203 · extract_json L246</text>
+    <text class="box-sub" x="440" y="112" text-anchor="middle">returns rows, evidence text, dict</text>
+  </g>
+  <g class="box" id="f4">
+    <title>Only file written</title>
+    <rect x="660" y="30" width="350" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="835" y="56" text-anchor="middle">results/E3_llm_cache.json</text>
+    <text class="box-sub" x="835" y="71" text-anchor="middle">written by save L237–L240</text>
+    <text class="box-sub" x="835" y="86" text-anchor="middle">one JSON blob per key</text>
+  </g>
+  <g class="box" id="f5">
+    <title>Return values</title>
+    <rect x="660" y="180" width="350" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="835" y="206" text-anchor="middle">returned values</text>
+    <text class="box-sub" x="835" y="221" text-anchor="middle">list[dict] L54 · str L98</text>
+    <text class="box-sub" x="835" y="236" text-anchor="middle">dict or None L246</text>
+  </g>
+  <path class="edge dashed-edge" data-from="f1" data-to="fmid" d="M250,67 H290" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="270" y="59" text-anchor="middle">rows L34</text>
+  <path class="edge dashed-edge" data-from="f2" data-to="fmid" d="M250,217 C270,217 280,180 300,140" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="200" y="150" text-anchor="middle">previews L125</text>
+  <path class="edge dashed-edge" data-from="f3" data-to="fmid" d="M405,180 V140" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="415" y="166" text-anchor="start">keys L163</text>
+  <path class="edge dashed-edge" data-from="fmid" data-to="f4" d="M590,67 H660" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="625" y="59" text-anchor="middle">save L237</text>
+  <path class="edge dashed-edge" data-from="fmid" data-to="f5" d="M590,110 C620,150 620,190 660,215" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="150" text-anchor="middle">return</text>
+
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; config fields read: none (this module never builds a <code>Config</code>). It reads three frozen inputs and writes one file, the LLM cache passed in at L169. <code>load_dotenv</code> sets keys in <code>os.environ</code> L163 and returns None.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; logic: cache rule, preview budget, JSON scan</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 536" role="img" aria-label="e3_common.py logic: cached completion with 3x token retry, evidence preview budget, brace-depth JSON scan">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <defs>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+  </defs>
+  <g class="box" id="c0">
+    <rect x="20" y="36" width="250" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="64" text-anchor="middle">cache hit, text >= 30?</text>
+    <text class="box-sub" x="145" y="80" text-anchor="middle">complete L209</text>
+  </g>
+  <g class="box" id="c0y">
+    <rect x="320" y="36" width="240" height="64" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="440" y="64" text-anchor="middle">return cached text</text>
+    <text class="box-sub" x="440" y="80" text-anchor="middle">L210</text>
+  </g>
+  <g class="box" id="c0n">
+    <rect x="320" y="130" width="240" height="64" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="440" y="158" text-anchor="middle">call _raw, store</text>
+    <text class="box-sub" x="440" y="174" text-anchor="middle">L215 · cache write L216</text>
+  </g>
+  <g class="box" id="c1">
+    <rect x="640" y="130" width="340" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="810" y="158" text-anchor="middle">text >= 30 chars?</text>
+    <text class="box-sub" x="810" y="174" text-anchor="middle">L222 · yes returns L223</text>
+  </g>
+  <g class="box" id="c1n">
+    <rect x="620" y="240" width="300" height="64" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="770" y="268" text-anchor="middle">retry once at 3x tokens</text>
+    <text class="box-sub" x="770" y="284" text-anchor="middle">key suffix L225 · call L227</text>
+  </g>
+  <g class="box" id="c2">
+    <rect x="20" y="352" width="260" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="373" text-anchor="middle">files left and budget?</text>
+    <text class="box-sub" x="150" y="388" text-anchor="middle">max_files 10 L114</text>
+    <text class="box-sub" x="150" y="403" text-anchor="middle">budget 24 000 L113</text>
+  </g>
+  <g class="box" id="c2a">
+    <rect x="320" y="352" width="220" height="64" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="430" y="380" text-anchor="middle">binary extension?</text>
+    <text class="box-sub" x="430" y="396" text-anchor="middle">skip L118</text>
+  </g>
+  <g class="box" id="c2b">
+    <rect x="580" y="352" width="230" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="695" y="373" text-anchor="middle">image extension?</text>
+    <text class="box-sub" x="695" y="388" text-anchor="middle">size only L121</text>
+    <text class="box-sub" x="695" y="403" text-anchor="middle">budget minus 200</text>
+  </g>
+  <g class="box" id="c2c">
+    <rect x="850" y="352" width="250" height="64" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="975" y="380" text-anchor="middle">text file: first 2KB</text>
+    <text class="box-sub" x="975" y="396" text-anchor="middle">budget minus size L127</text>
+  </g>
+  <g class="box" id="c3">
+    <rect x="20" y="448" width="260" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="476" text-anchor="middle">first { found?</text>
+    <text class="box-sub" x="150" y="492" text-anchor="middle">extract_json L251</text>
+  </g>
+  <g class="box" id="c3n">
+    <rect x="320" y="448" width="220" height="64" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="430" y="476" text-anchor="middle">return None</text>
+    <text class="box-sub" x="430" y="492" text-anchor="middle">L252</text>
+  </g>
+  <g class="box" id="c3y">
+    <rect x="580" y="448" width="400" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="780" y="469" text-anchor="middle">depth 0 and parses?</text>
+    <text class="box-sub" x="780" y="484" text-anchor="middle">json.loads L259 · then return dict</text>
+    <text class="box-sub" x="780" y="499" text-anchor="middle">bad JSON: keep scanning L262</text>
+  </g>
+  <path class="edge" data-from="c0" data-to="c0y" d="M270,68 H320" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="293" y="60" text-anchor="middle">yes</text>
+  <path class="edge" data-from="c0" data-to="c0n" d="M145,100 V130 H320" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="215" y="124" text-anchor="middle">no</text>
+  <path class="edge" data-from="c0n" data-to="c1" d="M560,162 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="154" text-anchor="middle">text out</text>
+  <path class="edge" data-from="c1" data-to="c1n" d="M680,194 C660,216 645,224 640,240" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="690" y="222" text-anchor="start">no</text>
+  <path class="edge" data-from="c2" data-to="c2a" d="M280,384 H320" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="300" y="376" text-anchor="middle">loop</text>
+  <path class="edge" data-from="c2a" data-to="c2b" d="M540,384 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="376" text-anchor="middle">else</text>
+  <path class="edge" data-from="c2b" data-to="c2c" d="M810,384 H850" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="830" y="376" text-anchor="middle">else</text>
+  <path class="edge" data-from="c3" data-to="c3n" d="M280,480 H320" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="300" y="472" text-anchor="middle">no</text>
+  <path class="edge" data-from="c3" data-to="c3y" d="M150,448 V420 H700 V420 V448" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="430" y="414" text-anchor="middle">yes</text>
+
+  <text class="box-sub" x="20" y="22">lane 1: LLMClient.complete L203</text>
+  <text class="box-sub" x="20" y="342">lane 2: build_evidence preview loop L114</text>
+  <text class="box-sub" x="20" y="438">lane 3: extract_json L246</text>
+  <text class="box-sub" x="20" y="530">green = continue, red = reject or skip, amber = retry. The retry at L226 has no second length test: whatever it returns is returned.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; three rules carry the behaviour: the cache-and-retry rule of <code>complete</code> L209&#8211;L231, the two-limit preview loop of <code>build_evidence</code> L114&#8211;L127, and the brace-depth scan of <code>extract_json</code> L251&#8211;L262.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">manifest.json</td><td>file, <code>experiments_verifiers/</code></td><td>population rows and their SR, VER, CBS, reward</td><td class="size">L34</td></tr>
+<tr><td>reads</td><td class="sym">note_file of each row</td><td>file, path taken from the manifest row</td><td>the task goal text, cached per path</td><td class="size">L36&#8211;L42</td></tr>
+<tr><td>reads</td><td class="sym">snapshot files</td><td>dir, <code>workspace_artefacts/snapshots/&lt;uuid_long&gt;</code></td><td>file listing, text head, image size</td><td class="size">L18 L116 L125</td></tr>
+<tr><td>reads</td><td class="sym">REPO/.env</td><td>file, repo root, via <code>load_dotenv</code></td><td>API keys into <code>os.environ</code>, never printed</td><td class="size">L154&#8211;L163</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no Config object and no env var</td><td>constants <code>MODELS</code> L144 and <code>PRICING_PER_TOKEN</code> L148 instead</td><td class="size">L144 L148</td></tr>
+<tr><td>state</td><td class="sym">none</td><td>no state key; the cache path is an argument</td><td>callers own the state files</td><td class="size">L169</td></tr>
+<tr><td>writes</td><td class="sym">cache JSON</td><td>path given to <code>LLMClient</code></td><td>one entry per model plus messages hash</td><td class="size">L237&#8211;L240</td></tr>
+<tr><td>returns</td><td class="sym">list[dict]</td><td><code>load_population</code> L31</td><td>rows with goal, labels and workspace path</td><td class="size">L48&#8211;L54</td></tr>
+<tr><td>returns</td><td class="sym">str</td><td><code>build_evidence</code> L98, <code>build_listing_only</code> L136</td><td>the prompt payload for a judge call</td><td class="size">L98 L136</td></tr>
+<tr><td>returns</td><td class="sym">str</td><td><code>complete</code> L203</td><td>the model reply, cached on disk</td><td class="size">L203&#8211;L231</td></tr>
+<tr><td>returns</td><td class="sym">dict or None</td><td><code>extract_json</code> L246</td><td>parsing the reply of a judge</td><td class="size">L246&#8211;L262</td></tr>
+</tbody>
+</table>
+<p class="note say">One file, three jobs: frozen-population loading, bounded workspace evidence, and a cached async LLM client. The budget caps at L113 and L114 are what keep a judge prompt small.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>1 class, 15 callables, 9 module constants &mdash; signatures and roles</summary><div class="dbody">
+<pre>load_population() -&gt; list[dict]                                     L31   manifest rows with snapshots
+_safe_read_head(path: Path, n: int = 2048) -&gt; str                   L57   first n bytes, decode with replace
+image_info(path: Path) -&gt; str                                       L66   PIL size line, else byte count
+build_listing(ws: str, cap: int = 200) -&gt; list[tuple[str, int]]     L76   relative path plus size, capped
+goal_files(goal: str) -&gt; set[str]                                   L92   paths the goal text names
+build_evidence(ws, goal, max_files=10, head_bytes=2048) -&gt; str      L98   listing plus bounded previews
+build_listing_only(ws: str) -&gt; str                                  L136  listing without previews
+load_dotenv(path: Path | None = None) -&gt; None                       L154  set missing env keys from .env
+extract_json(text: str) -&gt; dict | None                              L246  first complete JSON object
+LLMClient.__init__(self, cache_path: Path, concurrency: int = 8)    L169  load cache, semaphore, usage map
+LLMClient._key(model, messages) -&gt; str                              L178  sha256 of model plus messages
+LLMClient._raw(model, messages, max_tokens) -&gt; str                  L181  litellm call, token and cost log
+LLMClient.complete(model, messages, max_tokens=6000, label="")      L203  cached reply, one 3x retry
+LLMClient._maybe_save(self) -&gt; None                                 L233  save every 10 calls
+LLMClient.save(self) -&gt; None                                        L237  write cache via tmp then replace
+class LLMClient                                                     L166  async wrapper with disk cache</pre>
+<p>Module constants: <code>EXP</code> L15, <code>REPO</code> L16, <code>RESULTS</code> L17, <code>SNAPSHOTS</code> L18, <code>TEXT_EXTS</code> L20, <code>BINARY_EXTS</code> L24, <code>IMAGE_EXTS</code> L25, <code>MODELS</code> L144, <code>PRICING_PER_TOKEN</code> L148. Imports: <code>asyncio</code>, <code>hashlib</code>, <code>json</code>, <code>os</code>, <code>re</code>, <code>time</code> L5&#8211;L10, <code>Path</code> L11; <code>litellm</code> is imported inside <code>_raw</code> L182, <code>PIL</code> inside <code>image_info</code> L68.</p>
+<p>There is no <code>if __name__ == "__main__"</code> guard: importing the module runs nothing but the constant assignments L15&#8211;L148.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e3_run.py">harness/e3_run.py</a></td><td><code>import e3_common as C</code> L26</td><td class="sym">load_population L40 · goal_files L108 · MODELS L216 · build_listing_only L220 · extract_json L224 · load_dotenv L425 · LLMClient L426</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e3_run2.py">harness/e3_run2.py</a></td><td><code>import e3_common as C</code> L30</td><td class="sym">MODELS L53 · PRICING_PER_TOKEN L54 · load_dotenv L488 · LLMClient L489 · RESULTS L37</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e3_md.py">harness/e3_md.py</a></td><td><code>import e3_common as C</code> L10</td><td class="sym">RESULTS L24 and L123 only</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/scorers/llm_judge_ensemble.py">scorers/llm_judge_ensemble.py</a></td><td><code>import e3_common as C</code> L19</td><td class="sym">MODELS L151 · build_listing_only L152 · extract_json L159 · build_evidence L181</td></tr>
+<tr><td class="sym">tests/</td><td>no test found</td><td class="sym">grep of <code>tests/</code> for <code>e3_common</code> returns nothing</td></tr>
+</tbody>
+</table>
+<p>This module is a library, so it has no command-line entry point. It is reached only through the imports above. Its pages are <a href="file_index.html">file_index.html</a>, <a href="exp_e3_common.html">exp_e3_common.html</a> and <a href="exp_index.html">exp_index.html</a>.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e3_common.html">exp_e3_common.html</a>, <a href="file_harness_e3_run.html">e3_run.py</a>, <a href="file_harness_e3_run2.html">e3_run2.py</a>, <a href="file_harness_e3_md.html">e3_md.py</a>, <a href="exp_index.html">exp_index.html</a>, <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e3_common.py</code> (264 lines, whole file), import and call sites in <code class="path">harness/e3_run.py</code>, <code class="path">harness/e3_run2.py</code>, <code class="path">harness/e3_md.py</code> and <code class="path">scorers/llm_judge_ensemble.py</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>, plus greps over the repo and <code class="path">tests/</code> for importers.</p>
+<p class="skips">Skipped, with reason: <code class="path">.env</code> and <code class="path">experiments_verifiers/.env</code> (never opened, secrets; only the key names inside <code>load_dotenv</code> are described and no key name is printed); <code class="path">scorers/llm_judge_ensemble.py</code> bodies beyond the call sites listed above (a different file, page exists as <code class="path">exp_e3_common.html</code> scope); <code class="path">results/E3_llm_cache.json</code> contents (a cache, not evidence); the snapshot workspaces (their file names are the E3 experiment scope); compiled <code class="path">__pycache__</code>. Nothing in this file was executed and no pytest ran.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

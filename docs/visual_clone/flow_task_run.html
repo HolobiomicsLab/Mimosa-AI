@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Task run flow - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > flows > task run">
+<div class="wrap">
+
+<h1 class="hud">Task run flow</h1>
+<p class="intro">One task, from the command line to one scored workflow folder on disk. This page covers <code>uv run main.py --task "..."</code> without <code>--learn</code>, and the same command up to the first generation with <code>--learn</code>. Nothing here runs the application; every step was read from the code.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Sequence - one task run</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1160 780" role="img" aria-label="Sequence diagram of one task run across seven lanes">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="l1" href="area_entry_config.html">
+    <title>CLI</title>
+    <rect x="17" y="26" width="146" height="44" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="90" y="53" text-anchor="middle">CLI</text>
+  </a>
+  <path d="M 90,70 V 764" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="l2" href="area_entry_config.html">
+    <title>Config</title>
+    <rect x="177" y="26" width="146" height="44" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="250" y="53" text-anchor="middle">Config</text>
+  </a>
+  <path d="M 250,70 V 764" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="l3" href="mod_core_evolution_engine.html">
+    <title>EvolutionEngine</title>
+    <rect x="337" y="26" width="146" height="44" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="410" y="53" text-anchor="middle">EvolutionEngine</text>
+  </a>
+  <path d="M 410,70 V 764" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="l4" href="area_sources_core.html">
+    <title>WorkflowFactory</title>
+    <rect x="497" y="26" width="146" height="44" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="570" y="53" text-anchor="middle">WorkflowFactory</text>
+  </a>
+  <path d="M 570,70 V 764" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="l5" href="mod_core_runner.html">
+    <title>Runner/sandbox</title>
+    <rect x="657" y="26" width="146" height="44" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="730" y="53" text-anchor="middle">Runner/sandbox</text>
+  </a>
+  <path d="M 730,70 V 764" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="l6" href="data_runs.html">
+    <title>Workspace disk</title>
+    <rect x="817" y="26" width="146" height="44" rx="12" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="890" y="53" text-anchor="middle">Workspace disk</text>
+  </a>
+  <path d="M 890,70 V 764" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="l7" href="mod_evaluators_hybrid_verifier.html">
+    <title>Verifier</title>
+    <rect x="977" y="26" width="146" height="44" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1050" y="53" text-anchor="middle">Verifier</text>
+  </a>
+  <path d="M 1050,70 V 764" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <g>
+    <title>main.py::apply_config_overrides</title>
+    <path class="edge" data-from="l1" data-to="l2" d="M 90,100 H 250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="170.0" y="94" text-anchor="middle">1 args override</text>
+  </g>
+  <g>
+    <title>sources/utils/precheck.py::PreCheck.run</title>
+    <path class="edge" data-from="l1" data-to="l2" d="M 90,144 H 250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="170.0" y="138" text-anchor="middle">2 provider precheck</text>
+  </g>
+  <g>
+    <title>config.py::Config.create_paths</title>
+    <path class="edge" data-from="l1" data-to="l6" d="M 90,188 H 890" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="490.0" y="182" text-anchor="middle">3 creates dirs</text>
+  </g>
+  <g>
+    <title>main.py::normal_execution_mode</title>
+    <path class="edge" data-from="l1" data-to="l3" d="M 90,232 H 410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="250.0" y="226" text-anchor="middle">4 goal str</text>
+  </g>
+  <g>
+    <title>sources/utils/workspace_management.py::WorkspaceManager.begin_session</title>
+    <path class="edge" data-from="l3" data-to="l6" d="M 410,276 H 890" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="650.0" y="270" text-anchor="middle">5 snapshot initial</text>
+  </g>
+  <g>
+    <title>sources/core/orchestrator.py::WorkflowOrchestrator.orchestrate_workflow</title>
+    <path class="edge" data-from="l3" data-to="l4" d="M 410,320 H 570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="490.0" y="314" text-anchor="middle">6 craft instructions</text>
+  </g>
+  <g>
+    <title>sources/core/factory.py::Factory.save_workflow_files</title>
+    <path class="edge dashed-edge" data-from="l4" data-to="l6" d="M 570,364 H 890" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+    <text class="edge-label" x="730.0" y="358" text-anchor="middle">7 genotype file</text>
+  </g>
+  <g>
+    <title>sources/core/workflow_factory.py::WorkflowFactory.assemble_workflow</title>
+    <path class="edge" data-from="l4" data-to="l5" d="M 570,408 H 730" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="650.0" y="402" text-anchor="middle">8 assembled script</text>
+  </g>
+  <g>
+    <title>sources/core/workflow_runner.py::WorkflowRunner.execute</title>
+    <path class="edge dashed-edge" data-from="l5" data-to="l6" d="M 730,452 H 890" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+    <text class="edge-label" x="810.0" y="446" text-anchor="middle">9 run outputs</text>
+  </g>
+  <g>
+    <title>sources/core/orchestrator.py::WorkflowOrchestrator._execute_in_sandbox</title>
+    <path class="edge" data-from="l5" data-to="l3" d="M 730,496 H 410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="570.0" y="490" text-anchor="middle">10 stdout, executed flag</text>
+  </g>
+  <g>
+    <title>sources/core/evolution_engine.py::EvolutionEngine._evaluate_workflow_phenotype</title>
+    <path class="edge" data-from="l3" data-to="l7" d="M 410,540 H 1050" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="730.0" y="534" text-anchor="middle">11 uuid</text>
+  </g>
+  <g>
+    <title>sources/evaluators/hybrid_verifier/evaluator.py::HybridVerifierEvaluator._write_artifacts</title>
+    <path class="edge dashed-edge" data-from="l7" data-to="l6" d="M 1050,584 H 890" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+    <text class="edge-label" x="970.0" y="578" text-anchor="middle">12 evaluation.txt, gradient</text>
+  </g>
+  <g>
+    <title>sources/evaluators/hybrid_verifier/evaluator.py::HybridVerifierEvaluator.evaluate</title>
+    <path class="edge" data-from="l7" data-to="l3" d="M 1050,628 H 410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="730.0" y="622" text-anchor="middle">13 reward 0-1</text>
+  </g>
+  <g>
+    <title>sources/core/evolution_engine.py::EvolutionEngine._persist_iteration_metrics</title>
+    <path class="edge dashed-edge" data-from="l3" data-to="l6" d="M 410,672 H 890" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+    <text class="edge-label" x="650.0" y="666" text-anchor="middle">14 metrics, lineage</text>
+  </g>
+  <g>
+    <title>sources/core/evolution_engine.py::EvolutionEngine.evolve_generation</title>
+    <path class="edge dashed-edge" data-from="l3" data-to="l4" d="M 410,716 H 570" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+    <text class="edge-label" x="490.0" y="710" text-anchor="middle">15 (--learn) next prompt</text>
+  </g>
+  <text class="box-sub" x="20" y="778">solid = call  |  dashed = call that writes files  |  numbers = call order, not step-table numbers  |  15 is --learn only</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - lanes are components; time runs downward; each numbered arrow is one call. Every arrow and box cites its symbol in the step table below.</p>
+<h3>Step table</h3>
+<table><thead><tr><th>Step</th><th>What runs</th><th>Function</th><th>What it writes</th></tr></thead><tbody>
+<tr><td class="size">1</td><td>Parse argv</td><td class="sym"><a href="../../main.py">main.py</a>::<code>apply_config_overrides</code></td><td>nothing</td></tr>
+<tr><td class="size">2</td><td>Model precheck</td><td class="sym"><a href="../../sources/utils/precheck.py">sources/utils/precheck.py</a>::<code>PreCheck.run</code></td><td>nothing (config in memory)</td></tr>
+<tr><td class="size">3</td><td>Create dirs</td><td class="sym"><a href="../../config.py">config.py</a>::<code>Config.create_paths</code></td><td>three directories</td></tr>
+<tr><td class="size">4</td><td>Validate paths</td><td class="sym"><a href="../../config.py">config.py</a>::<code>Config.validate_paths</code></td><td>nothing</td></tr>
+<tr><td class="size">5</td><td>Enter task mode</td><td class="sym"><a href="../../main.py">main.py</a>::<code>normal_execution_mode</code></td><td>nothing</td></tr>
+<tr><td class="size">6</td><td>Select parent</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>EvolutionEngine.select_parent_workflow</code></td><td>nothing</td></tr>
+<tr><td class="size">7</td><td>Start session</td><td class="sym"><a href="../../sources/utils/workspace_management.py">workspace_management.py</a>::<code>WorkspaceManager.begin_session</code></td><td><code>/tmp/mimosa_initial_&lt;session&gt;</code></td></tr>
+<tr><td class="size">8</td><td>Build prompt</td><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a>::<code>VariationEngine.mutation_prompt</code></td><td>nothing</td></tr>
+<tr><td class="size">9</td><td>Ground, generate</td><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a>::<code>WorkflowOrchestrator.orchestrate_workflow</code></td><td>nothing yet</td></tr>
+<tr><td class="size">10</td><td>Discover MCP tools</td><td class="sym"><a href="../../sources/core/factory.py">factory.py</a>::<code>Factory.load_tools_code</code></td><td>nothing</td></tr>
+<tr><td class="size">11</td><td>Save source</td><td class="sym"><a href="../../sources/core/factory.py">factory.py</a>::<code>Factory.save_workflow_files</code></td><td>4 files in <code>&lt;uuid&gt;/</code></td></tr>
+<tr><td class="size">12</td><td>Validate, assemble</td><td class="sym"><a href="../../sources/core/workflow_factory.py">workflow_factory.py</a>::<code>WorkflowFactory.assemble_workflow</code></td><td>nothing</td></tr>
+<tr><td class="size">13</td><td>Install deps</td><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a>::<code>WorkflowOrchestrator.workflow_requirements_install</code></td><td><code>tmp/mimosa_venv</code></td></tr>
+<tr><td class="size">14</td><td>Run in sandbox</td><td class="sym"><a href="../../sources/core/workflow_runner.py">workflow_runner.py</a>::<code>WorkflowRunner.execute</code></td><td><code>tmp/&lt;exec_id&gt;.py</code>, workspace files</td></tr>
+<tr><td class="size">15</td><td>Save state</td><td class="sym">generated script tail, see <a href="#files">file ladder</a></td><td><code>state_result.json</code></td></tr>
+<tr><td class="size">16</td><td>Save prompt</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>EvolutionEngine._save_evolution_prompt_artifact</code></td><td><code>evolution_prompt_&lt;uuid&gt;.md</code></td></tr>
+<tr><td class="size">17</td><td>Record lineage</td><td class="sym"><a href="../../sources/core/lineage.py">lineage.py</a>::<code>record_lineage</code></td><td><code>lineage_&lt;uuid&gt;.json</code></td></tr>
+<tr><td class="size">18</td><td>Snapshot run</td><td class="sym"><a href="../../sources/utils/workspace_management.py">workspace_management.py</a>::<code>WorkspaceManager.save_run_snapshot</code></td><td><code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code></td></tr>
+<tr><td class="size">19</td><td>Score the run</td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a>::<code>HybridVerifierEvaluator.evaluate</code></td><td><code>evaluation.txt</code>, <code>textual_gradient.txt</code></td></tr>
+<tr><td class="size">20</td><td>Persist score</td><td class="sym"><a href="../../sources/evaluators/base.py">evaluators/base.py</a>::<code>BaseEvaluator._save_results</code></td><td><code>state_result.json</code> under <code>evaluation.verifier</code></td></tr>
+<tr><td class="size">21</td><td>Price the run</td><td class="sym"><a href="../../sources/utils/pricing.py">utils/pricing.py</a>::<code>PricingCalculator.calculate_cost</code></td><td>nothing (reads memory)</td></tr>
+<tr><td class="size">22</td><td>QD verdict</td><td class="sym"><a href="../../sources/core/selection.py">selection.py</a>::<code>SelectionPressure.validate_survivor</code></td><td><code>qd_archive.jsonl</code></td></tr>
+<tr><td class="size">23</td><td>Iteration metrics</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>EvolutionEngine._persist_iteration_metrics</code></td><td><code>run_metrics.json</code></td></tr>
+<tr><td class="size">24</td><td>Restore best</td><td class="sym"><a href="../../sources/utils/workspace_management.py">workspace_management.py</a>::<code>WorkspaceManager.restore_best</code></td><td>workspace files</td></tr>
+<tr><td class="size">25</td><td>Exit</td><td class="sym"><a href="../../main.py">main.py</a>::<code>main</code></td><td>nothing (no session started)</td></tr>
+</tbody></table>
+
+<p class="sub">Steps 1-25 are the plain <code>--task</code> path. With <code>--learn</code> the loop adds steps 26-29; see the last panel.</p>
+<details><summary>--learn adds steps 26-29</summary><div class="dbody">
+<table><thead><tr><th>Step</th><th>What runs</th><th>Function</th><th>What it writes</th></tr></thead><tbody>
+<tr><td class="size">26</td><td>Threshold check: stop at reward 0.9</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>EvolutionEngine.evolve_generation</code></td><td>nothing</td></tr>
+<tr><td class="size">27</td><td>Cold-start guard: 1 run is below 2</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>EvolutionEngine.evolve_generation</code></td><td>nothing</td></tr>
+<tr><td class="size">28</td><td>Seed prompt for generation 2</td><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a>::<code>VariationEngine.seed_genome_prompt</code></td><td><code>variation_log.jsonl</code></td></tr>
+<tr><td class="size">29</td><td>Generation 2, new uuid, steps 8-24</td><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a>::<code>WorkflowOrchestrator.orchestrate_workflow</code></td><td>a second <code>&lt;uuid&gt;/</code> folder</td></tr>
+</tbody></table>
+<p>Depth: <code>max_depth = config.max_learning_evolve_iterations</code> (default <code>16</code>). Without <code>--learn</code>, <code>max_iteration = 1</code>, so <code>evolve_generation</code> returns after the first run.</p>
+</div></details>
+
+<details><summary>signatures and config fields on this path</summary><div class="dbody">
+<pre>EvolutionEngine.start_workflow_evolution(goal, template_uuid="20260512_162504_70ccefbf", judge=True,
+    scenario_rubric=None, enable_evolution=False, original_task=None, single_agent_mode=False,
+    mockup_mode=False) -&gt; list[IndividualRun]
+EvolutionEngine.evolve_generation(runs, rewards_history, assertion_history, enable_evolution,
+    single_agent_mode, workspace_mgr) -&gt; list[IndividualRun]
+WorkflowOrchestrator.orchestrate_workflow(goal, craft_instructions, original_task=None,
+    single_agent_mode=False, no_run=False) -&gt; (output, uuid, genotype_code, executed)
+WorkflowFactory.craft_workflow(goal, craft_instructions, save_workflow=True, original_task=None)
+    -&gt; (complete_code, genotype_code, uuid)
+WorkflowRunner.execute(code, execution_id=None, progress_callback=None) -&gt; ExecutionResult
+HybridVerifierEvaluator.evaluate(uuid) -&gt; dict
+WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / restore_best(uuid)</pre>
+<p>Config fields read on this path: <code>workflow_dir</code>, <code>memory_dir</code>, <code>runner_temp_dir</code>, <code>runner_default_python_version</code> (<code>3.12</code>), <code>runner_default_timeout</code> (<code>10800 s</code>), <code>agent_execution_timeout</code> (<code>18000 s</code>), <code>runner_requirements</code>, <code>workspace_dir</code>, <code>workflow_llm_model</code>, <code>smolagent_model_id</code>, <code>judge_model</code>, <code>literrature_grounding</code>, <code>verifier_kind</code> (<code>hybrid</code>), <code>hybrid_verifier_num_claims</code> (<code>10</code>), <code>hybrid_verifier_scorer_timeout_s</code> (<code>60</code>), <code>hybrid_verifier_pairwise_mode</code> (<code>temporal</code>), <code>learned_score_threshold</code> (<code>0.9</code>), <code>max_learning_evolve_iterations</code> (<code>16</code>), <code>initial_population</code> (<code>2</code>), <code>selection_strategy</code> (<code>qd</code>), <code>export_astra</code> (<code>False</code>).</p>
+<p>Structural note: the default <code>template_uuid</code> <code class="uuid">20260512_162504_70ccefbf</code> is not a folder in <code class="path">sources/workflows/</code> here, and <code>select_parent_workflow</code> returns it without checking the disk. Generation 1 is therefore recorded as <code>evolution_kind = "mutation"</code> against a parent that is absent, and <code>WorkflowInfo.load_code</code> returns <code>""</code> for it.</p>
+</div></details>
+<p class="note flag">Docs say the runner uses the SmolAgents <code>LocalPythonExecutor</code> with an AST allow-list (<code>AGENTS.md</code>, <code>README.md</code> line 98); <code>WorkflowRunner.execute</code> actually writes the script to <code>tmp/</code> and starts a plain subprocess with <code>cwd = workspace_dir</code> and a timeout, and no AST check exists on that path.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="files">Where files land</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1160 444" role="img" aria-label="Folders written by one task run">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="c1" href="../../sources/utils/paths.py">
+  <title>sources/workflows/</title>
+  <rect x="20" y="44" width="330" height="62" rx="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <ellipse cx="185.0" cy="53" rx="165.0" ry="9" fill="none" stroke="#5E8CA3"/>
+  <text class="box-label" x="185.0" y="74" text-anchor="middle">sources/workflows/</text>
+  <text class="box-sub" x="185.0" y="90" text-anchor="middle">Config.workflow_dir</text>
+  </a>
+  <a class="box" id="c2" href="../../sources/cli/evaluation_cli.py">
+  <title>run_&lt;x&gt;/</title>
+  <rect x="20" y="148" width="330" height="62" rx="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <ellipse cx="185.0" cy="157" rx="165.0" ry="9" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <text class="box-label" x="185.0" y="178" text-anchor="middle">run_&lt;x&gt;/</text>
+  <text class="box-sub" x="185.0" y="194" text-anchor="middle">EvaluationCLI run id</text>
+  <text class="box-sub" x="28" y="204" fill="#FFB547">plain --task: absent</text>
+  </a>
+  <a class="box" id="c3" href="../../sources/core/factory.py">
+  <title>&lt;uuid&gt;/</title>
+  <rect x="20" y="252" width="330" height="62" rx="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <ellipse cx="185.0" cy="261" rx="165.0" ry="9" fill="none" stroke="#5E8CA3"/>
+  <text class="box-label" x="185.0" y="282" text-anchor="middle">&lt;uuid&gt;/</text>
+  <text class="box-sub" x="185.0" y="298" text-anchor="middle">Factory.create_folder_structure</text>
+  </a>
+  <a class="box" id="c4" href="data_runs.html">
+  <title>8 per-uuid files</title>
+  <rect x="20" y="356" width="330" height="62" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="185.0" y="382" text-anchor="middle">8 per-uuid files</text>
+  <text class="box-sub" x="185.0" y="398" text-anchor="middle">genotype, state, metrics, gradient</text>
+  </a>
+  <a class="box" href="../../sources/core/llm_provider.py">
+  <title>sources/memory/&lt;uuid&gt;/</title>
+  <rect x="400" y="44" width="330" height="62" rx="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <ellipse cx="565.0" cy="53" rx="165.0" ry="9" fill="none" stroke="#5E8CA3"/>
+  <text class="box-label" x="565.0" y="74" text-anchor="middle">sources/memory/&lt;uuid&gt;/</text>
+  <text class="box-sub" x="565.0" y="90" text-anchor="middle">LLMProvider.save_call</text>
+  </a>
+  <a class="box" href="../../sources/core/workflow_runner.py">
+  <title>tmp/</title>
+  <rect x="400" y="148" width="330" height="62" rx="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <ellipse cx="565.0" cy="157" rx="165.0" ry="9" fill="none" stroke="#5E8CA3"/>
+  <text class="box-label" x="565.0" y="178" text-anchor="middle">tmp/</text>
+  <text class="box-sub" x="565.0" y="194" text-anchor="middle">mimosa_venv, &lt;exec_id&gt;.py</text>
+  </a>
+  <a class="box" href="../../sources/utils/workspace_management.py">
+  <title>/tmp/mimosa_initial_&lt;session&gt;/</title>
+  <rect x="400" y="252" width="330" height="62" rx="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <ellipse cx="565.0" cy="261" rx="165.0" ry="9" fill="none" stroke="#5E8CA3"/>
+  <text class="box-label" x="565.0" y="282" text-anchor="middle">/tmp/mimosa_initial_&lt;session&gt;/</text>
+  <text class="box-sub" x="565.0" y="298" text-anchor="middle">WorkspaceManager.begin_session</text>
+  </a>
+  <a class="box" href="../../sources/utils/workspace_management.py">
+  <title>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;/</title>
+  <rect x="400" y="356" width="330" height="62" rx="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <ellipse cx="565.0" cy="365" rx="165.0" ry="9" fill="none" stroke="#5E8CA3"/>
+  <text class="box-label" x="565.0" y="386" text-anchor="middle">/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;/</text>
+  <text class="box-sub" x="565.0" y="402" text-anchor="middle">WorkspaceManager.save_run_snapshot</text>
+  </a>
+  <a class="box" href="../../sources/utils/transfer_toolomics.py">
+  <title>runs_capsule/&lt;capsule&gt;/</title>
+  <rect x="780" y="44" width="350" height="62" rx="8" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <ellipse cx="955.0" cy="53" rx="175.0" ry="9" fill="none" stroke="#5E8CA3"/>
+  <text class="box-label" x="955.0" y="74" text-anchor="middle">runs_capsule/&lt;capsule&gt;/</text>
+  <text class="box-sub" x="955.0" y="90" text-anchor="middle">LocalTransfer, benchmark + --goal only</text>
+  <text class="box-sub" x="788" y="100" fill="#FFB547">plain --task: absent</text>
+  </a>
+  <a class="box" href="../../sources/benchmark_evaluation/csv_mode.py">
+  <title>run_notes/run_&lt;x&gt;/&lt;task&gt;.json</title>
+  <rect x="780" y="148" width="350" height="62" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="955.0" y="174" text-anchor="middle">run_notes/run_&lt;x&gt;/&lt;task&gt;.json</text>
+  <text class="box-sub" x="955.0" y="190" text-anchor="middle">CsvEvaluationMode._save_run_notes</text>
+  <text class="box-sub" x="788" y="202" fill="#FFB547">plain --task: absent</text>
+  </a>
+  <a class="box" href="../../sources/benchmark_evaluation/capsule_evaluator.py">
+  <title>evaluation_results.json</title>
+  <rect x="780" y="252" width="350" height="62" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="955.0" y="278" text-anchor="middle">evaluation_results.json</text>
+  <text class="box-sub" x="955.0" y="294" text-anchor="middle">CapsuleEvaluator.save_results</text>
+  <text class="box-sub" x="788" y="306" fill="#FFB547">benchmark grade, benchmark only</text>
+  </a>
+    <path class="edge" data-from="c1" data-to="c2" d="M 185,106 V 148" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="196" y="131">benchmark, CLI runs</text>
+  <path class="edge" data-from="c2" data-to="c3" d="M 185,210 V 252" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="196" y="235">always</text>
+  <path class="edge" data-from="c3" data-to="c4" d="M 185,314 V 356" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="196" y="339">written per run</text>
+  <path d="M 380,75 H 400" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <path d="M 380,285 H 400" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <path d="M 740,75 H 780" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <path d="M 740,179 H 780" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <text class="box-sub" x="20" y="32">repo checkout layout, from sources/utils/paths.py</text>
+  <text class="box-sub" x="400" y="32">agent memory and scratch</text>
+  <text class="box-sub" x="780" y="32">benchmark and --goal runs</text>
+  <text class="box-sub" x="20" y="438">cylinders = folders of data on disk  |  amber tag = level a plain --task run never writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - paths come from <code>sources/utils/paths.py::default_workflow_dir</code>, <code>::default_memory_dir</code>, <code>::default_runs_capsule_dir</code> and <code>::default_tmp_dir</code>; a repo checkout keeps them in-tree, an installed wheel moves them to XDG dirs. <code>run_&lt;x&gt;/</code>, <code>runs_capsule/run_&lt;x&gt;/</code> and <code>run_notes/run_&lt;x&gt;/</code> are set by <a href="../../sources/cli/evaluation_cli.py">sources/cli/evaluation_cli.py</a>::<code>EvaluationCLI</code> (lines 1051-1078).</p>
+<details><summary>10 files inside one &lt;uuid&gt;/ folder</summary><div class="dbody">
+<table><thead><tr><th>File under <code>&lt;uuid&gt;/</code></th><th>Written by</th><th>Holds</th></tr></thead><tbody>
+<tr><td class="sym"><code>workflow_genotype_&lt;uuid&gt;.py</code></td><td class="sym">Factory.save_workflow_files</td><td>genotype, the mutant</td></tr>
+<tr><td class="sym"><code>system_prompt_&lt;uuid&gt;.md</code></td><td class="sym">Factory.save_workflow_files</td><td>workflow creator prompt</td></tr>
+<tr><td class="sym"><code>goal_&lt;uuid&gt;.txt</code></td><td class="sym">Factory.save_workflow_files</td><td>goal text</td></tr>
+<tr><td class="sym"><code>original_task_&lt;uuid&gt;.txt</code></td><td class="sym">Factory.save_workflow_files</td><td>unwrapped task</td></tr>
+<tr><td class="sym"><code>evolution_prompt_&lt;uuid&gt;.md</code></td><td class="sym">EvolutionEngine._save_evolution_prompt_artifact</td><td>prompt that made it</td></tr>
+<tr><td class="sym"><code>lineage_&lt;uuid&gt;.json</code></td><td class="sym">record_lineage</td><td>parents, kind, iteration</td></tr>
+<tr><td class="sym"><code>run_metrics.json</code></td><td class="sym">EvolutionEngine._persist_iteration_metrics</td><td>scores, cost, qd verdict</td></tr>
+<tr><td class="sym"><code>state_result.json</code></td><td class="sym">generated script, then BaseEvaluator._save_results</td><td>answers + evaluation.verifier</td></tr>
+<tr><td class="sym"><code>evaluation.txt</code></td><td class="sym">HybridVerifierEvaluator._write_artifacts</td><td>claim verdicts</td></tr>
+<tr><td class="sym"><code>textual_gradient.txt</code></td><td class="sym">HybridVerifierEvaluator._write_artifacts</td><td>gradient for next mutation</td></tr>
+</tbody></table>
+<p>Also under <code>workflow_dir</code> itself: <code>qd_archive.jsonl</code> (<code>EvolutionEngine._persist_qd_archive</code>), <code>variation_log.jsonl</code> (<code>::_persist_variation_log</code>), and <code>_verifier_tmp/hybrid_registry_&lt;key&gt;.json</code> plus <code>_verifier_tmp/&lt;uuid&gt;/verify_*.py</code> (<a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a>::<code>TaskRegistry.save</code>).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>--learn decision, up to generation 2</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 320" role="img" aria-label="Evolution decisions after one generation">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+    <a class="box" id="g1" href="mod_core_evolution_engine.html">
+    <title>one generation runs and is scored</title>
+    <rect x="20" y="110" width="180" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="110" y="132" text-anchor="middle">gen N: run workflow</text>
+    <text class="box-sub" x="110" y="148" text-anchor="middle">orchestrate_workflow</text>
+  </a>
+  <a class="box" id="g2" href="mod_evaluators_hybrid_verifier.html">
+    <title>hybrid verifier reward</title>
+    <rect x="240" y="110" width="170" height="52" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="325" y="132" text-anchor="middle">verifier reward 0-1</text>
+    <text class="box-sub" x="325" y="148" text-anchor="middle">win rate vs previous</text>
+  </a>
+  <a class="box" id="g3" href="mod_core_evolution_engine.html">
+    <title>learning threshold check</title>
+    <rect x="450" y="110" width="150" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="525" y="132" text-anchor="middle">score &gt;= 0.9?</text>
+    <text class="box-sub" x="525" y="148" text-anchor="middle">learned_score_threshold</text>
+  </a>
+  <a class="box" id="g4" href="mod_core_evolution_engine.html">
+    <title>evolution stops</title>
+    <rect x="650" y="30" width="170" height="48" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735" y="50" text-anchor="middle">stop: return runs</text>
+    <text class="box-sub" x="735" y="66" text-anchor="middle">restore_best, plots</text>
+  </a>
+  <a class="box" id="g5" href="mod_core_evolution_engine.html">
+    <title>cold start guard</title>
+    <rect x="450" y="205" width="150" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="525" y="227" text-anchor="middle">runs &lt; 2?</text>
+    <text class="box-sub" x="525" y="243" text-anchor="middle">initial_population</text>
+  </a>
+  <a class="box" id="g6" href="mod_core_variation.html">
+    <title>seed prompt branch</title>
+    <rect x="650" y="175" width="170" height="48" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735" y="195" text-anchor="middle">seed prompt</text>
+    <text class="box-sub" x="735" y="211" text-anchor="middle">seed_genome_prompt</text>
+  </a>
+  <a class="box" id="g7" href="mod_core_variation.html">
+    <title>mutation or crossover branch</title>
+    <rect x="650" y="250" width="170" height="48" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735" y="270" text-anchor="middle">mutation or crossover</text>
+    <text class="box-sub" x="735" y="286" text-anchor="middle">from gen 3 onwards</text>
+  </a>
+  <a class="box" id="g8" href="flow_evolution_loop.html">
+    <title>next generation repeats steps 5 to 21</title>
+    <rect x="880" y="195" width="180" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="970" y="217" text-anchor="middle">gen N+1 runs</text>
+    <text class="box-sub" x="970" y="233" text-anchor="middle">new uuid folder</text>
+  </a>
+  <path class="edge" data-from="g1" data-to="g2" d="M 200,136 H 240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="130" text-anchor="middle">uuid</text>
+  <path class="edge" data-from="g2" data-to="g3" d="M 410,136 H 450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="430" y="130" text-anchor="middle">reward</text>
+  <path class="edge" data-from="g3" data-to="g4" d="M 600,128 L 650,72" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="628" y="96" text-anchor="middle">yes</text>
+  <path class="edge" data-from="g3" data-to="g5" d="M 525,162 V 205" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="536" y="187">no</text>
+  <path class="edge" data-from="g5" data-to="g6" d="M 600,223 L 650,203" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="626" y="209" text-anchor="middle">yes</text>
+  <path class="edge" data-from="g5" data-to="g7" d="M 600,242 L 650,266" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="626" y="262" text-anchor="middle">no</text>
+  <path class="edge" data-from="g6" data-to="g8" d="M 820,199 H 880" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="g7" data-to="g8" d="M 820,274 H 880" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="850" y="240" text-anchor="middle">prompt</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - the branch taken after each scored generation. Source: <a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a>::<code>EvolutionEngine.evolve_generation</code>; <code>initial_population</code> and <code>learned_score_threshold</code> come from <a href="../../config.py">config.py</a>.</p>
+<p class="note say">With <code>--learn</code>, generation 2 is a <b>seed</b>, not a mutation: <code>runs</code> holds 1 element, below <code>initial_population = 2</code>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code>AGENTS.md</code> (claims checked against the code), <a href="../../main.py">main.py</a>, <a href="../../config.py">config.py</a>, <a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a>, <a href="../../sources/core/orchestrator.py">orchestrator.py</a>, <a href="../../sources/core/workflow_factory.py">workflow_factory.py</a>, <a href="../../sources/core/factory.py">factory.py</a>, <a href="../../sources/core/workflow_runner.py">workflow_runner.py</a>, <a href="../../sources/core/variation_engine.py">variation_engine.py</a>, <a href="../../sources/core/selection.py">selection.py</a>, <a href="../../sources/core/lineage.py">lineage.py</a>, <a href="../../sources/core/workflow_info.py">workflow_info.py</a>, <a href="../../sources/core/llm_provider.py">llm_provider.py</a>, <a href="../../sources/modules/smolagent_factory.py">sources/modules/smolagent_factory.py</a>, <a href="../../sources/evaluators/evaluator.py">evaluators/evaluator.py</a>, <a href="../../sources/evaluators/base.py">evaluators/base.py</a>, <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a>, <a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a>, <a href="../../sources/utils/paths.py">utils/paths.py</a>, <a href="../../sources/utils/workspace_management.py">workspace_management.py</a>, <a href="../../sources/utils/run_metrics.py">run_metrics.py</a>, <a href="../../sources/utils/precheck.py">precheck.py</a>, <a href="../../sources/utils/ensure_env.py">ensure_env.py</a>, <a href="../../sources/utils/transfer_toolomics.py">transfer_toolomics.py</a>, <a href="../../sources/cli/evaluation_cli.py">cli/evaluation_cli.py</a>, <a href="../../sources/benchmark_evaluation/csv_mode.py">benchmark_evaluation/csv_mode.py</a>, <a href="../../sources/benchmark_evaluation/capsule_evaluator.py">capsule_evaluator.py</a>.</p>
+<p class="skips">Skipped, with reason: <code class="path">sources/core/planner.py</code> and <code>single_agent_factory.py</code> (<code>--goal</code> and <code>--single_agent</code> paths, outside this flow) &#183; <code class="path">sources/core/tools_manager.py</code> (MCP discovery internals, <code>mod_core_tools_llm.html</code>) &#183; <code>sources/core/{schema,workflow_selection}.py</code> (only the fields used here were read) &#183; <code class="path">sources/modules/state_schema.py</code> (read for the initial-state keys only) &#183; the legacy verifier files <code>sources/evaluators/{verifier,verifier_claims,verifier_per_claim,verifier_workspace,verifier_claim_sources,generic,scenario,bs_detection}.py</code> (not on the default verifier path) &#183; <code>sources/evaluators/hybrid_verifier/{claims,layers,scorers,aggregation,gradient,digest,inventory}.py</code> (pipeline internals, <code>flow_verification.html</code>) &#183; <code>sources/utils/{pricing,logging,notify,visualization,evolution_tree}.py</code> (internals; only their write behaviour is named) &#183; <code>sources/benchmark_evaluation/*</code> except the two files cited (batch and ablation flows, <code>flow_sab_batch.html</code>) &#183; <code>tests/</code> (not on the runtime path) &#183; Tier D data and tooling: <code>docs/</code>, <code>datasets/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>tmp/</code>, <code>logs/</code>, <code>webui/</code>, <code>.venv/</code>.</p>
+<p>Unconfirmed: the exact artifacts of the OS-level Python 3.12 install in <a href="../../sources/utils/ensure_env.py">ensure_env.py</a> (package-manager commands run outside the repo) - <code>unknown</code>.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (<code>git status --porcelain</code> lists modified files, among them <code>main.py</code>, <code>config.py</code> and <code class="path">sources/evaluators/evaluator.py</code>), so line numbers may shift.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

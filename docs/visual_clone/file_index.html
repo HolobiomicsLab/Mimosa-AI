@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>File digests - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > all 89 files">
+<div class="wrap">
+
+<h1 class="hud">File digests</h1>
+<p class="intro">One page per important Python file: what the file does, in one diagram. Scope is <code class="path">sources/core/</code>, <code class="path">experiments_verifiers/harness/</code> and the current files in <code class="path">sources/evaluators/</code> including <code class="path">hybrid_verifier/</code>. Each page carries a master diagram, a data-flow diagram, a logic diagram where the file branches, the full symbol inventory and its callers and tests.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Scope</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 260" role="img" aria-label="File digest scope">
+  <defs>
+    <linearGradient id="hud" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/><stop offset="25%" stop-color="#BFF6FF"/>
+      <stop offset="50%" stop-color="#5CE1FF"/><stop offset="75%" stop-color="#00B8F0"/><stop offset="100%" stop-color="#0077C8"/>
+    </linearGradient>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <g class="box" id="s0"><title>Scope of the digest set</title>
+    <rect x="20" y="24" width="250" height="66" rx="2" fill="none" stroke="url(#hud)"/>
+    <text class="box-label" x="145" y="50" text-anchor="middle">89 file digests</text>
+    <text class="box-sub" x="145" y="70" text-anchor="middle">28 266 + 8 692 + 5 900 python lines</text>
+  </g>
+
+  <a class="box" id="s1" href="area_sources_core.html">
+    <title>The engine folder</title>
+    <rect x="330" y="24" width="260" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="50" text-anchor="middle">sources/core/</text>
+    <text class="box-sub" x="460" y="70" text-anchor="middle">19 files, 5 digest workers</text>
+  </a>
+  <a class="box" id="s2" href="exp_index.html">
+    <title>The experiment scripts</title>
+    <rect x="620" y="24" width="300" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="50" text-anchor="middle">experiments_verifiers/harness/</text>
+    <text class="box-sub" x="770" y="70" text-anchor="middle">54 files, 11 digest workers</text>
+  </a>
+
+  <a class="box" id="s3" href="mod_evaluators_hybrid_verifier.html">
+    <title>Verifier code, current files only</title>
+    <rect x="330" y="140" width="260" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="460" y="166" text-anchor="middle">hybrid_verifier/</text>
+    <text class="box-sub" x="460" y="186" text-anchor="middle">10 files, current default</text>
+  </a>
+  <a class="box" id="s4" href="area_evaluators.html">
+    <title>Other current evaluator files</title>
+    <rect x="620" y="140" width="300" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="166" text-anchor="middle">sources/evaluators/*.py</text>
+    <text class="box-sub" x="770" y="186" text-anchor="middle">6 files, legacy verifier dropped</text>
+  </a>
+
+  <path class="edge" data-from="s0" data-to="s1" d="M270,57 H330" fill="none" stroke="url(#hud)" stroke-width="1.75" marker-end="url(#arw)"/>
+  <path class="edge" data-from="s1" data-to="s2" d="M590,57 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="s0" data-to="s3" d="M270,66 H300 V173 H330" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="s3" data-to="s4" d="M590,173 H620" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw)"/>
+
+  <a class="box" id="s5" href="area_evaluators_legacy.html">
+    <title>Excluded from the digest set</title>
+    <rect x="620" y="216" width="300" height="36" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-sub" x="770" y="239" text-anchor="middle">verifier*.py (5 files, deprecated) not digested</text>
+  </a>
+  <path class="edge dotted-edge" data-from="s4" data-to="s5" d="M770,206 V216" fill="none" stroke="#4F7486" stroke-width="1.25" marker-end="url(#arwE)"/>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - the three folders that get a digest page per file, and the deprecated set that does not.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>sources/core (19 files)</h2>
+<table>
+<thead><tr><th>Digest page</th><th>File</th><th class="size">Lines</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_core_init.html">file_core_init.html</a></td><td class="sym"><a href="../../sources/core/__init__.py">__init__.py</a></td><td class="size">77</td></tr>
+<tr><td class="sym"><a href="file_core_code_features.html">file_core_code_features.html</a></td><td class="sym"><a href="../../sources/core/code_features.py">code_features.py</a></td><td class="size">37</td></tr>
+<tr><td class="sym"><a href="file_core_evolution_engine.html">file_core_evolution_engine.html</a></td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a></td><td class="size">1109</td></tr>
+<tr><td class="sym"><a href="file_core_factory.html">file_core_factory.html</a></td><td class="sym"><a href="../../sources/core/factory.py">factory.py</a></td><td class="size">208</td></tr>
+<tr><td class="sym"><a href="file_core_failure_fingerprint.html">file_core_failure_fingerprint.html</a></td><td class="sym"><a href="../../sources/core/failure_fingerprint.py">failure_fingerprint.py</a></td><td class="size">195</td></tr>
+<tr><td class="sym"><a href="file_core_genotype_embedding.html">file_core_genotype_embedding.html</a></td><td class="sym"><a href="../../sources/core/genotype_embedding.py">genotype_embedding.py</a></td><td class="size">329</td></tr>
+<tr><td class="sym"><a href="file_core_lineage.html">file_core_lineage.html</a></td><td class="sym"><a href="../../sources/core/lineage.py">lineage.py</a></td><td class="size">173</td></tr>
+<tr><td class="sym"><a href="file_core_llm_provider.html">file_core_llm_provider.html</a></td><td class="sym"><a href="../../sources/core/llm_provider.py">llm_provider.py</a></td><td class="size">643</td></tr>
+<tr><td class="sym"><a href="file_core_orchestrator.html">file_core_orchestrator.html</a></td><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a></td><td class="size">428</td></tr>
+<tr><td class="sym"><a href="file_core_planner.html">file_core_planner.html</a></td><td class="sym"><a href="../../sources/core/planner.py">planner.py</a></td><td class="size">1053</td></tr>
+<tr><td class="sym"><a href="file_core_schema.html">file_core_schema.html</a></td><td class="sym"><a href="../../sources/core/schema.py">schema.py</a></td><td class="size">163</td></tr>
+<tr><td class="sym"><a href="file_core_selection.html">file_core_selection.html</a></td><td class="sym"><a href="../../sources/core/selection.py">selection.py</a></td><td class="size">842</td></tr>
+<tr><td class="sym"><a href="file_core_single_agent_factory.html">file_core_single_agent_factory.html</a></td><td class="sym"><a href="../../sources/core/single_agent_factory.py">single_agent_factory.py</a></td><td class="size">315</td></tr>
+<tr><td class="sym"><a href="file_core_tools_manager.html">file_core_tools_manager.html</a></td><td class="sym"><a href="../../sources/core/tools_manager.py">tools_manager.py</a></td><td class="size">679</td></tr>
+<tr><td class="sym"><a href="file_core_variation_engine.html">file_core_variation_engine.html</a></td><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a></td><td class="size">609</td></tr>
+<tr><td class="sym"><a href="file_core_workflow_factory.html">file_core_workflow_factory.html</a></td><td class="sym"><a href="../../sources/core/workflow_factory.py">workflow_factory.py</a></td><td class="size">514</td></tr>
+<tr><td class="sym"><a href="file_core_workflow_info.html">file_core_workflow_info.html</a></td><td class="sym"><a href="../../sources/core/workflow_info.py">workflow_info.py</a></td><td class="size">271</td></tr>
+<tr><td class="sym"><a href="file_core_workflow_runner.html">file_core_workflow_runner.html</a></td><td class="sym"><a href="../../sources/core/workflow_runner.py">workflow_runner.py</a></td><td class="size">651</td></tr>
+<tr><td class="sym"><a href="file_core_workflow_selection.html">file_core_workflow_selection.html</a></td><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a></td><td class="size">396</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>experiments_verifiers/harness (54 files)</h2>
+<p class="intro">These pages explain the script itself; <a href="exp_index.html">exp_index.html</a> holds the experiment results pages.</p>
+<details><summary>all 54 harness digests</summary><div class="dbody">
+<table>
+<thead><tr><th>Digest page</th><th>File</th><th class="size">Lines</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_harness_init.html">file_harness_init.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/__init__.py">__init__.py</a></td><td class="size">0</td></tr>
+<tr><td class="sym"><a href="file_harness_claims_pattern_analysis.html">file_harness_claims_pattern_analysis.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/claims_pattern_analysis.py">claims_pattern_analysis.py</a></td><td class="size">567</td></tr>
+<tr><td class="sym"><a href="file_harness_claims_pca_3d.html">file_harness_claims_pca_3d.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/claims_pca_3d.py">claims_pca_3d.py</a></td><td class="size">212</td></tr>
+<tr><td class="sym"><a href="file_harness_e12_falsifier.html">file_harness_e12_falsifier.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e12_falsifier.py">e12_falsifier.py</a></td><td class="size">618</td></tr>
+<tr><td class="sym"><a href="file_harness_e13_common.html">file_harness_e13_common.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e13_common.py">e13_common.py</a></td><td class="size">255</td></tr>
+<tr><td class="sym"><a href="file_harness_e13_l3_extreme.html">file_harness_e13_l3_extreme.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e13_l3_extreme.py">e13_l3_extreme.py</a></td><td class="size">1444</td></tr>
+<tr><td class="sym"><a href="file_harness_e13_umap.html">file_harness_e13_umap.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e13_umap.py">e13_umap.py</a></td><td class="size">89</td></tr>
+<tr><td class="sym"><a href="file_harness_e14_bt_enabler.html">file_harness_e14_bt_enabler.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e14_bt_enabler.py">e14_bt_enabler.py</a></td><td class="size">1488</td></tr>
+<tr><td class="sym"><a href="file_harness_e15_bt_eval.html">file_harness_e15_bt_eval.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e15_bt_eval.py">e15_bt_eval.py</a></td><td class="size">731</td></tr>
+<tr><td class="sym"><a href="file_harness_e15_bt_pilot.html">file_harness_e15_bt_pilot.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e15_bt_pilot.py">e15_bt_pilot.py</a></td><td class="size">498</td></tr>
+<tr><td class="sym"><a href="file_harness_e16_gradient_audit.html">file_harness_e16_gradient_audit.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e16_gradient_audit.py">e16_gradient_audit.py</a></td><td class="size">1571</td></tr>
+<tr><td class="sym"><a href="file_harness_e17_gradient_duel.html">file_harness_e17_gradient_duel.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e17_gradient_duel.py">e17_gradient_duel.py</a></td><td class="size">265</td></tr>
+<tr><td class="sym"><a href="file_harness_e18_bt_eval.html">file_harness_e18_bt_eval.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e18_bt_eval.py">e18_bt_eval.py</a></td><td class="size">629</td></tr>
+<tr><td class="sym"><a href="file_harness_e18_gradient_duel.html">file_harness_e18_gradient_duel.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e18_gradient_duel.py">e18_gradient_duel.py</a></td><td class="size">285</td></tr>
+<tr><td class="sym"><a href="file_harness_e18_scripted_bt.html">file_harness_e18_scripted_bt.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e18_scripted_bt.py">e18_scripted_bt.py</a></td><td class="size">1223</td></tr>
+<tr><td class="sym"><a href="file_harness_e18_symmetric.html">file_harness_e18_symmetric.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e18_symmetric.py">e18_symmetric.py</a></td><td class="size">389</td></tr>
+<tr><td class="sym"><a href="file_harness_e19_bt_eval.html">file_harness_e19_bt_eval.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19_bt_eval.py">e19_bt_eval.py</a></td><td class="size">881</td></tr>
+<tr><td class="sym"><a href="file_harness_e19_cascade_analysis.html">file_harness_e19_cascade_analysis.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19_cascade_analysis.py">e19_cascade_analysis.py</a></td><td class="size">434</td></tr>
+<tr><td class="sym"><a href="file_harness_e19_gradient_duel.html">file_harness_e19_gradient_duel.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19_gradient_duel.py">e19_gradient_duel.py</a></td><td class="size">251</td></tr>
+<tr><td class="sym"><a href="file_harness_e19_hybrid_bt.html">file_harness_e19_hybrid_bt.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19_hybrid_bt.py">e19_hybrid_bt.py</a></td><td class="size">1044</td></tr>
+<tr><td class="sym"><a href="file_harness_e19b_diagnose.html">file_harness_e19b_diagnose.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19b_diagnose.py">e19b_diagnose.py</a></td><td class="size">418</td></tr>
+<tr><td class="sym"><a href="file_harness_e19b_dryrun.html">file_harness_e19b_dryrun.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19b_dryrun.py">e19b_dryrun.py</a></td><td class="size">469</td></tr>
+<tr><td class="sym"><a href="file_harness_e19b_eval.html">file_harness_e19b_eval.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19b_eval.py">e19b_eval.py</a></td><td class="size">545</td></tr>
+<tr><td class="sym"><a href="file_harness_e19b_extract.html">file_harness_e19b_extract.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19b_extract.py">e19b_extract.py</a></td><td class="size">891</td></tr>
+<tr><td class="sym"><a href="file_harness_e19b_gradient_duel.html">file_harness_e19b_gradient_duel.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19b_gradient_duel.py">e19b_gradient_duel.py</a></td><td class="size">233</td></tr>
+<tr><td class="sym"><a href="file_harness_e19c_confirm.html">file_harness_e19c_confirm.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19c_confirm.py">e19c_confirm.py</a></td><td class="size">573</td></tr>
+<tr><td class="sym"><a href="file_harness_e19c_eval.html">file_harness_e19c_eval.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19c_eval.py">e19c_eval.py</a></td><td class="size">338</td></tr>
+<tr><td class="sym"><a href="file_harness_e19c_gradient_duel.html">file_harness_e19c_gradient_duel.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19c_gradient_duel.py">e19c_gradient_duel.py</a></td><td class="size">246</td></tr>
+<tr><td class="sym"><a href="file_harness_e19c_online_bt.html">file_harness_e19c_online_bt.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19c_online_bt.py">e19c_online_bt.py</a></td><td class="size">179</td></tr>
+<tr><td class="sym"><a href="file_harness_e19c_ratchet.html">file_harness_e19c_ratchet.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a></td><td class="size">796</td></tr>
+<tr><td class="sym"><a href="file_harness_e24_common.html">file_harness_e24_common.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e24_common.py">e24_common.py</a></td><td class="size">301</td></tr>
+<tr><td class="sym"><a href="file_harness_e24_eval.html">file_harness_e24_eval.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e24_eval.py">e24_eval.py</a></td><td class="size">634</td></tr>
+<tr><td class="sym"><a href="file_harness_e24_gradient_duel.html">file_harness_e24_gradient_duel.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e24_gradient_duel.py">e24_gradient_duel.py</a></td><td class="size">379</td></tr>
+<tr><td class="sym"><a href="file_harness_e24_holdout.html">file_harness_e24_holdout.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e24_holdout.py">e24_holdout.py</a></td><td class="size">435</td></tr>
+<tr><td class="sym"><a href="file_harness_e24_iomap.html">file_harness_e24_iomap.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e24_iomap.py">e24_iomap.py</a></td><td class="size">369</td></tr>
+<tr><td class="sym"><a href="file_harness_e24_reexec.html">file_harness_e24_reexec.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e24_reexec.py">e24_reexec.py</a></td><td class="size">473</td></tr>
+<tr><td class="sym"><a href="file_harness_e3_common.html">file_harness_e3_common.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e3_common.py">e3_common.py</a></td><td class="size">264</td></tr>
+<tr><td class="sym"><a href="file_harness_e3_md.html">file_harness_e3_md.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e3_md.py">e3_md.py</a></td><td class="size">129</td></tr>
+<tr><td class="sym"><a href="file_harness_e3_run.html">file_harness_e3_run.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e3_run.py">e3_run.py</a></td><td class="size">503</td></tr>
+<tr><td class="sym"><a href="file_harness_e3_run2.html">file_harness_e3_run2.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e3_run2.py">e3_run2.py</a></td><td class="size">511</td></tr>
+<tr><td class="sym"><a href="file_harness_e4_policy_replay.html">file_harness_e4_policy_replay.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e4_policy_replay.py">e4_policy_replay.py</a></td><td class="size">484</td></tr>
+<tr><td class="sym"><a href="file_harness_e5_common.html">file_harness_e5_common.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e5_common.py">e5_common.py</a></td><td class="size">223</td></tr>
+<tr><td class="sym"><a href="file_harness_e5_embed.html">file_harness_e5_embed.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e5_embed.py">e5_embed.py</a></td><td class="size">35</td></tr>
+<tr><td class="sym"><a href="file_harness_e5_md.html">file_harness_e5_md.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e5_md.py">e5_md.py</a></td><td class="size">140</td></tr>
+<tr><td class="sym"><a href="file_harness_e5_run.html">file_harness_e5_run.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e5_run.py">e5_run.py</a></td><td class="size">524</td></tr>
+<tr><td class="sym"><a href="file_harness_e5b_splits.html">file_harness_e5b_splits.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e5b_splits.py">e5b_splits.py</a></td><td class="size">438</td></tr>
+<tr><td class="sym"><a href="file_harness_e5c_curve.html">file_harness_e5c_curve.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e5c_curve.py">e5c_curve.py</a></td><td class="size">427</td></tr>
+<tr><td class="sym"><a href="file_harness_e8_blast_radius.html">file_harness_e8_blast_radius.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e8_blast_radius.py">e8_blast_radius.py</a></td><td class="size">715</td></tr>
+<tr><td class="sym"><a href="file_harness_e9_deployment.html">file_harness_e9_deployment.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e9_deployment.py">e9_deployment.py</a></td><td class="size">557</td></tr>
+<tr><td class="sym"><a href="file_harness_harness_import.html">file_harness_harness_import.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/harness_import.py">harness_import.py</a></td><td class="size">7</td></tr>
+<tr><td class="sym"><a href="file_harness_metrics.html">file_harness_metrics.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/metrics.py">metrics.py</a></td><td class="size">177</td></tr>
+<tr><td class="sym"><a href="file_harness_run_e1.html">file_harness_run_e1.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/run_e1.py">run_e1.py</a></td><td class="size">543</td></tr>
+<tr><td class="sym"><a href="file_harness_run_e2.html">file_harness_run_e2.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/run_e2.py">run_e2.py</a></td><td class="size">398</td></tr>
+<tr><td class="sym"><a href="file_harness_e25_creed.html">file_harness_e25_creed.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e25_creed.py">e25_creed.py</a></td><td class="size">2038</td></tr>
+</tbody>
+</table>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>sources/evaluators (16 files)</h2>
+<table>
+<thead><tr><th>Digest page</th><th>File</th><th class="size">Lines</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_hybrid_init.html">file_hybrid_init.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td class="size">89</td></tr>
+<tr><td class="sym"><a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/aggregation.py">hybrid_verifier/aggregation.py</a></td><td class="size">434</td></tr>
+<tr><td class="sym"><a href="file_hybrid_claims.html">file_hybrid_claims.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/claims.py">hybrid_verifier/claims.py</a></td><td class="size">375</td></tr>
+<tr><td class="sym"><a href="file_hybrid_digest.html">file_hybrid_digest.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/digest.py">hybrid_verifier/digest.py</a></td><td class="size">175</td></tr>
+<tr><td class="sym"><a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td class="size">645</td></tr>
+<tr><td class="sym"><a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td class="size">294</td></tr>
+<tr><td class="sym"><a href="file_hybrid_inventory.html">file_hybrid_inventory.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/inventory.py">hybrid_verifier/inventory.py</a></td><td class="size">253</td></tr>
+<tr><td class="sym"><a href="file_hybrid_layers.html">file_hybrid_layers.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td class="size">497</td></tr>
+<tr><td class="sym"><a href="file_hybrid_registry.html">file_hybrid_registry.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a></td><td class="size">274</td></tr>
+<tr><td class="sym"><a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/scorers.py">hybrid_verifier/scorers.py</a></td><td class="size">309</td></tr>
+<tr><td class="sym"><a href="file_eval_base.html">file_eval_base.html</a></td><td class="sym"><a href="../../sources/evaluators/base.py">base.py</a></td><td class="size">380</td></tr>
+<tr><td class="sym"><a href="file_eval_bs_detection.html">file_eval_bs_detection.html</a></td><td class="sym"><a href="../../sources/evaluators/bs_detection.py">bs_detection.py</a></td><td class="size">801</td></tr>
+<tr><td class="sym"><a href="file_eval_evaluator.html">file_eval_evaluator.html</a></td><td class="sym"><a href="../../sources/evaluators/evaluator.py">evaluator.py</a></td><td class="size">193</td></tr>
+<tr><td class="sym"><a href="file_eval_generic.html">file_eval_generic.html</a></td><td class="sym"><a href="../../sources/evaluators/generic.py">generic.py</a></td><td class="size">472</td></tr>
+<tr><td class="sym"><a href="file_eval_grounding.html">file_eval_grounding.html</a></td><td class="sym"><a href="../../sources/evaluators/grounding.py">grounding.py</a></td><td class="size">55</td></tr>
+<tr><td class="sym"><a href="file_eval_scenario.html">file_eval_scenario.html</a></td><td class="sym"><a href="../../sources/evaluators/scenario.py">scenario.py</a></td><td class="size">654</td></tr>
+</tbody>
+</table>
+<p class="note">Five files are excluded because they are deprecated: <code class="path">verifier.py</code>, <code class="path">verifier_claims.py</code>, <code class="path">verifier_claim_sources.py</code>, <code class="path">verifier_per_claim.py</code>, <code class="path">verifier_workspace.py</code> (see <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>).</p>
+<p class="note">Two included files carry a deprecated docstring: <code class="path">generic.py</code> is still built by <code>WorkflowEvaluator</code>, and <code class="path">bs_detection.py</code> is wired into it but stays unused, because the facade passes <code>use_bs_penalty=False</code> (evaluator.py:54, :79) and no caller passes <code>True</code>.</p>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/core/*.py</code> (19), <code class="path">experiments_verifiers/harness/*.py</code> (54), <code class="path">sources/evaluators/*.py</code> (6 current), <code class="path">sources/evaluators/hybrid_verifier/*.py</code> (10). Line counts by <code>wc -l</code>, my computation.</p>
+<p class="skips">Skipped: the 5 deprecated verifier files, <code>__pycache__</code> folders, and the non-Python files in those folders.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

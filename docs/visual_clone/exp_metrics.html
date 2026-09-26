@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>metrics - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; metrics">
+<div class="wrap">
+
+<h1 class="hud">metrics.py &mdash; the shared section-0 metric library</h1>
+<p class="intro">This file is the section-0 metric contract of the verifier-search harness: AUC against SR and VER, Brier, Kendall tau overall and in the top score quartile, within-task ranking accuracy, exact McNemar, and two task-cluster bootstraps. Two scripts call it, <code>run_e1.py</code> and <code>run_e2.py</code>, and every number they publish is labelled "my computation" over frozen claim verdicts. The Bradley&ndash;Terry scripts (E15, E18, E19) never import it; they re-implement the fit and the bootstrap, and the ledgers named in the evidence map come from those scripts instead.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 300" role="img" aria-label="metrics.py design: score vectors from run_e1 and run_e2 feed five metric function groups that fill the two result JSONs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="h1">
+    <title>hypothesis: one metric contract every variant scores alike</title>
+    <rect x="20" y="20" width="250" height="56" rx="2" fill="rgba(183,156,255,0.08)" stroke="#B79CFF" stroke-dasharray="5 4"/><text class="box-label" x="145.0" y="46.0" text-anchor="middle">hypothesis: one metric contract</text><text class="box-sub" x="145.0" y="62.0" text-anchor="middle">every variant scores alike</text>
+  </g>
+  <a class="box" id="i1" href="exp_run_e1.html">
+    <title>scorer vectors, run_e1.py 15 542 verdicts, E1 JSON L12</title>
+    <rect x="300" y="20" width="300" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/><text class="box-label" x="450.0" y="46.0" text-anchor="middle">scorer vectors, run_e1.py</text><text class="box-sub" x="450.0" y="62.0" text-anchor="middle">15 542 verdicts, E1 JSON L12</text>
+  </a>
+  <a class="box" id="i2" href="exp_run_e2.html">
+    <title>static checks, run_e2.py 135 workspaces, E2 JSON L6</title>
+    <rect x="640" y="20" width="340" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/><text class="box-label" x="810.0" y="46.0" text-anchor="middle">static checks, run_e2.py</text><text class="box-sub" x="810.0" y="62.0" text-anchor="middle">135 workspaces, E2 JSON L6</text>
+  </a>
+  <a class="box" id="f1" href="../../experiments_verifiers/harness/metrics.py">
+    <title>auc(), brier() L23, L30</title>
+    <rect x="20" y="120" width="170" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/><text class="box-label" x="105.0" y="148.0" text-anchor="middle">auc(), brier()</text><text class="box-sub" x="105.0" y="164.0" text-anchor="middle">L23, L30</text>
+  </a>
+  <a class="box" id="f2" href="../../experiments_verifiers/harness/metrics.py">
+    <title>tau(), tau_top_quartile() L38, L46</title>
+    <rect x="210" y="120" width="170" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/><text class="box-label" x="295.0" y="148.0" text-anchor="middle">tau(), tau_top_quartile()</text><text class="box-sub" x="295.0" y="164.0" text-anchor="middle">L38, L46</text>
+  </a>
+  <a class="box" id="f3" href="../../experiments_verifiers/harness/metrics.py">
+    <title>within_task_ranking() L64</title>
+    <rect x="400" y="120" width="190" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/><text class="box-label" x="495.0" y="148.0" text-anchor="middle">within_task_ranking()</text><text class="box-sub" x="495.0" y="164.0" text-anchor="middle">L64</text>
+  </a>
+  <a class="box" id="f4" href="../../experiments_verifiers/harness/metrics.py">
+    <title>mcnemar_exact() L95</title>
+    <rect x="610" y="120" width="170" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/><text class="box-label" x="695.0" y="148.0" text-anchor="middle">mcnemar_exact()</text><text class="box-sub" x="695.0" y="164.0" text-anchor="middle">L95</text>
+  </a>
+  <a class="box" id="f5" href="../../experiments_verifiers/harness/metrics.py">
+    <title>cluster bootstraps L123, L146</title>
+    <rect x="800" y="120" width="180" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/><text class="box-label" x="890.0" y="148.0" text-anchor="middle">cluster bootstraps</text><text class="box-sub" x="890.0" y="164.0" text-anchor="middle">L123, L146</text>
+  </a>
+  <a class="box" id="o1" href="../../experiments_verifiers/results/E1_rubric_surgery_20260921.json">
+    <title>E1 and E2 result JSONs results/*_20260921.json</title>
+    <rect x="20" y="220" width="960" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/><text class="box-label" x="500.0" y="248.0" text-anchor="middle">E1 and E2 result JSONs</text><text class="box-sub" x="500.0" y="264.0" text-anchor="middle">results/*_20260921.json</text>
+  </a>
+  <path class="edge" data-from="h1" data-to="f1" d="M145,76 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="153" y="104" text-anchor="start">test</text>
+  <path class="edge dashed-edge" data-from="i1" data-to="f1" d="M350,76 L120,120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="230" y="104" text-anchor="start">vectors</text>
+  <path class="edge dashed-edge" data-from="i2" data-to="f3" d="M760,76 L520,120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="640" y="104" text-anchor="start">checks</text>
+  <path class="edge" data-from="f1" data-to="o1" d="M105,180 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="112" y="204" text-anchor="start">auc, brier</text>
+  <path class="edge" data-from="f2" data-to="o1" d="M295,180 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="302" y="204" text-anchor="start">tau, topq</text>
+  <path class="edge" data-from="f3" data-to="o1" d="M495,180 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="502" y="204" text-anchor="start">ranking</text>
+  <path class="edge" data-from="f4" data-to="o1" d="M695,180 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="702" y="204" text-anchor="start">mcnemar</text>
+  <path class="edge" data-from="f5" data-to="o1" d="M890,180 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="898" y="204" text-anchor="start">bootstrap CIs</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. Violet = hypothesis, steel = caller or output file, mint = function in <code class="path">experiments_verifiers/harness/metrics.py</code>. Solid = call, dashed = reads. The nine functions are drawn as five groups: <code>auc</code> L23 and <code>brier</code> L30 share <code>_clean</code> L15; <code>tau</code> L38 and <code>tau_top_quartile</code> L46 use <code>scipy.stats.kendalltau</code>; <code>within_task_ranking</code> L64 counts SR-true / SR-false pairs inside each task; <code>mcnemar_exact</code> L95 runs <code>stats.binomtest</code> on discordant pairs; <code>task_cluster_bootstrap_ci</code> L123 and <code>paired_auc_diff_bootstrap</code> L146 resample whole tasks. Related pages: <a href="exp_run_e1.html">exp_run_e1.html</a>, <a href="exp_run_e2.html">exp_run_e2.html</a>, <a href="exp_harness_import.html">exp_harness_import.html</a>, <a href="exp_harness_init.html">exp_harness_init.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/metrics.py">experiments_verifiers/harness/metrics.py</a></h4>
+<p class="role">Nine pure functions that turn score, label and task-id arrays into the section-0 metrics, with no file access and no global state.</p>
+<p class="meta">177 lines &#183; entry point: none (no <code>main</code>, no <code>__main__</code>) &#183; 9 functions, no classes &#183; CLI: none</p>
+<details><summary>signatures, returns and callers</summary><div class="dbody">
+<pre>_clean(scores, labels) -&gt; (s, y, ok)                                       (L15)
+auc(scores, labels) -&gt; float | None          # None if one label class     (L23)
+brier(scores, labels) -&gt; float | None        # score = predicted P(SR=1)   (L30)
+tau(scores, labels) -&gt; float | None          # Kendall, None if no spread  (L38)
+tau_top_quartile(scores, labels, threshold=None) -&gt; (tau, n, thr)          (L46)
+within_task_ranking(scores, labels, tasks) -&gt; dict                         (L64)
+mcnemar_exact(pred_a, pred_b, labels) -&gt; dict                              (L95)
+task_cluster_bootstrap_ci(scores, labels, tasks, metric_fn, n_boot=1000, seed=7) -&gt; (lo, hi) | None   (L123)
+paired_auc_diff_bootstrap(scores_v, scores_b, labels, tasks, n_boot=1000, seed=7) -&gt; dict | None      (L146)</pre>
+<p>Callers: <code class="path">experiments_verifiers/harness/run_e1.py</code> L36 imports it as <code>M</code> and uses <code>M.tau</code> (L107), <code>M.tau_top_quartile</code> (L109), the block at L176&ndash;194 (<code>auc</code>, <code>brier</code>, <code>tau</code>, <code>tau_top_quartile</code>, <code>within_task_ranking</code>, both bootstraps) and <code>M.mcnemar_exact</code> (L217, L308). <code class="path">run_e2.py</code> L31 imports it the same way and uses <code>auc</code>, <code>tau</code>, <code>tau_top_quartile</code>, <code>within_task_ranking</code>, <code>task_cluster_bootstrap_ci</code>, <code>paired_auc_diff_bootstrap</code> and <code>mcnemar_exact</code> (L162&ndash;172, L240&ndash;243, L253&ndash;256, L294). A repo-wide grep for <code>from harness import</code> returns exactly these two files.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Score, label and task-id arrays (arguments only)</td><td>returns dicts and floats</td><td class="sym"><a href="../../experiments_verifiers/harness/metrics.py">experiments_verifiers/harness/metrics.py</a> L23&ndash;177</td></tr>
+<tr><td>No file, no config, no LLM</td><td>No file</td><td class="sym">same file; no <code>open</code>, no <code>Path</code> in the module</td></tr>
+<tr><td>Frozen claim verdicts, via <code>run_e1.py</code></td><td>E1 JSON and MD, via <code>run_e1.py</code> L530&ndash;536</td><td class="sym"><a href="../../experiments_verifiers/results/E1_rubric_surgery_20260921.json">results/E1_rubric_surgery_20260921.json</a></td></tr>
+<tr><td>135 frozen workspaces, via <code>run_e2.py</code></td><td>E2 JSON and MD, via <code>run_e2.py</code> L363</td><td class="sym"><a href="../../experiments_verifiers/results/E2_static-grounding_20260921.json">results/E2_static-grounding_20260921.json</a></td></tr>
+</tbody>
+</table>
+
+<h3>What did <em>not</em> produce these numbers</h3>
+<table>
+<thead><tr><th>Artifact named in the evidence map</th><th>Who writes or reads it (verified by grep)</th><th>Imports metrics.py?</th></tr></thead>
+<tbody>
+<tr><td class="sym">results/_e16_judge_cache.jsonl</td><td><code>e16_gradient_audit.py</code> L53 (<code>CACHE_JSONL</code>)</td><td class="sym">no</td></tr>
+<tr><td class="sym">results/_e18_determinism_2026-09-23.jsonl</td><td><code>e18_bt_eval.py</code> L41, <code>e18_scripted_bt.py</code> L66</td><td class="sym">no</td></tr>
+<tr><td class="sym">results/_e19_determinism_2026-09-23.jsonl</td><td><code>e19_hybrid_bt.py</code> L76</td><td class="sym">no</td></tr>
+<tr><td class="sym">ablations/</td><td><code>e4_policy_replay.py</code> L25, <code>e8_blast_radius.py</code> L45, <code>e13_common.py</code> L194&ndash;208</td><td class="sym">no</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: nothing under <code>sources/</code> imports this library. The only mentions outside <code>experiments_verifiers/</code> are docstring references in <code>sources/evaluators/hybrid_verifier/*.py</code> to other harness scripts.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; auc_sr of every E1 aggregation variant</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 300" role="img" aria-label="Bar chart of auc_sr per aggregation variant from the E1 results JSON">
+<defs><filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<text x="20" y="22" font-size="11" fill="#8FB8C9">auc_sr per variant, E1 results JSON (axis 0.45&#8211;0.70; n = 607 rows, 124 tasks)</text>
+<path d="M90,230.0 H980" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="82" y="233.0" text-anchor="end" font-size="9" fill="#4F7486">0.45</text>
+<path d="M90,194.0 H980" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="82" y="197.0" text-anchor="end" font-size="9" fill="#4F7486">0.50</text>
+<path d="M90,158.0 H980" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="82" y="161.0" text-anchor="end" font-size="9" fill="#4F7486">0.55</text>
+<path d="M90,122.0 H980" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="82" y="125.0" text-anchor="end" font-size="9" fill="#4F7486">0.60</text>
+<path d="M90,86.0 H980" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="82" y="89.0" text-anchor="end" font-size="9" fill="#4F7486">0.65</text>
+<path d="M90,50.0 H980" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="82" y="53.0" text-anchor="end" font-size="9" fill="#4F7486">0.70</text>
+<rect x="117.4" y="160.1" width="44" height="69.9" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="139.4" y="156.1" text-anchor="middle" font-size="8.5">0.5471</text>
+<text x="139.4" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">manifest reward (159 rows)</text>
+<rect x="216.3" y="194.0" width="44" height="36.0" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="238.3" y="190.0" text-anchor="middle" font-size="8.5">0.5000</text>
+<text x="238.3" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">constant_0.5</text>
+<rect x="315.2" y="115.2" width="44" height="114.8" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="337.2" y="111.2" text-anchor="middle" font-size="8.5">0.6094</text>
+<text x="337.2" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">ver_bit</text>
+<rect x="414.1" y="93.4" width="44" height="136.6" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="436.1" y="89.4" text-anchor="middle" font-size="8.5">0.6397</text>
+<text x="436.1" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">v0_recomputed</text>
+<rect x="513.0" y="91.6" width="44" height="138.4" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="535.0" y="87.6" text-anchor="middle" font-size="8.5">0.6422</text>
+<text x="535.0" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">no_hardcap</text>
+<rect x="611.9" y="86.6" width="44" height="143.4" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="633.9" y="82.6" text-anchor="middle" font-size="8.5">0.6492</text>
+<text x="633.9" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">uniform</text>
+<rect x="710.8" y="83.1" width="44" height="146.9" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="732.8" y="79.1" text-anchor="middle" font-size="8.5">0.6540</text>
+<text x="732.8" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">unsure_exclude</text>
+<rect x="809.7" y="120.1" width="44" height="109.9" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="831.7" y="116.1" text-anchor="middle" font-size="8.5">0.6026</text>
+<text x="831.7" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">cap_070</text>
+<rect x="908.6" y="137.6" width="44" height="92.4" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF"/>
+<text x="930.6" y="133.6" text-anchor="middle" font-size="8.5">0.5783</text>
+<text x="930.6" y="242" text-anchor="middle" font-size="7.5" fill="#8FB8C9">fitted_group_lr_loto</text>
+<path d="M90,230.0 H980" fill="none" stroke="#1B4B6B" stroke-width="1.4"/>
+<text x="90" y="270" font-size="9" fill="#4F7486">Nine of the 19 variants in the JSON. Bars sorted by value; labels are the auc_sr key of each variant (JSON lines cited in the table).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; values are the <code>auc_sr</code> keys that <code>metrics.py::auc</code> returned inside the E1 results JSON (variant blocks at L32&ndash;467; the manifest baseline at L19). Every bar is one variant's AUC against the SR label over the same 607 examples; the E2 file holds the same metric family for its 135 workspaces.</p>
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Population in E1</td><td class="size">607 examples, 124 tasks</td><td class="sym">E1_rubric_surgery_20260921.json L6, L7</td></tr>
+<tr><td>Manifest reward auc_sr (159 rows only)</td><td class="size">0.5471</td><td class="sym">E1 JSON L19</td></tr>
+<tr><td><code>v0_recomputed</code> auc_sr (baseline)</td><td class="size">0.6397</td><td class="sym">E1 JSON L68</td></tr>
+<tr><td><code>uniform</code> / <code>unsure_exclude</code> auc_sr</td><td class="size">0.6492 / 0.6540 (best)</td><td class="sym">E1 JSON L96, L240</td></tr>
+<tr><td><code>no_hardcap</code> / <code>cap_070</code> auc_sr</td><td class="size">0.6422 / 0.6026</td><td class="sym">E1 JSON L268, L296</td></tr>
+<tr><td><code>fitted_group_lr_loto</code> auc_sr</td><td class="size">0.5783 (below baseline)</td><td class="sym">E1 JSON L416</td></tr>
+<tr><td>Variants scored / variants with a gate verdict</td><td class="size">19 / 17 (my computation)</td><td class="sym">E1 JSON <code>metrics</code> and <code>success_gate</code> blocks</td></tr>
+<tr><td>Gate passes</td><td class="size">0 of 17 (<code>gate_pass: false</code>)</td><td class="sym">E1 JSON L34025 onward (17 occurrences)</td></tr>
+<tr><td>Same-159-rows check: reward vs recomputation</td><td class="size">0.5471 vs 0.5821</td><td class="sym">E1 JSON L34423&ndash;34424</td></tr>
+<tr><td>Examples tied at the 0.89 cap</td><td class="size">108 of 607</td><td class="sym">E1 JSON L34370</td></tr>
+<tr><td>E2 extended auc_sr / auc_ver</td><td class="size">0.5913 / 0.7923</td><td class="sym">E2_static-grounding_20260921.json L60, L61</td></tr>
+<tr><td>E2 strict6 auc_sr / auc_ver</td><td class="size">0.5600 / 0.5013</td><td class="sym">E2 JSON L21, L22</td></tr>
+<tr><td>Bootstrap defaults</td><td class="size">1 000 draws, seed 7</td><td class="sym">metrics.py L123, L146</td></tr>
+<tr><td>Per-example rows written by E1</td><td class="size">607</td><td class="sym">E1 JSON <code>per_example</code> L18751&ndash;34420 (my count)</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the calling scripts fail their own gates anyway &mdash; E1's TL;DR says "Hypothesis REJECTED" and no variant clears <code>auc_sr &ge; v0 + 0.05</code>. So this page documents the measuring instrument, not a win: the library is the only place where "same metric for every candidate" is enforced.</p>
+<p class="note flag">Red: <code>metrics.py::tau_top_quartile</code> returns <code>(None, n, thr)</code> whenever the top slice has fewer than two label classes (L58&ndash;59), and E1 JSON shows <code>null</code> for <code>tau_top_quartile</code> on the saturated variants (for example <code>ver_bit</code>, L56). A <code>null</code> there is a small-slice outcome, not a zero.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>7 key lines from the library and the two result files</summary><div class="dbody">
+<blockquote>"""E1 - standard section-0 metrics for the verifier-search harness.
+
+All numbers computed here are "my computation". Every routine takes numpy
+arrays plus a task-id array so task-cluster structure is respected in
+resampling and per-fold reporting.
+"""</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/harness/metrics.py</code> lines 1&ndash;6 (module docstring).</p>
+<blockquote>def auc(scores, labels) -&gt; float | None:
+    s, y, _ = _clean(scores, labels)
+    if len(np.unique(y)) &lt; 2:
+        return None
+    return float(roc_auc_score(y, s))</blockquote>
+<p class="sub">Same file, lines 23&ndash;27.</p>
+<blockquote>def task_cluster_bootstrap_ci(scores, labels, tasks, metric_fn, n_boot=1000, seed=7):
+    # resample TASKS with replacement; metric_fn(scores, labels) on the pooled
+    # resampled examples. Returns (lo, hi) 95% percentile CI.</blockquote>
+<p class="sub">Same file, lines 123&ndash;125; returns <code>None</code> when fewer than 100 draws survive (L141&ndash;142).</p>
+<blockquote>  "auc_sr": 0.6540412303664922,
+  "auc_ver": 0.6565295169946332,</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> lines 240&ndash;241, inside the <code>metrics.unsure_exclude</code> block that opens at L236.</p>
+<blockquote>   "auc_sr": 0.639693666935159,
+   "auc_sr_minus_v0": 0.0,
+   "tau_top_quartile_pooled": 0.0827777279813897,
+   "frac_folds_tau_top_positive_of_defined": 0.6,
+   "gate_pass": false</blockquote>
+<p class="sub">Same file, lines 34020&ndash;34025 (<code>success_gate.v0_recomputed</code>; the block also carries the two gate thresholds quoted in E2 L301&ndash;302).</p>
+<blockquote>**Hypothesis REJECTED.** Changing only how the existing claim verdicts are aggregated moves
+`auc_sr` by at most **+0.014** (success gate needed +0.05), and per-fold top-quartile tau is
+positive on at most 9/124 folds (gate needed &ge; half). **No variant passes the gate.**</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.md</code> lines 9&ndash;11.</p>
+<blockquote>| **auc_sr** | **0.591** [CI 0.473–0.714] | 0.560 | 0.470 | 0.500 | 0.553 |
+| **auc_ver** | **0.792** [CI 0.591–0.974] | 0.501 | 0.366 | 0.500 | — |</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.md</code> lines 49&ndash;50 (extended vs strict6 vs reward vs constant vs VER bit).</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/metrics.py</code> (177 lines, read in full), <code class="path">experiments_verifiers/harness/run_e1.py</code> L1&ndash;60 and every <code>M.</code> call line (grep), <code class="path">experiments_verifiers/harness/run_e2.py</code> L1&ndash;60 and every <code>M.</code> call line (grep), <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> (34 465 lines, read by key and by line), <code class="path">.md</code> lines 1&ndash;80, <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.json</code> (8 688 lines, read by key), <code class="path">.md</code> lines 1&ndash;75, <code class="path">experiments_verifiers/README.md</code> L123 (<code>&#167;0 metrics harness + contract</code>), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> section 1 (M1&ndash;M4 registry). Line numbers from <code>grep -n</code>; variant and gate counts, and the checked claim that nothing under <code>sources/</code> imports this file, are my computation.</p>
+<p class="skips">Skipped, with reason: <code>experiments_verifiers/.env</code> (key material, never opened); <code>scorers/e1_aggregators.py</code> and <code>scorers/static_grounding.py</code> (they build the score vectors; <a href="exp_run_e1.html">exp_run_e1.html</a> and <a href="exp_run_e2.html">exp_run_e2.html</a> own them); the bodies of the ledger files (<code>_e16_judge_cache.jsonl</code>, <code>_e18_determinism_2026-09-23.jsonl</code>, <code>_e19_determinism_2026-09-23.jsonl</code>) beyond the first line each, which was enough to name the writing script; <code>ablations/</code> (462 JSON files, read by other scripts, not by this one); the 607-row <code>per_example</code> array beyond its length; the per-fold arrays in E1; E15/E18/E19 result files (their pages exist); no experiment, application, or pytest run, per the build rules.</p>
+<p>experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

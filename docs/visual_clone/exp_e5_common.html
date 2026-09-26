@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5_common - E5 learned claim importance - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e5_common">
+<div class="wrap">
+
+<h1 class="hud">e5_common &mdash; E5 shared loading and metrics</h1>
+<p class="intro">E5 asked whether the LLM's self-reported claim importance (1&ndash;10) can be replaced by weights learned from claims &times; outcomes. This page covers <code>e5_common.py</code>, the shared library that loads the frozen claims, joins each claim name to its rubric source letter, and computes the metric block. Every number in the E5 results file is labelled &ldquo;my computation&rdquo;.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; what the library joins and returns</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 400" role="img" aria-label="e5_common inputs, functions and returned values">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="hyp">
+    <title>The experiment hypothesis, stated in the results markdown</title>
+    <rect x="20" y="20" width="420" height="48" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="230" y="40" text-anchor="middle">hypothesis: weights are learnable</text>
+    <text class="box-sub" x="230" y="56" text-anchor="middle">rebuild importance from outcomes, not self-report</text>
+  </g>
+
+  <a class="box" id="a1" href="../../experiments_verifiers/data/verifier_claims.jsonl">
+    <title>Frozen claim verdicts, 607 rows</title>
+    <rect x="20" y="100" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="124" text-anchor="middle">frozen claims file</text>
+    <text class="box-sub" x="155" y="140" text-anchor="middle">data/verifier_claims.jsonl</text>
+  </a>
+  <a class="box" id="b1" href="exp_e5_run.html">
+    <title>load_examples maps claim status to a score</title>
+    <rect x="340" y="100" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="124" text-anchor="middle">load_examples L34</text>
+    <text class="box-sub" x="460" y="140" text-anchor="middle">status to score, SCORE_MAP L22</text>
+  </a>
+  <g class="box" id="c1">
+    <title>Returned per-example claim rows</title>
+    <rect x="630" y="100" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="124" text-anchor="middle">claim verdict rows</text>
+    <text class="box-sub" x="755" y="140" text-anchor="middle">name, imp, kind, status, s</text>
+  </g>
+
+  <a class="box" id="a2" href="../../experiments_verifiers/README.md">
+    <title>Goal strings and rubric caches on disk</title>
+    <rect x="20" y="200" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="224" text-anchor="middle">ablation goals + rubric caches</text>
+    <text class="box-sub" x="155" y="240" text-anchor="middle">ablations/*.json &#183; 233 cache files</text>
+  </a>
+  <a class="box" id="b2" href="exp_e5_run.html">
+    <title>build_rubric_join matches keys by sha256</title>
+    <rect x="340" y="200" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="224" text-anchor="middle">build_rubric_join L84</text>
+    <text class="box-sub" x="460" y="240" text-anchor="middle">sha256(goal + version)</text>
+  </a>
+  <g class="box" id="c2">
+    <title>Returned claim name to source letter map</title>
+    <rect x="630" y="200" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="224" text-anchor="middle">source letters</text>
+    <text class="box-sub" x="755" y="240" text-anchor="middle">rubric_by_task: a/b/c/d/e/g</text>
+  </g>
+
+  <g class="box" id="a3">
+    <title>Pooled scores plus SR labels, from rows 1 and 2</title>
+    <rect x="20" y="300" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="324" text-anchor="middle">claim rows + SR labels</text>
+    <text class="box-sub" x="155" y="340" text-anchor="middle">from rows 1 and 2</text>
+  </g>
+  <a class="box" id="b3" href="exp_e5_run.html">
+    <title>standard_metrics and v0_reward return the metric numbers</title>
+    <rect x="340" y="300" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="324" text-anchor="middle">standard_metrics &#183; v0_reward</text>
+    <text class="box-sub" x="460" y="340" text-anchor="middle">L154 auc_sr, tau &#183; L211 reward</text>
+  </a>
+  <g class="box" id="c3">
+    <title>The caller writes these into the E5 results JSON</title>
+    <rect x="630" y="300" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="324" text-anchor="middle">E5 result JSON</text>
+    <text class="box-sub" x="755" y="340" text-anchor="middle">metrics + per_example</text>
+  </g>
+
+  <path class="edge" data-from="hyp" data-to="a1" d="M155,68 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="163" y="88" text-anchor="start">tested on</text>
+
+  <path class="edge" data-from="a1" data-to="b1" d="M290,130 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="122" text-anchor="middle">reads</text>
+  <path class="edge" data-from="b1" data-to="c1" d="M580,130 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="122" text-anchor="middle">scores</text>
+
+  <path class="edge" data-from="a2" data-to="b2" d="M290,230 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="222" text-anchor="middle">goal hash</text>
+  <path class="edge" data-from="b2" data-to="c2" d="M580,230 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="222" text-anchor="middle">source letter</text>
+
+  <path class="edge" data-from="a3" data-to="b3" d="M290,330 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="322" text-anchor="middle">pooled scores</text>
+  <path class="edge" data-from="b3" data-to="c3" d="M580,330 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="322" text-anchor="middle">returns dict</text>
+
+  <text class="box-sub" x="20" y="384">steel = frozen data on disk &#183; cyan pill = function in e5_common.py &#183; 10 boxes, no crossing arrows</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. The hypothesis box at the top comes from <code class="path">results/E5_learned_importance_2026-09-21.md</code> L7. Row 3 aggregates rows 1 and 2, so its input box names both. Stage names are the real functions of <a href="../../experiments_verifiers/harness/e5_common.py">e5_common.py</a> with their line numbers.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e5_common.py">experiments_verifiers/harness/e5_common.py</a></h4>
+<p class="role">Shared E5 library: loads frozen claims, goals and rubric caches, joins claim names to source letters, then computes the metric block and the V0 reward.</p>
+<p class="meta">223 lines &#183; 12 functions, no class, no <code>main</code> &#183; entry point: imported by <code class="path">e5_run.py</code> L24 and <code class="path">e5_embed.py</code> L16 &#183; CLI arguments: none found</p>
+<details><summary>signatures and constants</summary><div class="dbody">
+<pre>task_key(goal: str, ver: str) -&gt; str                      # L25
+load_examples() -&gt; list[dict]                            # L34
+load_goals() -&gt; dict[tuple[str, str], str]               # L45
+load_eval_paths() -&gt; dict[tuple[str, str, str], Path]    # L55
+parse_descriptions(examples, eval_paths) -&gt; dict[str, dict]   # L67
+build_rubric_join(examples, goals) -&gt; tuple[dict, dict]  # L84
+standard_metrics(scores, labels_sr, labels_ver, task_ids, contrast_tasks) -&gt; dict   # L154
+cluster_bootstrap_auc(scores, sr, task_ids, n=500, seed=0)   # L188
+v0_reward(claims) -&gt; float                               # L211
+uniform_score(claims) -&gt; float                           # L222</pre>
+<p>Constants: <code>RUBRIC_VERSIONS</code> L18 (the empty salt "v0" era and <code>v2-fixability-20260912</code>), <code>SOURCES = ["a","b","c","d","e","g"]</code> L19, <code>CURRENT_SOURCES = ["a","b","c","e","g"]</code> L20, <code>SCORE_MAP</code> L22 (pass 1.0, fail 0.0, unsure 0.5).</p>
+<p><code>standard_metrics</code> returns <code>n</code>, <code>n_pos</code>, <code>auc_sr</code>, <code>auc_ver</code>, <code>tau_all</code>, <code>tau_top_quartile</code>, <code>n_top_quartile</code>, <code>within_task_ranking_accuracy</code>, <code>n_contrast_pairs</code>, <code>n_contrast_ties</code>.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th>Cited at</th></tr></thead>
+<tbody>
+<tr><td>Frozen claim verdicts</td><td>nothing, returns claim rows</td><td class="sym">experiments_verifiers/data/verifier_claims.jsonl</td><td class="sym">load_examples L34-L36</td></tr>
+<tr><td>Goal strings per task</td><td>nothing, returns a goal map</td><td class="sym">experiments_verifiers/ablations/*.json</td><td class="sym">load_goals L45-L48</td></tr>
+<tr><td>Evaluation file paths per uuid</td><td>nothing, returns a path map</td><td class="sym">experiments_verifiers/data/manifest_run_notes.json</td><td class="sym">load_eval_paths L55-L57</td></tr>
+<tr><td>Claim rationale and description</td><td>nothing, returns text per claim</td><td class="sym">sources/workflows/&lt;campaign&gt;/&lt;uuid&gt;/evaluation.txt</td><td class="sym">parse_descriptions L67-L74</td></tr>
+<tr><td>Rubric caches for provenance</td><td>nothing, returns name to source</td><td class="sym">sources/workflows/*/_verifier_tmp/rubric_cache_*.json</td><td class="sym">build_rubric_join L84-L90</td></tr>
+<tr><td>No file at all</td><td>no write call exists in the module</td><td class="sym">none</td><td class="sym">grep: 5 read_text calls, 0 writes</td></tr>
+</tbody>
+</table>
+<p class="sub">Line numbers from <code>wc -l</code> and the file text. <code>parse_descriptions</code> keys off the regex at L64 and keeps only the first description per claim name.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; the join quality the library produced</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 270" role="img" aria-label="Provenance join quality, four percentages">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="95" y="74.8" width="110" height="135.2" fill="rgba(0,229,255,0.16)" stroke="#00E5FF"/>
+  <text class="box-label" x="150" y="67.8" text-anchor="middle">84.5%</text>
+  <text class="box-sub" x="150" y="226" text-anchor="middle">direct source</text>
+  <rect x="275" y="53.8" width="110" height="156.2" fill="rgba(0,229,255,0.16)" stroke="#00E5FF"/>
+  <text class="box-label" x="330" y="46.8" text-anchor="middle">97.6%</text>
+  <text class="box-sub" x="330" y="226" text-anchor="middle">keys joined</text>
+  <rect x="455" y="102.5" width="110" height="107.5" fill="rgba(0,229,255,0.16)" stroke="#00E5FF"/>
+  <text class="box-label" x="510" y="95.5" text-anchor="middle">67.2%</text>
+  <text class="box-sub" x="510" y="226" text-anchor="middle">classifier acc</text>
+  <rect x="635" y="163.0" width="110" height="47.0" fill="rgba(0,229,255,0.16)" stroke="#00E5FF"/>
+  <text class="box-label" x="690" y="156.0" text-anchor="middle">29.4%</text>
+  <text class="box-sub" x="690" y="226" text-anchor="middle">classifier prior</text>
+  <path d="M40,210 H840" fill="none" stroke="#1B4B6B" stroke-width="1.2"/>
+  <path d="M40,130 H840" fill="none" stroke="#0E2A3F" stroke-width="1" stroke-dasharray="4 4"/>
+  <path d="M40,50 H840" fill="none" stroke="#0E2A3F" stroke-width="1" stroke-dasharray="4 4"/>
+  <text class="box-sub" x="34" y="214" text-anchor="end">0%</text>
+  <text class="box-sub" x="34" y="134" text-anchor="end">50%</text>
+  <text class="box-sub" x="34" y="54" text-anchor="end">100%</text>
+  <text class="box-sub" x="40" y="250">values read from results/E5_learned_importance_2026-09-21.json; &ldquo;keys joined&rdquo; is my computation (124 of 127)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; four percentages the join produced. <code>e5_common.py</code> writes no results file of its own; its return values are recorded in the E5 JSON and MD.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Rubric cache files found</td><td class="size">233</td><td class="sym">E5_learned_importance_2026-09-21.json L16</td></tr>
+<tr><td>Distinct rubric keys</td><td class="size">127</td><td class="sym">E5_learned_importance_2026-09-21.json L17</td></tr>
+<tr><td>Keys joined to a recorded task</td><td class="size">124 of 127 (97.6%, my computation)</td><td class="sym">E5_learned_importance_2026-09-21.json L18</td></tr>
+<tr><td>Joined keys by rubric version</td><td class="size">v0 102, v2 22</td><td class="sym">E5_learned_importance_2026-09-21.json L19-L22</td></tr>
+<tr><td>Claim verdicts with a direct source letter</td><td class="size">13 137 of 15 542 (84.5%)</td><td class="sym">E5_learned_importance_2026-09-21.json L28-L30</td></tr>
+<tr><td>Source classifier accuracy</td><td class="size">0.672 (n=13 137)</td><td class="sym">E5_learned_importance_2026-09-21.json L35-L36</td></tr>
+<tr><td>Source classifier prior</td><td class="size">0.294</td><td class="sym">E5_learned_importance_2026-09-21.json L37</td></tr>
+<tr><td>Source classifier cross-validation</td><td class="size">task-grouped 5-fold</td><td class="sym">E5_learned_importance_2026-09-21.json L89</td></tr>
+<tr><td>Unjoined key sample</td><td class="size">3 hashes listed of 3 unjoined keys</td><td class="sym">E5_learned_importance_2026-09-21.json L23-L27</td></tr>
+</tbody>
+</table>
+<p class="sub">The stored counts are 127 distinct keys and 124 joined, so 3 keys stay unjoined; the JSON lists 3 sample hashes.</p>
+
+<details><summary>verbatim: the provenance block and the classifier line</summary><div class="dbody">
+<blockquote>  "rubric_cache_files_found": 233,
+  "keys_joined_to_tasks": 124,
+  "direct_coverage": 0.8452580105520525,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.json</code> key <code>provenance</code>, lines 16, 18 and 30 (non-contiguous; the file's own indentation is kept).</p>
+<blockquote>  "accuracy": 0.6717667656238107,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.json</code> key <code>source_classifier.accuracy</code>, line 36.</p>
+<blockquote>- The plan assumed only **7** rubric caches survive. **233** `rubric_cache_*.json` files survive under `sources/workflows/*/_verifier_tmp/`.
+- Joining `sha256(goal + RUBRIC_VERSION)[:16]` (versions: no-salt v0 era and `v2-fixability-20260912`) to the ablation goals matches **124/127** keys.
+- Direct claim-&gt;source labels: **13137/15542 claims (84.5%)**. A classifier is only needed for the remainder.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> lines 11&ndash;13.</p>
+</div></details>
+
+<p class="note">Amber: <code>provenance.plan_assumed_7_seed_files</code> (JSON L32) says 235 cache files survive, counting 2 under <code class="path">sources/workflows/_verifier_tmp/</code>; <code>rubric_cache_files_found</code> (L16) counts 233 from the glob in <code>e5_common.py</code> L90, which only matches <code>*/_verifier_tmp/</code>. I re-counted both globs at 2026-10-02 and got the same 233 and 235.</p>
+<p class="note">Amber: <code>load_examples</code> (L35) reads <code class="path">data/verifier_claims.jsonl</code>, the raw file with 607 rows and no null SR. README.md section 2 names <code class="path">data/verifier_claims_sane.jsonl</code> as the primary dataset and says to exclude rows with <code>SR: null</code>. In the sane file those 42 rows are null (31 recorded False, 11 True in the raw file), so the E5 numbers include rows the sane file excludes.</p>
+<p class="note say">Why it matters: the join is what lets the ladder fit per-source weights, and it succeeded on 84.5% of claim verdicts without a classifier.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e5_common.py</code> (whole file, 223 lines), <code class="path">e5_run.py</code>, <code class="path">e5_embed.py</code>, <code class="path">e5_md.py</code>; <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.json</code> and <code class="path">.md</code>; <code class="path">experiments_verifiers/data/verifier_claims.jsonl</code> and <code class="path">data/verifier_claims_sane.jsonl</code> (row counts and SR values only); the glob <code class="path">sources/workflows/*/_verifier_tmp/rubric_cache_*.json</code> (re-counted); <code class="path">experiments_verifiers/README.md</code> (L26, L86&ndash;89, L103, L110&ndash;116, L134), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (L11&ndash;13, L84). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; never opened, by the build rules. Contents of <code class="path">ablations/*.json</code>, <code class="path">data/manifest_run_notes.json</code>, the <code class="path">evaluation.txt</code> files and the 233 <code class="path">rubric_cache_*.json</code> files &mdash; this page documents what <code>e5_common.py</code> reads from them (key names cited from the code), so the join counts are quoted from the E5 results file instead of recomputed. <code class="path">REPORT_e10_weights_visualization.html</code> &mdash; grepped for <code>E5</code>, 0 matches. <code class="path">REPORT_e11_theory.html</code> &mdash; quotes E5's lexical rung only; cited on <a href="exp_e5_run.html">exp_e5_run.html</a>. No pytest run, no experiment run, per the build rules.</p>
+<p>Gone at 2026-10-02: <code class="path">HANDOFF.md</code>, <code class="path">VERIFIER_ARCHITECTURE.md</code> and <code class="path">EXPERIMENTS_PLAN.md</code> are named in <code class="path">README.md</code> L110&ndash;116 but do not exist on disk; they are not linked here. <code class="path">PREV_VERIFIER_ARCHITECTURE.md</code> exists and is not named in the README.</p>
+<p>The folder <code class="path">experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

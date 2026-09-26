@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19b_eval - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e19b_eval">
+<div class="wrap">
+
+<h1 class="hud">e19b_eval &mdash; confirmatory readout of hybrid_bt_v2</h1>
+<p class="intro">Phase 3 asked whether the label-free winner (v2r2) beats the E19 v1 hybrid verifier on the benchmark's own success labels. The script fits Bradley-Terry rewards per group for three aggregation arms, reads SR once per selected config, and reports pairs-correct over the 147 contrast pairs with cluster-bootstrap CIs, M2 replay and cost. Labels were touched only here, after selection; the label-free table comes from <a href="exp_e19b_dryrun.html">e19b_dryrun</a> and the shipped package is <a href="mod_evaluators_hybrid_verifier.html">hybrid_verifier</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, outputs</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 430" role="img" aria-label="e19b_eval design: four input blocks, three stages, two outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="b1">
+    <title>Hypothesis: decisive claims also track SR success</title>
+    <rect x="290" y="20" width="320" height="54" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="42" text-anchor="middle">Hypothesis: decisiveness tracks SR</text>
+    <text class="box-sub" x="450" y="60" text-anchor="middle">more claims lift pairs-correct</text>
+  </g>
+
+  <a class="box" id="i1" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>Arena plan: groups, generations, contrast flags, SR, reward</title>
+    <rect x="20" y="110" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="132" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="120" y="148" text-anchor="middle">plan, SR, reward</text>
+  </a>
+  <a class="box" id="i2" href="../../experiments_verifiers/results/E15_bt_pilot_2026-09-23.json">
+    <title>E15 and E19 baseline rewards per generation</title>
+    <rect x="240" y="110" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="340" y="132" text-anchor="middle">E15, E19 result JSON</text>
+    <text class="box-sub" x="340" y="148" text-anchor="middle">baseline BT rewards</text>
+  </a>
+  <a class="box" id="i3" href="../../experiments_verifiers/results/E19b_scores_v2_2026-09-24.jsonl">
+    <title>E19b claim sets and score cells for the three tested configs</title>
+    <rect x="460" y="110" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="560" y="132" text-anchor="middle">E19b claim, score ledgers</text>
+    <text class="box-sub" x="560" y="148" text-anchor="middle">v1c, v2r1, v2r2</text>
+  </a>
+  <a class="box" id="i4" href="../../experiments_verifiers/results/_e19b_dryrun_2026-09-24.json">
+    <title>Pre-registered blocks embedded into the output: dry run, diagnosis, pilot</title>
+    <rect x="680" y="110" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="780" y="132" text-anchor="middle">_e19b pre-registered</text>
+    <text class="box-sub" x="780" y="148" text-anchor="middle">dryrun, diagnosis, pilot</text>
+  </a>
+
+  <a class="box" id="s1" href="../../experiments_verifiers/harness/e19b_eval.py">
+    <title>Per-config arm scores via weighted BT fit, plus claim variance flags</title>
+    <rect x="60" y="240" width="250" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="185" y="264" text-anchor="middle">build_config()</text>
+    <text class="box-sub" x="185" y="282" text-anchor="middle">BT fit, claim variance</text>
+  </a>
+  <a class="box" id="s2" href="../../experiments_verifiers/harness/e19b_eval.py">
+    <title>Pairs-correct, cluster bootstraps, M2 replay, claim categories</title>
+    <rect x="340" y="240" width="250" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="465" y="264" text-anchor="middle">eval_config()</text>
+    <text class="box-sub" x="465" y="282" text-anchor="middle">147 pairs, bootstraps, M2</text>
+  </a>
+  <a class="box" id="s3" href="../../experiments_verifiers/harness/e19b_eval.py">
+    <title>Reads labels once per config, checks snapshots, writes JSON and MD</title>
+    <rect x="620" y="240" width="250" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="745" y="264" text-anchor="middle">main()</text>
+    <text class="box-sub" x="745" y="282" text-anchor="middle">labels once, cost, writes</text>
+  </a>
+
+  <a class="box" id="o1" href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json">
+    <title>Data of record: per-config readouts, embedded blocks, cost</title>
+    <rect x="180" y="350" width="250" height="58" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="305" y="374" text-anchor="middle">E19b_hybrid_bt_v2.json</text>
+    <text class="box-sub" x="305" y="392" text-anchor="middle">per-config readouts</text>
+  </a>
+  <a class="box" id="o2" href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md">
+    <title>Readable report: TL;DR, per-config tables, cost, gaps</title>
+    <rect x="500" y="350" width="250" height="58" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="625" y="374" text-anchor="middle">E19b_hybrid_bt_v2.md</text>
+    <text class="box-sub" x="625" y="392" text-anchor="middle">tables and TL;DR</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="i1" d="M320,74 L120,110" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="b1" data-to="i2" d="M390,74 L340,110" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="b1" data-to="i3" d="M510,74 L560,110" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="b1" data-to="i4" d="M580,74 L780,110" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="200" y="96" text-anchor="middle">scopes the readout</text>
+
+  <path class="edge dashed-edge" data-from="i1" data-to="s1" d="M120,166 L175,240" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="60" y="206" text-anchor="start">plan and gens</text>
+  <path class="edge dashed-edge" data-from="i2" data-to="s1" d="M340,166 L200,240" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="255" y="206" text-anchor="middle">baseline rewards</text>
+  <path class="edge dashed-edge" data-from="i3" data-to="s2" d="M560,166 L470,240" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="575" y="206" text-anchor="start">score cells</text>
+  <path class="edge dashed-edge" data-from="i4" data-to="s3" d="M780,166 L750,240" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="790" y="206" text-anchor="start">embedded blocks</text>
+
+  <path class="edge" data-from="s1" data-to="s2" d="M310,270 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="325" y="262" text-anchor="middle">feeds</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M590,270 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="262" text-anchor="middle">feeds</text>
+
+  <path class="edge" data-from="s3" data-to="o1" d="M640,300 L305,350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="340" text-anchor="middle">writes</text>
+  <path class="edge" data-from="s3" data-to="o2" d="M860,300 L625,350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="780" y="336" text-anchor="middle">writes</text>
+
+  <text class="box-sub" x="20" y="424">rect = file  |  rounded = function  |  dashed = reads  |  solid = call or write  |  10 boxes</text>
+</svg>
+</div>
+<p class="figcap">Design 1 &mdash; real functions: <code>e19b_eval.py::build_config</code> (line 53), <code>::eval_config</code> (line 163), <code>::main</code> (line 282). The three arms come from <code>ARMS</code> (line 47): sign-sum (<code>e19b_sign</code>), escalation (<code>e19b_esc</code>) and mean-diff (<code>e19b_md</code>); the BT fit is reached through <code>e15_bt_eval.bt_fit_weighted</code> (line 108) and the pair decisions through <code>e19b_dryrun.decisive</code> / <code>winner_of</code> (lines 84-88).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e19b_eval.py">experiments_verifiers/harness/e19b_eval.py</a></h4>
+<p class="role">Runs the one-shot confirmatory readout per config: BT arms, pairs-correct with CIs, M2 replay, cost ledger; writes the JSON and markdown.</p>
+<p class="meta">545 lines &#183; entry point <code>main()</code> line 282 &#183; CLI: config names as positionals (line 283), default <code>v2r2</code></p>
+<details><summary>CLI usage and constants found in the file</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e19b_eval.py v2r2 [v2r1 ...]   # docstring line 15
+configs = sys.argv[1:] or [&#39;v2r2&#39;]                                        # lines 283-285
+N_BOOT = 10_000                                                           # line 46
+ARMS = (&#39;e19b_sign&#39;, &#39;e19b_esc&#39;, &#39;e19b_md&#39;)                              # line 47</pre>
+<p>Inputs are read at lines 36-42; the outputs <code>OUT_JSON</code> and <code>OUT_MD</code> are lines 43-44. The selection rule is quoted from the dry run at lines 313-325 and embedded into the JSON.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th class="size">Cited</th></tr></thead>
+<tbody>
+<tr><td>arena plan, SR, reward</td><td>nothing</td><td class="sym"><a href="../../experiments_verifiers/results/E14_bt_population.json">results/E14_bt_population.json</a></td><td class="size">line 36</td></tr>
+<tr><td>E15 and E19 baselines</td><td>nothing</td><td class="sym"><a href="../../experiments_verifiers/results/E15_bt_pilot_2026-09-23.json">results/E15_bt_pilot_2026-09-23.json</a>, <a href="../../experiments_verifiers/results/E19_hybrid_bt_2026-09-23.json">E19_hybrid_bt_2026-09-23.json</a></td><td class="size">lines 37-38</td></tr>
+<tr><td>pre-registered blocks</td><td>embedded in output</td><td class="sym"><a href="../../experiments_verifiers/results/_e19b_dryrun_2026-09-24.json">_e19b_dryrun_2026-09-24.json</a>, <a href="../../experiments_verifiers/results/_e19b_diagnosis_2026-09-24.json">_e19b_diagnosis</a>, <a href="../../experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json">_e19b_pilot_judge</a></td><td class="size">lines 39-41</td></tr>
+<tr><td>gradient duel verdict</td><td>embedded in output</td><td class="sym"><a href="../../experiments_verifiers/results/E19b_gradient_duel_2026-09-24.json">results/E19b_gradient_duel_2026-09-24.json</a></td><td class="size">line 42</td></tr>
+<tr><td>claims and score cells</td><td>nothing</td><td class="sym"><a href="../../experiments_verifiers/results/E19b_scores_v2_2026-09-24.jsonl">E19b_scores_v1c / _v2 2026-09-24.jsonl</a></td><td class="size">line 54-55</td></tr>
+<tr><td>LLM cost ledger</td><td>cost block</td><td class="sym"><a href="../../experiments_verifiers/results/E19b_bt_cost_ledger_2026-09-24.jsonl">results/E19b_bt_cost_ledger_2026-09-24.jsonl</a></td><td class="size">line 331</td></tr>
+<tr><td>nothing</td><td>readout JSON</td><td class="sym"><a href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json">results/E19b_hybrid_bt_v2_2026-09-24.json</a></td><td class="size">line 370</td></tr>
+<tr><td>nothing</td><td>readout markdown</td><td class="sym"><a href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md">results/E19b_hybrid_bt_v2_2026-09-24.md</a></td><td class="size">line 534</td></tr>
+</tbody>
+</table>
+<p class="note say">The script asserts snapshot integrity before and after the run (<code>E19H.GUARD.full_baseline()</code> line 295, <code>verify_full()</code> line 366); the recorded result is <code>snapshot_integrity.mutations</code> = empty list.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; pairs-correct on 147 contrast pairs (config v2r2)</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="Bar chart of pooled pairs-correct per arm with bootstrap CI whiskers">
+  <line x1="60" y1="40" x2="60" y2="250" stroke="#1B4B6B" stroke-width="1"/>
+  <line x1="60" y1="250" x2="880" y2="250" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="60" y="30" text-anchor="start">pooled pairs-correct, 95% CI whiskers</text>
+  <rect x="70" y="69.0" width="80" height="181.0" fill="rgba(125,249,199,0.20)" stroke="#7DF9C7"/>
+  <line x1="110" y1="108.7" x2="110" y2="42.2" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="101" y1="108.7" x2="119" y2="108.7" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="101" y1="42.2" x2="119" y2="42.2" stroke="#8FB8C9" stroke-width="1"/>
+  <text class="box-label" x="110" y="36.2" text-anchor="middle">0.646</text>
+  <text class="box-sub" x="110" y="266" text-anchor="middle">e19b_esc</text>
+  <rect x="176" y="69.0" width="80" height="181.0" fill="rgba(125,249,199,0.20)" stroke="#7DF9C7"/>
+  <line x1="216" y1="116.8" x2="216" y2="42.9" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="207" y1="116.8" x2="225" y2="116.8" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="207" y1="42.9" x2="225" y2="42.9" stroke="#8FB8C9" stroke-width="1"/>
+  <text class="box-label" x="216" y="36.9" text-anchor="middle">0.646</text>
+  <text class="box-sub" x="216" y="266" text-anchor="middle">e19b_sign</text>
+  <rect x="282" y="69.0" width="80" height="181.0" fill="rgba(125,249,199,0.20)" stroke="#7DF9C7"/>
+  <line x1="322" y1="108.7" x2="322" y2="42.2" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="313" y1="108.7" x2="331" y2="108.7" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="313" y1="42.2" x2="331" y2="42.2" stroke="#8FB8C9" stroke-width="1"/>
+  <text class="box-label" x="322" y="36.2" text-anchor="middle">0.646</text>
+  <text class="box-sub" x="322" y="266" text-anchor="middle">e19b_md</text>
+  <rect x="388" y="63.3" width="80" height="186.7" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <line x1="428" y1="99.6" x2="428" y2="34.5" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="419" y1="99.6" x2="437" y2="99.6" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="419" y1="34.5" x2="437" y2="34.5" stroke="#8FB8C9" stroke-width="1"/>
+  <text class="box-label" x="428" y="28.5" text-anchor="middle">0.667</text>
+  <text class="box-sub" x="428" y="266" text-anchor="middle">e19_v1</text>
+  <rect x="494" y="58.8" width="80" height="191.2" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <line x1="534" y1="94.9" x2="534" y2="29.0" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="525" y1="94.9" x2="543" y2="94.9" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="525" y1="29.0" x2="543" y2="29.0" stroke="#8FB8C9" stroke-width="1"/>
+  <text class="box-label" x="534" y="23.0" text-anchor="middle">0.683</text>
+  <text class="box-sub" x="534" y="266" text-anchor="middle">e19_v1_md</text>
+  <rect x="600" y="70.0" width="80" height="180.0" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <line x1="640" y1="113.6" x2="640" y2="20.6" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="631" y1="113.6" x2="649" y2="113.6" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="631" y1="20.6" x2="649" y2="20.6" stroke="#8FB8C9" stroke-width="1"/>
+  <text class="box-label" x="640" y="14.6" text-anchor="middle">0.643</text>
+  <text class="box-sub" x="640" y="266" text-anchor="middle">e15</text>
+  <rect x="706" y="71.5" width="80" height="178.5" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <line x1="746" y1="148.5" x2="746" y2="22.9" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="737" y1="148.5" x2="755" y2="148.5" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="737" y1="22.9" x2="755" y2="22.9" stroke="#8FB8C9" stroke-width="1"/>
+  <text class="box-label" x="746" y="16.9" text-anchor="middle">0.637</text>
+  <text class="box-sub" x="746" y="266" text-anchor="middle">uniform</text>
+  <rect x="812" y="93.8" width="80" height="156.2" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <line x1="852" y1="160.2" x2="852" y2="19.0" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="843" y1="160.2" x2="861" y2="160.2" stroke="#8FB8C9" stroke-width="1"/>
+  <line x1="843" y1="19.0" x2="861" y2="19.0" stroke="#8FB8C9" stroke-width="1"/>
+  <text class="box-label" x="852" y="13.0" text-anchor="middle">0.558</text>
+  <text class="box-sub" x="852" y="266" text-anchor="middle">recorded_reward</text>
+  <text class="box-sub" x="60" y="292" text-anchor="start">Bar height is my computation from the pooled values (280 px = 1.0); whiskers are the recorded CI bounds from the same JSON block.</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; <code>eval_v2r2.readout_a_pairs_correct_contrast</code>, <a href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json">E19b_hybrid_bt_v2_2026-09-24.json</a> lines 7407-7565; the same numbers are tabulated in the markdown at lines 39-46. Every paired diff against the E19 v1 arm has a CI that spans 0 (lines 7567-7642).</p>
+
+<table>
+<thead><tr><th>Arm (v2r2)</th><th class="size">Pooled</th><th class="size">CI 95%</th><th class="size">Tie rate</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>e19b_esc</td><td class="size">0.646</td><td class="size">[0.504, 0.742]</td><td class="size">0.3673</td><td class="sym">md:40, json:7428-7445</td></tr>
+<tr><td>e19b_sign</td><td class="size">0.646</td><td class="size">[0.476, 0.740]</td><td class="size">0.4354</td><td class="sym">md:39, json:7407-7425</td></tr>
+<tr><td>e19b_md</td><td class="size">0.646</td><td class="size">[0.504, 0.742]</td><td class="size">0.3673</td><td class="sym">md:41, json:7447-7465</td></tr>
+<tr><td>e19_v1 (baseline)</td><td class="size">0.667</td><td class="size">[0.537, 0.770]</td><td class="size">0.5442</td><td class="sym">md:42</td></tr>
+<tr><td>e19_v1_md (baseline)</td><td class="size">0.683</td><td class="size">[0.554, 0.789]</td><td class="size">0.4966</td><td class="sym">md:43</td></tr>
+<tr><td>e15 (baseline)</td><td class="size">0.643</td><td class="size">[0.487, 0.819]</td><td class="size">0.4422</td><td class="sym">md:44</td></tr>
+<tr><td>uniform (baseline)</td><td class="size">0.637</td><td class="size">[0.362, 0.811]</td><td class="size">0.1</td><td class="sym">md:46</td></tr>
+<tr><td>recorded_reward</td><td class="size">0.558</td><td class="size">[0.321, 0.825]</td><td class="size">0.2857</td><td class="sym">md:45</td></tr>
+</tbody>
+</table>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>e19b_esc minus e19_v1</td><td class="size">&minus;0.0249 [&minus;0.114, +0.029]</td><td class="sym">E19b_hybrid_bt_v2_2026-09-24.md:54</td></tr>
+<tr><td>e19b_sign minus e19_v1_md</td><td class="size">&minus;0.0438 [&minus;0.163, +0.046]</td><td class="sym">E19b_hybrid_bt_v2_2026-09-24.md:50</td></tr>
+<tr><td>e19b_esc minus uniform</td><td class="size">&minus;0.0446 [&minus;0.271, +0.185]</td><td class="sym">E19b_hybrid_bt_v2_2026-09-24.md:57</td></tr>
+<tr><td>e19b_esc minus recorded_reward</td><td class="size">+0.0708 [&minus;0.174, +0.270]</td><td class="sym">E19b_hybrid_bt_v2_2026-09-24.md:58</td></tr>
+<tr><td>M2 replay, v2r2 vs uniform vs oracle</td><td class="size">8 / 9 / 12 of 19</td><td class="sym">md:65, json:7645-7652</td></tr>
+<tr><td>Tie rate over 667 pairs, v2r2</td><td class="size">0.09</td><td class="sym">json:7986</td></tr>
+<tr><td>Surviving claims per group, v2r2</td><td class="size">8.737</td><td class="sym">json:7985</td></tr>
+<tr><td>v1c arm value (V4 scorers on v1 claims)</td><td class="size">0.670</td><td class="sym">md:172</td></tr>
+<tr><td>v2r1 arm value (escalation)</td><td class="size">0.636</td><td class="sym">md:106</td></tr>
+<tr><td>LLM spend for the whole experiment</td><td class="size">$0.9165 (625 calls)</td><td class="sym">md:244, json:14779</td></tr>
+<tr><td>Cap for the experiment</td><td class="size">$10.00</td><td class="sym">json:14800</td></tr>
+</tbody>
+</table>
+<p class="note">The smallest contrast-group count is the stated limit: nine contrast groups, so every paired CI is wide by construction (md:248).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Evidence quotes</h2>
+<details><summary>8 verbatim lines from the readout JSON and markdown</summary><div class="dbody">
+<blockquote> "confirmatory_note": "Labels were read ONLY in this evaluation stage, once per selected config, AFTER variant selection on label-free proxies (see selection block).",</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json</code> line 5</p>
+<blockquote>| e19b_esc | 0.646 | [0.504,0.742] | 0.3673 |<br>| e19_v1 | 0.667 | [0.537,0.770] | 0.5442 |<br>| e19_v1_md | 0.683 | [0.554,0.789] | 0.4966 |<br>| e15 | 0.643 | [0.487,0.819] | 0.4422 |<br>| recorded_reward | 0.558 | [0.321,0.825] | 0.2857 |<br>| uniform | 0.637 | [0.362,0.811] | 0.1 |</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md</code> lines 40, 42-46 (the v2r2 arm table; header on line 37)</p>
+<blockquote>M2 (19 groups): e19b_sign 8, e19b_esc 8, e19b_md 8, e19_v1 8, e15 8, reward 8, uniform 9, oracle 12; surviving claims/group 8.737; flat groups 0.</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md</code> line 65</p>
+<blockquote>- 9 contrast groups — every CI underpowered by construction (declared).</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md</code> line 248</p>
+<blockquote>LLM $0.9165 (625 calls) + duel $0.2425 of the $10.00 cap.</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md</code> line 244</p>
+<blockquote>  "llm_total_usd": 0.9165,</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json</code> line 14779</p>
+<blockquote>   "e19b_esc_minus_e19_v1": [<br>    -0.0249,<br>    -0.1141,<br>    0.0287</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json</code> lines 7592-7595 (mean, then CI low and high)</p>
+<blockquote>  "configs_evaluated": [<br>   "v2r2",<br>   "v2r1",<br>   "v1c"</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json</code> lines 6-9 (read-only evidence, not modified)</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources: <code>experiments_verifiers/harness/e19b_eval.py</code> (read in full); <code>results/E19b_hybrid_bt_v2_2026-09-24.md</code> and <code>.json</code>; the E19b ledgers and the dry-run, diagnosis and pilot JSON as embedded inputs; <code>harness/e15_bt_eval.py</code> and <code>harness/e19b_dryrun.py</code> function names only; <code>EXPERIMENTS.md</code>; <code>README.md</code>; <code>docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>; peer page <code>mod_evaluators_hybrid_verifier.html</code>.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> (secrets, never opened); the per-group tables and claim-category tables of the markdown (read, not quoted - 19 rows each); the <code>bt_table</code> and <code>m2_replay</code> detail blocks (values quoted, per-generation rows not reproduced); <code>results/E19b_gradient_duel_2026-09-24.json</code> full text (owned by <a href="exp_e19b_gradient_duel.html">e19b_gradient_duel</a>); <code>harness/e19_bt_eval.py</code> (claim-category rules, call target only); <code>run_notes/</code> and <code>runs_capsule/</code> (owned by data_runs.html); the ScienceAgentBench graders (not used by this experiment).</p>
+<p class="skips">Volatility: experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

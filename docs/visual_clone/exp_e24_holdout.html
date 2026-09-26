@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_holdout - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e24_holdout">
+<div class="wrap">
+
+<h1 class="hud">e24_holdout &mdash; Phase 2, verifier-owned holdout</h1>
+<p class="intro">Can a verifier score generalization without touching the benchmark's gold? This script splits each admissible group's own labeled train file 80/20, strips the labels from the held-out 20%, re-executes the delivered script, and scores its predictions against labels kept only in the verifier's key file. The pilot gate returned PROCEED with 3 of 5 groups computable.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram &mdash; split, swap, re-execute, score</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 470" role="img" aria-label="e24_holdout stages">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bQ">
+    <title>The question: can the verifier own the labels it scores against</title>
+    <rect x="20" y="10" width="190" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="115" y="31" text-anchor="middle">Verifier owns labels?</text>
+    <text class="box-sub" x="115" y="46" text-anchor="middle">hypothesis, not code</text>
+  </g>
+
+  <a class="box" id="bTrain" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>The mapped train file from the group's own workspace, read by build_split_*</title>
+    <rect x="20" y="90" width="190" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="115" y="112" text-anchor="middle">mapped train file</text>
+    <text class="box-sub" x="115" y="128" text-anchor="middle">csv, sdf or pkl</text>
+  </a>
+
+  <a class="box" id="bSpec" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>SPLIT_SPECS in e24_common fixes stratification, label columns and metric per group</title>
+    <rect x="20" y="175" width="190" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="115" y="197" text-anchor="middle">SPLIT_SPECS</text>
+    <text class="box-sub" x="115" y="213" text-anchor="middle">pre-registered per group</text>
+  </a>
+
+  <a class="box" id="bKeysIn" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>The held-out labels stay in the verifier key file only</title>
+    <rect x="20" y="260" width="190" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="115" y="282" text-anchor="middle">held-out labels</text>
+    <text class="box-sub" x="115" y="298" text-anchor="middle">not written to test file</text>
+  </a>
+
+  <a class="box" id="bSplit" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>e24_holdout.split_stage L176 calls build_split_csv L79 / sdf L101 / pkl L130</title>
+    <rect x="290" y="90" width="190" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="385" y="112" text-anchor="middle">split_stage</text>
+    <text class="box-sub" x="385" y="128" text-anchor="middle">_stratified_idx, seed 20260924</text>
+  </a>
+
+  <a class="box" id="bCache" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>The frozen split files, one directory per admissible group</title>
+    <rect x="580" y="90" width="270" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="715" y="112" text-anchor="middle">_e24_splits_2026-09-24/</text>
+    <text class="box-sub" x="715" y="128" text-anchor="middle">train_swapped, test_swapped, keys</text>
+  </a>
+
+  <a class="box" id="bMut" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>e24_holdout.make_mutate L220 overwrites the copy's train and test files</title>
+    <rect x="290" y="185" width="190" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="385" y="207" text-anchor="middle">make_mutate</text>
+    <text class="box-sub" x="385" y="223" text-anchor="middle">copies swapped files in</text>
+  </a>
+
+  <a class="box" id="bExec" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>e24_holdout calls e24_reexec.execute_gen to run the delivered script</title>
+    <rect x="290" y="280" width="190" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="385" y="302" text-anchor="middle">execute_gen</text>
+    <text class="box-sub" x="385" y="318" text-anchor="middle">tag holdout, keep_dir</text>
+  </a>
+
+  <a class="box" id="bScore" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>e24_holdout.score_predictions L248 joins predictions to held-out labels</title>
+    <rect x="290" y="375" width="190" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="385" y="397" text-anchor="middle">score_predictions</text>
+    <text class="box-sub" x="385" y="413" text-anchor="middle">auc, accuracy, rmse, spearman</text>
+  </a>
+
+  <a class="box" id="bLedger" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>e24_holdout.run_stage L386 appends one row per generation</title>
+    <rect x="580" y="280" width="270" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="715" y="302" text-anchor="middle">_e24_holdout_ledger.jsonl</text>
+    <text class="box-sub" x="715" y="318" text-anchor="middle">53 rows, one per generation</text>
+  </a>
+
+  <a class="box" id="bPilot" href="../../experiments_verifiers/harness/e24_holdout.py">
+    <title>The pilot run wrote the same rows with the metric value redacted</title>
+    <rect x="580" y="375" width="270" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="715" y="397" text-anchor="middle">_e24_holdout_pilot.jsonl</text>
+    <text class="box-sub" x="715" y="413" text-anchor="middle">53 rows, values redacted</text>
+  </a>
+
+  <path class="edge" data-from="bQ" data-to="bSplit" d="M210,33 H250 V117 H290" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="252" y="30" text-anchor="start">tests</text>
+
+  <path class="edge dashed-edge" data-from="bTrain" data-to="bSplit" d="M210,117 H290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="250" y="110" text-anchor="middle">train rows</text>
+
+  <path class="edge dashed-edge" data-from="bSpec" data-to="bSplit" d="M210,202 H250 V117 H290" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="215" y="173" text-anchor="start">stratify, metric</text>
+
+  <path class="edge dashed-edge" data-from="bSplit" data-to="bCache" d="M480,117 H580" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="530" y="110" text-anchor="middle">writes splits</text>
+
+  <path class="edge" data-from="bSplit" data-to="bMut" d="M385,144 V185" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="393" y="168" text-anchor="start">20% hold back</text>
+
+  <path class="edge" data-from="bMut" data-to="bExec" d="M385,239 V280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="393" y="264" text-anchor="start">mutated copy</text>
+
+  <path class="edge" data-from="bExec" data-to="bScore" d="M385,334 V375" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="393" y="358" text-anchor="start">regenerated files</text>
+
+  <path class="edge dashed-edge" data-from="bKeysIn" data-to="bScore" d="M210,287 H250 V402 H290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="215" y="360" text-anchor="start">held-out labels</text>
+
+  <path class="edge" data-from="bScore" data-to="bLedger" d="M480,402 H530 V307 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="490" y="390" text-anchor="start">score row</text>
+
+  <path class="edge dashed-edge" data-from="bLedger" data-to="bPilot" d="M715,334 V375" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="723" y="358" text-anchor="start">pilot rows redacted</text>
+
+  <text class="box-sub" x="20" y="455">11 boxes | solid = call | dashed = reads/writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. The split is built once and cached on disk; the re-execution then runs on a stripped temp copy of the frozen workspace. Entry script <code class="path">experiments_verifiers/harness/e24_holdout.py</code>; <code>execute_gen</code> lives in <code>e24_reexec.py</code> (L291).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e24_holdout.py">experiments_verifiers/harness/e24_holdout.py</a></h4>
+<p class="role">Phase 2: splits each admissible group's train file, strips held-out labels, re-executes the delivered script on the swapped copy, and scores predictions.</p>
+<p class="meta">435 lines &middot; 14 functions &middot; entry: <code>if __name__ == "__main__"</code> (L426) &middot; commands: <code>split</code>, <code>run</code> with <code>--pilot</code> and <code>--workers</code></p>
+<details><summary>signatures, builders and CLI</summary><div class="dbody">
+<pre>_stratified_idx(n, strata, seed) -&gt; np.ndarray        # L45  20% held out
+_input_fingerprint(group, rel) -&gt; dict[str, str]      # L62  sha256 prefix per gen
+_canonical_gen(group) -&gt; dict                         # L72  most files, earliest uuid
+build_split_csv(group, m, spec, out) -&gt; dict          # L79  pandas read_csv
+build_split_sdf(group, m, spec, out) -&gt; dict          # L101 rdkit SDMolSupplier
+build_split_pkl(group, m, spec, out) -&gt; dict          # L130 runs a helper in the venv
+BUILDERS = {"csv": ..., "sdf": ..., "pkl_mols": ...}  # L172
+split_stage() -&gt; dict                                  # L176 idempotent, writes keys
+make_mutate(gid, m) -&gt; callable                       # L220
+_load_keys(gid) -&gt; dict                               # L233
+_resolve_output(run_row, out_path) -&gt; Path | None      # L237
+score_predictions(gid, m, run_row) -&gt; dict             # L248
+holdout_gen(group, gen, maps, redact) -&gt; dict          # L366
+run_stage(pilot, workers)                              # L386</pre>
+<p>CLI: <code>uv run python experiments_verifiers/harness/e24_holdout.py split</code> (L426&ndash;431) and <code>... run [--pilot] [--workers 4]</code> (L432&ndash;435); <code>--workers</code> default is <code>e24_common.MAX_WORKERS = 4</code>. Other commands cannot be passed: <code>choices=["split", "run"]</code>.</p>
+<p>Failure mapping in <code>score_predictions</code>: <code>no_entry_script</code>, <code>crash</code>, <code>timeout</code>, <code>harness_error</code>, <code>no_output_map</code>, <code>predictions_missing</code>, <code>unjoinable</code>, <code>metric_uncomputable</code>, <code>unparseable</code>, <code>scored</code> &mdash; every non-<code>scored</code> status returns <code>score = 0.0</code> with a reason string.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th>Symbol</th></tr></thead>
+<tbody>
+<tr><td>Mapped train file (csv/sdf/pkl)</td><td>80% train copy + 20% test copy</td><td class="sym">results/_e24_splits_2026-09-24/&lt;gid&gt;/</td><td class="sym">e24_holdout.py::build_split_csv (L79), ::build_split_sdf (L101), ::build_split_pkl (L130)</td></tr>
+<tr><td>Held-out rows and labels</td><td>keys.json and _meta.json</td><td class="sym">results/_e24_splits_2026-09-24/&lt;gid&gt;/keys.json</td><td class="sym">::split_stage (L176)</td></tr>
+<tr><td>Split index for 5 groups</td><td>Holdout key summary</td><td class="sym">results/_e24_holdout_keys_2026-09-24.json</td><td class="sym">::split_stage (L176)</td></tr>
+<tr><td>Re-executed predictions</td><td>One row per generation</td><td class="sym">results/_e24_holdout_ledger_2026-09-24.jsonl</td><td class="sym">::holdout_gen (L366), ::run_stage (L386)</td></tr>
+<tr><td>Same rows, pilot mode</td><td>Same rows, metric redacted</td><td class="sym">results/_e24_holdout_pilot_2026-09-24.jsonl</td><td class="sym">::holdout_gen (L366) with <code>redact=True</code></td></tr>
+<tr><td>Reexec pilot rows</td><td>Gate JSON in e24_iomap</td><td class="sym">results/_e24_pilot_2026-09-24.json</td><td class="sym">e24_iomap.py::pilot_verdict (L318)</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: <code>build_split_pkl</code> writes a helper Python file and runs it inside the sandbox venv (<code>R.PersistentSandbox</code>, timeout 600 s) because unpickling needs <code>deepchem</code>; the csv and sdf paths run in the host interpreter.</p>
+<p class="note say">Why it matters: the held-out labels are never written into <code>test_swapped.*</code>, so a delivered script that reads the test labels fails instead of scoring itself.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; scored generations per admissible group</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 740 320" role="img" aria-label="Bar chart of scored holdout rows per group">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <line x1="50" y1="260" x2="720" y2="260" stroke="#1B4B6B" stroke-width="1.25"/>
+  <line x1="50" y1="260" x2="50" y2="40" stroke="#1B4B6B" stroke-width="1.25"/>
+  <text class="box-sub" x="50" y="32" text-anchor="start">scored rows (max 16 gens)</text>
+
+  <rect x="60" y="185" width="80" height="75" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="100" y="175" text-anchor="middle">6 / 10</text>
+  <text class="box-sub" x="100" y="278" text-anchor="middle">clintox (chem)</text>
+
+  <rect x="200" y="172.5" width="80" height="87.5" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="240" y="162" text-anchor="middle">7 / 9</text>
+  <text class="box-sub" x="240" y="278" text-anchor="middle">brain_blood</text>
+
+  <rect x="340" y="210" width="80" height="50" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="380" y="200" text-anchor="middle">4 / 5</text>
+  <text class="box-sub" x="380" y="278" text-anchor="middle">tox21</text>
+
+  <rect x="480" y="222.5" width="80" height="37.5" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="520" y="212" text-anchor="middle">3 / 13</text>
+  <text class="box-sub" x="520" y="278" text-anchor="middle">clintox (run_1)</text>
+
+  <rect x="620" y="122.5" width="80" height="137.5" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="660" y="112" text-anchor="middle">11 / 16</text>
+  <text class="box-sub" x="660" y="278" text-anchor="middle">bulk_modulus</text>
+
+  <text class="box-sub" x="60" y="305" text-anchor="start">bar height 200 px at 16 generations; my computation</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; bar = generations with <code>status = scored</code>; the second number is all generations of that group. Source: <code class="path">experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl</code>, one JSON object per line, key <code>status</code>.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>holdout ledger rows</td><td class="size">53</td><td class="sym">_e24_holdout_ledger_2026-09-24.jsonl (53 lines)</td></tr>
+<tr><td>status <code>scored</code></td><td class="size">31</td><td class="sym">same file, key <code>status</code> (my computation)</td></tr>
+<tr><td>status <code>crash</code></td><td class="size">18</td><td class="sym">same file (my computation)</td></tr>
+<tr><td>status <code>no_entry_script</code></td><td class="size">3</td><td class="sym">same file (my computation)</td></tr>
+<tr><td>status <code>timeout</code></td><td class="size">1</td><td class="sym">same file (my computation)</td></tr>
+<tr><td>groups with a split</td><td class="size">5</td><td class="sym">_e24_holdout_keys_2026-09-24.json <code>groups</code></td></tr>
+<tr><td>seed and held-out fraction</td><td class="size">20260924, 0.20</td><td class="sym">_e24_holdout_keys_2026-09-24.json <code>seed</code>, <code>holdout_frac</code></td></tr>
+<tr><td>held-out rows per group</td><td class="size">238, 59, 1253, 238, 189</td><td class="sym">same file, <code>groups[*].n_hold</code></td></tr>
+<tr><td>kept train rows per group</td><td class="size">954, 239, 5011, 954, 755</td><td class="sym">same file, <code>groups[*].n_keep</code></td></tr>
+<tr><td>median metric, clintox (chem)</td><td class="size">0.609 AUC</td><td class="sym">E24_reexec_holdout_2026-09-24.md L82</td></tr>
+<tr><td>median metric, brain_blood</td><td class="size">0.695 accuracy</td><td class="sym">E24_reexec_holdout_2026-09-24.md L83</td></tr>
+<tr><td>median metric, tox21</td><td class="size">0.917 Spearman</td><td class="sym">E24_reexec_holdout_2026-09-24.md L84</td></tr>
+<tr><td>median metric, bulk_modulus</td><td class="size">39.562 RMSE</td><td class="sym">E24_reexec_holdout_2026-09-24.md L86</td></tr>
+<tr><td>pilot file rows, all redacted</td><td class="size">53 of 53</td><td class="sym">_e24_holdout_pilot_2026-09-24.jsonl, key <code>redacted</code></td></tr>
+<tr><td>pilot rows the full run scored</td><td class="size">19 changed status</td><td class="sym">my computation: 11 <code>unjoinable</code> + 8 <code>metric_uncomputable</code></td></tr>
+<tr><td>longest pilot runtime</td><td class="size">602.6 s</td><td class="sym">_e24_pilot_2026-09-24.json (bulk_modulus list)</td></tr>
+</tbody>
+</table>
+<p class="sub">Note: the metric in the table is the raw metric; the stored <code>score</code> negates RMSE (source: <code>e24_holdout.py</code> L320, <code>"score": -val</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>three ledger rows, one key record, one pilot row (click to expand)</summary><div class="dbody">
+<blockquote>{"gid": "chemistry_iterative_v4_flash__clintox_multitask_nn_predictions_clintox_nn", "uuid8": "3946ba5c", "tag": "holdout", "run_status": "divergent", "runtime_s": 10.6, "metric_kind": "mean_roc_auc", "metric_value": 0.6050126818332093, "score": 0.6050126818332093, "status": "scored", "reason": "auc={'FDA_APPROVED': 0.5708051801801802, 'CT_TOX': 0.6392201834862385} join_cov=1.000"}</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl</code>, line 1.</p>
+<blockquote>{"gid": "run_1__llm_response_error_predict_bulk_modulus", "uuid8": "0ad30b46", "metric_kind": "rmse", "metric_value": 50.0329, "score": -50.0329, "status": "scored"}</blockquote>
+<p>Quoted keys from <code class="path">experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl</code>, line 35 (keys verbatim, values rounded to 4 decimals, order reduced).</p>
+<blockquote>"run_1__llm_response_error_predict_bulk_modulus": {"n_hold": 189, "n_keep": 755, "stratify": null, "input_fps_unique": {"train": 1, "test": 1}}</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/_e24_holdout_keys_2026-09-24.json</code>, under <code>groups</code> (fifth entry).</p>
+<blockquote>{"gid": "chemistry_iterative_v4_flash__clintox_multitask_nn_predictions_clintox_nn", "uuid8": "3a819c85", "run_status": "crash", "metric_value": null, "score": null, "status": "crash", "redacted": "pilot - value not recorded (anti-fishing)"}</blockquote>
+<p>Quoted keys from <code class="path">experiments_verifiers/results/_e24_holdout_pilot_2026-09-24.jsonl</code>, line 1 (reason text trimmed).</p>
+<blockquote>- Component-2 coverage is 5/19 groups (the arena's ML-with-train/test-labels subset); the remaining 14 groups are ranked by re-execution status + runtime tie-break only</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code>, line 104.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_holdout.py</code> (all 435 lines), <code class="path">experiments_verifiers/harness/e24_common.py</code> (<code>SPLIT_SPECS</code> L85&ndash;127, <code>HOLDOUT_FRAC</code> L63, <code>E24_SEED</code> L56), <code class="path">experiments_verifiers/harness/e24_reexec.py</code> (only <code>execute_gen</code> L291, <code>PersistentSandbox</code> L62, <code>run_env</code> L100), <code class="path">experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl</code>, <code class="path">results/_e24_holdout_pilot_2026-09-24.jsonl</code>, <code class="path">results/_e24_holdout_keys_2026-09-24.json</code>, <code class="path">results/_e24_pilot_2026-09-24.json</code>, <code class="path">results/_e24_splits_2026-09-24/</code> (file listing and sizes only), <code class="path">results/E24_reexec_holdout_2026-09-24.md</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> and <code>.env</code> (never opened). Skipped the contents of the swapped split files themselves (csv/sdf/pkl payloads): the key file records their row counts, and the 5.6 MB of payload is not needed for this page. Skipped <code class="path">results/_e24_venv/</code> &mdash; size only, 2.8 GB, it is a virtualenv (<code>du -sh</code>). Skipped <code class="path">results/_e24_runlogs_2026-09-24/</code>: 406 files in 4 sub-folders (<code>smoke</code> 1, <code>det</code> 7, <code>holdout</code> 5, <code>reexec</code> 19), per-phase run logs. Not run: the script.</p>
+<p class="note flag">Red: <code>_e24_holdout_ledger_2026-09-24.jsonl</code> and <code>_e24_holdout_pilot_2026-09-24.jsonl</code> hold the same 53 <code>(gid, uuid8)</code> keys but different statuses; the report explains this as two scorer bugs fixed after the pilot (E24_reexec_holdout_2026-09-24.md L101). <code>grep -rn</code> finds no harness constant or write call for a file name ending <code>_pilot.jsonl</code>: the producer of that file is <code>unknown</code>.</p>
+<p>Cross-links: the pilot gate that let this phase run is on <a href="exp_e24_iomap.html">exp_e24_iomap.html</a>; the readouts that consume the ledger are on <a href="exp_e24_eval.html">exp_e24_eval.html</a>; the folder pattern is on <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

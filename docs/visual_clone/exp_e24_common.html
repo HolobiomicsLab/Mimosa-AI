@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_common - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e24_common">
+<div class="wrap">
+
+<h1 class="hud">e24_common &mdash; shared E24 plumbing</h1>
+<p class="intro">E24 asks whether re-executing a delivered workflow, and scoring generalization on a holdout the verifier owns, ranks generations better than artifact inspection. This module is the shared base of the four E24 scripts: paths, one LLM call, append-only ledgers, plan loading, and two metrics. It has no entry point of its own.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram &mdash; question, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 420" role="img" aria-label="e24_common stages and artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bQ">
+    <title>The experiment question this module supports</title>
+    <rect x="20" y="16" width="200" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="37" text-anchor="middle">Question: execution-grounded ranking?</text>
+    <text class="box-sub" x="120" y="52" text-anchor="middle">hypothesis, not code</text>
+  </g>
+
+  <a class="box" id="bArena" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>e24_common.load_arena reads the frozen 19-group arena</title>
+    <rect x="20" y="90" width="180" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="110" y="112" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="110" y="128" text-anchor="middle">19 groups, 148 generations</text>
+  </a>
+
+  <a class="box" id="bSnap" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>e24_common.snapshot_guard_check hashes the frozen snapshot dirs</title>
+    <rect x="20" y="175" width="180" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="110" y="197" text-anchor="middle">snapshot dirs</text>
+    <text class="box-sub" x="110" y="213" text-anchor="middle">read-only, sha256 guard</text>
+  </a>
+
+  <a class="box" id="bEnv" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>e24_common._load_env sets environment variables from .env files (not shown here)</title>
+    <rect x="20" y="260" width="180" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="282" text-anchor="middle">environment variables</text>
+    <text class="box-sub" x="110" y="298" text-anchor="middle">set once, not printed</text>
+  </a>
+
+  <a class="box" id="bLoad" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>e24_common.load_arena and load_goals enrich the plan with inventories</title>
+    <rect x="290" y="90" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="112" text-anchor="middle">load_arena &middot; load_goals</text>
+    <text class="box-sub" x="390" y="128" text-anchor="middle">returns groups + goal text</text>
+  </a>
+
+  <a class="box" id="bGuard" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>e24_common.snapshot_guard_check asserts no snapshot directory changed</title>
+    <rect x="290" y="175" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="197" text-anchor="middle">snapshot_guard_check</text>
+    <text class="box-sub" x="390" y="213" text-anchor="middle">fails if a dir mutated</text>
+  </a>
+
+  <a class="box" id="bCall" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>e24_common.call_llm runs one deepseek call and ledgers its cost</title>
+    <rect x="290" y="260" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="282" text-anchor="middle">call_llm</text>
+    <text class="box-sub" x="390" y="298" text-anchor="middle">6 attempts, $8 cap</text>
+  </a>
+
+  <a class="box" id="bMetric" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>e24_common.midrank_auc and rmse score predictions against labels</title>
+    <rect x="290" y="345" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="367" text-anchor="middle">midrank_auc &middot; rmse</text>
+    <text class="box-sub" x="390" y="383" text-anchor="middle">no sklearn, scipy for rho</text>
+  </a>
+
+  <a class="box" id="bLedgers" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>Append-only JSONL ledgers: iomap, reexec, holdout, det, cost</title>
+    <rect x="600" y="90" width="250" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="725" y="112" text-anchor="middle">5 JSONL ledgers</text>
+    <text class="box-sub" x="725" y="128" text-anchor="middle">append_jsonl, done_keys</text>
+  </a>
+
+  <a class="box" id="bJSON" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>Phase JSON artifacts the module names as module constants</title>
+    <rect x="600" y="175" width="250" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="725" y="197" text-anchor="middle">gates, pilot, keys JSON</text>
+    <text class="box-sub" x="725" y="213" text-anchor="middle">written by the phase scripts</text>
+  </a>
+
+  <a class="box" id="bMetrics" href="../../experiments_verifiers/harness/e24_common.py">
+    <title>Metric values returned to the caller as floats</title>
+    <rect x="600" y="260" width="250" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="725" y="282" text-anchor="middle">AUC / RMSE values</text>
+    <text class="box-sub" x="725" y="298" text-anchor="middle">float or None per call</text>
+  </a>
+
+  <path class="edge" data-from="bQ" data-to="bLoad" d="M220,39 H250 V117 H290" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="258" y="34" text-anchor="start">tests</text>
+
+  <path class="edge dashed-edge" data-from="bArena" data-to="bLoad" d="M200,117 H290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="245" y="110" text-anchor="middle">plan + inventories</text>
+
+  <path class="edge dashed-edge" data-from="bSnap" data-to="bGuard" d="M200,202 H290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="245" y="195" text-anchor="middle">dir hashes</text>
+
+  <path class="edge dashed-edge" data-from="bEnv" data-to="bCall" d="M200,287 H290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="245" y="280" text-anchor="middle">API key in env</text>
+
+  <path class="edge" data-from="bCall" data-to="bLedgers" d="M490,287 H545 V117 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="200" text-anchor="start">one cost row</text>
+
+  <path class="edge" data-from="bGuard" data-to="bJSON" d="M490,202 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="545" y="195" text-anchor="middle">mutation report</text>
+
+  <path class="edge" data-from="bMetric" data-to="bMetrics" d="M490,372 H545 V287 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="340" text-anchor="start">score float</text>
+
+  <text class="box-sub" x="20" y="410">11 boxes | solid = call | dashed = reads/writes | arrows carry the data name</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. Mint = artifacts, steel = data, cyan pill = function. The dashed <a href="../../experiments_verifiers/harness/e24_common.py"><code>e24_common.py</code></a> boxes are shared helpers; the JSON under <code class="path">experiments_verifiers/results/</code> is written by the phase scripts that import this module.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e24_common.py">experiments_verifiers/harness/e24_common.py</a></h4>
+<p class="role">Shared E24 plumbing: ledger paths, one deepseek call with cost rows, arena loading, a snapshot guard, and two dependency-free metrics.</p>
+<p class="meta">301 lines &middot; 13 functions, 2 exceptions &middot; entry point: none (imported module) &middot; CLI arguments: none</p>
+<details><summary>signatures, constants, environment handling</summary><div class="dbody">
+<pre>load_spent() -&gt; float                                   # L133
+_load_env() -&gt; None                                     # L150
+call_llm(messages, max_tokens, role, meta, temperature=0.0) -&gt; str   # L160
+parse_json_loose(text)                                  # L213
+load_jsonl(path) -&gt; list[dict]                          # L225
+append_jsonl(path, rec) -&gt; None                         # L231
+done_keys(path) -&gt; set[tuple]                           # L236
+gid_of(group) -&gt; str                                    # L243
+load_arena() -&gt; list[dict]                              # L247
+load_goals() -&gt; dict[tuple[str, str], str]              # L256
+snapshot_guard_check(phase) -&gt; dict                     # L263
+midrank_auc(y_true, scores) -&gt; float | None             # L274
+rmse(y_true, y_pred) -&gt; float                           # L299
+CallFailed(Exception)  # L142      StopRun(Exception)  # L146</pre>
+<p>Constants: <code>MODEL_TEXT = "openrouter/deepseek/deepseek-v4.1-flash"</code> (L53), <code>PRICING</code> per token (L54), <code>E24_SEED = 20260924</code> (L56), <code>HARD_CAP_USD = 8.0</code> (L57), <code>SCRIPT_TIMEOUT_S = 600</code> (L58), <code>MAX_WORKERS = 4</code> (L59), <code>DET_FRAC = 0.10</code> (L60), <code>N_BOOT = 10_000</code> (L62), <code>HOLDOUT_FRAC = 0.20</code> (L63), <code>PILOT_GROUPS</code> 5 gids (L69), <code>SPLIT_SPECS</code> 5 per-group specs (L80).</p>
+<p><code>call_llm</code> retries 6 times, disables reasoning (<code>extra_body={"reasoning": {"enabled": False}}</code>), raises <code>StopRun</code> when <code>SPENT["usd"]</code> reaches <code>HARD_CAP_USD</code>, and appends one row to <code>COST_LEDGER</code> per call. <code>_load_env</code> (L150) reads key/value lines from two <code>.env</code> paths with <code>os.environ.setdefault</code>; this page does not open or quote those files.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th>Symbol</th></tr></thead>
+<tbody>
+<tr><td>Arena plan and inventories</td><td>Enriched groups in memory</td><td class="sym">results/E14_bt_population.json</td><td class="sym">e24_common.py::load_arena (L247)</td></tr>
+<tr><td>Snapshot directory hashes</td><td>Mutation report dict</td><td class="sym">frozen snapshot dirs</td><td class="sym">::snapshot_guard_check (L263)</td></tr>
+<tr><td>LLM responses</td><td>One cost row per call</td><td class="sym">results/E24_bt_cost_ledger_2026-09-24.jsonl</td><td class="sym">::call_llm (L160)</td></tr>
+<tr><td>Any E24 ledger</td><td>Set of (gid, uuid8) keys</td><td class="sym">results/_e24_*.jsonl</td><td class="sym">::done_keys (L236)</td></tr>
+<tr><td>Two label lists</td><td>One score float, in memory</td><td class="sym">(no file)</td><td class="sym">::midrank_auc (L274), ::rmse (L299)</td></tr>
+<tr><td>Group dict</td><td>gid string</td><td class="sym">(no file)</td><td class="sym">::gid_of (L243)</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: the module also names four ledger paths that this page does not own (<code>REEXEC_LEDGER</code> L42, <code>REEXEC_DET_LEDGER</code> L43, <code>HOLDOUT_LEDGER</code> L44, <code>IOMAP</code> L39); they are written by <a href="exp_e24_holdout.html">exp_e24_holdout</a>, <a href="exp_e24_iomap.html">exp_e24_iomap</a> and <a href="exp_e24_reexec.html">exp_e24_reexec</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; ledger rows written through these helpers</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 740 320" role="img" aria-label="Bar chart of E24 ledger row counts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <line x1="50" y1="260" x2="720" y2="260" stroke="#1B4B6B" stroke-width="1.25"/>
+  <line x1="50" y1="260" x2="50" y2="40" stroke="#1B4B6B" stroke-width="1.25"/>
+  <text class="box-sub" x="50" y="32" text-anchor="start">rows (max 155)</text>
+
+  <rect x="60" y="235.5" width="80" height="24.5" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="100" y="226" text-anchor="middle">19</text>
+  <text class="box-sub" x="100" y="278" text-anchor="middle">iomap</text>
+
+  <rect x="200" y="60" width="80" height="200" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="240" y="50" text-anchor="middle">155</text>
+  <text class="box-sub" x="240" y="278" text-anchor="middle">reexec</text>
+
+  <rect x="340" y="244.5" width="80" height="15.5" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="380" y="235" text-anchor="middle">12</text>
+  <text class="box-sub" x="380" y="278" text-anchor="middle">determinism</text>
+
+  <rect x="480" y="191.6" width="80" height="68.4" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="520" y="182" text-anchor="middle">53</text>
+  <text class="box-sub" x="520" y="278" text-anchor="middle">holdout</text>
+
+  <rect x="620" y="235.5" width="80" height="24.5" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="660" y="226" text-anchor="middle">19</text>
+  <text class="box-sub" x="660" y="278" text-anchor="middle">cost</text>
+
+  <text class="box-sub" x="60" y="305" text-anchor="start">bar height 200 px at 155 rows; my computation</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; bar = line count of each ledger named in <code>e24_common.py</code> (L39&ndash;L46). Values are my computation: <code>len(open(path).read().splitlines())</code>.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>iomap ledger rows</td><td class="size">19</td><td class="sym">results/_e24_iomap_2026-09-24.jsonl (19 lines)</td></tr>
+<tr><td>reexec ledger rows</td><td class="size">155</td><td class="sym">results/_e24_reexec_ledger_2026-09-24.jsonl (155 lines)</td></tr>
+<tr><td>reexec unique (gid, uuid8)</td><td class="size">148</td><td class="sym">my computation on the same file</td></tr>
+<tr><td>determinism rows</td><td class="size">12</td><td class="sym">results/_e24_reexec_det_2026-09-24.jsonl</td></tr>
+<tr><td>holdout ledger rows</td><td class="size">53</td><td class="sym">results/_e24_holdout_ledger_2026-09-24.jsonl</td></tr>
+<tr><td>cost ledger rows (LLM calls)</td><td class="size">19</td><td class="sym">results/E24_bt_cost_ledger_2026-09-24.jsonl</td></tr>
+<tr><td>cost ledger sum</td><td class="size">$0.015591</td><td class="sym">my computation: <code>sum(cost_usd)</code></td></tr>
+<tr><td>role of every cost row</td><td class="size">iomap (19 of 19)</td><td class="sym">E24_bt_cost_ledger..., each line key <code>role</code></td></tr>
+<tr><td>generation count in report</td><td class="size">148</td><td class="sym">E24_reexec_holdout_2026-09-24.json "n_gens" (L2772)</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: every E24 phase resumes from these ledgers, so <code>done_keys</code> is the only guard that stops a repeated LLM call or a repeated execution.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>cost ledger lines 1-3 and one reexec row (click to expand)</summary><div class="dbody">
+<blockquote>{"model": "openrouter/deepseek/deepseek-v4.1-flash", "role": "iomap", "prompt_tokens": 2239, "completion_tokens": 349, "cost_usd": 0.000319, "latency_s": 1.8, "ts": "2026-09-24T09:47:14", "gid": "chemistry_iterative_v4_flash__llm_response_error_charge_density_difference"}</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl</code>, line 1.</p>
+<blockquote>{"model": "openrouter/deepseek/deepseek-v4.1-flash", "role": "iomap", "prompt_tokens": 2477, "completion_tokens": 209, "cost_usd": 0.000282, "latency_s": 4.5, "ts": "2026-09-24T09:47:17", "gid": "chemistry_iterative_v4_flash__filter_compounds_pains_brenk_tanimoto_compound_filter"}</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl</code>, line 2.</p>
+<blockquote>"status": "divergent", "regen_rows": 292, "row_coverage": 1.0068, "frac_rows_divergent": 1.0</blockquote>
+<p>Quoted keys from <code class="path">experiments_verifiers/results/_e24_reexec_ledger_2026-09-24.jsonl</code>, line 1 (keys <code>outputs.pred_results/clintox_test_pred.csv</code>).</p>
+<blockquote>"f4_strict": 43, "f4_strict_rate": 0.2905,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json</code>, lines 2780&ndash;2781 (written by <a href="exp_e24_eval.html">exp_e24_eval</a>).</p>
+<blockquote>"spent_usd": 0.2425, "llm_ledger_usd": 0.0156, "duel_new_calls_usd": 0.2269, "calls": 142,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json</code>, lines 14&ndash;17 under <code>protocol.budget</code>.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_common.py</code> (all 301 lines), <code class="path">experiments_verifiers/harness/e18_scripted_bt.py</code> (only the symbols <code>e24_common.py</code> imports: <code>load_plan</code> L119, <code>load_goals</code> L131, <code>enrich_inventories</code> L139, <code>SnapshotGuard</code> L173), <code class="path">experiments_verifiers/README.md</code> (codename table, L50), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (constitution section 2), <code class="path">experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl</code>, <code class="path">results/_e24_reexec_ledger_2026-09-24.jsonl</code>, <code class="path">results/_e24_reexec_det_2026-09-24.jsonl</code>, <code class="path">results/_e24_holdout_ledger_2026-09-24.jsonl</code>, <code class="path">results/_e24_iomap_2026-09-24.jsonl</code>, <code class="path">results/E24_reexec_holdout_2026-09-24.json</code> (keys quoted on this page). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> and <code>.env</code> (rule: never open or quote). Skipped <code class="path">experiments_verifiers/results/E24_bt_gradients/</code> (148 files, 592K, owned by <a href="exp_e24_gradient_duel.html">exp_e24_gradient_duel.html</a>), <code class="path">results/_e24_venv/</code> (2.8 GB virtualenv, size only per the evidence map), <code class="path">results/_e24_runlogs_2026-09-24/</code> (406 files, per-phase run logs, owned by the phase pages). E18/E19/E15 internals were not read: outside this page's scope.</p>
+<p class="note flag">Red: <code>experiments_verifiers/EXPERIMENTS.md</code> has no section for E24 (grep finds no E24 heading); the design intent lives in the module docstrings and the README codename row only.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

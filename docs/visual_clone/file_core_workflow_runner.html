@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/core/workflow_runner.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<!-- file_core_workflow_runner.html - file digest: sources/core/workflow_runner.py.
+     Built by the visual-clone worker "file-digests-core-workflow". Sources: see footer. -->
+<body data-crumb="File digests > sources/core > workflow_runner.py">
+<div class="wrap">
+
+<h1 class="hud">workflow_runner.py</h1>
+<p class="intro"><code>WorkflowRunner</code> writes a Python script to <code>&lt;temp_dir&gt;/&lt;execution_id&gt;.py</code> and runs it as a host subprocess. It resolves the interpreter on <code>PATH</code>, installs dependencies into a managed venv, streams stdout through a pseudo-terminal, and enforces the timeout. It is the only subprocess engine in the repo: the orchestrator uses it for generated workflows, the verifiers use it for scorer scripts.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Main diagram - from config to a finished subprocess</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 420" role="img" aria-label="WorkflowRunner stages: config, interpreter setup, install, execute, stream, result, cancel">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="b1">
+    <title>Caller supplies a RuntimeConfig, the code string and an execution_dir (lines 100-112).</title>
+    <rect x="20" y="30" width="190" height="100" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="115" y="56" text-anchor="middle">caller inputs</text>
+    <text class="box-sub" x="115" y="76" text-anchor="middle">RuntimeConfig</text>
+    <text class="box-sub" x="115" y="94" text-anchor="middle">code: str</text>
+    <text class="box-sub" x="115" y="112" text-anchor="middle">execution_dir: str</text>
+  </g>
+
+  <g class="box" id="b2">
+    <title>__init__ stores the config and calls _setup_environment (lines 100-138).</title>
+    <rect x="260" y="30" width="220" height="100" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="370" y="56" text-anchor="middle">WorkflowRunner.__init__()</text>
+    <text class="box-sub" x="370" y="76" text-anchor="middle">_setup_environment()</text>
+    <text class="box-sub" x="370" y="94" text-anchor="middle">_resolve_python_executable()</text>
+    <text class="box-sub" x="370" y="112" text-anchor="middle">_check_python_version()</text>
+  </g>
+
+  <g class="box" id="b3">
+    <title>install_dependencies builds a pip command and runs it through _run_command (lines 273-308).</title>
+    <rect x="260" y="180" width="220" height="100" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="370" y="206" text-anchor="middle">install_dependencies()</text>
+    <text class="box-sub" x="370" y="226" text-anchor="middle">_ensure_venv()</text>
+    <text class="box-sub" x="370" y="244" text-anchor="middle">ensure_pip()</text>
+    <text class="box-sub" x="370" y="262" text-anchor="middle">pip install cmd</text>
+  </g>
+
+  <g class="box" id="b4">
+    <title>execute writes the script and builds argv (lines 310-339).</title>
+    <rect x="540" y="30" width="220" height="100" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="650" y="56" text-anchor="middle">execute()</text>
+    <text class="box-sub" x="650" y="76" text-anchor="middle">writes &lt;execution_id&gt;.py</text>
+    <text class="box-sub" x="650" y="94" text-anchor="middle">generates exec_MMDD_HHMMSS id</text>
+    <text class="box-sub" x="650" y="112" text-anchor="middle">cmd = [*_python_cmd, script]</text>
+  </g>
+
+  <g class="box" id="b5">
+    <title>_run_command spawns the process, registers the id and waits with a timeout (lines 364-470).</title>
+    <rect x="540" y="180" width="220" height="100" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="650" y="206" text-anchor="middle">_run_command()</text>
+    <text class="box-sub" x="650" y="226" text-anchor="middle">_build_color_env()</text>
+    <text class="box-sub" x="650" y="244" text-anchor="middle">_pty_available()</text>
+    <text class="box-sub" x="650" y="262" text-anchor="middle">create_subprocess_exec</text>
+  </g>
+
+  <g class="box" id="b6">
+    <title>Two streaming helpers drain stdout and stderr (lines 476-566).</title>
+    <rect x="820" y="180" width="210" height="100" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="925" y="206" text-anchor="middle">streaming helpers</text>
+    <text class="box-sub" x="925" y="226" text-anchor="middle">_stream_output_pty()</text>
+    <text class="box-sub" x="925" y="244" text-anchor="middle">_stream_output_pipe()</text>
+    <text class="box-sub" x="925" y="262" text-anchor="middle">progress_callback per line</text>
+  </g>
+
+  <g class="box" id="b7">
+    <title>ExecutionResult and ExecutionStatus are the return value (lines 19-48, 439-451).</title>
+    <rect x="820" y="30" width="210" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="925" y="56" text-anchor="middle">ExecutionResult</text>
+    <text class="box-sub" x="925" y="76" text-anchor="middle">status, return_code</text>
+    <text class="box-sub" x="925" y="94" text-anchor="middle">stdout, stderr</text>
+    <text class="box-sub" x="925" y="112" text-anchor="middle">execution_time</text>
+  </g>
+
+  <g class="box" id="b8">
+    <title>cancel_execution and cleanup terminate registered processes (lines 568-624).</title>
+    <rect x="540" y="320" width="220" height="80" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="650" y="346" text-anchor="middle">cancel and cleanup</text>
+    <text class="box-sub" x="650" y="364" text-anchor="middle">cancel_execution(), _kill_process()</text>
+    <text class="box-sub" x="650" y="382" text-anchor="middle">cleanup(), get_active_executions()</text>
+  </g>
+
+  <a class="box" id="b9" href="mod_core_runner.html">
+    <title>Callers: orchestrator.py (workflow runs) and the two verifier evaluators (scorer scripts).</title>
+    <rect x="1060" y="30" width="120" height="100" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1120" y="60" text-anchor="middle">callers</text>
+    <text class="box-sub" x="1120" y="78" text-anchor="middle">orchestrator</text>
+    <text class="box-sub" x="1120" y="96" text-anchor="middle">verifiers</text>
+  </a>
+
+  <path class="edge" data-from="b1" data-to="b2" d="M210,70 H260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="235" y="62" text-anchor="middle">constructs</text>
+  <path class="edge dashed-edge" data-from="b1" data-to="b4" d="M210,105 H450 V45 H540" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="450" y="38" text-anchor="middle">code: str</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M370,130 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="158" text-anchor="middle">resolved _python_cmd</text>
+  <path class="edge" data-from="b3" data-to="b5" d="M480,225 H510 V215 H540" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="180" text-anchor="middle">pip install</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M650,130 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="680" y="158" text-anchor="middle">_run_command()</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M760,230 H820" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="790" y="222" text-anchor="middle">streams stdout</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M925,180 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="955" y="158" text-anchor="middle">stdout, stderr</text>
+  <path class="edge" data-from="b7" data-to="b9" d="M1030,80 H1060" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1045" y="72" text-anchor="middle">returns</text>
+  <path class="edge" data-from="b5" data-to="b8" d="M650,280 V320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="306" text-anchor="middle">on timeout</text>
+  <text class="box-sub" x="20" y="410">solid = call  |  dashed = caller-supplied value  |  every box names a real symbol with its line range</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - the order of work: config, interpreter resolution, optional install, script write, spawn, stream, result. The cancel and cleanup stage is reached from the timeout path (<code class="path">sources/core/workflow_runner.py:455</code>) and by callers. Full-page view of this file inside the runner group: <a href="mod_core_runner.html">mod_core_runner.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Data flow - config in, result out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 340" role="img" aria-label="RuntimeConfig fields, environment and files read, files written, ExecutionResult out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="x1">
+    <title>RuntimeConfig dataclass defaults, lines 77-89.</title>
+    <rect x="20" y="40" width="250" height="200" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="66" text-anchor="middle">RuntimeConfig</text>
+    <text class="box-sub" x="145" y="86" text-anchor="middle">python_version "3.12"</text>
+    <text class="box-sub" x="145" y="104" text-anchor="middle">python_executable None</text>
+    <text class="box-sub" x="145" y="122" text-anchor="middle">timeout 1800 s</text>
+    <text class="box-sub" x="145" y="140" text-anchor="middle">max_memory_mb 1024 (advisory)</text>
+    <text class="box-sub" x="145" y="158" text-anchor="middle">max_cpu_percent 100 (advisory)</text>
+    <text class="box-sub" x="145" y="176" text-anchor="middle">temp_dir "./tmp"</text>
+    <text class="box-sub" x="145" y="194" text-anchor="middle">requirements_file "requirements.txt"</text>
+    <text class="box-sub" x="145" y="212" text-anchor="middle">use_pty True</text>
+    <text class="box-sub" x="145" y="230" text-anchor="middle">__post_init__ sets temp_dir (line 91)</text>
+  </g>
+
+  <g class="box" id="x2">
+    <title>Environment and interpreter probes: os.environ copy, python --version, pip --version.</title>
+    <rect x="320" y="40" width="250" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="445" y="66" text-anchor="middle">read: host environment</text>
+    <text class="box-sub" x="445" y="86" text-anchor="middle">dict(os.environ) line 352</text>
+    <text class="box-sub" x="445" y="104" text-anchor="middle">python --version lines 164, 192</text>
+  </g>
+
+  <g class="box" id="x3">
+    <title>Files read: settings module and the optional requirements file.</title>
+    <rect x="320" y="160" width="250" height="110" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="445" y="186" text-anchor="middle">runner core</text>
+    <text class="box-sub" x="445" y="206" text-anchor="middle">requirements_file.exists() line 303</text>
+    <text class="box-sub" x="445" y="224" text-anchor="middle">environment variables added</text>
+    <text class="box-sub" x="445" y="242" text-anchor="middle">TERM, FORCE_COLOR, PY_COLORS,</text>
+    <text class="box-sub" x="445" y="260" text-anchor="middle">CLICOLOR_FORCE, PYTHONUNBUFFERED</text>
+  </g>
+
+  <g class="box" id="x4">
+    <title>Files written by the runner itself.</title>
+    <rect x="620" y="160" width="250" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="745" y="186" text-anchor="middle">files written</text>
+    <text class="box-sub" x="745" y="206" text-anchor="middle">&lt;temp_dir&gt;/&lt;execution_id&gt;.py line 335</text>
+    <text class="box-sub" x="745" y="224" text-anchor="middle">&lt;temp_dir&gt;/mimosa_venv/ line 235-244</text>
+    <text class="box-sub" x="745" y="242" text-anchor="middle">files the child writes are not tracked here</text>
+  </g>
+
+  <g class="box" id="x5">
+    <title>ExecutionResult returned to the caller, lines 43-48.</title>
+    <rect x="620" y="40" width="250" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="745" y="66" text-anchor="middle">values out</text>
+    <text class="box-sub" x="745" y="86" text-anchor="middle">status, return_code, stdout, stderr</text>
+    <text class="box-sub" x="745" y="104" text-anchor="middle">execution_time, resource_usage (unused)</text>
+  </g>
+
+  <g class="box" id="x6">
+    <title>Config fields the orchestrator copies into RuntimeConfig, config.py 229-242.</title>
+    <rect x="920" y="40" width="240" height="230" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="1040" y="66" text-anchor="middle">config.py fields upstream</text>
+    <text class="box-sub" x="1040" y="86" text-anchor="middle">runner_default_python_version</text>
+    <text class="box-sub" x="1040" y="104" text-anchor="middle">runner_default_timeout</text>
+    <text class="box-sub" x="1040" y="122" text-anchor="middle">runner_default_max_memory_mb</text>
+    <text class="box-sub" x="1040" y="140" text-anchor="middle">runner_default_max_cpu_percent</text>
+    <text class="box-sub" x="1040" y="158" text-anchor="middle">runner_temp_dir</text>
+    <text class="box-sub" x="1040" y="176" text-anchor="middle">runner_requirements</text>
+    <text class="box-sub" x="1040" y="200" text-anchor="middle">copied at orchestrator.py:43-47</text>
+    <text class="box-sub" x="1040" y="222" text-anchor="middle">this file reads no Config object</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="x1" data-to="x2" d="M270,85 H320" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="295" y="77" text-anchor="middle">python_version</text>
+  <path class="edge" data-from="x1" data-to="x3" d="M270,190 H320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="295" y="182" text-anchor="middle">timeout, temp_dir</text>
+  <path class="edge dashed-edge" data-from="x3" data-to="x4" d="M570,215 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="595" y="207" text-anchor="middle">execute() writes</text>
+  <path class="edge" data-from="x4" data-to="x5" d="M745,160 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="148" text-anchor="middle">captured output</text>
+  <path class="edge dashed-edge" data-from="x6" data-to="x1" d="M1040,270 V290 H145 V240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="600" y="306" text-anchor="middle">copied by the orchestrator</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - left: the file's own input dataclass; right: the Config fields that the orchestrator copies into it before construction. <code class="path">resource_usage</code> is declared at line 48 and never assigned anywhere in the repo.</p>
+<p class="note flag">Docs mismatch: <code class="path">docs/concepts/architecture.md:74-75</code> says the runner applies "per-run limits on time, memory, and CPU", but <code>max_memory_mb</code> and <code>max_cpu_percent</code> (lines 81-82) are stored and never read in this file; only <code>timeout</code> is enforced (line 413 and line 431).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic - interpreter resolution (a loop)</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 300" role="img" aria-label="Candidate loop that resolves the python executable">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="r1">
+    <title>First branch: an explicit interpreter path short-circuits the loop (lines 161-173).</title>
+    <rect x="20" y="40" width="170" height="60" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="105" y="66" text-anchor="middle">_resolve_python_</text>
+    <text class="box-label" x="105" y="82" text-anchor="middle">executable()</text>
+  </g>
+  <g class="box" id="r2">
+    <title>Explicit path is tested with --version, timeout 10 s.</title>
+    <rect x="230" y="40" width="180" height="60" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="320" y="66" text-anchor="middle">python_executable set?</text>
+    <text class="box-sub" x="320" y="84" text-anchor="middle">line 161</text>
+  </g>
+  <g class="box" id="r3">
+    <title>Unix candidates: pythonX.Y then python3 then python; Windows: py -X.Y then python.</title>
+    <rect x="450" y="40" width="230" height="80" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="565" y="62" text-anchor="middle">try each candidate</text>
+    <text class="box-sub" x="565" y="80" text-anchor="middle">pythonX.Y, python3, python</text>
+    <text class="box-sub" x="565" y="98" text-anchor="middle">lines 177-188, loop 190-205</text>
+  </g>
+  <g class="box" id="r4">
+    <title>The versioned binary is accepted as-is; a generic binary must print the right version.</title>
+    <rect x="720" y="40" width="230" height="80" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="835" y="62" text-anchor="middle">versioned, or output</text>
+    <text class="box-label" x="835" y="78" text-anchor="middle">startswith "Python X.Y"?</text>
+    <text class="box-sub" x="835" y="98" text-anchor="middle">lines 197-203</text>
+  </g>
+  <g class="box" id="r5">
+    <title>Failure path: setup raises RuntimeError naming the target (lines 133-138).</title>
+    <rect x="720" y="180" width="230" height="70" rx="6" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="835" y="208" text-anchor="middle">return None</text>
+    <text class="box-sub" x="835" y="228" text-anchor="middle">RuntimeError at line 138</text>
+  </g>
+  <g class="box" id="r6">
+    <title>Accepted candidate is cached in self._python_cmd (lines 218-221).</title>
+    <rect x="450" y="180" width="230" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="565" y="208" text-anchor="middle">_python_cmd = candidate</text>
+    <text class="box-sub" x="565" y="228" text-anchor="middle">_check_python_version() line 209</text>
+  </g>
+  <g class="box" id="r7">
+    <title>Every command for the rest of the object's life uses this prefix.</title>
+    <rect x="20" y="180" width="380" height="70" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="210" y="208" text-anchor="middle">cmd = [*self._python_cmd, ...]</text>
+    <text class="box-sub" x="210" y="228" text-anchor="middle">execute() line 338, install_dependencies() line 298</text>
+  </g>
+
+  <path class="edge" data-from="r1" data-to="r2" d="M190,70 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="210" y="62" text-anchor="middle">checks</text>
+  <path class="edge" data-from="r2" data-to="r3" d="M410,70 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="430" y="62" text-anchor="middle">no</text>
+  <path class="edge" data-from="r3" data-to="r4" d="M680,80 H720" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="72" text-anchor="middle">accept test</text>
+  <path class="edge dashed-edge" data-from="r4" data-to="r3" d="M835,40 V20 H565 V40" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="14" text-anchor="middle">no: next candidate</text>
+  <path class="edge" data-from="r3" data-to="r5" d="M600,120 V150 H835 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="900" y="150" text-anchor="middle">list exhausted</text>
+  <path class="edge" data-from="r4" data-to="r6" d="M800,120 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="820" y="160" text-anchor="middle">yes</text>
+  <path class="edge" data-from="r6" data-to="r7" d="M450,215 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="425" y="207" text-anchor="middle">caches</text>
+  <path class="edge" data-from="r2" data-to="r6" d="M300,100 V150 H520 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="350" y="146" text-anchor="middle">yes: explicit path used</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - the resolution loop, with the real candidate order and the version check. Conditions quoted from <code class="path">sources/core/workflow_runner.py:161-205</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic - PTY or pipes, and the timeout path</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 300" role="img" aria-label="PTY versus pipe choice, timeout kill escalation, status assignment">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="t1">
+    <title>_run_command builds the environment, then chooses the stdout plumbing.</title>
+    <rect x="20" y="110" width="180" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="110" y="138" text-anchor="middle">_run_command()</text>
+    <text class="box-sub" x="110" y="158" text-anchor="middle">_build_color_env() line 393</text>
+  </g>
+  <g class="box" id="t2">
+    <title>_pty_available is false on win32 and when use_pty is False (line 362).</title>
+    <rect x="240" y="110" width="180" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="138" text-anchor="middle">_pty_available()?</text>
+    <text class="box-sub" x="330" y="158" text-anchor="middle">not win32 and use_pty</text>
+  </g>
+  <g class="box" id="t3">
+    <title>PTY path: stdout is the slave fd of pty.openpty (lines 395-416).</title>
+    <rect x="470" y="30" width="240" height="70" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590" y="58" text-anchor="middle">pty.openpty()</text>
+    <text class="box-sub" x="590" y="78" text-anchor="middle">stdout = slave_fd, colours kept</text>
+  </g>
+  <g class="box" id="t4">
+    <title>Pipe path: both streams are asyncio pipes, 1 MiB limit (lines 417-434).</title>
+    <rect x="470" y="190" width="240" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="590" y="218" text-anchor="middle">stdout = PIPE</text>
+    <text class="box-sub" x="590" y="238" text-anchor="middle">line 419, limit 1024*1024</text>
+  </g>
+  <g class="box" id="t5">
+    <title>asyncio.wait_for wraps the streaming helpers with config.timeout.</title>
+    <rect x="470" y="110" width="240" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="590" y="138" text-anchor="middle">asyncio.wait_for</text>
+    <text class="box-sub" x="590" y="158" text-anchor="middle">timeout=config.timeout</text>
+  </g>
+  <g class="box" id="t6">
+    <title>TimeoutError kills the registered process and returns TIMEOUT (lines 453-458).</title>
+    <rect x="760" y="190" width="300" height="70" rx="6" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="910" y="212" text-anchor="middle">TIMEOUT -> _kill_process()</text>
+    <text class="box-sub" x="910" y="230" text-anchor="middle">terminate, wait 5 s, then kill</text>
+    <text class="box-sub" x="910" y="248" text-anchor="middle">lines 601-606</text>
+  </g>
+  <g class="box" id="t7">
+    <title>Any other exception returns FAILED with the message as stderr (lines 460-462).</title>
+    <rect x="760" y="110" width="300" height="70" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="910" y="132" text-anchor="middle">FAILED, return_code -1</text>
+    <text class="box-sub" x="910" y="152" text-anchor="middle">except Exception, message in stderr</text>
+  </g>
+  <g class="box" id="t8">
+    <title>Normal exit sets the status from the return code (lines 436-451).</title>
+    <rect x="760" y="30" width="300" height="70" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="910" y="52" text-anchor="middle">returncode == 0</text>
+    <text class="box-sub" x="910" y="72" text-anchor="middle">COMPLETED, else FAILED</text>
+  </g>
+
+  <path class="edge" data-from="t1" data-to="t2" d="M200,145 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="137" text-anchor="middle">asks</text>
+  <path class="edge" data-from="t2" data-to="t3" d="M420,130 H445 V65 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="100" text-anchor="middle">yes</text>
+  <path class="edge" data-from="t2" data-to="t4" d="M420,160 H445 V225 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="196" text-anchor="middle">no</text>
+  <path class="edge" data-from="t3" data-to="t5" d="M590,100 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t4" data-to="t5" d="M590,190 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t5" data-to="t6" d="M680,180 H710 V225 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="175" text-anchor="middle">timeout</text>
+  <path class="edge" data-from="t5" data-to="t7" d="M710,145 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="735" y="137" text-anchor="middle">error</text>
+  <path class="edge" data-from="t5" data-to="t8" d="M690,110 V65 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="58" text-anchor="middle">exit</text>
+</svg>
+</div>
+<p class="figcap">Diagram 4 - the second decision rule: stdout plumbing, then the three exits of <code>_run_command</code>. The <code>finally</code> block closes both file descriptors and drops the id from <code>_active_processes</code> (lines 464-470).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>file written</td><td class="sym">&lt;temp_dir&gt;/&lt;execution_id&gt;.py</td><td class="sym">line 335-337</td><td>the script the child interpreter runs.</td></tr>
+<tr><td>dir written</td><td class="sym">&lt;temp_dir&gt;/mimosa_venv/</td><td class="sym">lines 235-243</td><td>managed venv for pip installs and runs.</td></tr>
+<tr><td>file read</td><td class="sym">requirements_file</td><td class="sym">line 303, default "requirements.txt"</td><td>pip <code>-r</code> fallback when no list is passed.</td></tr>
+<tr><td>env read</td><td class="sym">os.environ</td><td class="sym">line 352</td><td>copied, then five colour variables added.</td></tr>
+<tr><td>env written</td><td class="sym">TERM, FORCE_COLOR, PY_COLORS, CLICOLOR_FORCE, PYTHONUNBUFFERED</td><td class="sym">lines 353-357</td><td>force coloured, unbuffered child output.</td></tr>
+<tr><td>process</td><td class="sym">asyncio.create_subprocess_exec</td><td class="sym">lines 399, 419</td><td>starts the child with <code>cwd=execution_dir</code>.</td></tr>
+<tr><td>state</td><td class="sym">self._active_processes</td><td class="sym">lines 411, 429, 469</td><td>id to process map for cancel and timeout kill.</td></tr>
+<tr><td>config field</td><td class="sym">timeout</td><td class="sym">RuntimeConfig.timeout, line 80</td><td>only limit actually enforced (lines 413, 431).</td></tr>
+<tr><td>config field</td><td class="sym">max_memory_mb, max_cpu_percent</td><td class="sym">lines 81-82</td><td>stored only; no read site in the repo.</td></tr>
+<tr><td>config field</td><td class="sym">python_version, python_executable</td><td class="sym">lines 77-79</td><td>interpreter resolution; executable overrides version.</td></tr>
+<tr><td>config field</td><td class="sym">temp_dir, use_pty</td><td class="sym">lines 83, 89</td><td>script location and stdout plumbing choice.</td></tr>
+<tr><td>config field</td><td class="sym">Config.runner_default_*</td><td class="sym">config.py:229-242</td><td>not read here; the orchestrator copies them.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>4 classes (one is an enum), 18 methods, 1 module function - 23 symbols</summary><div class="dbody">
+<pre>ExecutionStatus(Enum)                                       line 19   six lifecycle values
+  PENDING, RUNNING, COMPLETED, FAILED, TIMEOUT, CANCELLED   lines 22-27
+ExecutionResult(dataclass)                                  line 31   subprocess outcome record
+  status, return_code, stdout, stderr, execution_time       lines 43-47
+  resource_usage: dict | None = None                        line 48   declared, never assigned
+RuntimeConfig(dataclass)                                    line 52   how to spawn python
+  python_version: str = "3.12"                              line 77
+  python_executable: str | None = None                      line 79
+  timeout: int = 1800                                       line 80
+  max_memory_mb: int = 1024                                 line 81   advisory, unused
+  max_cpu_percent: int = 100                                line 82   advisory, unused
+  temp_dir: Path | None = None                              line 83
+  requirements_file: Path | None = "requirements.txt"       line 85
+  use_pty: bool = True                                      line 89
+  __post_init__(self) -&gt; None                               line 91   temp_dir defaults to "./tmp"
+WorkflowRunner                                              line 97   async python execution engine
+  __init__(self, config: RuntimeConfig | None = None, execution_dir: str = '.') -&gt; None  line 100
+  _setup_environment(self) -&gt; None                          line 119  abs temp_dir, mkdir, version check
+  _resolve_python_executable(self) -&gt; list[str] | None      line 140  candidate loop, returns argv prefix
+  _check_python_version(self) -&gt; bool                       line 209  caches _python_cmd
+  _ensure_venv(self) -&gt; None                                line 224  venv under temp_dir, idempotent
+  ensure_pip(self) -&gt; None                        async     line 246  pip present or ensurepip
+  install_dependencies(self, requirements: list[str] | None = None) -&gt; ExecutionResult  async  line 273
+  execute(self, code: str, execution_id: str | None = None, progress_callback: Callable[[str], None] | None = None) -&gt; ExecutionResult  async  line 310
+  _build_color_env() -&gt; dict[str, str]           static    line 342  copy env, add colour flags
+  _pty_available(self) -&gt; bool                              line 360  not win32 and use_pty
+  _run_command(self, cmd: list[str], execution_id: str | None = None, progress_callback: Callable[[str], None] | None = None) -&gt; ExecutionResult  async  line 364
+  _stream_output_pty(self, process, master_fd: int, progress_callback=None) -&gt; tuple[str, str]  async  line 476
+  _stream_output_pipe(self, process, progress_callback=None) -&gt; tuple[str, str]  async  line 534
+  cancel_execution(self, execution_id: str) -&gt; bool  async  line 568  False when id unknown
+  _kill_process(self, execution_id: str) -&gt; bool     async  line 584  terminate, 5 s, then kill
+  get_active_executions(self) -&gt; list[str]           async  line 610  ids currently registered
+  cleanup(self) -&gt; None                              async  line 618  kills every registered process
+main() -&gt; None                                    async    line 627  __main__ demo: pip install, run, print
+
+# nested closures not listed (local to their parent): _on_master_readable (505), _read_stderr (525),
+# read_stdout (553), read_stderr (560) inside the two stream helpers; progress_handler (641) inside main</pre>
+<p>Module imports at lines 5-16: <code>asyncio</code>, <code>fcntl</code>, <code>logging</code>, <code>os</code>, <code>pty</code>, <code>sys</code>, <code>time</code>. <code>fcntl</code> and <code>pty</code> are POSIX-only modules; the PTY path is guarded by <code>_pty_available</code> (line 360).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer</th><th>Symbols used</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">sources/core/orchestrator.py</td><td><code>RuntimeConfig</code>, <code>WorkflowRunner</code>, <code>install_dependencies</code>, <code>execute</code></td><td class="sym">lines 20, 43-49, 60</td></tr>
+<tr><td class="sym"><a href="mod_evaluators_hybrid_verifier.html">sources/evaluators/hybrid_verifier/evaluator.py</a></td><td><code>RuntimeConfig(python_executable=sys.executable, use_pty=False)</code>, <code>execute</code>, <code>cleanup</code></td><td class="sym">lines 49, 236-247, 250-273</td></tr>
+<tr><td class="sym"><a href="area_evaluators_legacy.html">sources/evaluators/verifier_per_claim.py</a></td><td>same pinned-subprocess pattern</td><td class="sym">lines 30-31, 1143-1154</td></tr>
+<tr><td class="sym">sources/core/__init__.py</td><td>re-export of all four names</td><td class="sym">lines 25, 60-63</td></tr>
+<tr><td class="sym">experiments_verifiers/harness/e19c_eval.py</td><td>import only, marked "import-order anchor"</td><td class="sym">line 38</td></tr>
+<tr><td class="sym">experiments_verifiers/harness/e19c_ratchet.py</td><td>import only, same comment</td><td class="sym">lines 44-45</td></tr>
+<tr><td class="sym">experiments_verifiers/harness/e19c_online_bt.py</td><td>import only, same comment</td><td class="sym">line 32</td></tr>
+</tbody>
+</table>
+<p>Tests: <code class="path">tests/hybrid_verifier_test.py:381</code> (<code>test_full_pipeline_real_subprocess</code>) is the only test that runs a real <code>WorkflowRunner</code> subprocess, through <code>HybridVerifierEvaluator._execute_scorer_script</code>; the other tests in that file use <code>_ScriptedRunner</code> (<code class="path">tests/hybrid_verifier_test.py:121</code>), a mock that spawns nothing. No test file imports <code>RuntimeConfig</code>, <code>WorkflowRunner</code> or <code>ExecutionStatus</code> directly. <code class="path">sources/utils/ensure_env.py</code> describes the same <code>pythonX.Y -m venv</code> capability in prose (lines 4, 139, 247, 286) but does not call this class.</p>
+<p>Related pages: <a href="mod_core_runner.html">mod_core_runner.html</a> (the runner group in context), <a href="flow_task_run.html">flow_task_run.html</a> (one task in time order), <a href="file_core_workflow_info.html">file_core_workflow_info.html</a> (reads the folders the child writes), <a href="file_core_workflow_selection.html">file_core_workflow_selection.html</a>, <a href="file_index.html">file_index.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/core/workflow_runner.py</code> (651 lines, every def and class), <code class="path">sources/core/orchestrator.py</code> (lines 38-60), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (lines 27-28, 236-273), <code class="path">sources/evaluators/verifier_per_claim.py</code> (lines 30-31, 1140-1160), <code class="path">sources/core/__init__.py</code> (lines 25, 60-63), <code class="path">sources/utils/paths.py</code> (lines 96-101), <code class="path">sources/utils/ensure_env.py</code> (lines 4, 139, 247, 286), <code class="path">config.py</code> (lines 229-242), <code class="path">main.py</code> (lines 69-72, 131-136), <code class="path">tests/hybrid_verifier_test.py</code> (lines 121-133, 381-470), <code class="path">experiments_verifiers/harness/e19c_eval.py</code> (line 38), <code class="path">e19c_ratchet.py</code> (lines 44-45), <code class="path">e19c_online_bt.py</code> (line 32).</p>
+<p class="skips">Skipped: <code class="path">sources/core/workflow_factory.py</code>, <code class="path">factory.py</code>, <code class="path">single_agent_factory.py</code> (they produce the code string, covered by <a href="mod_core_runner.html">mod_core_runner.html</a>); the sandbox and allow-list, which live in the injected SmolAgents agent code, not here; <code class="path">sources/evaluators/verifier_per_claim.py</code> bodies (legacy verifier page); <code class="path">webui/</code> (no import found); <code>tmp/</code>, <code class="path">sources/workflows/</code> (runtime artifacts, not read). Nothing was modified outside <code>docs/visual_clone/</code>.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. The 53 changed paths did not include the three source files of this batch, so every line number above matches <code>HEAD</code>.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Evaluators area - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > evaluators">
+<div class="wrap">
+
+<h1 class="hud">Evaluators</h1>
+<p class="intro"><code class="path">sources/evaluators/</code> holds the judge channel that scores every generation of a workflow. <code>WorkflowEvaluator.evaluate</code> routes a run to one backend: the hybrid verifier by default, the deprecated per-claim verifier on request. The generic and scenario evaluators are reachable only by a direct library call, not from the CLI.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Which evaluator runs when</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 330" role="img" aria-label="Selector: which evaluator runs when">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4F7486"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1-engine" href="mod_core_evolution_engine.html">
+    <title>evolution_engine.py calls the facade every generation</title>
+    <rect x="20" y="90" width="190" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="115" y="114" text-anchor="middle">evolution_engine.py</text>
+    <text class="box-sub" x="115" y="130" text-anchor="middle">evaluator_type="verifier"</text>
+  </a>
+
+  <a class="box" id="d1-config" href="area_entry_config.html">
+    <title>config.verifier_kind chooses the verifier channel</title>
+    <rect x="20" y="170" width="190" height="58" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="115" y="194" text-anchor="middle">config.py</text>
+    <text class="box-sub" x="115" y="210" text-anchor="middle">verifier_kind = hybrid</text>
+  </a>
+
+  <a class="box" id="d1-facade" href="../../sources/evaluators/evaluator.py">
+    <title>WorkflowEvaluator builds the backends and routes evaluate()</title>
+    <rect x="300" y="105" width="200" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="400" y="133" text-anchor="middle">WorkflowEvaluator</text>
+    <text class="box-sub" x="400" y="149" text-anchor="middle">evaluator.py facade</text>
+  </a>
+
+  <a class="box" id="d1-hybrid" href="mod_evaluators_hybrid_verifier.html">
+    <title>default verifier channel</title>
+    <rect x="600" y="18" width="250" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="725" y="42" text-anchor="middle">HybridVerifierEvaluator</text>
+    <text class="box-sub" x="725" y="58" text-anchor="middle">default channel</text>
+  </a>
+
+  <a class="box" id="d1-legacy" href="area_evaluators_legacy.html">
+    <title>deprecated per-claim verifier, still selectable</title>
+    <rect x="600" y="92" width="250" height="64" rx="12" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="725" y="116" text-anchor="middle">VerifierEvaluator</text>
+    <text class="box-sub" x="725" y="132" text-anchor="middle">verifier_kind = legacy</text>
+    <text class="box-sub" x="725" y="147" text-anchor="middle">DEPRECATED</text>
+  </a>
+
+  <a class="box" id="d1-generic" href="#generic">
+    <title>four-criterion LLM judge</title>
+    <rect x="600" y="166" width="250" height="64" rx="12" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="725" y="190" text-anchor="middle">GenericEvaluator</text>
+    <text class="box-sub" x="725" y="206" text-anchor="middle">evaluator_type="generic"</text>
+    <text class="box-sub" x="725" y="221" text-anchor="middle">DEPRECATED</text>
+  </a>
+
+  <a class="box" id="d1-scenario" href="#scenario">
+    <title>rubric and assertion scoring</title>
+    <rect x="600" y="240" width="250" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="725" y="264" text-anchor="middle">ScenarioEvaluator</text>
+    <text class="box-sub" x="725" y="280" text-anchor="middle">evaluator_type="scenario"</text>
+  </a>
+
+  <path class="edge" data-from="d1-engine" data-to="d1-facade" d="M210,119 H255 V140 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="232" y="112" text-anchor="middle">evaluator_type</text>
+
+  <path class="edge dashed-edge" data-from="d1-config" data-to="d1-facade" d="M210,199 H270 V160 H300" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="248" y="192" text-anchor="middle">verifier_kind</text>
+
+  <path class="edge" data-from="d1-facade" data-to="d1-hybrid" d="M500,140 H545 V50 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="562" y="42" text-anchor="middle">hybrid (default)</text>
+
+  <path class="edge dashed-edge" data-from="d1-facade" data-to="d1-legacy" d="M500,140 H555 V124 H600" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arwd)"/>
+  <text class="edge-label" x="568" y="117" text-anchor="middle">legacy</text>
+
+  <path class="edge" data-from="d1-facade" data-to="d1-generic" d="M500,140 H570 V198 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="585" y="191" text-anchor="middle">generic</text>
+
+  <path class="edge" data-from="d1-facade" data-to="d1-scenario" d="M450,175 V272 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="490" y="265" text-anchor="middle">scenario</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - <code class="path">sources/evaluators/evaluator.py</code> selects the backend. Dashed boxes are deprecated.</p>
+
+<p>The legacy per-claim verifier is still reachable, not dead code. <code>WorkflowEvaluator.__init__</code> reads <code>config.verifier_kind</code>, and when the value is <code>legacy</code> it imports <code>VerifierEvaluator</code> lazily from <code class="path">sources/evaluators/verifier.py</code> (<code>evaluator.py::WorkflowEvaluator.__init__</code>, lines 85-98). Set the field in the config file or pass <code>--verifier_kind legacy</code> (<code>main.py:77-80</code>, <code>config.py:459</code>); the default is <code>hybrid</code> (<code>config.py:76</code>).</p>
+
+<details><summary>selector code, verbatim</summary><div class="dbody">
+<blockquote>verifier_kind = str(getattr(config, "verifier_kind", "hybrid")).lower()
+if verifier_kind == "legacy":
+    # Escape hatch: the deprecated multi-source verifier.
+    # Imported lazily so the default path never loads it.
+    from .verifier import VerifierEvaluator
+
+    self.verifier_evaluator = VerifierEvaluator(config, workspace_dir=verifier_workspace_dir)
+else:
+    self.verifier_evaluator = HybridVerifierEvaluator(config, workspace_dir=verifier_workspace_dir)
+self.verifier_kind = verifier_kind</blockquote>
+<p>Path: <code class="path">sources/evaluators/evaluator.py</code> lines 85-98. The choice is made once, in <code>__init__</code>, so a running engine cannot switch channel mid-run.</p>
+<p>Call site, verbatim (<code class="path">sources/core/evolution_engine.py</code> lines 808-812): <code>self.judge.evaluate(uuid=uuid, agent_answers=agent_answers, evaluator_type="verifier", scenario_rubric=scenario_rubric)</code>. This is the only call site of <code>WorkflowEvaluator.evaluate</code> in the repo.</p>
+<p><code>WorkflowEvaluator.__init__</code> also builds <code>GenericEvaluator</code> and <code>ScenarioEvaluator</code> on every construction, even when the run uses the verifier channel (<code>evaluator.py:77-84</code>). A scenario rubric passed with <code>--scenario</code> reaches <code>verifier_evaluator.evaluate</code>, whose signature is <code>evaluate(uuid)</code> only, so the rubric does not enter verifier scoring.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The Evaluator interface and its implementers</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 400" role="img" aria-label="BaseEvaluator interface and its implementers">
+  <defs>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4F7486"/>
+    </marker>
+    <marker id="arw2e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow2" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="d2-core">
+    <title>shared LLM and workflow readers outside this area</title>
+    <rect x="20" y="148" width="160" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="100" y="176" text-anchor="middle">sources/core</text>
+    <text class="box-sub" x="100" y="192" text-anchor="middle">LLMProvider</text>
+    <text class="box-sub" x="100" y="206" text-anchor="middle">WorkflowInfo</text>
+  </g>
+
+  <a class="box" id="d2-base" href="../../sources/evaluators/base.py">
+    <title>BaseEvaluator: shared setup and judge calls</title>
+    <rect x="230" y="145" width="200" height="80" rx="12" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="330" y="178" text-anchor="middle">BaseEvaluator</text>
+    <text class="box-sub" x="330" y="194" text-anchor="middle">base.py interface</text>
+  </a>
+
+  <a class="box" id="d2-hybrid" href="mod_evaluators_hybrid_verifier.html">
+    <title>default implementer</title>
+    <rect x="560" y="18" width="280" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="700" y="42" text-anchor="middle">HybridVerifierEvaluator</text>
+    <text class="box-sub" x="700" y="58" text-anchor="middle">default, in hybrid_verifier/</text>
+  </a>
+
+  <a class="box" id="d2-legacy" href="area_evaluators_legacy.html">
+    <title>deprecated implementer</title>
+    <rect x="560" y="92" width="280" height="64" rx="12" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="700" y="116" text-anchor="middle">VerifierEvaluator</text>
+    <text class="box-sub" x="700" y="132" text-anchor="middle">verifier.py, three mixins</text>
+    <text class="box-sub" x="700" y="147" text-anchor="middle">DEPRECATED</text>
+  </a>
+
+  <a class="box" id="d2-generic" href="#generic">
+    <title>deprecated implementer</title>
+    <rect x="560" y="166" width="280" height="64" rx="12" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="700" y="190" text-anchor="middle">GenericEvaluator</text>
+    <text class="box-sub" x="700" y="206" text-anchor="middle">four LLM judges</text>
+    <text class="box-sub" x="700" y="221" text-anchor="middle">DEPRECATED</text>
+  </a>
+
+  <a class="box" id="d2-scenario" href="#scenario">
+    <title>implementer for rubric scoring</title>
+    <rect x="560" y="240" width="280" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="700" y="264" text-anchor="middle">ScenarioEvaluator</text>
+    <text class="box-sub" x="700" y="280" text-anchor="middle">rubric scoring</text>
+  </a>
+
+  <a class="box" id="d2-helper" href="../../sources/evaluators/base.py">
+    <title>JSON extraction helper, reused by the hybrid verifier</title>
+    <rect x="180" y="330" width="220" height="48" rx="22" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="290" y="350" text-anchor="middle">extract_json_payload</text>
+    <text class="box-sub" x="290" y="366" text-anchor="middle">base.py function</text>
+  </a>
+
+  <a class="box" id="d2-mixins" href="../../sources/evaluators/verifier_claims.py">
+    <title>three mixin classes mixed into the legacy verifier</title>
+    <rect x="440" y="326" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="565" y="350" text-anchor="middle">three verifier mixins</text>
+    <text class="box-sub" x="565" y="366" text-anchor="middle">claims, per-claim, workspace</text>
+  </a>
+
+  <path class="edge dotted-edge" data-from="d2-core" data-to="d2-base" d="M180,186 H230" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw2e)"/>
+  <text class="edge-label" x="205" y="178" text-anchor="middle">imports</text>
+
+  <path class="edge" data-from="d2-base" data-to="d2-hybrid" d="M430,186 H490" fill="none" stroke="#00E5FF" stroke-width="1.5"/>
+  <path class="edge" data-from="d2-base" data-to="d2-hybrid" d="M490,50 V280" fill="none" stroke="#00E5FF" stroke-width="1.5"/>
+  <path class="edge" data-from="d2-base" data-to="d2-hybrid" d="M490,50 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="d2-base" data-to="d2-legacy" d="M490,124 H560" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arw2d)"/>
+  <path class="edge" data-from="d2-base" data-to="d2-generic" d="M490,198 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="d2-base" data-to="d2-scenario" d="M490,272 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="524" y="178" text-anchor="middle">implements</text>
+
+  <path class="edge dotted-edge" data-from="d2-base" data-to="d2-helper" d="M360,225 V300 H290 V330" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arw2e)"/>
+  <text class="edge-label" x="300" y="294" text-anchor="start">same file</text>
+
+  <path class="edge dotted-edge" data-from="d2-mixins" data-to="d2-legacy" d="M520,326 V158 H660 V156" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arw2e)"/>
+  <text class="edge-label" x="532" y="152" text-anchor="start">mixes in</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - <code>base.py::BaseEvaluator</code> and its four subclasses. Dotted arrows are imports or mixin use.</p>
+
+<p class="note say">Every backend writes the same artifact: <code>evaluation.txt</code> in <code>sources/workflows/&lt;uuid&gt;/</code> (<code>generic.py:445</code>, <code>scenario.py:182</code>, <code>verifier.py:945</code>, <code>hybrid_verifier/gradient.py:229</code>), so the report on disk is written by whichever backend ran that generation. Only one backend runs per generation.</p>
+
+<details><summary>interface signatures</summary><div class="dbody">
+<pre>BaseEvaluator.__init__(config: Config) -&gt; None
+BaseEvaluator._load_workflow_data(workflow_id: str) -&gt; WorkflowInfo
+BaseEvaluator.workflow_execution_text(uuid: str) -&gt; tuple[str, bool] | None
+BaseEvaluator._call_judge(uuid, agent_name, prompt) -&gt; str
+BaseEvaluator._call_judge_for_json(uuid, agent_name, prompt) -&gt; tuple[Any, str | None]
+BaseEvaluator._save_results(scores: dict, uuid: str, eval_type: str) -&gt; None
+GenericEvaluator.evaluate(uuid: str, agent_answers: str | None = None) -&gt; None
+ScenarioEvaluator.evaluate(uuid: str, scenario_rubric: str) -&gt; dict[str, Any]
+VerifierEvaluator.evaluate(uuid: str) -&gt; dict[str, Any]
+HybridVerifierEvaluator.evaluate(uuid: str) -&gt; dict[str, Any]
+extract_json_payload(text: str) -&gt; str</pre>
+<p><code>BaseEvaluator.__init__</code> reads <code>memory_dir</code>, <code>workflow_dir</code>, <code>model_pricing</code>, <code>reasoning_effort</code> and <code>judge_model</code>, and fails with <code>EvaluatorError</code> when one is missing. <code>GenericEvaluator.evaluate</code> returns <code>None</code>; it writes scores into <code>state_result.json</code> under <code>evaluation.generic</code>.</p>
+<p>Error classes live in <code>base.py</code>: <code>EvaluatorError</code>, <code>WorkflowDataError</code>, <code>ScenarioError</code>, <code>LLMEvaluationError</code>, <code>ScoreExtractionError</code>. <code>extract_json_payload</code> is reused by <code>hybrid_verifier/digest.py:23</code> and <code>hybrid_verifier/layers.py:22</code>.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Files</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Symbols</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">evaluator.py</a></td><td>Facade: routes a run to one backend.</td><td class="size">193</td><td class="sym">WorkflowEvaluator.evaluate</td><td>default</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/base.py">base.py</a></td><td>Interface plus shared judge LLM helpers.</td><td class="size">380</td><td class="sym">BaseEvaluator, extract_json_payload</td><td>other</td></tr>
+<tr id="generic"><td class="sym"><a href="../../sources/evaluators/generic.py">generic.py</a></td><td>Four LLM judges; optional fraud penalty.</td><td class="size">471</td><td class="sym">GenericEvaluator.evaluate</td><td><span class="tag dep">legacy-deprecated</span></td></tr>
+<tr id="scenario"><td class="sym"><a href="../../sources/evaluators/scenario.py">scenario.py</a></td><td>Scores a run against rubric assertions.</td><td class="size">654</td><td class="sym">ScenarioEvaluator.evaluate</td><td>other</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/grounding.py">grounding.py</a></td><td>Fetches Perspicacité literature grounding.</td><td class="size">55</td><td class="sym">get_perspicacite_grounding</td><td>other</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/bs_detection.py">bs_detection.py</a></td><td>Flags numerical fraud, proposes a penalty.</td><td class="size">801</td><td class="sym">BullshitDetectorNumerical</td><td><span class="tag dep">legacy-deprecated</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/verifier.py">verifier.py</a></td><td>Deprecated per-claim verifier orchestrator.</td><td class="size">961</td><td class="sym">VerifierEvaluator.evaluate</td><td><span class="tag dep">legacy-deprecated</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/verifier_claims.py">verifier_claims.py</a></td><td>Extracts claims, rates importance.</td><td class="size">476</td><td class="sym">_VerifierClaimExtractionMixin</td><td><span class="tag dep">legacy-deprecated</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/verifier_claim_sources.py">verifier_claim_sources.py</a></td><td>Five claim-source prompts and dispatch.</td><td class="size">477</td><td class="sym">SOURCES, ClaimSource</td><td><span class="tag dep">legacy-deprecated</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/verifier_per_claim.py">verifier_per_claim.py</a></td><td>Writes and runs per-claim verifier scripts.</td><td class="size">1 798</td><td class="sym">_VerifierPerClaimMixin</td><td><span class="tag dep">legacy-deprecated</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/verifier_workspace.py">verifier_workspace.py</a></td><td>Lists workspace files, renders previews.</td><td class="size">252</td><td class="sym">_VerifierWorkspaceMixin</td><td><span class="tag dep">legacy-deprecated</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/">hybrid_verifier/</a></td><td>Default verifier: claims, scorers, pairwise reward.</td><td class="size">3 345</td><td class="sym">HybridVerifierEvaluator.evaluate</td><td>default</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/__pycache__/">__pycache__/</a></td><td>Compiled caches for both folders; no source.</td><td class="size">21</td><td class="sym">none</td><td>other</td></tr>
+</tbody>
+</table>
+<p>Deeper pages: <a href="mod_evaluators_hybrid_verifier.html">hybrid verifier package (L2)</a> &#183; <a href="area_evaluators_legacy.html">deprecated verifier pipeline (L2)</a>. Verification flow: <a href="flow_verification.html">flow page</a>. The folder has no <code>__init__.py</code>; imports work as namespace packages, for example <code>from sources.evaluators.evaluator import WorkflowEvaluator</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Notes and gaps</h2>
+<p class="note">Amber: <code>bs_detection.py</code> calls itself "now unused", yet <code>generic.py:31</code> imports <code>BullshitDetectorNumerical</code> and calls it when <code>use_bs_penalty=True</code>; <code>WorkflowEvaluator</code> defaults that flag to <code>False</code> (<code>evaluator.py:53</code>).</p>
+<p class="note flag">Red: <code>docs/concepts/architecture.md:82</code> links the facade as <code class="path">sources/core/evaluators/evaluator.py</code>. That path does not exist; the file is <code class="path">sources/evaluators/evaluator.py</code>.</p>
+<details><summary>tests that touch this area</summary><div class="dbody">
+<p><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (<code>HybridVerifierEvaluator</code>, <code>verifier_kind</code> selection and the CLI flag) &#183; <a href="../../tests/workflow_evaluator_test.py">tests/workflow_evaluator_test.py</a> (<code>WorkflowEvaluator</code>) &#183; <a href="../../tests/verifier_importance_test.py">tests/verifier_importance_test.py</a> &#183; <a href="../../tests/verifier_visual_test.py">tests/verifier_visual_test.py</a> &#183; <a href="../../tests/verifier_recovery_test.py">tests/verifier_recovery_test.py</a> &#183; <a href="../../tests/verifier_claim_cache_test.py">tests/verifier_claim_cache_test.py</a> &#183; <a href="../../tests/verifier_result_focused_claims_test.py">tests/verifier_result_focused_claims_test.py</a> &#183; <a href="../../tests/test_detect_language.py">tests/test_detect_language.py</a> (<code>verifier_per_claim._detect_language</code>) &#183; <a href="../../tests/scenario_rubric_test.py">tests/scenario_rubric_test.py</a> (loader only).</p>
+<p>Two files import modules that no longer exist: <code class="path">tests/evaluator_test.py</code> needs <code>sources.core.dgm</code> and <code class="path">tests/judge_test.py</code> needs <code>sources.core.judge</code>. Both skip collection with <code>pytest.importorskip</code>. Coverage matrix: <a href="area_tests.html">area tests</a>.</p>
+</div></details>
+<details><summary>what I did not read</summary><div class="dbody">
+<p>I read symbol lists for <code>bs_detection.py</code>, <code>scenario.py</code> and <code>verifier_per_claim.py</code> instead of full bodies (Tier B). For <code>hybrid_verifier/</code> I read <code>__init__.py</code> in full and only the class and method list of <code>evaluator.py</code>; the deep read belongs to <a href="mod_evaluators_hybrid_verifier.html">the L2 page</a>.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/evaluators/</code> (base.py, evaluator.py, generic.py, scenario.py, bs_detection.py, grounding.py, verifier*.py, hybrid_verifier/__init__.py, hybrid_verifier/evaluator.py); <code>config.py</code> line 76; <code>main.py</code> lines 77-80; <code class="path">sources/core/evolution_engine.py</code> lines 29, 93, 808-812, 828-834, 871; <code class="path">docs/concepts/architecture.md</code> line 82; <code class="path">docs/concepts/evaluation-pipeline.md</code>; <code class="path">docs/reference/configuration.md</code>; <code class="path">docs/DEVELOPER_GUIDE.md</code> line 390; <code>tests/</code> import headers; <code>git status</code> and <code>git ls-files</code> at build time; UPDATE_VISUAL_CLONE.md; docs/visual_clone/_reference.html and _clone.css.</p>
+<p class="skips">Skipped: <code class="path">sources/evaluators/__pycache__/</code> and <code class="path">hybrid_verifier/__pycache__/</code> (compiled caches) &#183; <code>hybrid_verifier/</code> module bodies (own L2 page) &#183; full bodies of bs_detection.py, scenario.py, verifier_per_claim.py (Tier B, symbol lists only) &#183; the pytest suite and the application (not run, per the build rules) &#183; <code class="path">docs/site/</code> (generated).</p>
+<p>Working tree note: the page describes the working tree, not commit <code>7e8463b</code>. At build time <code class="path">sources/evaluators/hybrid_verifier/</code> was untracked and <code>config.py</code>, <code>main.py</code>, <code>evaluator.py</code> and the <code>verifier*.py</code> files had uncommitted changes; at <code>7e8463b</code> the facade still defaulted to <code>VerifierEvaluator</code> (<code>git show 7e8463b:sources/evaluators/evaluator.py</code>).</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

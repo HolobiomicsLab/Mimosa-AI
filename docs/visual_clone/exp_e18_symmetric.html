@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E18 symmetric - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e18_symmetric">
+<div class="wrap">
+
+<h1 class="hud">e18_symmetric &mdash; A/B label-swap re-aggregation</h1>
+<p class="intro">This follow-up asked whether the E18 Bradley&ndash;Terry ranking comes from the artifacts or from the A/B label order. It re-executed the 599 cached comparison scripts with the candidate inputs swapped, with zero new LLM calls. Agreement keeps the winner, disagreement becomes a tie.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; swap pipeline</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 440" role="img" aria-label="e18_symmetric pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="bHyp">
+    <title>the question this experiment answered</title>
+    <rect x="20" y="12" width="210" height="46" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="30" text-anchor="middle">Hypothesis: aggregation is stable</text>
+    <text class="box-sub" x="125" y="46" text-anchor="middle">same code, swapped inputs</text>
+  </g>
+  <a class="box" id="b1" href="../../experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl">
+    <title>judgment records from the main phase</title>
+    <rect x="20" y="100" width="210" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="122" text-anchor="middle">E18_bt_judgments.jsonl</text>
+    <text class="box-sub" x="125" y="138" text-anchor="middle">599 cached scripts</text>
+  </a>
+  <g class="box" id="b2">
+    <title>e18_symmetric.py::load_main line 51</title>
+    <rect x="280" y="100" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="375" y="121" text-anchor="middle">load_main()</text>
+    <text class="box-sub" x="375" y="137" text-anchor="middle">main-phase records</text>
+  </g>
+  <g class="box" id="b3">
+    <title>e18_symmetric.py::rerun_swapped line 80</title>
+    <rect x="280" y="186" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="375" y="207" text-anchor="middle">rerun_swapped()</text>
+    <text class="box-sub" x="375" y="223" text-anchor="middle">swapped argv A/B</text>
+  </g>
+  <g class="box" id="b4">
+    <title>e18_scripted_bt.py::execute_script line 596, imported as E18</title>
+    <rect x="280" y="272" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="375" y="293" text-anchor="middle">execute_script()</text>
+    <text class="box-sub" x="375" y="309" text-anchor="middle">E18 helper, 60 s</text>
+  </g>
+  <g class="box" id="b5">
+    <title>e18_symmetric.py::swap_winner line 71</title>
+    <rect x="280" y="358" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="375" y="379" text-anchor="middle">swap_winner()</text>
+    <text class="box-sub" x="375" y="395" text-anchor="middle">maps back to uuids</text>
+  </g>
+  <g class="box" id="b6">
+    <title>e15_bt_eval.py::bt_fit_weighted line 90</title>
+    <rect x="530" y="186" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="625" y="207" text-anchor="middle">bt_fit_weighted()</text>
+    <text class="box-sub" x="625" y="223" text-anchor="middle">E15E, ridge 1.0</text>
+  </g>
+  <a class="box" id="b8" href="../../experiments_verifiers/results/E18_scripted_bt_2026-09-23.json">
+    <title>receives the symmetric_reaggregation block</title>
+    <rect x="530" y="256" width="190" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="625" y="279" text-anchor="middle">E18_scripted_bt</text>
+    <text class="box-sub" x="625" y="295" text-anchor="middle">2026-09-23.json</text>
+  </a>
+  <a class="box" id="b7" href="../../experiments_verifiers/results/_e18_symmetric_2026-09-23.jsonl">
+    <title>per-pair swap ledger</title>
+    <rect x="530" y="356" width="190" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+    <text class="box-label" x="625" y="379" text-anchor="middle">_e18_symmetric</text>
+    <text class="box-sub" x="625" y="395" text-anchor="middle">2026-09-23.jsonl</text>
+  </a>
+  <path class="edge dashed-edge" data-from="bHyp" data-to="b1" d="M125,58 V100" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="133" y="84" text-anchor="start">measured on</text>
+  <path class="edge" data-from="b1" data-to="b2" d="M230,127 H280" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="255" y="120" text-anchor="middle">reads</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M375,152 V186" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="382" y="174" text-anchor="start">script pairs</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M375,238 V272" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="382" y="260" text-anchor="start">calls</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M375,324 V358" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="382" y="346" text-anchor="start">stdout</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M470,378 L530,214" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="476" y="300" text-anchor="start">swapped winner</text>
+  <path class="edge" data-from="b5" data-to="b7" d="M470,392 H530" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="486" y="386" text-anchor="start">writes</text>
+  <path class="edge" data-from="b6" data-to="b8" d="M625,238 V256" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="632" y="254" text-anchor="start">appends</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>9 boxes</code>. Steel = experiment harness code; the green box is E18 code imported as <code>E18</code> (line 39). Solid = call, dashed = reads/writes. <code>rerun_swapped</code> passes <code>rec["paths"]["b"]</code> as A and <code>rec["paths"]["a"]</code> as B to the same cached script (line 82), so no new code and no new LLM call is made. Related pages: <a href="exp_e18_scripted_bt.html">exp_e18_scripted_bt.html</a>, <a href="exp_e18_bt_eval.html">exp_e18_bt_eval.html</a>, <a href="exp_e18_gradient_duel.html">exp_e18_gradient_duel.html</a>, <a href="exp_e15_bt_pilot.html">exp_e15_bt_pilot.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card steel">
+<h4><a href="../../experiments_verifiers/harness/e18_symmetric.py">experiments_verifiers/harness/e18_symmetric.py</a></h4>
+<p class="role">Re-executes the cached E18 scripts with swapped inputs, re-fits Bradley&ndash;Terry, and appends a labeled symmetric section to the E18 results files.</p>
+<p class="meta">389 lines &#183; entry: <code>main()</code> line 134 under <code>__main__</code> line 388 &#183; CLI arguments: none found &mdash; no argparse &#183; imports <code>e15_bt_eval as E15E</code> line 38, <code>e18_scripted_bt as E18</code> line 39</p>
+<details><summary>functions and module constants</summary><div class="dbody">
+<pre>load_main() -&gt; list[dict]          # line 51
+done_keys() -&gt; set[tuple]         # line 61
+swap_winner(rec, parsed) -&gt; str   # line 71
+rerun_swapped(rec, tmp_root) -&gt; dict   # line 80
+phase_symmetric(workers=8) -&gt; list[dict]   # line 98
+expit(x)                          # line 130
+main() -&gt; None                    # line 134
+  sp(a_key, b_key, gd)            # nested Spearman helper   # line 217
+  to_pairfn(key)                  # nested pair scorer        # line 238
+  ship_rate(key)                  # nested SR counter         # line 291</pre>
+<p>Constants: <code>JUDGMENTS</code> line 42, <code>SYM_LEDGER</code> line 43, <code>OUT_JSON = results/E18_scripted_bt_2026-09-23.json</code> line 44, <code>OUT_MD</code> line 45, <code>N_BOOT = 10_000</code> line 47, <code>BOOT_SEED = 20260923</code> line 48.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>E18 judgments with embedded scripts</td><td>&mdash;</td><td class="sym"><code class="path">results/E18_bt_judgments_2026-09-23.jsonl</code> &#183; <code>load_main</code> line 51</td></tr>
+<tr><td>E14 pair plan, 19 groups</td><td>&mdash;</td><td class="sym"><code class="path">results/E14_bt_population.json</code> &#183; line 144</td></tr>
+<tr><td>Claim statuses, E15 BT rewards</td><td>&mdash;</td><td class="sym"><code class="path">data/verifier_claims_sane.jsonl</code>, <code class="path">results/E15_bt_pilot_2026-09-23.json</code> &#183; lines 146, 150</td></tr>
+<tr><td>&mdash;</td><td>One swap record per pair</td><td class="sym"><code class="path">results/_e18_symmetric_2026-09-23.jsonl</code> &#183; <code>SYM_LEDGER</code> line 43</td></tr>
+<tr><td>&mdash;</td><td><code>symmetric_reaggregation</code> block</td><td class="sym"><code class="path">results/E18_scripted_bt_2026-09-23.json</code> &#183; json key <code>symmetric_reaggregation</code> line 2432</td></tr>
+<tr><td>&mdash;</td><td>Appended markdown section</td><td class="sym"><code class="path">results/E18_scripted_bt_2026-09-23.md</code> &#183; line 67 of that file</td></tr>
+<tr><td>&mdash;</td><td>Zero LLM calls</td><td class="sym">json key <code>zero_llm_calls</code> line 2434</td></tr>
+</tbody>
+</table>
+<p class="note">The original asymmetric results stay verbatim: the script only adds the new key (<code>e18_symmetric.py</code> lines 346&ndash;348) and appends the markdown section, which says so in its own text (md line 69).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 860 300" role="img" aria-label="bar chart of symmetric aggregation outcomes and tie rate">
+  <text class="box-sub" x="262" y="24" text-anchor="middle" style="font-size:11px">aggregation of 599 swapped re-runs</text>
+  <path d="M70,40 V240" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M70,240 H445" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M70,240.0 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="243.0" text-anchor="end">0</text>
+  <path d="M70,177.5 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="180.5" text-anchor="end">100</text>
+  <path d="M70,115.0 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="118.0" text-anchor="end">200</text>
+  <path d="M70,52.5 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="55.5" text-anchor="end">300</text>
+  <rect x="114.2" y="52.5" width="80.0" height="187.5" fill="#39FF88" fill-opacity="0.18" stroke="#39FF88"/>
+  <text class="box-label" x="154.2" y="47.5" text-anchor="middle" style="font-size:11px">300</text>
+  <text class="box-sub" x="154.2" y="256.0" text-anchor="middle">agree</text>
+  <rect x="222.5" y="54.4" width="80.0" height="185.6" fill="#FFB547" fill-opacity="0.18" stroke="#FFB547"/>
+  <text class="box-label" x="262.5" y="49.4" text-anchor="middle" style="font-size:11px">297</text>
+  <text class="box-sub" x="262.5" y="256.0" text-anchor="middle">disagree</text>
+  <rect x="330.8" y="238.8" width="80.0" height="1.2" fill="#FF4D6A" fill-opacity="0.18" stroke="#FF4D6A"/>
+  <text class="box-label" x="370.8" y="233.8" text-anchor="middle" style="font-size:11px">2</text>
+  <text class="box-sub" x="370.8" y="256.0" text-anchor="middle">kept original</text>
+  <text class="box-sub" x="648" y="24" text-anchor="middle" style="font-size:11px">pair tie rate (0-1)</text>
+  <path d="M455,40 V240" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M455,240 H830" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M455,240.0 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="243.0" text-anchor="end">0</text>
+  <path d="M455,173.3 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="176.3" text-anchor="end">0.2</text>
+  <path d="M455,106.7 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="109.7" text-anchor="end">0.4</text>
+  <path d="M455,40.0 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="43.0" text-anchor="end">0.6</text>
+  <rect x="526.2" y="92.6" width="80.0" height="147.4" fill="#00E5FF" fill-opacity="0.18" stroke="#00E5FF"/>
+  <text class="box-label" x="566.2" y="87.6" text-anchor="middle" style="font-size:11px">0.4423</text>
+  <text class="box-sub" x="566.2" y="256.0" text-anchor="middle">original</text>
+  <rect x="688.8" y="74.7" width="80.0" height="165.3" fill="#4D9FFF" fill-opacity="0.18" stroke="#4D9FFF"/>
+  <text class="box-label" x="728.8" y="69.7" text-anchor="middle" style="font-size:11px">0.4958</text>
+  <text class="box-sub" x="728.8" y="256.0" text-anchor="middle">symmetric</text>
+  <text class="box-sub" x="70" y="288">left: counts of 599 script-outcome pairs; right: tie rate before and after the swap</text>
+</svg>
+</div>
+<p class="figcap">Chart 3 &mdash; aggregated numbers read from <code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> lines 2441, 2442, 2438, 2446, 2447. The ledger itself holds no aggregate: the per-pair rows are in <code class="path">results/_e18_symmetric_2026-09-23.jsonl</code> (599 lines, my computation).</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Swap re-executions</td><td>599 rows in ledger</td><td class="sym">_e18_symmetric_2026-09-23.jsonl, 599 lines (my computation)</td></tr>
+<tr><td>Exit code 0</td><td>599 of 599</td><td class="sym">_e18_symmetric...jsonl <code>swap_rc</code> (my computation)</td></tr>
+<tr><td>Parsed winner</td><td>597 ok, 2 all-metrics-null</td><td class="sym">_e18_symmetric...jsonl <code>swap_parse</code> (my computation)</td></tr>
+<tr><td>Agreement</td><td>300 agree, 297 disagree</td><td class="sym">...scripted_bt_2026-09-23.json lines 2441&ndash;2442</td></tr>
+<tr><td>Decisive winner flips</td><td>1</td><td class="sym">...scripted_bt_2026-09-23.json line 2443</td></tr>
+<tr><td>Swap failures kept original</td><td>2</td><td class="sym">...scripted_bt_2026-09-23.json line 2438</td></tr>
+<tr><td>Tie rate, original</td><td>0.4423</td><td class="sym">...scripted_bt_2026-09-23.json line 2447</td></tr>
+<tr><td>Tie rate, symmetric</td><td>0.4958</td><td class="sym">...scripted_bt_2026-09-23.json line 2446</td></tr>
+<tr><td>Pairs-correct, E18-symmetric</td><td>0.4796 over 147 pairs</td><td class="sym">...scripted_bt_2026-09-23.json line 2452</td></tr>
+<tr><td>Pairs-correct, E15, reward, uniform</td><td>0.6429, 0.5578, 0.6375</td><td class="sym">...scripted_bt_2026-09-23.json lines 2461, 2469, 2477</td></tr>
+<tr><td>Paired delta E18s minus E18 original</td><td>+0.000 [0.000, 0.000]</td><td class="sym">...scripted_bt_2026-09-23.md line 72</td></tr>
+<tr><td>M2 SR shipped</td><td>E18s 8, E15 8, reward 8, uniform 9, oracle 12</td><td class="sym">...scripted_bt_2026-09-23.json lines 2510&ndash;2514</td></tr>
+<tr><td>Snapshot mutations after pass</td><td>none</td><td class="sym">...scripted_bt_2026-09-23.json line 2901</td></tr>
+<tr><td>New LLM calls</td><td>0</td><td class="sym">...scripted_bt_2026-09-23.json line 2434</td></tr>
+</tbody>
+</table>
+<p class="note say">Reproducing the recorded counts from the ledger: my own join of the 599 swap rows against the 667 main judgments gives 300 agree, 299 disagree (2 of which are the failed re-runs) and 1 decisive flip &mdash; the same numbers the script reports for the 597 successful pairs.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>8 lines from the results files (click to expand)</summary><div class="dbody">
+<p class="sub"><code class="path">experiments_verifiers/results/_e18_symmetric_2026-09-23.jsonl</code> line 1 (first 520 characters of 1 line)</p>
+<blockquote>{"group": "chemistry_iterative_v4_flash__llm_response_error_brain_blood_qsar", "i": "27fbf721", "j": "881a1601", "a_uuid8": "27fbf721", "b_uuid8": "881a1601", "original_outcome": "script", "original_winner_ij": "tie", "swap_rc": 0, "swap_timeout": false, "swap_parse": "ok", "swap_winner_ij": "tie", "ok": true}</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 2433</p>
+<blockquote>  "operator_decision": "2026-09-24: zero-LLM-cost symmetric re-aggregation \u2014 same cached scripts re-executed with swapped A/B inputs; agree->winner, disagree->tie(0.5 each), swap-failure->original kept",</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 2436</p>
+<blockquote>   "script_outcome_pairs": 599,</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 2438</p>
+<blockquote>   "swap_failures_kept_original": 2</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 2441</p>
+<blockquote>   "agree": 300,</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 2442</p>
+<blockquote>   "disagree_or_tie_mismatch": 297,</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 2443</p>
+<blockquote>   "winner_flips_vs_original": 1</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 2446</p>
+<blockquote>   "symmetric": 0.4958,</blockquote>
+</div></details>
+</div>
+<footer>
+<p><b>Sources read:</b> <code class="path">experiments_verifiers/harness/e18_symmetric.py</code> (389 lines), <code class="path">experiments_verifiers/harness/e18_scripted_bt.py</code> (lines 57&ndash;81, 596&ndash;625, 925&ndash;930), <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> (line numbers of the imported helpers).</p>
+<p>Results read: <code class="path">experiments_verifiers/results/_e18_symmetric_2026-09-23.jsonl</code> (599 rows, JSON-parsed) and the <code>symmetric_reaggregation</code> block of <code class="path">results/E18_scripted_bt_2026-09-23.json</code> plus the appended section of <code class="path">results/E18_scripted_bt_2026-09-23.md</code>.</p>
+<p>Design intent: <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (constitution &sect;2 rules 5, 7, 8; &sect;3 data map line 72) and <code class="path">experiments_verifiers/README.md</code> (E18 codename row).</p>
+<p class="skips"><b>Skipped:</b></p>
+<p><code class="path">experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl</code> &mdash; not opened line by line: only the <code>(group, i, j)</code> join key and <code>winner_ij</code> were read, to reproduce the agreement counts.</p>
+<p><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> per-group and <code>bt_table</code> arrays &mdash; not quoted: the symmetric block reports the same readouts.</p>
+<p><code class="path">experiments_verifiers/results/_e18_pilot_2026-09-23.json</code> and <code class="path">_e18_determinism_2026-09-23.jsonl</code> &mdash; not opened here: they belong to the scripted-BT page.</p>
+<p><code class="path">experiments_verifiers/.env</code>, <code class="path">.env</code>, <code>token.json</code>, <code>credentials.json</code> &mdash; never opened (key material).</p>
+<p>The experiment was not re-run; no pytest and no application run.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

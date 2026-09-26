@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E8 blast radius - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e8_blast_radius">
+<div class="wrap">
+
+<h1 class="hud">e8_blast_radius &mdash; how far did the note bug spread?</h1>
+<p class="intro">An infra-excluded capsule dropped out of <code>_save_run_notes</code>, so the run note of that task was written from the previous evaluated task's execution data. This experiment finds every affected task by three independent signals, recovers the real per-generation verdicts from the evaluation log, and rebuilds the sane datasets. Folder context: <a href="data_experiments.html">data_experiments.html</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 430" role="img" aria-label="E8 blast-radius audit pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="hy">
+    <title>Do notes carry foreign data?</title>
+    <rect x="20" y="16" width="380" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="210.0" y="40.0" text-anchor="middle">Do notes carry foreign data?</text>
+    <text class="box-sub" x="210.0" y="57.0" text-anchor="middle">hypothesis · csv_mode fallback</text>
+  </g>
+  <a class="box" id="in1" href="../../run_notes/">
+    <title>run_notes/</title>
+    <rect x="20" y="110" width="190" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="115.0" y="134.0" text-anchor="middle">run_notes/</text>
+    <text class="box-sub" x="115.0" y="151.0" text-anchor="middle">per-task note JSON</text>
+  </a>
+  <a class="box" id="in2" href="../../runs_capsule/">
+    <title>runs_capsule/</title>
+    <rect x="20" y="180" width="190" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="115.0" y="204.0" text-anchor="middle">runs_capsule/</text>
+    <text class="box-sub" x="115.0" y="221.0" text-anchor="middle">evaluation_results.json</text>
+  </a>
+  <a class="box" id="in3" href="../../logs/">
+    <title>evaluation_csv_mode.log</title>
+    <rect x="20" y="250" width="190" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="115.0" y="274.0" text-anchor="middle">evaluation_csv_mode.log</text>
+    <text class="box-sub" x="115.0" y="291.0" text-anchor="middle">eval + ablation lines</text>
+  </a>
+  <a class="box" id="s3" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>match_notes_to_segments()</title>
+    <rect x="240" y="110" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335.0" y="132.0" text-anchor="middle">match_notes_to_segments()</text>
+    <text class="box-sub" x="335.0" y="149.0" text-anchor="middle">L137 · name + timestamp</text>
+  </a>
+  <a class="box" id="s1" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>capsule_status()</title>
+    <rect x="240" y="180" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335.0" y="202.0" text-anchor="middle">capsule_status()</text>
+    <text class="box-sub" x="335.0" y="219.0" text-anchor="middle">L77 · status + VER</text>
+  </a>
+  <a class="box" id="s2" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>parse_log()</title>
+    <rect x="240" y="250" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335.0" y="272.0" text-anchor="middle">parse_log()</text>
+    <text class="box-sub" x="335.0" y="289.0" text-anchor="middle">L98 · regex segments</text>
+  </a>
+  <a class="box" id="s4" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>byte_identity_groups()</title>
+    <rect x="240" y="330" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335.0" y="352.0" text-anchor="middle">byte_identity_groups()</text>
+    <text class="box-sub" x="335.0" y="369.0" text-anchor="middle">L160 · md5 of blocks</text>
+  </a>
+  <a class="box" id="s5" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>build_recovery()</title>
+    <rect x="490" y="140" width="230" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="605.0" y="164.0" text-anchor="middle">build_recovery()</text>
+    <text class="box-sub" x="605.0" y="181.0" text-anchor="middle">L193 · real log rows</text>
+  </a>
+  <a class="box" id="s6" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>substitute_recovered() + replay()</title>
+    <rect x="490" y="240" width="230" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="605.0" y="266.0" text-anchor="middle">substitute_recovered() + replay()</text>
+    <text class="box-sub" x="605.0" y="283.0" text-anchor="middle">L290 / L350 · 4 policies</text>
+  </a>
+  <a class="box" id="out1" href="../../experiments_verifiers/data/">
+    <title>manifest_sane.json</title>
+    <rect x="490" y="340" width="230" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="605.0" y="368.0" text-anchor="middle">manifest_sane.json</text>
+    <text class="box-sub" x="605.0" y="385.0" text-anchor="middle">+ verifier_claims_sane.jsonl</text>
+  </a>
+  <a class="box" id="out2" href="../../experiments_verifiers/results/">
+    <title>blast-radius report</title>
+    <rect x="740" y="340" width="140" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="810.0" y="368.0" text-anchor="middle">blast-radius report</text>
+    <text class="box-sub" x="810.0" y="385.0" text-anchor="middle">results/ · json + md</text>
+  </a>
+
+  <path class="edge" data-from="hy" data-to="in1" d="M200,68 L115,110" fill="none" stroke="#B79CFF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="150" y="92" text-anchor="start">drives</text>
+  <path class="edge dashed-edge" data-from="in1" data-to="s3" d="M220,136 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="222" y="128" text-anchor="start">reads notes</text>
+  <path class="edge dashed-edge" data-from="in1" data-to="s4" d="M20,150 H8 V354 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="in2" data-to="s1" d="M220,206 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="222" y="198" text-anchor="start">capsule status</text>
+  <path class="edge dashed-edge" data-from="in3" data-to="s2" d="M220,276 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="222" y="268" text-anchor="start">parses lines</text>
+  <path class="edge" data-from="s3" data-to="s5" d="M430,134 L490,166" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="434" y="122" text-anchor="start">matched notes</text>
+  <path class="edge" data-from="s1" data-to="s5" d="M430,204 L490,172" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="434" y="194" text-anchor="start">affected set</text>
+  <path class="edge" data-from="s2" data-to="s5" d="M430,276 L490,178" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="434" y="262" text-anchor="start">segments</text>
+  <path class="edge" data-from="s4" data-to="s5" d="M430,354 L490,190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="434" y="340" text-anchor="start">uuid groups</text>
+  <path class="edge" data-from="s5" data-to="s6" d="M605,192 V240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="611" y="222" text-anchor="start">recovered rows</text>
+  <path class="edge dashed-edge" data-from="s6" data-to="out1" d="M605,296 V340" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="611" y="324" text-anchor="start">writes</text>
+  <path class="edge dashed-edge" data-from="s6" data-to="out2" d="M700,296 L810,340" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="790" y="334" text-anchor="end">report</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>12 boxes</code>. Dashed grey = read-only evidence (<code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">logs/evaluation_csv_mode.log</code>), mint pills = functions in <code>e8_blast_radius.py</code>, cyan = written artifacts. <code>capsule_status</code> (L77) reads each capsule's <code>evaluation_results.json</code>; <code>parse_log</code> (L98) splits the log on note-save lines; <code>match_notes_to_segments</code> (L137) joins notes to log segments by task name and a save timestamp within 5 s (<code>TS_MATCH_TOL_S</code> L72); <code>byte_identity_groups</code> (L160) groups notes by md5 of the ablations block and of the uuid list; <code>build_recovery</code> (L193) parses <code>[ABLATION]</code> rows and re-attaches rewards from <code class="path">sources/workflows/&lt;campaign&gt;/&lt;uuid&gt;/run_metrics.json</code> via <code>find_wf_dir</code> (L182). <code>load_task_sequences</code> (L257) loads the frozen <code>ablations/*.json</code> copies, <code>run_policy</code> (L320) implements P0, P1, P2-3 and PORACLE.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e8_blast_radius.py">experiments_verifiers/harness/e8_blast_radius.py</a></h4>
+<p class="role">Finds every note contaminated by the excluded-task fallback, recovers real verdicts from the log, writes sane datasets.</p>
+<p class="meta">715 lines &#183; entry <code>main()</code> L371 &#183; CLI: one optional positional <code>&lt;date&gt;</code> (L41, default today) &#183; 13 functions &#183; no LLM calls</p>
+<details><summary>signatures and constants</summary><div class="dbody">
+<pre>capsule_status() -&gt; dict[(note_dir, task), {status, VER}]            # L77
+parse_log() -&gt; list[dict]                                            # L98
+match_notes_to_segments(all_note_dirs, segments) -&gt; dict            # L137
+byte_identity_groups(all_note_dirs) -&gt; dict                          # L160
+find_wf_dir(base, uuid) -&gt; str | None                                # L182
+build_recovery(affected, matched, segments, capsule_stat) -&gt; dict     # L193
+load_task_sequences() -&gt; dict                                        # L257
+substitute_recovered(tasks, recovery) -&gt; dict                        # L290
+run_policy(name, sh) -&gt; dict                                         # L320  P0 / P1 / P2-3 / PORACLE
+replay(tasks, policies=('P0','P1','P2-3','PORACLE')) -&gt; tuple        # L350</pre>
+<p>Constants: <code>CAMPAIGNS</code> (L48) maps capsule dir to note dir, <code>NOTE_ONLY_CAMPAIGNS = ['asb_full_oneshot_1', 'asb_full_single_2']</code> (L59), <code>WF_MAP</code> (L61) maps capsules to <code>sources/workflows/</code> dirs, <code>PLACEHOLDER_UUIDS = {'failed', 'generation_failed'}</code> (L71), <code>TS_MATCH_TOL_S = 5.0</code> (L72).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Per-task campaign notes</td><td>nothing (read-only)</td><td class="sym"><code class="path">../../run_notes/&lt;note_dir&gt;/&lt;task&gt;.json</code></td></tr>
+<tr><td>Capsule verdicts, status was excluded</td><td>nothing</td><td class="sym"><code class="path">../../runs_capsule/&lt;campaign&gt;/&lt;task&gt;/evaluation_results.json</code></td></tr>
+<tr><td>Eval and ablation lines per occupied slot</td><td>nothing</td><td class="sym"><code class="path">../../logs/evaluation_csv_mode.log</code> (LOG_PATH L42)</td></tr>
+<tr><td>Real verifier reward per generation</td><td>nothing</td><td class="sym"><code>sources/workflows/&lt;campaign&gt;/&lt;uuid&gt;/run_metrics.json</code> <code>overall_score</code> (L244)</td></tr>
+<tr><td>Frozen note copies, raw claims rows, row manifest</td><td>nothing</td><td class="sym"><code class="path">experiments_verifiers/ablations/*.json</code>, <code>data/verifier_claims.jsonl</code>, <code>manifest.json</code></td></tr>
+<tr><td>all of the above</td><td>Rows nulled + 54 recovered rows appended</td><td class="sym"><code class="path">experiments_verifiers/data/manifest_sane.json</code> (L495)</td></tr>
+<tr><td>raw claims rows</td><td>607 rows, 42 flagged and nulled</td><td class="sym"><code class="path">experiments_verifiers/data/verifier_claims_sane.jsonl</code> (L501)</td></tr>
+<tr><td>identification, recovery, replay results</td><td>Blast-radius report, json of record + md digest</td><td class="sym"><code class="path">experiments_verifiers/results/E8_blast_radius_&lt;date&gt;.json</code> (L632) and <code>.md</code> (L704)</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the script's docstring names the bug as <code>csv_mode.py:455-457</code>, but the working-tree copy of <code class="path">sources/benchmark_evaluation/csv_mode.py</code> now guards <code>current_execution_data</code> (L465&ndash;473) and the call site passes it (L1507&ndash;1516). <code>git status --porcelain</code> lists that file as modified (<code>M</code>), so the fix is uncommitted and the cited line range no longer holds.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; the measured blast radius</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 798 370" role="img" aria-label="bar chart of the measured metrics">
+  <path d="M248,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="248" y="346" text-anchor="middle">0</text>
+  <path d="M368,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="368" y="346" text-anchor="middle">2</text>
+  <path d="M488,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="488" y="346" text-anchor="middle">4</text>
+  <path d="M608,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="608" y="346" text-anchor="middle">6</text>
+  <text class="box-sub" x="238" y="70" text-anchor="end">asb_full_iterative_1</text>
+  <rect x="248" y="58" width="360" height="15" fill="#FF4D6A" fill-opacity="0.30" stroke="#FF4D6A"/>
+  <text class="box-label" x="616" y="70" text-anchor="start">6</text>
+  <text class="box-sub" x="238" y="100" text-anchor="end">asb_full_oneshot_1</text>
+  <rect x="248" y="88" width="360" height="15" fill="#FF4D6A" fill-opacity="0.30" stroke="#FF4D6A"/>
+  <text class="box-label" x="616" y="100" text-anchor="start">6</text>
+  <text class="box-sub" x="238" y="130" text-anchor="end">asb_full_single_2</text>
+  <rect x="248" y="118" width="300" height="15" fill="#FF4D6A" fill-opacity="0.30" stroke="#FF4D6A"/>
+  <text class="box-label" x="556" y="130" text-anchor="start">5</text>
+  <text class="box-sub" x="238" y="160" text-anchor="end">asb_full_single_1</text>
+  <rect x="248" y="148" width="240" height="15" fill="#FFB547" fill-opacity="0.30" stroke="#FFB547"/>
+  <text class="box-label" x="496" y="160" text-anchor="start">4</text>
+  <text class="box-sub" x="238" y="190" text-anchor="end">chemistry_single_v4_flash</text>
+  <rect x="248" y="178" width="180" height="15" fill="#FFB547" fill-opacity="0.30" stroke="#FFB547"/>
+  <text class="box-label" x="436" y="190" text-anchor="start">3</text>
+  <text class="box-sub" x="238" y="220" text-anchor="end">chemistry_iterative_v4_flash</text>
+  <rect x="248" y="208" width="120" height="15" fill="#FFB547" fill-opacity="0.30" stroke="#FFB547"/>
+  <text class="box-label" x="376" y="220" text-anchor="start">2</text>
+  <text class="box-sub" x="238" y="250" text-anchor="end">chemistry_iterative_2_v3.2</text>
+  <rect x="248" y="238" width="60" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="316" y="250" text-anchor="start">1</text>
+  <text class="box-sub" x="238" y="280" text-anchor="end">chemistry_oneshot_2_v3.2</text>
+  <rect x="248" y="268" width="60" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="316" y="280" text-anchor="start">1</text>
+  <text class="box-sub" x="238" y="310" text-anchor="end">chemistry_single_2_v3.2</text>
+  <rect x="248" y="298" width="60" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="316" y="310" text-anchor="start">1</text>
+  <text class="box-sub" x="12" y="362" text-anchor="start">affected tasks per campaign, 29 total · source: E8_blast_radius_20260922.json identification.by_campaign; .md L14-L24</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; affected tasks per campaign, drawn by hand from the recorded counts; red campaigns hold 5&ndash;6 affected tasks, amber 2&ndash;4, green one each.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Affected tasks</td><td>29 across 9 campaigns</td><td class="sym">.md L7; json <code>identification.affected_tasks_total</code> = 29</td></tr>
+<tr><td>Manifest rows with foreign labels</td><td>84</td><td class="sym">.md L8; json <code>blast_radius.foreign_manifest_rows_nulled</code></td></tr>
+<tr><td>Claims rows flagged and nulled</td><td>42 of 607</td><td class="sym">.md L8, L66</td></tr>
+<tr><td>Log recovery rate</td><td>26 of 29 tasks, 0.897</td><td class="sym">.md L9; json <code>recovery.verdict_recovery_rate</code></td></tr>
+<tr><td>Ablation rows recovered</td><td>60: 45 excluded, 15 evaluated</td><td class="sym">.md L9</td></tr>
+<tr><td>Rewards re-attached</td><td>50 from <code>run_metrics.json</code></td><td class="sym">.md L9</td></tr>
+<tr><td>Sane E4 table, P0</td><td>82 of 202, was 91 of 207</td><td class="sym">.md L32</td></tr>
+<tr><td>Sane E4 table, P1</td><td>83 of 202, was 92 of 207</td><td class="sym">.md L32</td></tr>
+<tr><td>Sane E4 table, P2-3</td><td>91 of 202, was 101 of 207</td><td class="sym">.md L32</td></tr>
+<tr><td>Sane E4 table, ORACLE</td><td>92 of 202, was 102 of 207</td><td class="sym">.md L32</td></tr>
+<tr><td>SR wins lost by the fix</td><td>P0 9, P1 9, P2-3 10, PORACLE 10</td><td class="sym">json <code>blast_radius.sr_wins_lost_by_policies</code></td></tr>
+<tr><td>Universe change</td><td>12 contaminated tasks to 7 sane tasks</td><td class="sym">json <code>blast_radius.tasks_in_contaminated_e4_universe</code> / <code>tasks_in_sane_universe</code></td></tr>
+<tr><td>Method agreement</td><td>no capsule-versus-log disagreements</td><td class="sym">.md L26; json <code>identification.method_agreement</code></td></tr>
+<tr><td>Sane artifacts written</td><td>manifest 1158 rows (54 appended)</td><td class="sym">.md L65</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the contaminated rows inflated every policy's SR count by 9&ndash;10 tasks, and the sane datasets are the input of <a href="exp_e9_deployment.html">exp_e9_deployment.html</a>.</p>
+<p class="note">Amber: 3 tasks of <code>chemistry_single_v4_flash</code> have no log segment and stay unrecoverable; the report says so instead of guessing (.md L59).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>results markdown, 5 quoted lines</summary><div class="dbody">
+<blockquote>- **29 affected tasks** across 9 campaigns (capsule evaluation EXCLUDED &rarr; run note written from the previous task's execution data).</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E8_blast_radius_20260922.md</code> line 7</p>
+<blockquote>- **84 manifest rows** and **42 verifier-claims rows** carried foreign labels; all flagged and nulled in <code>data/manifest_sane.json</code> / <code>data/verifier_claims_sane.jsonl</code>.</blockquote>
+<p class="sub">Same file, line 8</p>
+<blockquote>- Log recovery: **26/29** affected tasks (90%) have their real capsule verdict + ablation rows in <code>logs/evaluation_csv_mode.log</code>; 60 real ablation rows recovered (45 EXCLUDED, 15 evaluated), 50 real rewards re-attached from run_metrics.json.</blockquote>
+<p class="sub">Same file, line 9</p>
+<blockquote>| OVERALL | 207-&gt;202 |91-&gt;82|92-&gt;83|101-&gt;91|102-&gt;92|</blockquote>
+<p class="sub">Same file, line 32</p>
+<blockquote>- The chemistry_single_v4_flash campaign (2026-09-18 evening) left no eval/note-save lines in the surviving log; its 3 affected tasks are log-unrecoverable (empty-ablation single-shot notes anyway).</blockquote>
+<p class="sub">Same file, line 59</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e8_blast_radius.py</code> (715 lines), <code class="path">experiments_verifiers/results/E8_blast_radius_20260922.md</code> and <code>.json</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code> L425&ndash;500 and <code>git diff</code> for that file, <code class="path">experiments_verifiers/README.md</code> (codename table L31, joining rules L100&ndash;106), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (frozen-evidence rule L49&ndash;52). Directory presence checked with <code>os.path.isdir</code> on 2026-10-02.</p>
+<p class="skips">Skipped: <code>logs/evaluation_csv_mode.log</code> and <code>run_notes/</code> bodies (megabyte-scale raw evidence, read by the script and cited here only as inputs); <code>sources/benchmark_evaluation/csv_mode.py</code> outside L425&ndash;500 (out of scope, owned by <a href="flow_sab_batch.html">flow_sab_batch.html</a>); <code>experiments_verifiers/.env</code> (never opened, by rule); <code>experiments_verifiers/__pycache__/</code> (bytecode); every other E5*, E5c, E9 result pair (outside this page); <code>/tmp/mimosa_run_*</code> workspaces of these campaigns (gone: only three 2026-09-25 dirs survive). Gone on disk and therefore not linked: <code class="path">sources/workflows/asb_full_oneshot_1/</code> and <code class="path">sources/workflows/chemistry_single_v4_flash/</code> (the same cleanup that makes the oneshot rewards unrecoverable, .md L60); the report reads <code>chemistry_single_v4_flash_wf/</code> instead. No experiment was run.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

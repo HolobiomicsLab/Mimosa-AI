@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/core/planner.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > core > planner">
+<div class="wrap">
+
+<h1 class="hud">Planner - goal mode (L0)</h1>
+<p class="intro">In <code>--goal</code> mode the planner turns one goal string into a JSON step list, then runs each step through the evolution engine. It reads its system prompt from <code>config.prompt_planner</code>, asks Perspicacit&#233; for literature context first, and can stop for human plan approval. Default: 3 plan attempts (<code>max_retries</code>) and 5 attempts per step (<code>max_task_retry</code>).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Goal mode flow - goal string to evolution engine</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 820 690" role="img" aria-label="Goal mode flow through the planner">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="g1-main" href="area_entry_config.html">
+    <title>--goal dispatch in main.py</title>
+    <rect x="200" y="10" width="470" height="54" rx="2" fill="rgba(230,251,255,0.05)" stroke="#E6FBFF"/>
+    <text class="box-label" x="435" y="32" text-anchor="middle">main.py --goal</text>
+    <text class="box-sub" x="435" y="50" text-anchor="middle">normal_execution_mode calls start_planner</text>
+  </a>
+
+  <a class="box" id="g1-start" href="#card-planner">
+    <title>Planner.start_planner</title>
+    <rect x="200" y="94" width="470" height="54" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="435" y="116" text-anchor="middle">Planner.start_planner</text>
+    <text class="box-sub" x="435" y="134" text-anchor="middle">checks stdin TTY, prepends workspace file list</text>
+  </a>
+
+  <a class="box" id="g1-human" href="#card-planner">
+    <title>Approval loop: approve or send feedback</title>
+    <rect x="200" y="178" width="470" height="54" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="435" y="200" text-anchor="middle">_generate_plan_with_human_validation</text>
+    <text class="box-sub" x="435" y="218" text-anchor="middle">prints plan, loops on operator feedback</text>
+  </a>
+
+  <a class="box" id="g1-makeplan" href="#card-planner">
+    <title>Planner.make_plan</title>
+    <rect x="200" y="262" width="470" height="54" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="435" y="284" text-anchor="middle">make_plan</text>
+    <text class="box-sub" x="435" y="302" text-anchor="middle">3 attempts, sleeps 2 s then 4 s</text>
+  </a>
+
+  <a class="box" id="g1-llm" href="mod_core_tools_llm.html">
+    <title>One LLM call per attempt, flat cache</title>
+    <rect x="200" y="346" width="470" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435" y="368" text-anchor="middle">LLMProvider "plan_creator"</text>
+    <text class="box-sub" x="435" y="386" text-anchor="middle">use_flat_cache=True, use_cache=True</text>
+  </a>
+
+  <a class="box" id="g1-extract" href="#card-planner">
+    <title>Fenced JSON extraction, then validation</title>
+    <rect x="200" y="430" width="470" height="54" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="435" y="452" text-anchor="middle">_extract_json_from_code_block</text>
+    <text class="box-sub" x="435" y="470" text-anchor="middle">then _parse_and_validate_plan gives a Plan</text>
+  </a>
+
+  <a class="box" id="g1-attempts" href="#card-planner">
+    <title>Planner.run_attempts, one plan step</title>
+    <rect x="200" y="514" width="470" height="54" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="435" y="536" text-anchor="middle">run_attempts</text>
+    <text class="box-sub" x="435" y="554" text-anchor="middle">one step, up to 5 attempts</text>
+  </a>
+
+  <a class="box" id="g1-evolve" href="mod_core_evolution_engine.html">
+    <title>EvolutionEngine.start_workflow_evolution</title>
+    <rect x="200" y="598" width="470" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435" y="620" text-anchor="middle">EvolutionEngine.start_workflow_evolution</text>
+    <text class="box-sub" x="435" y="638" text-anchor="middle">enable_evolution=True, returns IndividualRun list</text>
+  </a>
+
+  <path class="edge" data-from="g1-main" data-to="g1-start" d="M435,64 V94" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="448" y="84">goal str</text>
+
+  <path class="edge" data-from="g1-start" data-to="g1-human" d="M435,148 V178" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="448" y="168">goal + file list</text>
+
+  <path class="edge" data-from="g1-human" data-to="g1-makeplan" d="M435,232 V262" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="448" y="252">goal str</text>
+
+  <path class="edge" data-from="g1-makeplan" data-to="g1-llm" d="M435,316 V346" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="448" y="336">prompt</text>
+
+  <path class="edge" data-from="g1-llm" data-to="g1-extract" d="M435,400 V430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="448" y="420">raw text</text>
+
+  <path class="edge" data-from="g1-extract" data-to="g1-attempts" d="M435,484 V514" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="448" y="504">Plan.steps, in order</text>
+
+  <path class="edge" data-from="g1-attempts" data-to="g1-evolve" d="M435,568 V598" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="448" y="588">step task</text>
+
+  <!-- approval hook: make_plan returns the plan for review, the approval loop calls it again -->
+  <path class="edge dashed-edge" data-from="g1-makeplan" data-to="g1-human" d="M200,289 H165 V205 H200" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="158" y="252" text-anchor="end">Plan back</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - goal mode, top to bottom. Symbols on the boxes: <code>main.py::normal_execution_mode</code>, <code>Planner.start_planner</code> (planner.py:925), <code>Planner._generate_plan_with_human_validation</code> (:466), <code>Planner.make_plan</code> (:163), <code>LLMProvider.__call__</code> (llm_provider.py:420), <code>Planner._extract_json_from_code_block</code> (:295), <code>Planner._parse_and_validate_plan</code> (:240), <code>Planner.run_attempts</code> (:811), <code>EvolutionEngine.start_workflow_evolution</code> (evolution_engine.py:338). Dashed edge = the <code>Plan</code> object returned for approval.</p>
+
+<details><summary>step ordering, gates and retries</summary><div class="dbody">
+<table>
+<thead><tr><th>Stage</th><th>Symbol</th><th>Behaviour</th></tr></thead>
+<tbody>
+<tr><td>Plan order</td><td class="sym">Planner.start_planner</td><td>Runs steps in <code>Plan.steps</code> order (planner.py:987); no sort.</td></tr>
+<tr><td>Dependency gate</td><td class="sym">Planner._can_execute_step</td><td>From step 2 on: a dependency must be <code>COMPLETED</code>.</td></tr>
+<tr><td>Missing dependency</td><td class="sym">Planner.request_user_exit</td><td>Sends a Pushover note, then <code>input()</code>; <code>n</code> calls <code>exit(1)</code>.</td></tr>
+<tr><td>Stop sentinel</td><td class="sym">Planner._check_stop_condition</td><td>A step named or tasked <code>stop</code> ends planning before step 1.</td></tr>
+<tr><td>Output check</td><td class="sym">Planner._verify_expected_outputs</td><td>Path match, or 70 % stem-term overlap with a workspace file.</td></tr>
+<tr><td>Per-step retry</td><td class="sym">Planner.run_attempts</td><td>Default 5 attempts; <code>csv_mode.py</code> passes 3.</td></tr>
+<tr><td>Attempt success</td><td class="sym">Planner.run_attempts</td><td>Breaks when <code>evolve_success</code> and score &ge; 0.7 (hardcoded).</td></tr>
+<tr><td>Step failure</td><td class="sym">Planner.start_planner</td><td>Pushover note, then raises <code>ValueError</code>.</td></tr>
+<tr><td>Knowledge carry-over</td><td class="sym">Planner._build_knowledge_aware_task</td><td>Prepends completed-task answers to the next step task.</td></tr>
+</tbody></table>
+<p>Each step task reaches the engine as <code>"Broader context:&lt;plan goal&gt;\n---\nYour task:&lt;step task&gt;"</code>, with <code>enable_evolution=True</code>: goal mode evolves every step (planner.py:783, :842).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Retry and repair path around JSON parsing</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1170 290" role="img" aria-label="Planner JSON retry and repair path">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="r-llm" href="mod_core_tools_llm.html">
+    <title>One call per attempt, cache always on</title>
+    <rect x="30" y="110" width="190" height="64" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="125" y="136" text-anchor="middle">LLMProvider call</text>
+    <text class="box-sub" x="125" y="154" text-anchor="middle">use_cache=True, flat cache</text>
+  </a>
+
+  <a class="box" id="r-extract" href="#card-planner">
+    <title>Only ```json fences are scanned</title>
+    <rect x="260" y="110" width="190" height="64" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="355" y="136" text-anchor="middle">_extract_json_</text>
+    <text class="box-sub" x="355" y="154" text-anchor="middle">json fence only</text>
+  </a>
+
+  <a class="box" id="r-parse" href="#card-planner">
+    <title>Plan and PlanStep validation</title>
+    <rect x="490" y="110" width="190" height="64" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="585" y="136" text-anchor="middle">_parse_and_validate_plan</text>
+    <text class="box-sub" x="585" y="154" text-anchor="middle">Plan + PlanStep checks</text>
+  </a>
+
+  <a class="box" id="r-retry" href="#card-planner">
+    <title>Sleep, then rebuild the goal prompt</title>
+    <rect x="720" y="110" width="190" height="64" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="815" y="136" text-anchor="middle">retry path</text>
+    <text class="box-sub" x="815" y="154" text-anchor="middle">sleep 2 s, then 4 s</text>
+  </a>
+
+  <a class="box" id="r-giveup" href="#card-planner">
+    <title>Notification then ValueError</title>
+    <rect x="950" y="110" width="190" height="64" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="1045" y="136" text-anchor="middle">give up</text>
+    <text class="box-sub" x="1045" y="154" text-anchor="middle">Pushover + ValueError</text>
+  </a>
+
+  <a class="box" id="r-steps" href="#card-planner">
+    <title>Plan returned, steps start running</title>
+    <rect x="490" y="20" width="190" height="48" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="585" y="40" text-anchor="middle">steps run</text>
+    <text class="box-sub" x="585" y="57" text-anchor="middle">start_planner, plan order</text>
+  </a>
+
+  <path class="edge" data-from="r-llm" data-to="r-extract" d="M220,142 H260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="240" y="134" text-anchor="middle">raw text</text>
+
+  <path class="edge" data-from="r-extract" data-to="r-parse" d="M450,142 H490" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="134" text-anchor="middle">dict or None</text>
+
+  <path class="edge" data-from="r-parse" data-to="r-retry" d="M680,142 H720" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="134" text-anchor="middle">parse error</text>
+
+  <path class="edge" data-from="r-retry" data-to="r-giveup" d="M910,142 H950" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="930" y="134" text-anchor="middle">3 attempts used</text>
+
+  <path class="edge" data-from="r-parse" data-to="r-steps" d="M585,110 V68" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="595" y="95">Plan OK</text>
+
+  <path class="edge dashed-edge" data-from="r-retry" data-to="r-llm" d="M815,174 V250 H125 V174" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="470" y="244" text-anchor="middle">same prompt, same cache</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - what happens on malformed or missing JSON (planner.py:183-238). Attempt 2 and 3 re-send the prompt that was built once at :182; <code>use_cache=True</code> is hardcoded at :188, so the flat cache can replay the same bad answer.</p>
+
+<p class="note flag">Red: <code class="path">tests/planner_json_extraction_test.py</code> asserts tolerant JSON extraction and a cache-bypassing retry, but <code>planner.py</code> does neither.</p>
+
+<details><summary>mismatch detail - my check, no pytest run</summary><div class="dbody">
+<blockquote>I did not run the pytest suite. I called <code>Planner._extract_json_from_code_block</code> directly, with the same import stubs the test module uses.</blockquote>
+<table>
+<thead><tr><th>Test asserts</th><th>planner.py does</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>Plain fence parses</td><td>Returns <code>None</code>; only <code>```json</code> or <code>```JSON</code> opens a block</td><td class="sym">planner.py:313 &#183; my call returned None</td></tr>
+<tr><td>Raw JSON parses</td><td>Returns <code>None</code> (no fence, no block)</td><td class="sym">planner.py:322 &#183; my call returned None</td></tr>
+<tr><td>Prose-wrapped JSON parses</td><td>Returns <code>None</code></td><td class="sym">planner.py:308-325 &#183; my call returned None</td></tr>
+<tr><td>Retry sends <code>use_cache=False</code></td><td><code>use_cache=True</code> on every attempt</td><td class="sym">planner.py:188</td></tr>
+<tr><td>Retry prompt differs</td><td>Built once at :182; the retry sends <code>goal_prompt</code> as <code>Plan.goal</code>.</td><td class="sym">planner.py:182, 197, 218</td></tr>
+</tbody></table>
+<p>The <code>except Exception</code> branch (:222) does not enhance the prompt at all and breaks out at the last attempt.</p>
+</div></details>
+
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File card - planner.py</h2>
+<div class="card l0" id="card-planner">
+<h4><a href="../../sources/core/planner.py">sources/core/planner.py</a></h4>
+<p class="role">Turns one goal string into a JSON step list, validates it, and runs each step through the evolution engine. Owns the TTY approval gate.</p>
+<p class="meta">1 053 lines &#183; class <code>Planner</code> + 3 exceptions &#183; 26 methods (3 async) &#183; reads: <code>config.planner_llm_model</code>, <code>config.prompt_planner</code></p>
+<details><summary>signatures</summary><div class="dbody">
+<pre>Planner.__init__(config: "Config", enable_tts: bool = True) -&gt; None
+Planner.perspicacite_grounding(goal: str) -&gt; str
+Planner.make_scientific_grounded_prompt(goal: str) -&gt; str
+Planner.make_plan(system_prompt: str, goal_prompt: str, max_retries: int = 3) -&gt; Plan
+Planner._parse_and_validate_plan(plan_dict: dict[str, Any], goal: str) -&gt; Plan
+Planner._extract_json_from_code_block(text: str) -&gt; dict[str, Any] | None   [staticmethod]
+Planner._enhance_prompt_with_error(original_prompt: str, error_msg: str) -&gt; str   [staticmethod]
+Planner._read_prompt() -&gt; str
+Planner._build_knowledge_aware_task(task_description: str) -&gt; str
+Planner._check_stop_condition(plan: Plan) -&gt; bool
+Planner._display_plan(plan: Plan) -&gt; None
+Planner._request_human_plan_validation(plan: Plan) -&gt; tuple[bool, str]
+Planner._generate_plan_with_human_validation(goal: str, human_approve: bool = False) -&gt; Plan
+Planner._init_visualization(plan: Plan) -&gt; None
+Planner._update_visualization(total_cost: float = 0.0) -&gt; None
+Planner._cleanup_visualization() -&gt; None
+Planner._get_workspace_files() -&gt; list[str]
+Planner._capture_workspace_snapshot() -&gt; list[str]
+Planner._verify_required_inputs(step: PlanStep) -&gt; tuple[bool, list[str]]
+Planner._verify_expected_outputs(step: PlanStep) -&gt; tuple[bool, list[str]]
+Planner._can_execute_step(step: PlanStep) -&gt; tuple[bool, list[str]]
+Planner.request_user_exit(msg: str) -&gt; None
+async Planner.evolve_runs(task: str, judge: bool, cached_wf_allow: bool = True, original_task: str | None = None) -&gt; list[IndividualRun]
+Planner._get_evolve_success(run: IndividualRun) -&gt; bool
+async Planner.run_attempts(attempt_counts: dict[str, int], max_attempts: int, step: PlanStep, judge: bool) -&gt; PlanStep
+async Planner.start_planner(goal: str, judge: bool = True, max_task_retry: int = 5, human_approve: bool = False) -&gt; list[Task]</pre>
+<p>Module exceptions: <code>UserInterventionRequired</code> (:37), <code>PlanValidationError</code> (:46), <code>DependencyError</code> (:51).</p>
+<p>Unused at this commit: <code>DependencyError</code> is exported by <code>sources/core/__init__.py:21</code> but never raised; <code>_verify_required_inputs</code> (:625) has no caller.</p>
+<p>Returns: <code>list[Task]</code> on success; raises <code>ValueError</code> on total plan failure or step failure, <code>UserInterventionRequired</code> when approval was asked without a TTY.</p>
+</div></details>
+</div>
+
+<div class="grid2">
+<div class="card l0">
+<h4><a href="../../sources/prompts/planner_reproduction.md">sources/prompts/planner_reproduction.md</a></h4>
+<p class="role">Default planner system prompt. It fixes the JSON schema: <code>goal</code> plus <code>steps[]</code> with <code>name</code>, <code>task</code>, <code>depends_on</code>, <code>required_inputs</code>, <code>expected_outputs</code>, <code>complexity</code>.</p>
+<p class="meta">121 lines &#183; reached through <code>config.prompt_planner</code> &#183; read by <code>Planner._read_prompt</code></p>
+</div>
+<div class="card l0">
+<h4><a href="../../sources/prompts/planner_paperbench_codedev.md">sources/prompts/planner_paperbench_codedev.md</a></h4>
+<p class="role">Same JSON schema, but the plan is code-development only: no execution step, <code>reproduce.sh</code> as root entrypoint.</p>
+<p class="meta">94 lines &#183; not the default &#183; set it with <code>prompt_planner</code> in the config JSON</p>
+</div>
+</div>
+<p class="sub">Both prompts demand a fenced <code>```json</code> block, which is the only format <code>_extract_json_from_code_block</code> accepts. Prompt text is described on <a href="data_modules_prompts.html">data_modules_prompts.html</a>.</p>
+
+<p class="note say">Why it matters: the plan decides how many evolution runs goal mode pays for, so a bad plan costs budget before any sandbox run starts.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Planner config fields</h2>
+<details open><summary>fields read by planner.py</summary><div class="dbody">
+<table>
+<thead><tr><th>Field</th><th>Default</th><th>What planner.py does with it</th><th class="size">Read at</th></tr></thead>
+<tbody>
+<tr><td class="sym">planner_llm_model</td><td class="sym">openrouter/z-ai/glm-5.3</td><td>Split by <code>extract_model_pattern</code> into provider + model for <code>LLMConfig</code></td><td class="size">planner.py:84</td></tr>
+<tr><td class="sym">reasoning_effort</td><td class="sym">medium</td><td>Passed into <code>LLMConfig</code></td><td class="size">planner.py:88</td></tr>
+<tr><td class="sym">max_tokens</td><td class="size">16 384</td><td>Passed into <code>LLMConfig</code>; shown in the truncation hint</td><td class="size">planner.py:89, 210</td></tr>
+<tr><td class="sym">prompt_planner</td><td class="sym">planner_reproduction.md</td><td>Read as the LLM system message</td><td class="size">planner.py:361</td></tr>
+<tr><td class="sym">planner_human_approve</td><td class="size">false</td><td>Gates the plan-approval prompt; refuses before planning if no TTY</td><td class="size">main.py:143</td></tr>
+<tr><td class="sym">memory_dir</td><td class="sym">sources/memory</td><td>Flat cache directory for the <code>plan_creator</code> agent</td><td class="size">planner.py:187</td></tr>
+<tr><td class="sym">workspace_dir</td><td class="sym">Toolomics/workspace</td><td>File list prepended to the goal; output-check scan root</td><td class="size">planner.py:959, 578</td></tr>
+<tr><td class="sym">pushover_token, pushover_user</td><td class="sym">env vars</td><td>Failure notifications for plan, step and exit requests</td><td class="size">planner.py:83</td></tr>
+<tr><td class="sym">runs_capsule_dir</td><td class="sym">runs_capsule</td><td>Read by <code>main.py</code> after <code>start_planner</code> returns, to copy the workspace</td><td class="size">main.py:245</td></tr>
+</tbody></table>
+<p>The only planner CLI flag is <code>--planner_human_approve</code> (main.py:99); <code>planner_llm_model</code> and <code>prompt_planner</code> are set in the config JSON only. Defaults live on <a href="area_entry_config.html">area_entry_config.html</a>.</p>
+</div></details>
+
+<p class="note">Amber: <a href="../concepts/grounding.md">docs/concepts/grounding.md</a> lists two Perspicacit&#233; call sites (workflow factory, legacy verifier) and does not mention <code>Planner.perspicacite_grounding</code>, the third call site, used in goal mode.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/core/planner.py</code> (1 053 lines), <code class="path">sources/core/schema.py</code>, <code class="path">sources/core/llm_provider.py</code>, <code class="path">sources/core/__init__.py</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/core/workflow_selection.py</code>, <code class="path">sources/utils/list_files.py</code>, <code class="path">sources/utils/notify.py</code>, <code class="path">sources/utils/perspicacite_client.py</code>, <code class="path">sources/utils/planner_visualization.py</code>, <code class="path">sources/extensibility/text_to_speech.py</code>, <code class="path">sources/cli/pretty_print.py</code>, <code class="path">sources/prompts/planner_reproduction.md</code>, <code class="path">sources/prompts/planner_paperbench_codedev.md</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, <code class="path">main.py</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code>, <code class="path">tests/planner_test.py</code>, <code class="path">tests/planner_json_extraction_test.py</code>, <code class="path">tests/planner_human_approve_test.py</code>, <code class="path">docs/concepts/grounding.md</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/utils/planner_visualization.py</code> (pygame window internals - one-line role only, page is area_utils.html) &#183; <code class="path">sources/extensibility/text_to_speech.py</code> (TTS hook, area_extensibility.html) &#183; <code class="path">sources/cli/pretty_print.py</code> (console formatting, area_cli.html) &#183; <code>LLMProvider</code> internals (mod_core_tools_llm.html) &#183; <code>EvolutionEngine</code> internals (mod_core_evolution_engine.html) &#183; prompt files line by line (Tier C pattern summary, data_modules_prompts.html) &#183; other test files (area_tests.html) &#183; Tier D: docs site, datasets, run_notes, runs_capsule, sources/workflows, sources/memory, webui, tmp, .venv, logs, CLA, lock files.</p>
+<p>Tests that cover this file: <code class="path">tests/planner_test.py</code> (<code>_can_execute_step</code>), <code class="path">tests/planner_json_extraction_test.py</code> (extraction + retry), <code class="path">tests/planner_human_approve_test.py</code> (approval gate).</p>
+<p>Two claims I could not confirm and did not run: whether the mismatches above make the test file fail (rule: no pytest run), and the behaviour of <code>run_attempts</code> when <code>evolve_runs</code> returns an empty list (planner.py:866 would raise <code>IndexError</code> before the <code>last_run is not None</code> guard).</p>
+<p>The working tree had uncommitted changes when this page was built (<code>git status --porcelain</code> listed modified <code>config.py</code>, <code>main.py</code>, many <code>docs/</code> files). <code class="path">sources/core/planner.py</code> itself was unmodified. Line numbers are hints from that working tree.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

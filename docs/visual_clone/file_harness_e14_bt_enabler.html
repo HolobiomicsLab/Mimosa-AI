@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e14_bt_enabler.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > experiments_verifiers/harness > e14_bt_enabler.py">
+<div class="wrap">
+
+<h1 class="hud">e14_bt_enabler.py</h1>
+<p class="intro">The zero-API enabler for the Bradley-Terry preference verifier: it maps which generation groups are still comparable on disk, simulates tournament designs and their pair budgets, projects judge cost, and writes the machine-readable pair plan that <a href="file_harness_e15_bt_pilot.html">e15_bt_pilot.py</a> executes. It runs from the repo root with one command and no arguments. Its only network touch is one OpenRouter pricing fetch, with a hardcoded fallback.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Master diagram &mdash; four deliverables in order</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="e14_bt_enabler.py pipeline: population map, simulator, replay, cost, plan, report">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="bin" href="#reads">
+    <title>Frozen evidence read by the population map and the cost projection</title>
+    <rect x="10" y="20" width="164" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="92" y="42" text-anchor="middle">frozen evidence</text>
+    <text class="box-sub" x="92" y="58" text-anchor="middle">data/manifest_run_notes.json</text>
+    <text class="box-sub" x="92" y="74" text-anchor="middle">data/verifier_claims_sane</text>
+    <text class="box-sub" x="92" y="90" text-anchor="middle">workspace_artefacts/snapshots</text>
+    <text class="box-sub" x="92" y="104" text-anchor="middle">gold_programs &#183; run_notes</text>
+  </a>
+
+  <a class="box" id="bmain" href="#reads">
+    <title>main() runs the six steps in a fixed order and prints progress</title>
+    <rect x="10" y="150" width="164" height="82" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="92" y="174" text-anchor="middle">main()</text>
+    <text class="box-sub" x="92" y="190" text-anchor="middle">map &#8594; sim &#8594; replay</text>
+    <text class="box-sub" x="92" y="206" text-anchor="middle">&#8594; cost &#8594; plan &#8594; md</text>
+    <text class="box-sub" x="92" y="222" text-anchor="middle">prints each stage</text>
+  </a>
+
+  <a class="box" id="s1" href="#reads">
+    <title>Deliverable 1: which groups are BT-eligible and comparable</title>
+    <rect x="216" y="6" width="238" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="28" text-anchor="middle">1 &#183; population map</text>
+    <text class="box-sub" x="335" y="44" text-anchor="middle">load_population &#183; check_reproduction</text>
+  </a>
+
+  <a class="box" id="s2" href="#reads">
+    <title>Deliverable 2: pair-budget simulator over designs and judge settings</title>
+    <rect x="216" y="72" width="238" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="94" text-anchor="middle">2 &#183; pair-budget simulator</text>
+    <text class="box-sub" x="335" y="110" text-anchor="middle">run_simulator &#183; simulate_group</text>
+    <text class="box-sub" x="335" y="124" text-anchor="middle">bt_fit &#183; calibrate_sr &#183; boot_ci</text>
+  </a>
+
+  <a class="box" id="s3" href="#reads">
+    <title>Supplementary: the same design sweep on the real groups and labels</title>
+    <rect x="216" y="140" width="238" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="162" text-anchor="middle">3 &#183; real-group replay</text>
+    <text class="box-sub" x="335" y="178" text-anchor="middle">real_group_replay &#183; _real_sim_designs</text>
+  </a>
+
+  <a class="box" id="s4" href="#reads">
+    <title>Deliverable 3: measured prompt sizes and a dollar projection</title>
+    <rect x="216" y="206" width="238" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="228" text-anchor="middle">4 &#183; cost projection</text>
+    <text class="box-sub" x="335" y="244" text-anchor="middle">cost_projection &#183; build_prompt</text>
+    <text class="box-sub" x="335" y="258" text-anchor="middle">preview_blocks &#183; tok_count</text>
+  </a>
+
+  <a class="box" id="s5" href="#reads">
+    <title>Pick the cheapest design within 0.02 of the best at the headline cell</title>
+    <rect x="216" y="274" width="238" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="296" text-anchor="middle">5 &#183; design recommendation</text>
+    <text class="box-sub" x="335" y="312" text-anchor="middle">design_recommendation &#183; nearest_rec</text>
+  </a>
+
+  <a class="box" id="s6" href="#reads">
+    <title>Deliverable 4: the pair plan file for E15, then an acceptance check</title>
+    <rect x="216" y="340" width="238" height="58" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="362" text-anchor="middle">6 &#183; pair plan</text>
+    <text class="box-sub" x="335" y="378" text-anchor="middle">build_plan (seed pairs then gaps)</text>
+    <text class="box-sub" x="335" y="392" text-anchor="middle">validate_plan (asserts paths)</text>
+  </a>
+
+  <a class="box" id="s7" href="#reads">
+    <title>Markdown report over the same dict and plan</title>
+    <rect x="216" y="408" width="238" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="430" text-anchor="middle">7 &#183; report</text>
+    <text class="box-sub" x="335" y="446" text-anchor="middle">write_md &#183; cell_for</text>
+  </a>
+
+  <g class="box" id="bext">
+    <title>Only network call in the file, with a recorded fallback</title>
+    <rect x="600" y="14" width="220" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="710" y="38" text-anchor="middle">OpenRouter list prices</text>
+    <text class="box-sub" x="710" y="54" text-anchor="middle">fetch_pricing &#183; timeout 20 s</text>
+    <text class="box-sub" x="710" y="70" text-anchor="middle">fallback PRICING_FALLBACK</text>
+  </g>
+
+  <g class="box" id="bout">
+    <title>Three files written, no state outside experiments_verifiers/results/</title>
+    <rect x="600" y="200" width="220" height="140" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="710" y="224" text-anchor="middle">writes</text>
+    <text class="box-sub" x="710" y="244" text-anchor="middle">E14_bt_enabler_2026-09-23.json</text>
+    <text class="box-sub" x="710" y="262" text-anchor="middle">E14_bt_enabler_2026-09-23.md</text>
+    <text class="box-sub" x="710" y="284" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="710" y="302" text-anchor="middle">(the E15 pair plan)</text>
+    <text class="box-sub" x="710" y="322" text-anchor="middle">13 460 lines in the plan</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="bin" data-to="bmain" d="M92,106 V150" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="100" y="136" text-anchor="start">reads once</text>
+
+  <path class="edge" data-from="bmain" data-to="s1" d="M174,164 L216,36" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="182" y="96" text-anchor="start">load_population()</text>
+  <path class="edge" data-from="bmain" data-to="s2" d="M174,178 L216,101" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="184" y="128" text-anchor="start">run_simulator()</text>
+  <path class="edge" data-from="bmain" data-to="s3" d="M174,190 L216,168" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="186" y="176" text-anchor="start">real_group_replay()</text>
+  <path class="edge" data-from="bmain" data-to="s4" d="M174,202 L216,235" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="182" y="232" text-anchor="start">cost_projection()</text>
+  <path class="edge" data-from="bmain" data-to="s5" d="M174,214 L216,302" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="176" y="276" text-anchor="start">recommendation()</text>
+  <path class="edge" data-from="bmain" data-to="s6" d="M174,226 L216,369" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="170" y="320" text-anchor="start">build_plan()</text>
+  <path class="edge" data-from="bmain" data-to="s7" d="M174,236 L216,433" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="164" y="380" text-anchor="start">write_md()</text>
+
+  <path class="edge dashed-edge" data-from="s1" data-to="s2" d="M454,40 C496,70 500,90 460,96" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="470" y="76" text-anchor="start">reward pool</text>
+  <path class="edge dashed-edge" data-from="s2" data-to="s5" d="M454,110 C500,180 500,250 456,296" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="466" y="206" text-anchor="start">cells</text>
+  <path class="edge dashed-edge" data-from="s1" data-to="s6" d="M454,44 C560,140 540,300 456,362" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="492" y="290" text-anchor="start">pop</text>
+  <path class="edge dashed-edge" data-from="s4" data-to="s6" d="M454,240 C500,290 500,340 460,362" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="466" y="322" text-anchor="start">pricing + cost</text>
+  <path class="edge dashed-edge" data-from="s5" data-to="s6" d="M454,306 C520,330 500,350 460,366" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="466" y="356" text-anchor="start">recs</text>
+  <path class="edge" data-from="s4" data-to="bext" d="M454,229 C540,180 560,60 600,47" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="120" text-anchor="middle">fetch_pricing()</text>
+
+  <path class="edge dashed-edge" data-from="s6" data-to="bout" d="M454,372 C540,380 560,300 600,282" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="530" y="330" text-anchor="middle">write_text(plan)</text>
+  <path class="edge dashed-edge" data-from="s7" data-to="bout" d="M454,436 C520,440 560,320 600,300" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="520" y="400" text-anchor="middle">write_text(md)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; seven steps, all called from <code>main()</code> (lines 1192&ndash;1355). Dashed arrows are data handed between steps, not calls; the call edges fan out from <code>main</code>. Every box name is a real symbol in <a href="../../experiments_verifiers/harness/e14_bt_enabler.py">e14_bt_enabler.py</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Data flow &mdash; snapshots and run notes in, one plan out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="e14_bt_enabler.py data flow between inputs, the plan and the reports">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="d1">
+    <title>Everything read is either frozen evidence or one live price list</title>
+    <rect x="10" y="26" width="216" height="176" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="118" y="50" text-anchor="middle">reads</text>
+    <text class="box-sub" x="118" y="72" text-anchor="middle">data/manifest_run_notes.json</text>
+    <text class="box-sub" x="118" y="90" text-anchor="middle">data/verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="118" y="108" text-anchor="middle">workspace_artefacts/snapshots/</text>
+    <text class="box-sub" x="118" y="126" text-anchor="middle">datasets/.../gold_programs/</text>
+    <text class="box-sub" x="118" y="144" text-anchor="middle">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</text>
+    <text class="box-sub" x="118" y="162" text-anchor="middle">snapshot artifact bytes</text>
+    <text class="box-sub" x="118" y="180" text-anchor="middle">openrouter.ai/api/v1/models</text>
+    <text class="box-sub" x="118" y="196" text-anchor="middle">(network, 20 s timeout)</text>
+  </g>
+
+  <a class="box" id="d2" href="#reads">
+    <title>One in-memory dict holds every result and the plan</title>
+    <rect x="270" y="60" width="196" height="112" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="368" y="84" text-anchor="middle">out dict + plan dict</text>
+    <text class="box-sub" x="368" y="102" text-anchor="middle">population, simulator,</text>
+    <text class="box-sub" x="368" y="118" text-anchor="middle">real_group_replay, cost_projection,</text>
+    <text class="box-sub" x="368" y="134" text-anchor="middle">pricing, design_recommendations_by_n,</text>
+    <text class="box-sub" x="368" y="150" text-anchor="middle">gaps, runtime_seconds</text>
+    <text class="box-sub" x="368" y="166" text-anchor="middle">plan: groups[].design.judging_order</text>
+  </a>
+
+  <g class="box" id="d3">
+    <title>Writes: two E14 reports plus the E15 pair plan</title>
+    <rect x="520" y="60" width="200" height="140" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="620" y="84" text-anchor="middle">writes</text>
+    <text class="box-sub" x="620" y="104" text-anchor="middle">E14_bt_enabler_2026-09-23.json</text>
+    <text class="box-sub" x="620" y="122" text-anchor="middle">E14_bt_enabler_2026-09-23.md</text>
+    <text class="box-sub" x="620" y="142" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="620" y="160" text-anchor="middle">= results/E14_bt_population.json</text>
+    <text class="box-sub" x="620" y="180" text-anchor="middle">(consumed by E15 pilot)</text>
+  </g>
+
+  <a class="box" id="d4" href="#reads">
+    <title>validate_plan returns a small acceptance dict, printed by main</title>
+    <rect x="750" y="90" width="140" height="80" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="820" y="114" text-anchor="middle">val dict</text>
+    <text class="box-sub" x="820" y="132" text-anchor="middle">groups, files checked,</text>
+    <text class="box-sub" x="820" y="148" text-anchor="middle">round_trip: ok</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d2" d="M226,110 H270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="248" y="102" text-anchor="middle">json.load</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d3" d="M466,116 H520" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="493" y="108" text-anchor="middle">dumps()</text>
+  <path class="edge" data-from="d3" data-to="d4" d="M720,130 H750" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="735" y="122" text-anchor="middle">re-load</text>
+
+  <text class="box-sub" x="10" y="234">No project config field is read: paths are module constants (lines 49&ndash;58).</text>
+  <text class="box-sub" x="10" y="256">The only writes are the three files above; nothing under <tspan font-style="italic">snapshots/</tspan> or <tspan font-style="italic">run_notes/</tspan> is modified.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; reads at lines 115, 129, 132, 477, 960 and 759; writes at lines 1227, 1352, 1353. The plan dict is built by <code>build_plan</code> (line 1032) and checked by <code>validate_plan</code> (line 1167).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic &mdash; eligibility, comparability, and the budget rule</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 340" role="img" aria-label="e14_bt_enabler.py eligibility and comparability decisions">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="g1" href="#reads">
+    <title>Snapshot join: exact dir name, else a unique uuid8 suffix</title>
+    <rect x="10" y="120" width="170" height="70" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="95" y="144" text-anchor="middle">join_snap(uuid)</text>
+    <text class="box-sub" x="95" y="160" text-anchor="middle">exact match?</text>
+    <text class="box-sub" x="95" y="176" text-anchor="middle">else unique suffix</text>
+  </a>
+
+  <a class="box" id="g2" href="#reads">
+    <title>No live snapshot means the group is skipped</title>
+    <rect x="220" y="30" width="180" height="64" rx="12" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="310" y="54" text-anchor="middle">0 alive rows</text>
+    <text class="box-sub" x="310" y="70" text-anchor="middle">groups_no_artifacts += 1</text>
+    <text class="box-sub" x="310" y="86" text-anchor="middle">continue</text>
+  </a>
+
+  <a class="box" id="g3" href="#reads">
+    <title>One alive generation is not enough for a comparison</title>
+    <rect x="220" y="120" width="180" height="64" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="310" y="144" text-anchor="middle">1 alive row</text>
+    <text class="box-sub" x="310" y="160" text-anchor="middle">groups_single_alive += 1</text>
+    <text class="box-sub" x="310" y="176" text-anchor="middle">continue</text>
+  </a>
+
+  <a class="box" id="g4" href="#reads">
+    <title>Two or more alive generations make the group eligible</title>
+    <rect x="220" y="210" width="180" height="64" rx="12" fill="rgba(57,255,136,0.08)" stroke="#39FF88"/>
+    <text class="box-label" x="310" y="234" text-anchor="middle">alive rows &gt;= 2</text>
+    <text class="box-sub" x="310" y="250" text-anchor="middle">n_eligible += 1</text>
+    <text class="box-sub" x="310" y="266" text-anchor="middle">contrast if SR mixed</text>
+  </a>
+
+  <a class="box" id="g5" href="#reads">
+    <title>Comparability rule on file-kind Jaccard and pred_results presence</title>
+    <rect x="450" y="196" width="212" height="86" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="556" y="220" text-anchor="middle">comparability</text>
+    <text class="box-sub" x="556" y="236" text-anchor="middle">Jaccard &gt;= 0.6 and consistent</text>
+    <text class="box-sub" x="556" y="252" text-anchor="middle">&#8594; comparable</text>
+    <text class="box-sub" x="556" y="268" text-anchor="middle">Jaccard &gt;= 0.4 &#8594; partial, else apples-to-oranges</text>
+  </a>
+
+  <a class="box" id="g6" href="#reads">
+    <title>Recommendation rule at the headline cell pi 0.75, b 0.1, rho 0.5</title>
+    <rect x="450" y="60" width="212" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="556" y="84" text-anchor="middle">design_recommendation</text>
+    <text class="box-sub" x="556" y="100" text-anchor="middle">keep designs within 0.02 of</text>
+    <text class="box-sub" x="556" y="116" text-anchor="middle">the best P(best@1)</text>
+    <text class="box-sub" x="556" y="132" text-anchor="middle">then take the fewest calls</text>
+    <text class="box-sub" x="556" y="148" text-anchor="middle">nearest_rec picks the size</text>
+  </a>
+
+  <a class="box" id="g7" href="#reads">
+    <title>Plan acceptance: round trip, every path exists, pair list complete</title>
+    <rect x="700" y="120" width="190" height="110" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="795" y="144" text-anchor="middle">validate_plan</text>
+    <text class="box-sub" x="795" y="160" text-anchor="middle">assert gold path exists</text>
+    <text class="box-sub" x="795" y="176" text-anchor="middle">assert snapshot + artifacts</text>
+    <text class="box-sub" x="795" y="192" text-anchor="middle">assert n(n-1)/2 pairs</text>
+    <text class="box-sub" x="795" y="212" text-anchor="middle">failure = AssertionError</text>
+  </a>
+
+  <path class="edge" data-from="g1" data-to="g2" d="M180,140 L220,62" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="190" y="100" text-anchor="start">none</text>
+  <path class="edge" data-from="g1" data-to="g3" d="M180,152 H220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="144" text-anchor="middle">1</text>
+  <path class="edge" data-from="g1" data-to="g4" d="M180,166 L220,238" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="190" y="214" text-anchor="start">2 or more</text>
+  <path class="edge" data-from="g4" data-to="g5" d="M400,242 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="425" y="234" text-anchor="middle">kinds</text>
+  <path class="edge" data-from="g5" data-to="g6" d="M556,196 V160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="564" y="182" text-anchor="start">labelled groups</text>
+  <path class="edge" data-from="g6" data-to="g7" d="M662,110 L700,150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="676" y="120" text-anchor="middle">plan</text>
+
+  <text class="box-sub" x="10" y="312">Recorded counts in this run (results JSON <tspan font-style="italic">population</tspan>): 207 groups, 19 eligible, 9 contrast, 188 groups with no alive artifacts.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the three decision rules that shape the plan: the snapshot join (lines 122&ndash;126), the eligibility gate (lines 177&ndash;189), the comparability rule (lines 230&ndash;235) and the budget rule (lines 1016&ndash;1019).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="reads">What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym">reads</td><td class="sym">manifest_run_notes.json</td><td><code>EV/data/</code></td><td>1 104 generation rows with uuid, SR, VER, reward</td><td class="size">115</td></tr>
+<tr><td class="sym">reads</td><td class="sym">verifier_claims_sane.jsonl</td><td><code>EV/data/</code></td><td>cross-check of SR labels and contrast target</td><td class="size">129</td></tr>
+<tr><td class="sym">reads</td><td class="sym">snapshots/ directories</td><td><code>SNAP_ROOT</code> (line 56)</td><td>alive generations and their file inventories</td><td class="size">117</td></tr>
+<tr><td class="sym">reads</td><td class="sym">gold_programs/*.py stems</td><td><code>GOLD_DIR</code> (line 57)</td><td>gold program path per task, normalized match</td><td class="size">132</td></tr>
+<tr><td class="sym">reads</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td><td><code>RUN_NOTES</code> (line 58)</td><td>task goal text for prompt measurement</td><td class="size">960</td></tr>
+<tr><td class="sym">reads</td><td class="sym">snapshot artifact bytes</td><td>preview and image policy</td><td>CSV/JSON/script previews, PNG header dims</td><td class="size">783</td></tr>
+<tr><td class="sym">reads</td><td class="sym">OpenRouter model list</td><td><code>OR_PRICING_URL</code> (line 72)</td><td>live prompt/completion prices</td><td class="size">759</td></tr>
+<tr><td class="sym">writes</td><td class="sym">E14_bt_enabler_2026-09-23.json</td><td><code>OUT_JSON</code> (line 52)</td><td>population, 360 sim cells, cost, gaps</td><td class="size">1352</td></tr>
+<tr><td class="sym">writes</td><td class="sym">E14_bt_enabler_2026-09-23.md</td><td><code>OUT_MD</code> (line 53)</td><td>readable report over the same dict</td><td class="size">1353</td></tr>
+<tr><td class="sym">writes</td><td class="sym">E14_bt_population.json</td><td><code>OUT_PLAN</code> (line 54)</td><td>the pair plan E15 executes</td><td class="size">1227</td></tr>
+<tr><td class="sym">reads</td><td class="sym">config fields</td><td>none</td><td>no project config key is read</td><td class="size">&ndash;</td></tr>
+</tbody>
+</table>
+
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e14_bt_enabler.py">experiments_verifiers/harness/e14_bt_enabler.py</a></h4>
+<p class="role">Builds the BT-eligible population map, simulates pair-budget designs, projects cost and writes the E15 pair plan.</p>
+<p class="meta">1 488 lines &#183; classes: none &#183; 49 functions (17 nested) &#183; imports numpy, scipy, urllib</p>
+<details><summary>full symbol inventory &mdash; every class, method and top-level function</summary><div class="dbody">
+<pre>u8(uuid)                                   # 98: last underscore token, lowercased
+norm(s)                                    # 102: lowercase alphanumerics only
+stable_seed(*parts)                        # 106: sha256 of repr(parts) -> int seed
+load_population()                          # 114: the population map (deliverable 1)
+  load_population.join_snap(u)             # 122: nested; uuid -> snapshot dir or None
+  load_population.gold_for(task)           # 134: nested; longest normalized stem match
+  load_population.inventory(snap_dir)      # 141: nested; file list, kinds, signals
+check_reproduction(claims)                 # 262: asserts the E10 29 contrast groups
+tau_top(theta, rank, k=3)                  # 278: Kendall tau over the true top-3
+bt_fit(w_idx, l_idx, wgt, n, theta0, iters=12)  # 292: BT MMLE with ridge, returns variance
+  bt_fit.hess()                            # 303: nested; Hessian and win probs
+sr_sep(sr, rank)                           # 334: P(SR-true ranked above SR-false)
+simulate_group(rng, n, rho, pi, bias, sr_cal, reward_pool)  # 349: one synthetic group
+  simulate_group.one_call(a, b)            # 360: nested; memoized judge call
+  simulate_group.add_call(...)             # 369: nested; one random-order match
+  simulate_group.add_both(...)             # 380: nested; both orders, 2 calls
+  simulate_group.record(...)               # 407: nested; fit and log a design
+  simulate_group.bracket(ls)               # 463: nested; seeded single elimination
+  simulate_group.played_with(a)            # 497: nested; opponents already faced
+calibrate_sr(target_auc, target_rate=0.34, n_draw=100_000, seed=7)  # 530: (alpha, c)
+  calibrate_sr.solve_a(c)                  # 535: nested; bisection on the SR rate
+  calibrate_sr.auc_for(c)                  # 547: nested; AUC of theta against SR
+boot_ci(vals, n_boot=BOOT, seed=13)        # 573: bootstrap mean and 95% CI
+run_simulator(reward_pool)                 # 585: the full grid plus strong-SR cells
+_real_sim_designs(rng, n, theta, r, sr)    # 648: design sweep on a fixed real group
+  _real_sim_designs.one_call(a, b)         # 652: nested; judge call at the headline cell
+  _real_sim_designs.record(...)            # 662: nested; fit and log a design
+real_group_replay(pop)                     # 715: designs on real groups and labels
+fetch_pricing()                            # 756: live prices, else PRICING_FALLBACK
+tok_count(text)                            # 775: tiktoken cl100k_base, else len/3.8
+read_text_head(path, cap)                  # 783: capped utf-8 read with replacement
+count_newlines(path, cap_bytes=64 MiB)     # 791: cheap row-count proxy
+csv_shape(path, size)                      # 808: rows and cols, only up to 8 MB
+file_signal(abspath, rel_is_image, size, ext)  # 821: PNG dims or CSV shape string
+_preview_block(name, body)                 # 837: one labelled preview block
+preview_blocks(gen, cap=CAND_TEXT_CAP)     # 841: the operator-approved preview order
+  preview_blocks.take(n)                   # 864: nested; spend from the preview budget
+build_prompt(goal, gen_a, gen_b)           # 913: fills PROMPT_TEMPLATE (line 80)
+  build_prompt.fmt(gen)                    # 914: nested; inventory lines plus previews
+png_dims(path)                             # 925: 33-byte header read, IHDR width/height
+mean_image_tokens(pop, max_images_per_gen=2)  # 937: vision token estimate ceil(w*h/750)
+cost_projection(pop, pricing)              # 956: measured prompts and dollar totals
+design_recommendation(cells)               # 1009: budget-minimal near-best design per n
+nearest_rec(recs, n)                       # 1027: closest simulated size on a log scale
+build_plan(pop, recs, pricing, cost_proj)  # 1032: the E15 pair plan
+validate_plan(plan)                        # 1167: acceptance asserts, returns a dict
+main()                                     # 1192: runs the six steps and prints
+write_md(out, plan)                        # 1358: builds the Markdown report
+  write_md.cell_for(n)                     # 1411: nested; headline cell lookup</pre>
+<p>Module constants: <code>OUT_JSON</code> / <code>OUT_MD</code> / <code>OUT_PLAN</code> (52&ndash;54), <code>SNAP_ROOT</code> / <code>GOLD_DIR</code> / <code>RUN_NOTES</code> (56&ndash;58), <code>N_SIMS</code> 200 and <code>BOOT</code> 1 000 (60&ndash;61), <code>RHO_GRID</code> / <code>PI_GRID</code> / <code>B_GRID</code> / <code>N_GRID</code> (62&ndash;65), <code>RIDGE</code> (66), <code>HEAD_PI</code> / <code>HEAD_B</code> / <code>HEAD_RHO</code> (67), <code>IMAGE_EXTS</code> / <code>TEXT_EXTS</code> (69&ndash;70), <code>OR_PRICING_URL</code> and <code>PRICING_FALLBACK</code> (72&ndash;78), <code>PROMPT_TEMPLATE</code> (80), <code>CAND_TEXT_CAP</code> 16 KiB, <code>SCRIPT_EXTS</code>, <code>HELPER_RE</code> (832&ndash;834).</p>
+<p>No classes, no methods, and no code runs on import: the entry point is the <code>if __name__ == "__main__"</code> guard at line 1487.</p>
+</div></details>
+
+<details><summary>numbers this run produced (read from the results JSON)</summary><div class="dbody">
+<blockquote>"groups_total": 207, "groups_eligible_ge2_alive": 19, "contrast_groups_manifest_sr": 9, "groups_no_alive_artifacts": 188</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E14_bt_enabler_2026-09-23.json</code>, key <code>population</code></p>
+<blockquote>"total_full_rr2_calls": 1584, "total_full_rr2_cost_usd": 22.07, "total_est_calls": 1585</blockquote>
+<p class="sub">same file, key <code>totals</code>; <code>runtime_seconds</code> is 377.2 s. The simulator wrote 360 cells at 200 sims each.</p>
+<blockquote>"fallback_used": false</blockquote>
+<p class="sub">same file, key <code>pricing.meta</code> &mdash; the live price fetch succeeded on 2026-09-23.</p>
+</div></details>
+
+<p class="note">Two recorded gaps make the E15 readout thin: the asb campaigns have no surviving snapshots, so 19 of E10's 29 contrast tasks are not BT-eligible (the file states this in its own <code>gaps</code> list, line 1333), and 25 of the 148 alive generations take their SR label from the manifest instead of <code>verifier_claims_sane.jsonl</code> (line 1336).</p>
+<p class="note say">The plan declares a gold-hygiene constraint in writing: gold paths are evaluation-side metadata only, and no grader query happens at selection time (line 1073).</p>
+<p class="note">The preview policy was changed by operator review and the file records what changed and why (lines 1308&ndash;1322). The current rule prioritizes <code>pred_results/</code>, then top-level deliverable scripts, then other text.</p>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">importer</td><td><code>import e14_bt_enabler as E14</code></td><td><a href="../../experiments_verifiers/harness/e15_bt_pilot.py">e15_bt_pilot.py</a> line 38</td></tr>
+<tr><td class="sym">importer</td><td>same import for the preview policy</td><td><code class="path">experiments_verifiers/harness/e18_scripted_bt.py</code> line 60</td></tr>
+<tr><td class="sym">importer</td><td>same import</td><td><code class="path">experiments_verifiers/harness/e19_hybrid_bt.py</code> line 66</td></tr>
+<tr><td class="sym">functions called</td><td><code>E14.build_prompt(goal, first, second)</code></td><td>e15_bt_pilot.py lines 277 and 410</td></tr>
+<tr><td class="sym">functions called</td><td><code>E14.file_signal</code>, <code>E14.read_text_head</code></td><td>e18_scripted_bt.py lines 147, 474</td></tr>
+<tr><td class="sym">functions called</td><td><code>E14.preview_blocks</code>, <code>E14.IMAGE_EXTS</code>, <code>E14.count_newlines</code>, <code>E14.HELPER_RE</code>, <code>E14.SCRIPT_EXTS</code></td><td>e18_scripted_bt.py 452&ndash;470, e19_hybrid_bt.py</td></tr>
+<tr><td class="sym">consumer of its output</td><td><code>E14_bt_population.json</code> is read by the pilot</td><td><a href="file_harness_e15_bt_pilot.html">e15_bt_pilot.py</a> <code>PLAN_PATH</code> (line 41)</td></tr>
+<tr><td class="sym">tests</td><td>none</td><td><code>grep -rn "e14_bt_enabler" tests/</code> returns nothing</td></tr>
+</tbody>
+</table>
+<p class="note">Related pages: <a href="exp_e14_bt_enabler.html">exp_e14_bt_enabler</a> (experiment view), <a href="file_harness_e15_bt_pilot.html">e15_bt_pilot</a> and <a href="file_harness_e15_bt_eval.html">e15_bt_eval</a> (its consumers), <a href="data_experiments.html">data &amp; experiments</a> (where the snapshots live), <a href="exp_index.html">exp_index</a>, and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e14_bt_enabler.py</code> (1 488 lines, read in full), <code class="path">experiments_verifiers/results/E14_bt_enabler_2026-09-23.json</code> (keys <code>population</code>, <code>simulator</code>, <code>totals</code>, <code>pricing.meta</code>, <code>design_recommendations_by_n</code>), <code class="path">experiments_verifiers/results/E14_bt_population.json</code> (top-level keys and <code>totals</code> only), <code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.json</code> (coverage and cost keys, to confirm the hand-off), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> (never opened), the 19 <code>groups[]</code> entries and the 360 simulator cells of the results JSON beyond the totals quoted here, the 13 460-line pair plan body, the contents of individual snapshot files, and the OpenRouter response itself (the file records that no fallback was used). No snapshot artifact bytes were read for this page. The simulator was not executed. Greps for importers and tests ran over the working copy only.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

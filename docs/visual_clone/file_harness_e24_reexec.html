@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_reexec.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e24_reexec.py">
+<div class="wrap">
+<h1 class="hud">e24_reexec.py</h1>
+<p class="intro">This file re-executes every frozen E24 generation in a clean room and labels the outcome: copy the snapshot, strip generated outputs, run the mapped entry script in a pinned sandbox, compare the new outputs with the frozen ones. It runs by hand, in stages, from the command line; a 600 s wall cap and a process-group kill guard each run. The label it assigns (<code>clean_recover</code>, <code>divergent</code>, <code>crash</code>, <code>timeout</code>, <code>no_entry_script</code>) is pre-registered in the docstring L15&#8211;L24.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; one generation at a time: copy, strip, sandbox run, compare, label</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1130 400" role="img" aria-label="e24_reexec.py: run_stage submits each frozen generation to execute_gen, which copies, strips outputs, runs the pinned sandbox and compares outputs; results go to ledgers and logs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="pCli">
+    <rect x="20" y="25" width="200" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="49" text-anchor="middle">command line</text>
+    <text class="box-sub" x="120" y="64" text-anchor="middle">cmd run or det L466</text>
+    <text class="box-sub" x="120" y="79" text-anchor="middle">workers L468</text>
+  </g>
+  <g class="box" id="pArena">
+    <rect x="250" y="25" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="365" y="49" text-anchor="middle">frozen arena</text>
+    <text class="box-sub" x="365" y="64" text-anchor="middle">load_arena L387</text>
+    <text class="box-sub" x="365" y="79" text-anchor="middle">148 generations L1</text>
+  </g>
+  <g class="box" id="pRun">
+    <rect x="510" y="25" width="220" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="620" y="56" text-anchor="middle">run_stage</text>
+    <text class="box-sub" x="620" y="72" text-anchor="middle">L384 · parallel workers L398</text>
+  </g>
+  <g class="box" id="pDet">
+    <rect x="760" y="25" width="340" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="930" y="49" text-anchor="middle">det_stage</text>
+    <text class="box-sub" x="930" y="64" text-anchor="middle">L415 · 10% subsample L428</text>
+    <text class="box-sub" x="930" y="79" text-anchor="middle">outputs compared L441</text>
+  </g>
+  <g class="box" id="pGen">
+    <rect x="20" y="140" width="230" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="167" text-anchor="middle">execute_gen</text>
+    <text class="box-sub" x="135" y="182" text-anchor="middle">L291 · one generation</text>
+    <text class="box-sub" x="135" y="197" text-anchor="middle">temp copy L309 · strip L312</text>
+  </g>
+  <g class="box" id="pStrip">
+    <rect x="280" y="140" width="200" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="380" y="174" text-anchor="middle">strip_outputs</text>
+    <text class="box-sub" x="380" y="190" text-anchor="middle">L146 · removes generated files</text>
+  </g>
+  <g class="box" id="pSand">
+    <rect x="510" y="140" width="230" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="625" y="167" text-anchor="middle">PersistentSandbox</text>
+    <text class="box-sub" x="625" y="182" text-anchor="middle">class L62 · venv reuse L71</text>
+    <text class="box-sub" x="625" y="197" text-anchor="middle">cleanup disabled L96</text>
+  </g>
+  <g class="box" id="pSbx">
+    <rect x="770" y="140" width="330" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="935" y="167" text-anchor="middle">ExecutionSandbox</text>
+    <text class="box-sub" x="935" y="182" text-anchor="middle">sources/benchmark_evaluation L48</text>
+    <text class="box-sub" x="935" y="197" text-anchor="middle">PINNED_CONSTRAINTS L88</text>
+  </g>
+  <g class="box" id="pCmp">
+    <rect x="20" y="265" width="230" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="292" text-anchor="middle">compare_file</text>
+    <text class="box-sub" x="135" y="307" text-anchor="middle">L188 · csv, npy, png</text>
+    <text class="box-sub" x="135" y="322" text-anchor="middle">tolerance L55</text>
+  </g>
+  <g class="box" id="pCls">
+    <rect x="280" y="265" width="230" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="395" y="300" text-anchor="middle">classify</text>
+    <text class="box-sub" x="395" y="314" text-anchor="middle">L265 · clean_recover or divergent</text>
+  </g>
+  <g class="box" id="pLogs">
+    <rect x="540" y="265" width="250" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="665" y="292" text-anchor="middle">run logs</text>
+    <text class="box-sub" x="665" y="307" text-anchor="middle">_e24_runlogs_2026-09-24 L328</text>
+    <text class="box-sub" x="665" y="322" text-anchor="middle">stdout and stderr L345</text>
+  </g>
+  <g class="box" id="pLedger">
+    <rect x="820" y="265" width="280" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="960" y="292" text-anchor="middle">ledgers</text>
+    <text class="box-sub" x="960" y="307" text-anchor="middle">_e24_reexec_ledger L408</text>
+    <text class="box-sub" x="960" y="322" text-anchor="middle">_e24_reexec_det_ledger L454</text>
+  </g>
+  <path class="edge" data-from="pCli" data-to="pRun" d="M120,25 V12 H620 V25" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="370" y="9" text-anchor="middle">cmd run L470</text>
+  <path class="edge" data-from="pCli" data-to="pDet" d="M160,95 V120 H930 V95" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="114" text-anchor="middle">cmd det L473</text>
+  <path class="edge dashed-edge" data-from="pArena" data-to="pRun" d="M480,60 H510" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="495" y="52" text-anchor="middle">groups L387</text>
+  <path class="edge" data-from="pRun" data-to="pGen" d="M515,95 V132 H135 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="320" y="128" text-anchor="middle">submit L399</text>
+  <path class="edge" data-from="pGen" data-to="pStrip" d="M250,178 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="265" y="170" text-anchor="middle">strip L312</text>
+  <path class="edge" data-from="pGen" data-to="pSand" d="M135,216 C250,242 420,232 510,192" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="226" text-anchor="middle">run L335</text>
+  <path class="edge dotted-edge" data-from="pSand" data-to="pSbx" d="M740,178 H770" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="755" y="170" text-anchor="middle">imports L48</text>
+  <path class="edge" data-from="pGen" data-to="pCmp" d="M100,216 V240 H135 V265" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="150" y="252" text-anchor="start">compare L365</text>
+  <path class="edge" data-from="pCmp" data-to="pCls" d="M250,303 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="265" y="295" text-anchor="middle">classify L367 &#183; execute_gen</text>
+  <path class="edge dashed-edge" data-from="pRun" data-to="pLogs" d="M560,95 V126 H665 V265" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="672" y="180" text-anchor="start">logs L328</text>
+  <path class="edge dashed-edge" data-from="pRun" data-to="pLedger" d="M700,95 V110 H750 V240 H960 V265" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="850" y="234" text-anchor="middle">append L408</text>
+  <path class="edge" data-from="pDet" data-to="pGen" d="M760,80 C500,118 300,128 135,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="118" text-anchor="middle">execute_gen L436</text>
+  <path class="edge dashed-edge" data-from="pDet" data-to="pLedger" d="M1100,80 C1116,130 1116,330 1112,360 H960 V343" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="1120" y="200" text-anchor="start">det ledger L454</text>
+
+  <text class="box-sub" x="20" y="394">solid = call  |  dashed = reads / writes  |  dotted = import only  |  12 boxes. One JSON line per generation.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the order of work inside <code>execute_gen</code> L291: resolve the iomap and the entry script L297&#8211;L300, copy the snapshot L311, strip generated outputs L312, provision the persistent sandbox L331, run the script with a 600 s cap L335, then compare L365 and label L367.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: frozen workspace in, label plus logged run out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 280" role="img" aria-label="e24_reexec.py data flow: snapshot, iomap and clean env in; logs and ledger rows out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="v1">
+    <rect x="20" y="30" width="280" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="160" y="56" text-anchor="middle">frozen snapshot</text>
+    <text class="box-sub" x="160" y="71" text-anchor="middle">copied by copytree L311</text>
+    <text class="box-sub" x="160" y="86" text-anchor="middle">never written in place</text>
+  </g>
+  <g class="box" id="v2">
+    <rect x="20" y="170" width="280" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="160" y="204" text-anchor="middle">_e24_iomap_2026-09-24.jsonl</text>
+    <text class="box-sub" x="160" y="218" text-anchor="middle">read per gid L112</text>
+  </g>
+  <g class="box" id="v3">
+    <rect x="330" y="170" width="240" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="450" y="196" text-anchor="middle">subprocess env</text>
+    <text class="box-sub" x="450" y="211" text-anchor="middle">_subprocess_env L101</text>
+    <text class="box-sub" x="450" y="226" text-anchor="middle">key names stripped L102</text>
+  </g>
+  <g class="box" id="vMid">
+    <rect x="330" y="30" width="330" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="495" y="66" text-anchor="middle">execute_gen L291</text>
+    <text class="box-sub" x="495" y="82" text-anchor="middle">temp copy under e24_&lt;tag&gt;_ L309</text>
+    <text class="box-sub" x="495" y="96" text-anchor="middle">regenerated workspace removed L324</text>
+    <text class="box-sub" x="495" y="112" text-anchor="middle">keep_dir keeps it alive L321</text>
+  </g>
+  <g class="box" id="v4">
+    <rect x="700" y="30" width="330" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="865" y="56" text-anchor="middle">run logs</text>
+    <text class="box-sub" x="865" y="71" text-anchor="middle">_e24_runlogs_2026-09-24/&lt;tag&gt;/&lt;gid&gt;</text>
+    <text class="box-sub" x="865" y="86" text-anchor="middle">stdout and stderr, last 20 000 L345</text>
+  </g>
+  <g class="box" id="v5">
+    <rect x="700" y="170" width="330" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="865" y="196" text-anchor="middle">ledgers</text>
+    <text class="box-sub" x="865" y="211" text-anchor="middle">_e24_reexec_ledger L408</text>
+    <text class="box-sub" x="865" y="226" text-anchor="middle">_e24_reexec_det_ledger L454</text>
+  </g>
+  <path class="edge dashed-edge" data-from="v1" data-to="vMid" d="M300,67 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="315" y="59" text-anchor="middle">copy L311</text>
+  <path class="edge dashed-edge" data-from="v2" data-to="vMid" d="M300,207 C320,207 325,160 340,140" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="180" y="150" text-anchor="middle">map L112</text>
+  <path class="edge dashed-edge" data-from="v3" data-to="vMid" d="M450,170 V140" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="460" y="156" text-anchor="start">env L337</text>
+  <path class="edge dashed-edge" data-from="vMid" data-to="v4" d="M660,67 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="680" y="59" text-anchor="middle">write L345</text>
+  <path class="edge dashed-edge" data-from="vMid" data-to="v5" d="M660,120 C680,160 680,190 700,207" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="670" y="160" text-anchor="middle">append L408</text>
+
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; config fields read: none. Constants come from <code>e24_common</code>: <code>IOMAP</code>, <code>VENV_ROOT</code>, <code>RUN_LOG_DIR</code>, <code>SCRIPT_TIMEOUT_S</code> 600, <code>MAX_WORKERS</code> 4, <code>E24_SEED</code>, <code>DET_FRAC</code> 0.10. The returned value is the row dict L302&#8211;L370.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; logic: the pre-registered label, the per-file rules, the determinism check</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 520" role="img" aria-label="e24_reexec.py logic: entry, exit code and timeout tests give the status label; per-file rules gate clean_recover; a 10% subsample is re-run">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <defs>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+  </defs>
+  <g class="box" id="w1">
+    <rect x="20" y="36" width="260" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="62" text-anchor="middle">entry script found?</text>
+    <text class="box-sub" x="150" y="78" text-anchor="middle">L301</text>
+  </g>
+  <g class="box" id="w1r">
+    <rect x="320" y="36" width="220" height="60" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="430" y="62" text-anchor="middle">no_entry_script</text>
+    <text class="box-sub" x="430" y="78" text-anchor="middle">L303</text>
+  </g>
+  <g class="box" id="w2">
+    <rect x="580" y="36" width="240" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700" y="62" text-anchor="middle">exit code 0?</text>
+    <text class="box-sub" x="700" y="78" text-anchor="middle">L357</text>
+  </g>
+  <g class="box" id="w2r">
+    <rect x="860" y="36" width="240" height="60" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="980" y="62" text-anchor="middle">crash</text>
+    <text class="box-sub" x="980" y="78" text-anchor="middle">L358</text>
+  </g>
+  <g class="box" id="w3">
+    <rect x="580" y="130" width="240" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700" y="156" text-anchor="middle">runtime >= 600 s?</text>
+    <text class="box-sub" x="700" y="172" text-anchor="middle">L352</text>
+  </g>
+  <g class="box" id="w3r">
+    <rect x="860" y="130" width="240" height="60" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="980" y="156" text-anchor="middle">timeout</text>
+    <text class="box-sub" x="980" y="172" text-anchor="middle">L353</text>
+  </g>
+  <g class="box" id="w4">
+    <rect x="20" y="230" width="560" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="300" y="246" text-anchor="middle">per-file rules in compare_file</text>
+    <text class="box-sub" x="300" y="262" text-anchor="middle">csv: schema, row coverage, tolerance L199</text>
+    <text class="box-sub" x="300" y="276" text-anchor="middle">npy: shape L231 · png: dims L250</text>
+    <text class="box-sub" x="300" y="292" text-anchor="middle">text, log, json, out: existence only L258</text>
+  </g>
+  <g class="box" id="w5">
+    <rect x="20" y="340" width="300" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170" y="366" text-anchor="middle">any gating problem?</text>
+    <text class="box-sub" x="170" y="382" text-anchor="middle">L277</text>
+  </g>
+  <g class="box" id="w5a">
+    <rect x="360" y="340" width="240" height="60" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="480" y="366" text-anchor="middle">clean_recover</text>
+    <text class="box-sub" x="480" y="382" text-anchor="middle">L283</text>
+  </g>
+  <g class="box" id="w5b">
+    <rect x="640" y="340" width="260" height="60" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="770" y="366" text-anchor="middle">divergent</text>
+    <text class="box-sub" x="770" y="382" text-anchor="middle">L283</text>
+  </g>
+  <g class="box" id="w6">
+    <rect x="20" y="450" width="320" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="180" y="476" text-anchor="middle">status clean or divergent?</text>
+    <text class="box-sub" x="180" y="492" text-anchor="middle">det_stage L425</text>
+  </g>
+  <g class="box" id="w6r">
+    <rect x="380" y="450" width="520" height="60" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="640" y="469" text-anchor="middle">one re-run, outputs compared</text>
+    <text class="box-sub" x="640" y="484" text-anchor="middle">sample is 10% L428 · seed E24_SEED L427</text>
+    <text class="box-sub" x="640" y="499" text-anchor="middle">deterministic_outputs L452</text>
+  </g>
+  <path class="edge" data-from="w1" data-to="w1r" d="M280,66 H320" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="300" y="58" text-anchor="middle">no</text>
+  <path class="edge" data-from="w1" data-to="w2" d="M280,80 C400,98 480,84 580,72" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="430" y="100" text-anchor="middle">yes L307</text>
+  <path class="edge" data-from="w2" data-to="w2r" d="M820,66 H860" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="840" y="58" text-anchor="middle">no</text>
+  <path class="edge" data-from="w2" data-to="w3" d="M700,96 V130" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="710" y="116" text-anchor="start">exit 0</text>
+  <path class="edge" data-from="w3" data-to="w3r" d="M820,160 H860" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="840" y="152" text-anchor="middle">yes</text>
+  <path class="edge" data-from="w4" data-to="w5" d="M300,300 V340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="310" y="324" text-anchor="start">problems</text>
+  <path class="edge" data-from="w5" data-to="w5a" d="M320,370 H360" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="340" y="362" text-anchor="middle">no</text>
+  <path class="edge" data-from="w5" data-to="w5b" d="M320,384 C480,404 560,384 640,372" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="490" y="400" text-anchor="middle">yes</text>
+  <path class="edge" data-from="w6" data-to="w6r" d="M340,480 H380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="360" y="472" text-anchor="middle">sample L428</text>
+
+  <text class="box-sub" x="20" y="26">lane 1: status tests L301, L352, L357</text>
+  <text class="box-sub" x="20" y="222">lane 2: per-file comparison L188 to L263</text>
+  <text class="box-sub" x="20" y="332">lane 3: classification L265</text>
+  <text class="box-sub" x="20" y="514">lane 4: determinism subsample L415. Text, log, json and out files never gate the label L279.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the label is pre-registered in the docstring L15&#8211;L24: <code>no_entry_script</code>, <code>crash</code>, <code>timeout</code>, <code>clean_recover</code> or <code>divergent</code>. Counted on disk (my computation): the re-exec ledger holds 155 rows over 148 unique keys &#8212; 102 <code>clean_recover</code>, 27 <code>divergent</code>, 16 <code>crash</code>, 8 <code>no_entry_script</code>, 2 <code>timeout</code>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">frozen snapshot</td><td>dir, path held in the arena group row</td><td>copied to a temp dir, never modified</td><td class="size">L299 L311</td></tr>
+<tr><td>reads</td><td class="sym">_e24_iomap_2026-09-24.jsonl</td><td><code>C.IOMAP</code>, <code>results/</code></td><td>entry script name, output file, id columns, intermediates</td><td class="size">L112</td></tr>
+<tr><td>reads</td><td class="sym">arena groups</td><td><code>C.load_arena()</code>, a call</td><td>the generation list plus pilot filter</td><td class="size">L387 L389</td></tr>
+<tr><td>reads</td><td class="sym">sandbox interpreter</td><td><code>sb.python_exe</code>, pinned Python 3.10</td><td>the command that runs the entry script</td><td class="size">L333</td></tr>
+<tr><td>reads</td><td class="sym">parent process env</td><td><code>sb._subprocess_env()</code></td><td>base env, then key names removed and MPLBACKEND set to Agg</td><td class="size">L101&#8211;L104</td></tr>
+<tr><td>writes</td><td class="sym">temp workspace</td><td>dir, <code>e24_&lt;tag&gt;_*</code> under the system temp root</td><td>strip, run and compare; deleted unless <code>keep_dir</code></td><td class="size">L309 L324</td></tr>
+<tr><td>writes</td><td class="sym">run logs</td><td><code>_e24_runlogs_2026-09-24/&lt;tag&gt;/&lt;gid&gt;/&lt;uuid8&gt;.stdout</code> and <code>.stderr</code></td><td>last 20 000 characters of each stream</td><td class="size">L328 L345&#8211;L346</td></tr>
+<tr><td>writes</td><td class="sym">_e24_reexec_ledger_2026-09-24.jsonl</td><td><code>C.REEXEC_LEDGER</code>, append-only</td><td>one row per generation: status, outputs, problems</td><td class="size">L408</td></tr>
+<tr><td>writes</td><td class="sym">_e24_reexec_det_2026-09-24.jsonl</td><td><code>C.REEXEC_DET_LEDGER</code>, append-only</td><td>determinism rows with both statuses</td><td class="size">L454</td></tr>
+<tr><td>writes</td><td class="sym">shared venv</td><td><code>results/_e24_venv/&lt;fingerprint&gt;/venv</code></td><td>built once, then reused across stages</td><td class="size">L74 L79&#8211;L88</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no Config object, no env var from the app</td><td>constants live in <code>e24_common</code></td><td class="size">L46</td></tr>
+<tr><td>state</td><td class="sym">C.GUARD</td><td>snapshot guard from <code>e18_scripted_bt</code></td><td>register each snapshot L320, verify after the run L411</td><td class="size">L320 L411</td></tr>
+</tbody>
+</table>
+<p class="note">Extra directory wrapper: <code>gid</code> nests the logs one level deeper than the docstring suggests. <code>C.RUN_LOG_DIR / tag / gid</code> L328 puts the files under a per-group folder.</p>
+<p class="note">Recorded on disk (my computation): there are 155 ledger rows over 148 unique (gid, uuid8) keys, so 7 keys were appended twice. The det ledger holds 12 rows: 8 with <code>deterministic_outputs</code> true and 4 false, and both runs share the same status in every row. One venv fingerprint exists under <code class="path">results/_e24_venv/</code>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>1 class, 15 callables, 3 module constants &mdash; signatures and roles</summary><div class="dbody">
+<pre>PersistentSandbox._create_or_reuse_base_venv(self) -&gt; Path           L71   build or reuse the shared venv
+PersistentSandbox.cleanup_shared_venv(cls) -&gt; None                  L96   classmethod, does nothing on purpose
+run_env(sb: ExecutionSandbox) -&gt; dict                               L100  clean env, no provider keys
+iomap_for(gid: str) -&gt; dict                                        L111  the I/O map of one group
+entry_for(gen: dict, m: dict) -&gt; Path | None                       L116  unique top-level script with the mapped name
+frozen_outputs(gen: dict, m: dict) -&gt; list[str]                    L127  pred_results plus the mapped output
+strip_outputs(copy_root: Path, m: dict) -&gt; list[str]               L146  remove generated files from the copy
+_png_dims(path: Path) -&gt; tuple[int, int] | None                    L174  image size, None on failure
+_num_pair_ok(a: float, b: float) -&gt; bool                           L183  relative and absolute tolerance test
+compare_file(frozen: Path, regen: Path, m: dict) -&gt; dict           L188  per-format comparison of one file
+classify(files: dict[str, dict]) -&gt; tuple[str, dict]               L265  label plus problem map
+execute_gen(group, gen, mutate=None, tag="reexec", keep_dir=False) L291  one clean-room run of one generation
+iter_gens(groups: list[dict])                               L378  groups to (group, gen) pairs
+run_stage(pilot: bool, workers: int) -&gt; None                       L384  parallel re-execution, ledger append
+det_stage() -&gt; None                                                L415  10% subsample re-run and comparison
+class PersistentSandbox(ExecutionSandbox)                          L62   sandbox with a persistent base venv</pre>
+<p>Nested inside <code>execute_gen</code>: <code>_cleanup()</code> L323 removes the temp dir. Module constants: <code>STRIP_ENV_KEYS</code> L53&#8211;L54, <code>NUMERIC_TOL_REL = 1e-4</code> L55, <code>NUMERIC_TOL_ABS = 1e-6</code> L56. Imports: <code>argparse</code>, <code>shutil</code>, <code>sys</code>, <code>tempfile</code>, <code>threading</code>, <code>time</code>, <code>Path</code> L32&#8211;L39; <code>numpy</code> L41 and <code>pandas</code> L42; <code>e24_common as C</code> L46; <code>PINNED_CONSTRAINTS, ExecutionSandbox</code> L48&#8211;L51; <code>PIL.Image</code> and <code>concurrent.futures</code> are imported at first use L176 and L385.</p>
+<p>Command line: <code>run</code> or <code>det</code> L466, <code>--pilot</code> L467, <code>--workers</code> default <code>C.MAX_WORKERS</code> L468; dispatch at L470&#8211;L473. Docstring usage lines: L27&#8211;L28.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_holdout.py">harness/e24_holdout.py</a></td><td><code>import e24_reexec as R</code> L37</td><td class="sym">PersistentSandbox L165 · run_env L167 · execute_gen L369</td></tr>
+<tr><td class="sym">command line</td><td><code>uv run python experiments_verifiers/harness/e24_reexec.py run --pilot --workers 4</code> L27</td><td class="sym">run_stage L471</td></tr>
+<tr><td class="sym">command line</td><td><code>uv run python experiments_verifiers/harness/e24_reexec.py det</code> L28</td><td class="sym">det_stage L473</td></tr>
+<tr><td class="sym">tests/</td><td>no test found</td><td class="sym">grep of <code>tests/</code> for <code>e24_reexec</code> returns nothing</td></tr>
+<tr><td class="sym">results JSON</td><td>records ledger and log paths for the E24 report</td><td class="sym"><code class="path">results/E24_reexec_holdout_2026-09-24.json</code> L6290&#8211;L6292</td></tr>
+</tbody>
+</table>
+<p>Internal order inside <code>run_stage</code> L384: <code>C.GUARD.full_baseline</code> L386, <code>C.load_arena</code> L387, pilot filter L389&#8211;L390, <code>C.done_keys</code> L391, then one <code>execute_gen</code> per pending generation through a thread pool L398&#8211;L410, then <code>C.snapshot_guard_check</code> L411. The experiment page is <a href="exp_e24_reexec.html">exp_e24_reexec.html</a>.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e24_reexec.html">exp_e24_reexec.html</a>, <a href="exp_index.html">exp_index.html</a>, <a href="data_experiments.html">data_experiments.html</a>, <a href="file_harness_e3_common.html">e3_common.py</a>.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_reexec.py</code> (473 lines, whole file), constants and paths in <code class="path">harness/e24_common.py</code> (header and constants to L60), call sites in <code class="path">harness/e24_holdout.py</code>, row counts and status counts of <code class="path">results/_e24_reexec_ledger_2026-09-24.jsonl</code> and <code class="path">results/_e24_reexec_det_2026-09-24.jsonl</code> (aggregated counts only), directory listings of <code class="path">results/_e24_runlogs_2026-09-24/</code> and <code class="path">results/_e24_venv/</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>, plus greps over the repo and <code class="path">tests/</code>.</p>
+<p class="skips">Skipped, with reason: the env files (never opened, secrets; the key names stripped by the code are not reprinted here); <code class="path">sources/benchmark_evaluation/execution_sandbox.py</code> bodies (a different file and not this page's subject; only the imported names are cited); <code class="path">results/_e24_iomap_2026-09-24.jsonl</code> contents (per-group maps belong to the E24 experiment page); <code class="path">results/_e24_runlogs_2026-09-24/**</code> file bodies (stdout and stderr of generated programs; only the directory listing was read); <code class="path">E24_reexec_holdout_2026-09-24.json</code> beyond the two ledger paths named above; the shared venv tree (a runtime environment, not evidence); compiled <code class="path">__pycache__</code>. The runner was not executed; no pytest ran.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

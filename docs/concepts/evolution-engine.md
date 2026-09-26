@@ -23,7 +23,7 @@ flowchart TB
     Think --> Mut[Mutation prompt<br/>parent code + directive]
     Mut --> Orch
     Cross --> Orch
-    Orch --> Eval[multi-source per-claim verifier<br/>reward + prompt gradient]
+    Orch --> Eval[hybrid temporal-ladder verifier<br/>reward + textual gradient]
     Eval --> Admit{Validity: improvement<br/>or qd_score ≥ threshold?}
     Admit -- yes --> Archive[Admit to archive]
     Admit -- no --> Reject[Reject<br/>telemetry only]
@@ -42,9 +42,9 @@ A more detailed view lives in the source diagram
 1. **Reset** the workspace to the initial state.
 2. **Orchestrate** a workflow run (LLM writes Python → sandbox runs it).
 3. **Snapshot** the workspace.
-4. **Evaluate** — get `overall_score` (which drives QD quality) plus an
-   `abstracted_prompt_gradient`; `overall_score_uncapped` is still
-   persisted for analysis.
+4. **Evaluate** — get `overall_score` (which drives QD quality) plus the
+  `abstracted_textual_gradient`; `overall_score_uncapped` is still
+  persisted for analysis.
 5. **`validate_survivor()`** — admit to the archive when the candidate
    improves over baseline or clears `qd_score > admit_threshold`;
    capacity is curated by lowest-`qd_score` eviction.
@@ -137,10 +137,12 @@ offspring are never rewarded merely for being "different".
 > registered source letter `a`–`g`; the module is now marked deprecated)
 > — and, before that,
 > from a structural descriptor `[n_agents, n_edges, n_branches,
-> prompt_chars]`. Both have been retired as the behaviour descriptor. The
-> failure fingerprint is **still computed and persisted** by the verifier
+> prompt_chars]`. Both have been retired as the behaviour descriptor.
+> The `failure_fingerprint` key is still written by the verifier
 > under `state_result.json` → `evaluation.verifier.failure_fingerprint`,
-> but only as a diagnostic — selection no longer reads it. The structural
+> but only as a diagnostic — selection no longer reads it. (Under the
+> hybrid verifier that key holds a neutral placeholder; only the
+> deprecated legacy verifier computes real pass rates.) The structural
 > descriptor is gone entirely; `code_features.py` is now the
 > genotype-embedding shim.
 
@@ -171,7 +173,7 @@ the last strict improvement, normalised by `_PLATEAU_PATIENCE = 6`),
 the success rate `_compute_success_rate(window=5)` over the last 5
 scored offspring, and a short score-only trajectory (last 5 child
 scores). The block deliberately contains no rubric or diagnosis text,
-so the verifier's rubric-blindness firewall is preserved. The same
+so no verifier rubric text leaks into the mutation state. The same
 fields are written to `variation_state` telemetry.
 
 Magnitude guidance lives in the directive prompt instead: the LLM
@@ -207,7 +209,7 @@ reasoning steps. Before the orchestrator is invoked, a dedicated LLM
 call reads:
 
 - the parent's per-agent answers (`<agents_answers>`),
-- the rubric-blind textual gradient from the verifier
+- the textual gradient from the verifier
   (`<diagnosis>` — trusted as ground truth),
 - the read-only search-state block produced by `_search_state_block`
   (`<search_state>` — plain search statistics: parent score, iteration

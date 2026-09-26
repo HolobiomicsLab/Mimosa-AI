@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/utils - shared helpers - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > utils">
+<div class="wrap">
+
+<h1 class="hud">sources/utils - shared helpers</h1>
+<p class="intro">Twenty helper modules live in <code class="path">sources/utils/</code>. Three caller areas import them: <code>sources/core</code>, <code>sources/cli</code> and <code>sources/benchmark_evaluation</code>. This page groups the helpers, lists every file, and opens cards for the five files that carry the real logic.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1a - sources/core imports these groups</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 230" role="img" aria-label="sources/core calls utility groups">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="core">
+    <title>sources/core imports 8 of the 9 groups drawn here</title>
+    <rect x="360" y="8" width="280" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="500" y="32" text-anchor="middle">sources/core</text>
+    <text class="box-sub" x="500" y="48" text-anchor="middle">evolution engine, planner, orchestrator, runner</text>
+  </g>
+
+  <path class="edge" d="M500,60 V132" fill="none" stroke="#00E5FF" stroke-width="1.5"/>
+  <path class="edge" d="M500,70 H55 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" d="M500,78 H161 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" d="M500,86 H267 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" d="M500,94 H373 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" d="M500,102 H479 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" d="M500,132 H585 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" d="M500,124 H691 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" d="M500,116 H797 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="420" y="126" text-anchor="end">calls these groups</text>
+
+  <a class="box" id="gpaths" href="#card-paths">
+    <title>paths.py plus workspace_management.py, transfer_toolomics.py</title>
+    <path d="M5,146 V194 A50,7 0 0 0 105,194 V146" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <ellipse cx="55" cy="146" rx="50" ry="7" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="55" y="168" text-anchor="middle">paths&#183;workspace</text>
+    <text class="box-sub" x="55" y="184" text-anchor="middle">3 files</text>
+  </a>
+
+  <a class="box" id="gpricing" href="#card-pricing">
+    <title>pricing.py plus openrouter_endpoints.py</title>
+    <rect x="111" y="140" width="100" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="161" y="164" text-anchor="middle">pricing</text>
+    <text class="box-sub" x="161" y="180" text-anchor="middle">+ openrouter</text>
+  </a>
+
+  <g class="box" id="gnotify">
+    <title>notify.py plus email_reporter.py</title>
+    <rect x="217" y="140" width="100" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="267" y="164" text-anchor="middle">notify</text>
+    <text class="box-sub" x="267" y="180" text-anchor="middle">+ email</text>
+  </g>
+
+  <g class="box" id="gvis">
+    <title>visualization.py, shared_visualization.py, planner_visualization.py</title>
+    <rect x="323" y="140" width="100" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="373" y="164" text-anchor="middle">visualization</text>
+    <text class="box-sub" x="373" y="180" text-anchor="middle">3 files</text>
+  </g>
+
+  <a class="box" id="gmetrics" href="#card-runmetrics">
+    <title>run_metrics.py plus logging.py</title>
+    <rect x="429" y="140" width="100" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="479" y="164" text-anchor="middle">run_metrics</text>
+    <text class="box-sub" x="479" y="180" text-anchor="middle">+ logging</text>
+  </a>
+
+  <g class="box" id="gtree">
+    <title>evolution_tree.py plus archive_projection.py</title>
+    <rect x="535" y="140" width="100" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="585" y="164" text-anchor="middle">evolution_tree</text>
+    <text class="box-sub" x="585" y="180" text-anchor="middle">+ archive PCA</text>
+  </g>
+
+  <a class="box" id="gpersp" href="#card-perspicacite">
+    <title>perspicacite_client.py</title>
+    <rect x="641" y="140" width="100" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="691" y="164" text-anchor="middle">perspicacite</text>
+    <text class="box-sub" x="691" y="180" text-anchor="middle">HTTP client</text>
+  </a>
+
+  <g class="box" id="gdata">
+    <title>dataset.py, list_files.py, mock_data.py</title>
+    <rect x="747" y="140" width="100" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="797" y="164" text-anchor="middle">dataset&#183;lists</text>
+    <text class="box-sub" x="797" y="180" text-anchor="middle">+ mock_data</text>
+  </g>
+
+  <g class="box" id="gpre">
+    <title>precheck.py plus ensure_env.py - called by main.py, not by the three boxes</title>
+    <rect x="853" y="140" width="100" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="903" y="164" text-anchor="middle">precheck</text>
+    <text class="box-sub" x="903" y="180" text-anchor="middle">main.py only</text>
+  </g>
+
+  <text class="box-sub" x="5" y="218">cylinder = directory state on disk  |  dashed = no arrow from the three caller boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1a - every arrow is verified by import statement: <code>sources/core/evolution_engine.py::EvolutionEngine</code> (paths/workspace, pricing, notify, visualization, run_metrics, evolution_tree, archive_projection), <code class="path">sources/core/orchestrator.py</code> (notify, perspicacite), <code class="path">sources/core/planner.py</code> (notify, perspicacite, list_files, planner_visualization). <code>precheck.py</code> and <code>ensure_env.py</code> are imported by <code>main.py</code> only, so they get no core arrow.</p>
+
+<h2>Diagram 1b - sources/cli and sources/benchmark_evaluation</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 370" role="img" aria-label="cli and benchmark_evaluation call utility groups">
+  <defs>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E6FBFF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="cli">
+    <title>sources/cli imports paths, list_files and transfer_toolomics</title>
+    <rect x="20" y="20" width="220" height="60" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="130" y="44" text-anchor="middle">sources/cli</text>
+    <text class="box-sub" x="130" y="60" text-anchor="middle">onboard_cli</text>
+  </g>
+
+  <a class="box" id="cliA" href="#card-paths">
+    <title>paths.py plus transfer_toolomics.py</title>
+    <rect x="340" y="10" width="260" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="470" y="34" text-anchor="middle">paths&#183;workspace</text>
+    <text class="box-sub" x="470" y="50" text-anchor="middle">config_dir, LocalTransfer</text>
+  </a>
+
+  <g class="box" id="cliE">
+    <title>list_files.py</title>
+    <rect x="340" y="100" width="260" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="470" y="124" text-anchor="middle">dataset&#183;lists</text>
+    <text class="box-sub" x="470" y="140" text-anchor="middle">list_files</text>
+  </g>
+
+  <path class="edge" d="M240,35 H340" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="290" y="28" text-anchor="middle">paths</text>
+  <path class="edge" d="M240,60 H300 V130 H340" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="252" y="92">list_files</text>
+
+  <g class="box" id="bench">
+    <title>sources/benchmark_evaluation imports email_reporter and transfer_toolomics</title>
+    <rect x="20" y="210" width="220" height="60" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="130" y="234" text-anchor="middle">benchmark_evaluation</text>
+    <text class="box-sub" x="130" y="250" text-anchor="middle">csv_mode</text>
+  </g>
+
+  <a class="box" id="benchA" href="#card-paths">
+    <title>transfer_toolomics.py</title>
+    <rect x="340" y="200" width="260" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="470" y="224" text-anchor="middle">paths&#183;workspace</text>
+    <text class="box-sub" x="470" y="240" text-anchor="middle">LocalTransfer</text>
+  </a>
+
+  <g class="box" id="benchC">
+    <title>email_reporter.py</title>
+    <rect x="340" y="290" width="260" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="470" y="314" text-anchor="middle">notify&#183;email</text>
+    <text class="box-sub" x="470" y="330" text-anchor="middle">send_evaluation_report</text>
+  </g>
+
+  <path class="edge" d="M240,225 H340" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="290" y="218" text-anchor="middle">LocalTransfer</text>
+  <path class="edge" d="M240,250 H300 V320 H340" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="252" y="286">report</text>
+
+  <text class="box-sub" x="640" y="60">paths&#183;workspace and notify appear in both diagrams so</text>
+  <text class="box-sub" x="640" y="76">each caller keeps its own arrow. No box is left unexplained.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1b - arrows from real imports: <code class="path">sources/cli/onboard_cli.py</code> imports <code>sources.utils.paths</code>, <code>list_files</code> and <code>LocalTransfer</code>; <code class="path">sources/benchmark_evaluation/csv_mode.py</code> imports <code>LocalTransfer</code> and <code>send_evaluation_report</code>. Two shared groups are redrawn here so that no arrow crosses another.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>All files in sources/utils</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Key symbol</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/utils/archive_projection.py">archive_projection.py</a></td><td>Draws 2-D PCA map of the QD archive embeddings.</td><td class="size">241</td><td class="sym">render_archive_pca</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/dataset.py">dataset.py</a></td><td>Reads a dataset path and returns question subsets.</td><td class="size">162</td><td class="sym">read_dataset</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/email_reporter.py">email_reporter.py</a></td><td>Sends the evaluation summary through the Gmail API.</td><td class="size">324</td><td class="sym">send_evaluation_report</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/ensure_env.py">ensure_env.py</a></td><td>Checks and installs Python 3.12 and venv support.</td><td class="size">331</td><td class="sym">ensure_environment</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/evolution_tree.py">evolution_tree.py</a></td><td>Renders the workflow evolution tree to PNG.</td><td class="size">269</td><td class="sym">render_evolution_tree</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/list_files.py">list_files.py</a></td><td>Lists files of a directory tree as one string.</td><td class="size">19</td><td class="sym">list_files</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/logging.py">logging.py</a></td><td>Sets console and rotating file log handlers.</td><td class="size">64</td><td class="sym">setup_logging</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/mock_data.py">mock_data.py</a></td><td>Builds mock objects for schema tests.</td><td class="size">330</td><td class="sym">MockDataGenerator</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/notify.py">notify.py</a></td><td>Sends a Pushover push notification to a phone.</td><td class="size">54</td><td class="sym">PushNotifier.send_message</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/openrouter_endpoints.py">openrouter_endpoints.py</a></td><td>Lists providers that serve an OpenRouter model.</td><td class="size">171</td><td class="sym">fetch_endpoints</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/paths.py">paths.py</a></td><td>Resolves checkout and XDG runtime directories.</td><td class="size">120</td><td class="sym">state_dir</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/perspicacite_client.py">perspicacite_client.py</a></td><td>Queries Perspicacite-AI and caches the answer.</td><td class="size">394</td><td class="sym">query_perspicacite</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/planner_visualization.py">planner_visualization.py</a></td><td>Pygame timeline window for planner progress.</td><td class="size">323</td><td class="sym">PlannerVisualizer</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/precheck.py">precheck.py</a></td><td>Vets OpenRouter provider availability before a run.</td><td class="size">477</td><td class="sym">PreCheck</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/pricing.py">pricing.py</a></td><td>Turns token usage into USD cost.</td><td class="size">476</td><td class="sym">PricingCalculator.calculate_cost</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/run_metrics.py">run_metrics.py</a></td><td>Writes run_metrics.json and appends JSONL trails.</td><td class="size">71</td><td class="sym">write_run_metrics</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/shared_visualization.py">shared_visualization.py</a></td><td>Shared plot data store for parallel workers.</td><td class="size">369</td><td class="sym">SharedVisualizationData</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/transfer_toolomics.py">transfer_toolomics.py</a></td><td>Copies files between workspace and capsule folders.</td><td class="size">197</td><td class="sym">LocalTransfer</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/visualization.py">visualization.py</a></td><td>Curve-plot helpers for evolution charts.</td><td class="size">429</td><td class="sym">VisualizationUtils</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/workspace_management.py">workspace_management.py</a></td><td>Snapshots, resets and restores the workspace per run.</td><td class="size">169</td><td class="sym">WorkspaceManager</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/__init__.py">__init__.py</a></td><td>Package marker with a one-line docstring.</td><td class="size">3</td><td class="sym">none</td></tr>
+</tbody>
+</table>
+<p class="note">Line counts are <code>wc -l</code> at commit <code>7e8463b</code>. The folder holds 20 modules plus <code>__init__.py</code> = 21 files and 4 993 lines; the brief said 22 files, so the count differs by one.</p>
+<p class="note say">Four files have no importer inside the shipped code: <code>dataset.py</code>, <code>mock_data.py</code>, <code>shared_visualization.py</code> and <code>openrouter_endpoints.py</code> (that last one is imported by <code>precheck.py</code>). <code>dataset.py</code> is referenced by <code class="path">docs/evaluation/custom-benchmarks.md</code>; <code>mock_data.py</code> by <code class="path">tests/pricing_test.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The XDG against checkout rule</h2>
+<p><code>sources/utils/paths.py::is_repo_checkout</code> checks for <code>pyproject.toml</code> next to the package. <code>paths.py::state_dir</code> then picks where mutable state goes: inside the checkout for repo runs, under the XDG dirs for installed runs.</p>
+<blockquote>installed runs: ~/.config/mimosa (config.json, .env), ~/.local/share/mimosa (memory, workflows, runs_capsule), ~/.cache/mimosa (tmp, openrouter_pricing.json)
+repo checkout: sources/memory, sources/workflows, runs_capsule/, tmp/, sources/cache/openrouter_pricing.json</blockquote>
+<p>Path: <code class="path">sources/utils/paths.py</code> - functions <code>is_repo_checkout</code>, <code>state_dir</code>, <code>default_memory_dir</code>, <code>default_workflow_dir</code>, <code>default_runs_capsule_dir</code>, <code>default_tmp_dir</code>, <code>pricing_cache_file</code>. <code>paths.py::resource_path</code> always stays package-relative, so prompts and module templates load from either layout.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Short cards - the five files with real logic</h2>
+
+<div class="card steel" id="card-paths">
+<h4><a href="../../sources/utils/paths.py">sources/utils/paths.py</a></h4>
+<p class="role">Returns the directories for read-only package assets and for mutable runtime state, in a checkout or in an installed run.</p>
+<p class="meta">120 lines &#183; 14 functions &#183; no imports outside <code>os</code> and <code>pathlib</code></p>
+<details><summary>signatures and callers</summary><div class="dbody">
+<pre>is_repo_checkout() -&gt; bool
+resource_path(relative: str) -&gt; str
+config_dir() -&gt; Path          data_dir() -&gt; Path          cache_dir() -&gt; Path
+user_config_file() -&gt; Path    user_env_file() -&gt; Path
+state_dir(repo_relative: str, installed_name: str) -&gt; str
+default_memory_dir() -&gt; str   default_workflow_dir() -&gt; str
+default_runs_capsule_dir() -&gt; str   default_tmp_dir() -&gt; str
+pricing_cache_file() -&gt; str</pre>
+<p>Callers found by grep: <code>config.py</code>, <code>main.py</code>, <code class="path">sources/cli/onboard_cli.py</code> (all <code>from sources.utils import paths</code>), plus <code class="path">sources/utils/pricing.py</code> for <code>pricing_cache_file()</code>. <code>APP_NAME = "mimosa"</code>; <code>PACKAGE_ROOT</code> is three levels above the module file.</p>
+</div></details>
+</div>
+
+<div class="card steel" id="card-pricing">
+<h4><a href="../../sources/utils/pricing.py">sources/utils/pricing.py</a></h4>
+<p class="role">Reads LLM memory JSON files, sums tokens per agent, matches each model id to a price and returns the run cost in USD.</p>
+<p class="meta">476 lines &#183; classes: TokenUsage, PricingCalculator, OpenRouterPricingClient &#183; default price $3 / $15 per 1M tokens</p>
+<details><summary>signatures and config fields</summary><div class="dbody">
+<pre>TokenUsage(agent, model, input_tokens, output_tokens, total_tokens)   # dataclass
+PricingCalculator(config)
+  .calculate_cost(uuid: str) -&gt; float
+  ._collect_verifier_calls(memory_path) -&gt; list[TokenUsage]
+  ._find_model_by_substring(target_model) -&gt; str | None
+  ._get_model_pricing_with_fallback(model_name) -&gt; dict
+OpenRouterPricingClient(cache_duration_hours=24, cache_file=None)
+  .fetch_model_pricing() -&gt; dict[str, dict[str, float]]
+  .get_fallback_pricing() -&gt; dict[str, dict[str, float]]</pre>
+<p>Reads <code>config.memory_dir</code>, <code>config.workflow_dir</code>, <code>config.model_pricing</code>. Reads per-run <code>workflow_creator.json</code>, <code>judge.json</code>, <code>verifier_*.json</code> and <code>task_*.json</code>. <code>DEFAULT_PRICING = {"input": 3.0, "output": 15.0}</code> applies when no match exists; with no TTY the cost is a lower bound and no prompt appears.</p>
+<p>Called by <code>config.py::Config</code> (<code>OpenRouterPricingClient</code>) and <code class="path">sources/core/evolution_engine.py</code> (<code>PricingCalculator</code>).</p>
+</div></details>
+</div>
+
+<div class="card steel" id="card-workspace">
+<h4><a href="../../sources/utils/workspace_management.py">sources/utils/workspace_management.py</a></h4>
+<p class="role">Snapshots the workspace once per session, resets it before each run, stores each run under /tmp, and restores the best run at the end.</p>
+<p class="meta">169 lines &#183; class: WorkspaceManager &#183; uses <code>LocalTransfer</code> from <code>transfer_toolomics.py</code></p>
+<details><summary>signatures and session order</summary><div class="dbody">
+<pre>WorkspaceManager(config, logger=None)
+  .session_id -&gt; str | None          # property, 12 hex chars
+  .begin_session() -&gt; None           # backup + clean + restore
+  .reset_for_run() -&gt; None
+  .save_run_snapshot(run_uuid) -&gt; Path    # /tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;
+  .restore_best(best_uuid) -&gt; None
+  .cleanup() -&gt; None
+  ._backup_initial_workspace() -&gt; Path    # /tmp/mimosa_initial_&lt;session&gt;</pre>
+<p>Call order from the class docstring: <code>begin_session</code> &rarr; (<code>reset_for_run</code>, run, <code>save_run_snapshot</code>) per generation &rarr; <code>restore_best</code> &rarr; <code>cleanup</code>. <code>_assert_session</code> raises <code>RuntimeError</code> when <code>begin_session</code> was skipped. <code>cleanup()</code> returns without globbing when no session id exists, so it cannot delete another worker's /tmp folders.</p>
+<p>Called by <code>main.py</code> and <code class="path">sources/core/evolution_engine.py</code>.</p>
+</div></details>
+</div>
+
+<div class="card steel" id="card-runmetrics">
+<h4><a href="../../sources/utils/run_metrics.py">sources/utils/run_metrics.py</a></h4>
+<p class="role">Writes one metrics JSON per workflow and appends single JSON lines to the QD and variation trails.</p>
+<p class="meta">71 lines &#183; 2 functions &#183; schema stays with the caller</p>
+<details><summary>signatures and files written</summary><div class="dbody">
+<pre>write_run_metrics(workflow_folder: str | Path, metrics: dict) -&gt; Path
+append_jsonl(file_path: str | Path, entry: dict) -&gt; Path</pre>
+<p>Writes <code>&lt;workflow_dir&gt;/&lt;uuid&gt;/run_metrics.json</code>, <code>&lt;workflow_dir&gt;/qd_archive.jsonl</code> and <code>&lt;workflow_dir&gt;/variation_log.jsonl</code>. Parent folders are created; non-JSON values become <code>str</code> through <code>json.dump(default=str)</code>. Called by <code class="path">sources/core/evolution_engine.py</code>.</p>
+</div></details>
+</div>
+
+<div class="card steel" id="card-perspicacite">
+<h4><a href="../../sources/utils/perspicacite_client.py">sources/utils/perspicacite_client.py</a></h4>
+<p class="role">Sends the task to the Perspicacite-AI RAG service over SSE streaming, falls back to plain JSON, and caches each answer on disk.</p>
+<p class="meta">394 lines &#183; cache key = sha256 of query and mode &#183; returns <code>None</code> when the service is down</p>
+<details><summary>signatures, timeouts and cache</summary><div class="dbody">
+<pre>query_perspicacite(science_query, mode="agentic", base_url=PERSPICACITE_BASE_URL) -&gt; Optional[str]
+_query_perspicacite_streaming(science_query, mode, base_url) -&gt; Optional[str]
+_query_perspicacite_non_streaming(science_query, mode, base_url) -&gt; Optional[str]
+format_scientific_context(task, scientific_context) -&gt; str
+_cache_key(science_query, mode) -&gt; str      # sha256 hex
+_read_cache(...)  /  _write_cache(...)</pre>
+<p>Timeouts: connect <code>30 s</code>, read <code>600 s</code>, write <code>60 s</code>, pool <code>30 s</code>. Base URL comes from <code>PERSPICACITE_API_URL</code>, default <code>http://localhost:5468</code>. Sends <code>max_papers = 5</code> and databases <code>semantic_scholar</code>, <code>openalex</code>, <code>pubmed</code>. Cache files: <code>sources/memory/perspicacite_requests/&lt;key&gt;.json</code>. A failure logs a warning and workflow generation continues without grounding.</p>
+<p>Called by <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/core/planner.py</code> and <code class="path">sources/evaluators/grounding.py</code>.</p>
+</div></details>
+</div>
+</div>
+
+<footer>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>; <code class="path">docs/visual_clone/_clone.css</code>; whole files <code class="path">sources/utils/paths.py</code>, <code>run_metrics.py</code>, <code>list_files.py</code>, <code>logging.py</code>, <code>notify.py</code>, <code>workspace_management.py</code>, <code>perspicacite_client.py</code>, <code>pricing.py</code>; docstring and symbol index for the other 12 modules plus <code>__init__.py</code>; caller check by <code>grep</code> over <code>sources/</code>, <code>main.py</code>, <code>config.py</code>, <code>tests/</code>.</p>
+<p class="skips">Skipped or summarised: <code>visualization.py</code>, <code>shared_visualization.py</code>, <code>planner_visualization.py</code> (plot classes only, grouped in one box); <code>dataset.py</code>, <code>mock_data.py</code>, <code>openrouter_endpoints.py</code> (helper code with no importer in the shipped path); <code>precheck.py</code>, <code>ensure_env.py</code> (entry-point helpers, grouped in one dashed box); <code>email_reporter.py</code> (Gmail OAuth path not exercised); <code>archive_projection.py</code>, <code>evolution_tree.py</code>, <code>transfer_toolomics.py</code> (covered by table rows and the group boxes). No secret, token or key file was opened.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time, so line counts and grep results are a snapshot of the dirty tree, not of the commit alone.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

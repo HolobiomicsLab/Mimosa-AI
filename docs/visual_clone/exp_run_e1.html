@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>run_e1 - E1 rubric surgery - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; run_e1">
+<div class="wrap">
+
+<h1 class="hud">run_e1 &mdash; E1 rubric surgery</h1>
+<p class="intro">E1 asked whether re-aggregating the already-parsed claim verdicts can fix the verifier's inversion at the top of its ranking. <code class="path">run_e1.py</code> rescores 607 frozen examples under 15 static re-aggregations plus two fitted baselines. Best observed move is +0.014 AUC_sr against a gate of +0.05, so every variant fails.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 680" role="img" aria-label="E1 run_e1.py pipeline: inputs, stages, output">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="e1h">
+    <title>E1 hypothesis: re-aggregation alone fixes the F1 inversion</title>
+    <rect x="330" y="20" width="240" height="46" rx="2" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="450" y="40" text-anchor="middle">Hypothesis: re-aggregation fixes F1</text>
+    <text class="box-sub" x="450" y="56" text-anchor="middle">gate written before the run</text>
+  </g>
+
+  <a class="box" id="e1i1" href="../../experiments_verifiers/data/verifier_claims.jsonl">
+    <title>Frozen parse of claim verdicts; 607 examples</title>
+    <rect x="20" y="100" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="124" text-anchor="middle">data/verifier_claims.jsonl</text>
+    <text class="box-sub" x="145" y="140" text-anchor="middle">607 rows, parsed claims</text>
+  </a>
+
+  <a class="box" id="e1i2" href="../../experiments_verifiers/manifest.json">
+    <title>Manifest rows carry reward and CBS labels</title>
+    <rect x="20" y="200" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="224" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="145" y="240" text-anchor="middle">159 rewarded rows</text>
+  </a>
+
+  <a class="box" id="e1l" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>load_examples merges claims with the manifest reward</title>
+    <rect x="330" y="100" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="124" text-anchor="middle">load_examples()</text>
+    <text class="box-sub" x="450" y="140" text-anchor="middle">drops the jsonl reward column</text>
+  </a>
+
+  <a class="box" id="e1f" href="../../experiments_verifiers/scorers/e1_aggregators.py">
+    <title>claim_group_features builds kind x importance x status rates</title>
+    <rect x="330" y="200" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="224" text-anchor="middle">claim_group_features()</text>
+    <text class="box-sub" x="450" y="240" text-anchor="middle">kind x importance x status</text>
+  </a>
+
+  <a class="box" id="e1s" href="../../experiments_verifiers/scorers/e1_aggregators.py">
+    <title>score_all_variants rescores every example under each static variant</title>
+    <rect x="250" y="300" width="180" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="340" y="326" text-anchor="middle">score_all_variants()</text>
+    <text class="box-sub" x="340" y="342" text-anchor="middle">15 static variants</text>
+  </a>
+
+  <a class="box" id="e1g" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>fit_loto fits logistic and GBM models leave-one-task-out</title>
+    <rect x="470" y="300" width="180" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="560" y="326" text-anchor="middle">fit_loto()</text>
+    <text class="box-sub" x="560" y="342" text-anchor="middle">LR + GBM, 124 folds</text>
+  </a>
+
+  <a class="box" id="e1m" href="../../experiments_verifiers/harness/metrics.py">
+    <title>auc, tau and task_cluster_bootstrap_ci used by full_metrics</title>
+    <rect x="330" y="400" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="426" text-anchor="middle">full_metrics()</text>
+    <text class="box-sub" x="450" y="442" text-anchor="middle">per_fold_stats: auc, tau, CIs</text>
+  </a>
+
+  <a class="box" id="e1n" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>mcnemar_vs_baseline and the paired bootstrap compare to v0</title>
+    <rect x="330" y="500" width="240" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="524" text-anchor="middle">mcnemar_vs_baseline()</text>
+    <text class="box-sub" x="450" y="540" text-anchor="middle">median-split SR vs v0</text>
+  </a>
+
+  <a class="box" id="e1a" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>_additional_analyses: per-campaign tables, cap plateau, Wilcoxon</title>
+    <rect x="330" y="570" width="240" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="594" text-anchor="middle">_additional_analyses()</text>
+    <text class="box-sub" x="450" y="610" text-anchor="middle">cap plateau, per campaign</text>
+  </a>
+
+  <path class="edge" data-from="e1h" data-to="e1l" d="M450,66 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="86" text-anchor="start">tests</text>
+
+  <path class="edge dashed-edge" data-from="e1i1" data-to="e1l" d="M270,128 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="120" text-anchor="middle">reads</text>
+  <path class="edge dashed-edge" data-from="e1i2" data-to="e1l" d="M270,228 H300 V140 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="286" y="248" text-anchor="middle">labels</text>
+
+  <path class="edge" data-from="e1l" data-to="e1f" d="M450,156 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="180" text-anchor="start">feats</text>
+
+  <path class="edge" data-from="e1f" data-to="e1s" d="M400,256 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="272" text-anchor="middle">scores</text>
+  <path class="edge" data-from="e1f" data-to="e1g" d="M500,256 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="572" y="272" text-anchor="middle">fits</text>
+
+  <path class="edge" data-from="e1s" data-to="e1m" d="M340,360 V400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="380" text-anchor="middle">score vectors</text>
+  <path class="edge" data-from="e1g" data-to="e1m" d="M560,360 V400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="380" text-anchor="middle">score vectors</text>
+
+  <path class="edge" data-from="e1m" data-to="e1n" d="M450,460 V500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="480" text-anchor="start">per example</text>
+  <path class="edge" data-from="e1n" data-to="e1a" d="M450,556 V570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="566" text-anchor="start">rows</text>
+
+  <text class="box-sub" x="20" y="660" text-anchor="start">solid = call | dashed = reads | max 12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram &mdash; <code>10 boxes</code>; the other experiment pages are listed in <a href="exp_index.html">exp_index.html</a>. Violet = hypothesis, steel = frozen input file, mint = function in this script or in <code class="path">scorers/e1_aggregators.py</code>, cyan = metric helper. Solid = call, dashed = reads. <code>main()</code> (L364) wires the stages and writes the result JSON at L530&ndash;536; the output box is the file card and the results table below. Each static variant's score vector goes to <code>run_e1.py::full_metrics</code> (L166), which calls <code>harness/metrics.py::auc</code> (L23), <code>tau</code> (L38) and <code>task_cluster_bootstrap_ci</code> (L123); <code>fit_loto</code> (L65) fits on all tasks but the held-out one.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/run_e1.py">experiments_verifiers/harness/run_e1.py</a></h4>
+<p class="role">Rescores the frozen claim parse under 15 aggregation variants, adds two leave-one-task-out fitted baselines, and writes one result JSON with gates.</p>
+<p class="meta">543 lines (<code>wc -l</code>) &#183; entry point: <code>main()</code> L364, guard L542 &#183; CLI arguments: none found (no <code>argparse</code>; run as a module)</p>
+<details><summary>entry point, constants, how to run</summary><div class="dbody">
+<pre>uv run python -m experiments_verifiers.harness.run_e1   # docstring L7
+main() -> None                                          # L364, reads no argv
+SEED = 7                                                # L38
+N_BOOT = 1000                                           # L39</pre>
+<p>No command-line flag is read anywhere: <code>grep -n "sys.argv"</code> returns nothing in this file, and <code>argparse</code> is not imported. The output filename date comes from <code>date.today()</code> (L533), so the <code>20260921</code> suffix is the run date, not an argument.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>Citation</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>607 claim-verdict rows</td><td class="sym">run_e1.py::load_examples L42&ndash;50</td><td>Result JSON, indent 1</td><td class="sym"><a href="../../experiments_verifiers/results/E1_rubric_surgery_20260921.json">results/E1_rubric_surgery_20260921.json</a></td></tr>
+<tr><td>Manifest reward and CBS labels</td><td class="sym">run_e1.py::load_examples L51&ndash;62</td><td>Two metric blocks to stdout</td><td class="sym">stdout L538&ndash;539; summary <a href="../../experiments_verifiers/results/E1_rubric_surgery_20260921.md">.md</a> has no writer</td></tr>
+<tr><td>Variant scorer code</td><td class="sym">scorers/e1_aggregators.py::score_all_variants L116</td><td>Nothing else</td><td class="sym">unknown</td></tr>
+<tr><td>Per-example feature rates</td><td class="sym">scorers/e1_aggregators.py::claim_group_features L131</td><td>&mdash;</td><td class="sym">&mdash;</td></tr>
+<tr><td>Metric helpers</td><td class="sym">harness/metrics.py::auc L23, mcnemar_exact L95</td><td>&mdash;</td><td class="sym">&mdash;</td></tr>
+</tbody>
+</table>
+<p class="note flag">The script writes only the JSON. <code class="path">results/E1_rubric_surgery_20260921.md</code> exists but no file in the tree writes it: <code>grep -r "E1_rubric_surgery"</code> returns only <code>run_e1.py</code> L4 and L533, both about the JSON. The author of the markdown is <code>unknown</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; AUC_sr per variant, gate line at v0 + 0.05</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 860 300" role="img" aria-label="Bar chart of E1 AUC_sr per aggregation variant">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <path d="M40,260 H800" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M40,68 H800" fill="none" stroke="#FFB547" stroke-width="1.25" stroke-dasharray="5 4"/>
+  <text class="box-sub" x="44" y="62" text-anchor="start">gate: v0 + 0.05 = 0.690 (run_e1.py L502)</text>
+
+  <g><title>v0_recomputed AUC_sr 0.6397, JSON L68</title>
+    <rect x="40" y="108" width="70" height="152" rx="2" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+    <text class="box-sub" x="75" y="100" text-anchor="middle">0.6397</text>
+    <text class="box-sub" x="75" y="278" text-anchor="middle">v0_</text>
+    <text class="box-sub" x="75" y="290" text-anchor="middle">recomputed</text>
+  </g>
+  <g><title>uniform AUC_sr 0.6492, JSON L96</title>
+    <rect x="155" y="100" width="70" height="160" rx="2" fill="rgba(57,255,136,0.18)" stroke="#39FF88"/>
+    <text class="box-sub" x="190" y="92" text-anchor="middle">0.6492</text>
+    <text class="box-sub" x="190" y="278" text-anchor="middle">uniform</text>
+  </g>
+  <g><title>unsure_exclude AUC_sr 0.6540, JSON L240</title>
+    <rect x="270" y="97" width="70" height="163" rx="2" fill="rgba(57,255,136,0.28)" stroke="#39FF88"/>
+    <text class="box-sub" x="305" y="89" text-anchor="middle">0.6540</text>
+    <text class="box-sub" x="305" y="278" text-anchor="middle">unsure_</text>
+    <text class="box-sub" x="305" y="290" text-anchor="middle">exclude</text>
+  </g>
+  <g><title>no_hardcap AUC_sr 0.6422, JSON L268</title>
+    <rect x="385" y="106" width="70" height="154" rx="2" fill="rgba(0,229,255,0.12)" stroke="#00E5FF"/>
+    <text class="box-sub" x="420" y="98" text-anchor="middle">0.6422</text>
+    <text class="box-sub" x="420" y="278" text-anchor="middle">no_hardcap</text>
+  </g>
+  <g><title>manifest reward AUC_sr 0.5471 on 159 rows, JSON L19</title>
+    <rect x="500" y="182" width="70" height="78" rx="2" fill="rgba(94,140,163,0.18)" stroke="#5E8CA3"/>
+    <text class="box-sub" x="535" y="174" text-anchor="middle">0.5471</text>
+    <text class="box-sub" x="535" y="278" text-anchor="middle">manifest</text>
+    <text class="box-sub" x="535" y="290" text-anchor="middle">reward</text>
+  </g>
+  <g><title>constant_05 AUC_sr 0.5, JSON L36</title>
+    <rect x="615" y="220" width="70" height="40" rx="2" fill="rgba(143,184,201,0.18)" stroke="#8FB8C9"/>
+    <text class="box-sub" x="650" y="212" text-anchor="middle">0.5000</text>
+    <text class="box-sub" x="650" y="278" text-anchor="middle">constant_0.5</text>
+  </g>
+  <g><title>fitted_group_lr_loto AUC_sr 0.5783, JSON L416</title>
+    <rect x="730" y="157" width="70" height="103" rx="2" fill="rgba(255,77,106,0.18)" stroke="#FF4D6A"/>
+    <text class="box-sub" x="765" y="149" text-anchor="middle">0.5783</text>
+    <text class="box-sub" x="765" y="278" text-anchor="middle">fitted_group</text>
+    <text class="box-sub" x="765" y="290" text-anchor="middle">lr_loto</text>
+  </g>
+</svg>
+</div>
+<p class="figcap">Chart &mdash; <code>auc_sr</code> per variant on 607 examples; bar height is the value, printed above each bar. Bar names are shortened keys from <code>metrics</code> in the result JSON. Green = variants above the v0 baseline, red = the fitted variant that is significantly below it, steel = the recorded reward and the constant baseline. All seven values and the gate rule are cited in the table below. No bar reaches the amber gate line.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Population examples</td><td>607</td><td class="sym">E1_rubric_surgery_20260921.json L6</td></tr>
+<tr><td>Populated tasks</td><td>124</td><td class="sym">E1_rubric_surgery_20260921.json L7</td></tr>
+<tr><td>Parsed claim verdicts</td><td>15 542</td><td class="sym">E1_rubric_surgery_20260921.json L12</td></tr>
+<tr><td>v0_recomputed auc_sr</td><td>0.6397</td><td class="sym">E1_rubric_surgery_20260921.json L68</td></tr>
+<tr><td>uniform auc_sr</td><td>0.6492</td><td class="sym">E1_rubric_surgery_20260921.json L96</td></tr>
+<tr><td>unsure_exclude auc_sr</td><td>0.6540</td><td class="sym">E1_rubric_surgery_20260921.json L240</td></tr>
+<tr><td>no_hardcap auc_sr</td><td>0.6422</td><td class="sym">E1_rubric_surgery_20260921.json L268</td></tr>
+<tr><td>manifest reward auc_sr (159 rows)</td><td>0.5471</td><td class="sym">E1_rubric_surgery_20260921.json L19</td></tr>
+<tr><td>Best paired delta vs v0</td><td>+0.0137 [&minus;0.0062, +0.0328]</td><td class="sym">E1_rubric_surgery_20260921.json L33969&ndash;33973</td></tr>
+<tr><td>Gate pass, all 17 entries</td><td>false</td><td class="sym">E1_rubric_surgery_20260921.json L34033, L34081</td></tr>
+<tr><td>Examples tied at 0.89 cap</td><td>108</td><td class="sym">E1_rubric_surgery_20260921.json L34370</td></tr>
+<tr><td>Median per-task win-rate (v0)</td><td>0.8102, Wilcoxon p 0.000426</td><td class="sym">E1_rubric_surgery_20260921.json L34397&ndash;34398</td></tr>
+<tr><td>Fitted LR auc_sr (LOTO)</td><td>0.5783</td><td class="sym">E1_rubric_surgery_20260921.json L416</td></tr>
+</tbody>
+</table>
+
+<details><summary>verbatim evidence lines (result JSON and markdown)</summary><div class="dbody">
+<blockquote>  "n_examples": 607,
+  "n_tasks": 124,
+  "n_campaigns": 5,
+  "n_sr_true": 191,
+  "n_ver_true": 516,
+  "n_with_manifest_reward": 159,
+  "claim_verdicts": 15542,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> lines 6&ndash;12 (<code>population</code> block).</p>
+
+<blockquote>    "auc_sr": 0.639693666935159,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> line 68 (<code>metrics.v0_recomputed</code>; the key starts at L64).</p>
+
+<blockquote>    "auc_sr": 0.6540412303664922,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> line 240 (<code>metrics.unsure_exclude</code>; key at L236). The best static variant.</p>
+
+<blockquote>    "mean": 0.013670696081925624,
+    "ci95": [
+     -0.0062399989515495935,
+     0.032828324479444025,
+    ],
+    "p_gt0": 0.903,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> lines 33970&ndash;33975 (<code>paired_auc_diff_vs_v0.unsure_exclude</code>). The confidence interval includes zero.</p>
+
+<blockquote>    "gate_pass": false</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> line 34033 (<code>success_gate.uniform</code>); line 34081 gives the same for <code>unsure_exclude</code>. The gate needs <code>auc_sr &gt;= v0 + 0.05</code> (run_e1.py L502) plus half the folds positive.</p>
+
+<blockquote>    "n_examples_capped_at_0.89": 108,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> line 34370 (<code>additional_analyses.cap_plateau</code>).</p>
+
+<blockquote>**Hypothesis REJECTED.** Changing only how the existing claim verdicts are aggregated moves
+`auc_sr` by at most **+0.014** (success gate needed +0.05), and per-fold top-quartile tau is
+positive on at most 9/124 folds (gate needed &ge; half). **No variant passes the gate.** The F1</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.md</code> lines 9&ndash;11.</p>
+
+<blockquote>1. **The 0.89 cap is a symptom, not the cause.** 108/607 examples tie at exactly 0.89</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.md</code> line 70.</p>
+</div></details>
+
+<p class="note say">Why it matters: this closes the cheapest hypothesis. Re-weighting the same verdicts cannot reach the gate, so the remaining levers are judge content and selection policy, not aggregation.</p>
+<p class="note">Amber: the pre-registered design text lives in <code class="path">experiments_verifiers/EXPERIMENTS_PLAN.md</code> (cited by <code>run_e1.py</code> L1) and that file is <strong>gone</strong> from the folder, so the E1 section of the plan could not be read. The gate rule itself is readable in code (L499&ndash;507).</p>
+</div>
+
+<footer>
+<p>Related pages: <a href="exp_index.html">exp_index.html</a> lists every experiment page; <a href="data_experiments.html">data_experiments.html</a> covers the folder itself; <a href="exp_e5_run.html">exp_e5_run.html</a> is the fitted-importance ladder this result points to.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/run_e1.py</code> (543 lines), <code class="path">experiments_verifiers/scorers/e1_aggregators.py</code> (156 lines, <code>score_all_variants</code> L116, <code>claim_group_features</code> L131), <code class="path">experiments_verifiers/harness/metrics.py</code> (177 lines), <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> and <code class="path">.md</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>, <code class="path">experiments_verifiers/manifest.json</code> (keys only), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> (never opened, secrets); <code class="path">experiments_verifiers/EXPERIMENTS_PLAN.md</code>, <code class="path">HANDOFF.md</code>, <code class="path">VERIFIER_ARCHITECTURE.md</code> (cited by README.md and script docstrings, but absent from disk &mdash; not linked); every other <code class="path">results/*.json</code> and <code class="path">results/*.md</code> (other experiments, out of scope); <code class="path">experiments_verifiers/REPORT_*.html</code> (rendered duplicates of the same data); <code class="path">experiments_verifiers/data/verifier_claims.jsonl</code> (1.6 MB, only its row count was needed and it is in the JSON); <code class="path">sources/**</code> (the app code this experiment does not touch); <code class="path">experiments_verifiers/ablations/</code> (not an E1 input). No experiment was run and no test was run: page built from cheap reads only.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,2266 @@
+{
+  "built_commit": "7e8463b",
+  "built_date": "2026-10-02",
+  "build_note": "First build. HEAD was 7e8463b; the working tree also had uncommitted edits.",
+  "pages": {
+    "area_benchmark_evaluation.html": {
+      "covers": [
+        "sources/benchmark_evaluation/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "datasets/ScienceAgentBench/{datasets,datasets_chemistry,gold_programs,scoring_rubrics}: Tier D, counted only",
+        "98 of 111 grader scripts: pattern check only"
+      ]
+    },
+    "area_cli.html": {
+      "covers": [
+        "sources/cli/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/cli/__pycache__: build artifacts",
+        "webui/backend/mimosa_bridge.py: web UI out of scope (Tier D)"
+      ]
+    },
+    "area_entry_config.html": {
+      "covers": [
+        "main.py",
+        "config.py",
+        "config_default.json",
+        "auto-install.sh",
+        "cleanup.sh",
+        "workflow_evolution_anim.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/utils/*, sources/cli/*: read only for call targets, owned by area_utils.html / area_cli.html",
+        "Tier D: docs/*, webui/, datasets/, run_notes/, runs_capsule/, sources/workflows/, sources/memory/, logs/, audits/, CLA/"
+      ]
+    },
+    "area_evaluators.html": {
+      "covers": [
+        "sources/evaluators/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "area_evaluators_legacy.html": {
+      "covers": [
+        "sources/evaluators/verifier*.py",
+        "sources/evaluators/base.py",
+        "sources/evaluators/evaluator.py",
+        "sources/evaluators/generic.py",
+        "sources/evaluators/scenario.py",
+        "sources/evaluators/bs_detection.py",
+        "sources/evaluators/grounding.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "per-file cards for verifier*.py: one diagram + one table only",
+        "recovery/visual/package-install branch bodies (entry points only)"
+      ]
+    },
+    "area_extensibility.html": {
+      "covers": [
+        "sources/extensibility/human_mode.py",
+        "sources/extensibility/text_to_speech.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/extensibility/__pycache__: compiled bytecode",
+        "HumanMode private print helpers: console formatting only"
+      ]
+    },
+    "area_security_transparency.html": {
+      "covers": [
+        "sources/security/*.py",
+        "sources/transparency/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/transparency/prompts/decision_extraction.md body (counted only)",
+        "runtime data folders (sources/memory, sources/workflows, run_notes, runs_capsule)"
+      ]
+    },
+    "area_sources_core.html": {
+      "covers": [
+        "sources/core/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "area_tests.html": {
+      "covers": [
+        "tests/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "tests/__pycache__/*.pyc: generated output, not source",
+        "test bodies: page is a coverage matrix, not per-test text",
+        "did not run the pytest suite (rule 10)"
+      ]
+    },
+    "area_utils.html": {
+      "covers": [
+        "sources/utils/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/utils/__pycache__: bytecode"
+      ]
+    },
+    "data_audits.html": {
+      "covers": [
+        "audits/*",
+        "audits/**/*"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "bodies of the large HTML reports: read title, first heading and TL;DR only (Tier C method)",
+        "audits/reward_signal_analysis/*.pdf: binary, no text read",
+        "audits/.DS_Store: macOS system file",
+        "per-task transition HTML bodies: same five-block template, described once",
+        "chemical-correctness judgments: out of scope"
+      ]
+    },
+    "data_experiments.html": {
+      "covers": [
+        "experiments_verifiers/**",
+        "diversity_experiments/**"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "experiments_verifiers/.env: never opened (secrets rule)",
+        "results/_e24_venv/: virtualenv, size counted only",
+        "report bodies: titles/intro text only"
+      ]
+    },
+    "data_modules_prompts.html": {
+      "covers": [
+        "sources/modules/*.py",
+        "sources/prompts/*.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "line-by-line reading of the 10 prompt files - Tier C; sampled 3",
+        "sources/modules/__pycache__/"
+      ]
+    },
+    "data_runs.html": {
+      "covers": [
+        "run_notes/**",
+        "runs_capsule/**",
+        "sources/workflows/**",
+        "logs/**",
+        "tmp/**"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/workflows/**/workflow_genotype_*.py (20474 files): name and writer only",
+        "tmp/mimosa_venv/: ~4.9 GB of installed packages",
+        "logs/*.log bodies: size and line count only"
+      ]
+    },
+    "flow_evolution_loop.html": {
+      "covers": [
+        "sources/core/evolution_engine.py",
+        "sources/core/selection.py",
+        "sources/core/genotype_embedding.py",
+        "sources/core/code_features.py",
+        "sources/core/variation_engine.py",
+        "sources/core/lineage.py",
+        "sources/core/workflow_selection.py",
+        "sources/core/workflow_info.py",
+        "sources/evaluators/hybrid_verifier/gradient.py",
+        "sources/evaluators/hybrid_verifier/aggregation.py",
+        "sources/evaluators/hybrid_verifier/registry.py",
+        "config.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/core/factory.py, workflow_factory.py, single_agent_factory.py, schema.py: builder helpers, not the loop",
+        "sources/core/failure_fingerprint.py: written by the verifier, not read by the loop",
+        "diversity_experiments/code_reference/selection.py: frozen experiment copy"
+      ]
+    },
+    "flow_sab_batch.html": {
+      "covers": [
+        "sources/benchmark_evaluation/*.py",
+        "datasets/ScienceAgentBench/eval_programs/*.py",
+        "run_notes/**/*.json",
+        "main.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "datasets/ScienceAgentBench/datasets/, gold_programs/, scoring_rubrics/: data only, counts given",
+        "105 of 111 eval_programs files after sampling 5"
+      ]
+    },
+    "flow_task_run.html": {
+      "covers": [
+        "main.py",
+        "config.py",
+        "sources/core/evolution_engine.py",
+        "sources/core/orchestrator.py",
+        "sources/core/workflow_factory.py",
+        "sources/core/factory.py",
+        "sources/core/workflow_runner.py",
+        "sources/core/variation_engine.py",
+        "sources/core/lineage.py",
+        "sources/core/workflow_info.py",
+        "sources/modules/smolagent_factory.py",
+        "sources/evaluators/evaluator.py",
+        "sources/evaluators/base.py",
+        "sources/evaluators/hybrid_verifier/evaluator.py",
+        "sources/utils/paths.py",
+        "sources/utils/workspace_management.py",
+        "sources/utils/run_metrics.py",
+        "sources/utils/precheck.py",
+        "sources/cli/evaluation_cli.py",
+        "sources/benchmark_evaluation/csv_mode.py",
+        "sources/benchmark_evaluation/capsule_evaluator.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/core/planner.py, single_agent_factory.py: --goal and --single_agent paths, outside this flow",
+        "sources/evaluators/{verifier,verifier_*,generic,scenario,bs_detection}.py: not on the default verifier path",
+        "tests/: not on the runtime path"
+      ]
+    },
+    "flow_verification.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/*.py",
+        "sources/evaluators/base.py",
+        "sources/evaluators/evaluator.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/evaluators/verifier*.py etc: covered by area_evaluators_legacy.html"
+      ]
+    },
+    "index.html": {
+      "covers": [
+        "docs/visual_clone/*.html"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "mod_core_evolution_engine.html": {
+      "covers": [
+        "sources/core/evolution_engine.py",
+        "sources/core/code_features.py",
+        "sources/core/failure_fingerprint.py",
+        "sources/core/orchestrator.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/utils/* one-line roles only, no cards",
+        "sources/core/genotype_embedding.py: only its entry point embed_genotype is shown"
+      ]
+    },
+    "mod_core_lineage.html": {
+      "covers": [
+        "sources/core/lineage.py",
+        "sources/core/workflow_info.py",
+        "sources/core/schema.py",
+        "sources/utils/evolution_tree.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/workflows/** runtime data: only lineage/run_metrics/goal files opened"
+      ]
+    },
+    "mod_core_planner.html": {
+      "covers": [
+        "sources/core/planner.py",
+        "sources/prompts/planner_*.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/utils/planner_visualization.py: pygame internals, one-line role only",
+        "sources/prompts/*.md line by line: Tier C"
+      ]
+    },
+    "mod_core_runner.html": {
+      "covers": [
+        "sources/core/workflow_runner.py",
+        "sources/core/workflow_factory.py",
+        "sources/core/factory.py",
+        "sources/core/single_agent_factory.py",
+        "sources/core/orchestrator.py",
+        "sources/modules/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/core/__init__.py: re-exports only",
+        "sources/modules/__pycache__: build artifact"
+      ]
+    },
+    "mod_core_selection.html": {
+      "covers": [
+        "sources/core/selection.py",
+        "sources/core/workflow_selection.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/core/genotype_embedding.py, code_features.py: covered by mod_core_variation.html"
+      ]
+    },
+    "mod_core_tools_llm.html": {
+      "covers": [
+        "sources/core/tools_manager.py",
+        "sources/core/llm_provider.py",
+        "sources/utils/perspicacite_client.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/core/__init__.py: re-exports only",
+        "ToolHive lifecycle helpers: disabled path, no runtime caller"
+      ]
+    },
+    "mod_core_variation.html": {
+      "covers": [
+        "sources/core/variation_engine.py",
+        "sources/core/genotype_embedding.py",
+        "sources/core/code_features.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "mod_evaluators_hybrid_verifier.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/evaluators/*.py at folder root: covered by area_evaluators.html / area_evaluators_legacy.html",
+        "experiments_verifiers/ harnesses: not opened, out of scope"
+      ]
+    },
+    "overview.html": {
+      "covers": [
+        "AGENTS.md",
+        "config_default.json",
+        "main.py",
+        "config.py",
+        "sources/core/*.py",
+        "sources/evaluators/hybrid_verifier/*.py",
+        "sources/utils/paths.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "_reference.html": {
+      "covers": [
+        "docs/visual_clone/_clone.css",
+        "docs/visual_clone/_clone.js"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_run_e2.html": {
+      "covers": [
+        "experiments_verifiers/harness/e4_policy_replay.py",
+        "experiments_verifiers/harness/run_e1.py",
+        "experiments_verifiers/harness/run_e2.py",
+        "experiments_verifiers/results/E1_*",
+        "experiments_verifiers/results/E2_*",
+        "experiments_verifiers/results/E2_static-grounding_20260921.json",
+        "experiments_verifiers/results/E2_static-grounding_20260921.md",
+        "experiments_verifiers/results/E4_*"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19c_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_*.py",
+        "experiments_verifiers/harness/e19c_eval.py",
+        "experiments_verifiers/results/E19c_*",
+        "experiments_verifiers/results/E19c_bt_cost_ledger_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_claims_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_digests_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.json",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.md",
+        "experiments_verifiers/results/E19c_scorers_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_scores_2026-09-25.jsonl",
+        "experiments_verifiers/results/_e19c_label_free_2026-09-25.json",
+        "experiments_verifiers/results/_e19c_scores_archive_2026-09-25.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e5_common.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5_common.py",
+        "experiments_verifiers/harness/e5_embed.py",
+        "experiments_verifiers/harness/e5_md.py",
+        "experiments_verifiers/harness/e5_run.py",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.*",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.json",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19_cascade_analysis.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19_*.py",
+        "experiments_verifiers/harness/e19_cascade_analysis.py",
+        "experiments_verifiers/results/E19_*",
+        "experiments_verifiers/results/E19_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_claims_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E19_gradient_duel_2026-09-23.md",
+        "experiments_verifiers/results/E19_hybrid_bt_2026-09-23.json",
+        "experiments_verifiers/results/E19_hybrid_bt_2026-09-23.md",
+        "experiments_verifiers/results/E19_scorers_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_scores_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e19_determinism_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e19_pilot1_gate_FAILED.json",
+        "experiments_verifiers/results/_e19_pilot1_scorers_archived.jsonl",
+        "experiments_verifiers/results/_e19_pilot1_scores_archived.jsonl",
+        "experiments_verifiers/results/_e19_pilot_2026-09-23.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19c_online_bt.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_*.py",
+        "experiments_verifiers/harness/e19c_online_bt.py",
+        "experiments_verifiers/results/E19c_*",
+        "experiments_verifiers/results/E19c_bt_cost_ledger_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_claims_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_digests_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.json",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.md",
+        "experiments_verifiers/results/E19c_scorers_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_scores_2026-09-25.jsonl",
+        "experiments_verifiers/results/_e19c_label_free_2026-09-25.json",
+        "experiments_verifiers/results/_e19c_scores_archive_2026-09-25.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e18_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e18_*.py",
+        "experiments_verifiers/harness/e18_gradient_duel.py",
+        "experiments_verifiers/results/E18_*",
+        "experiments_verifiers/results/E18_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl",
+        "experiments_verifiers/results/E18_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E18_gradient_duel_2026-09-23.md",
+        "experiments_verifiers/results/E18_scripted_bt_2026-09-23.json",
+        "experiments_verifiers/results/E18_scripted_bt_2026-09-23.md",
+        "experiments_verifiers/results/_e18_determinism_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e18_pilot_2026-09-23.json",
+        "experiments_verifiers/results/_e18_symmetric_2026-09-23.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_metrics.html": {
+      "covers": [
+        "experiments_verifiers/harness/metrics.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e8_blast_radius.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5b_splits.py",
+        "experiments_verifiers/harness/e5c_curve.py",
+        "experiments_verifiers/harness/e8_blast_radius.py",
+        "experiments_verifiers/harness/e9_deployment.py",
+        "experiments_verifiers/results/E5b_*",
+        "experiments_verifiers/results/E5c_*",
+        "experiments_verifiers/results/E8_*",
+        "experiments_verifiers/results/E8_blast_radius_20260922.json",
+        "experiments_verifiers/results/E8_blast_radius_20260922.md",
+        "experiments_verifiers/results/E9_*"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e4_policy_replay.html": {
+      "covers": [
+        "experiments_verifiers/harness/e4_policy_replay.py",
+        "experiments_verifiers/harness/run_e1.py",
+        "experiments_verifiers/harness/run_e2.py",
+        "experiments_verifiers/results/E1_*",
+        "experiments_verifiers/results/E2_*",
+        "experiments_verifiers/results/E4_*",
+        "experiments_verifiers/results/E4_policy_replay_20260921.json",
+        "experiments_verifiers/results/E4_summary.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19_hybrid_bt.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19_*.py",
+        "experiments_verifiers/harness/e19_hybrid_bt.py",
+        "experiments_verifiers/results/E19_*",
+        "experiments_verifiers/results/E19_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_claims_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E19_gradient_duel_2026-09-23.md",
+        "experiments_verifiers/results/E19_hybrid_bt_2026-09-23.json",
+        "experiments_verifiers/results/E19_hybrid_bt_2026-09-23.md",
+        "experiments_verifiers/results/E19_scorers_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_scores_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e19_determinism_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e19_pilot1_gate_FAILED.json",
+        "experiments_verifiers/results/_e19_pilot1_scorers_archived.jsonl",
+        "experiments_verifiers/results/_e19_pilot1_scores_archived.jsonl",
+        "experiments_verifiers/results/_e19_pilot_2026-09-23.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e13_umap.html": {
+      "covers": [
+        "experiments_verifiers/harness/e12_falsifier.py",
+        "experiments_verifiers/harness/e13_common.py",
+        "experiments_verifiers/harness/e13_l3_extreme.py",
+        "experiments_verifiers/harness/e13_umap.py",
+        "experiments_verifiers/results/E12_*",
+        "experiments_verifiers/results/E13_*",
+        "experiments_verifiers/results/E13_l3_extreme_2026-09-23.json",
+        "experiments_verifiers/results/E13_l3_extreme_2026-09-23.md",
+        "experiments_verifiers/results/E13_umap_claims_2026-09-23.png"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e3_run2.html": {
+      "covers": [
+        "experiments_verifiers/harness/e3_*.py",
+        "experiments_verifiers/harness/e3_run2.py",
+        "experiments_verifiers/results/E3_*",
+        "experiments_verifiers/results/E3_designA-pilot_20260921.json",
+        "experiments_verifiers/results/E3_designA-salvaged_20260921.json",
+        "experiments_verifiers/results/E3_designA_full_state.json",
+        "experiments_verifiers/results/E3_designA_state.json",
+        "experiments_verifiers/results/E3_llm_cache.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e3_md.html": {
+      "covers": [
+        "experiments_verifiers/harness/e3_*.py",
+        "experiments_verifiers/harness/e3_md.py",
+        "experiments_verifiers/results/E3_*",
+        "experiments_verifiers/results/E3_designA-pilot_20260921.json",
+        "experiments_verifiers/results/E3_designA-salvaged_20260921.json",
+        "experiments_verifiers/results/E3_designA_full_state.json",
+        "experiments_verifiers/results/E3_designA_state.json",
+        "experiments_verifiers/results/E3_llm_cache.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e15_bt_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e14_bt_enabler.py",
+        "experiments_verifiers/harness/e15_bt_eval.py",
+        "experiments_verifiers/harness/e15_bt_pilot.py",
+        "experiments_verifiers/results/E14_*",
+        "experiments_verifiers/results/E15_*",
+        "experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E15_bt_pilot_2026-09-23.json",
+        "experiments_verifiers/results/E15_bt_pilot_2026-09-23.md",
+        "experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_index.html": {
+      "covers": [
+        "experiments_verifiers/harness/*.py",
+        "experiments_verifiers/results/**"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e18_bt_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e16_gradient_audit.py",
+        "experiments_verifiers/harness/e17_gradient_duel.py",
+        "experiments_verifiers/harness/e18_bt_eval.py",
+        "experiments_verifiers/results/E16_*",
+        "experiments_verifiers/results/E17_*",
+        "experiments_verifiers/results/E18_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl",
+        "experiments_verifiers/results/E18_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E18_gradient_duel_2026-09-23.md",
+        "experiments_verifiers/results/E18_scripted_bt_2026-09-23.json",
+        "experiments_verifiers/results/E18_scripted_bt_2026-09-23.md",
+        "experiments_verifiers/results/_e18_determinism_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e18_pilot_2026-09-23.json",
+        "experiments_verifiers/results/_e18_symmetric_2026-09-23.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e5_embed.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5_common.py",
+        "experiments_verifiers/harness/e5_embed.py",
+        "experiments_verifiers/harness/e5_md.py",
+        "experiments_verifiers/harness/e5_run.py",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.*",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.json",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19b_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_*.py",
+        "experiments_verifiers/harness/e19b_eval.py",
+        "experiments_verifiers/results/E19b_*",
+        "experiments_verifiers/results/E19b_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_claims_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md",
+        "experiments_verifiers/results/E19b_scorers_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scorers_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e19b_diagnosis_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_dryrun_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e24_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_common.py",
+        "experiments_verifiers/harness/e24_eval.py",
+        "experiments_verifiers/harness/e24_holdout.py",
+        "experiments_verifiers/harness/e24_iomap.py",
+        "experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md",
+        "experiments_verifiers/results/_e24_*.json*",
+        "experiments_verifiers/results/_e24_gates_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_keys_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_holdout_pilot_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_pilot_2026-09-24.json",
+        "experiments_verifiers/results/_e24_reexec_det_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_reexec_ledger_2026-09-24.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19c_ratchet.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_*.py",
+        "experiments_verifiers/harness/e19c_ratchet.py",
+        "experiments_verifiers/results/E19c_*",
+        "experiments_verifiers/results/E19c_bt_cost_ledger_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_claims_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_digests_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.json",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.md",
+        "experiments_verifiers/results/E19c_scorers_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_scores_2026-09-25.jsonl",
+        "experiments_verifiers/results/_e19c_label_free_2026-09-25.json",
+        "experiments_verifiers/results/_e19c_scores_archive_2026-09-25.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e3_common.html": {
+      "covers": [
+        "experiments_verifiers/harness/e3_*.py",
+        "experiments_verifiers/harness/e3_common.py",
+        "experiments_verifiers/results/E3_*",
+        "experiments_verifiers/results/E3_designA-pilot_20260921.json",
+        "experiments_verifiers/results/E3_designA-salvaged_20260921.json",
+        "experiments_verifiers/results/E3_designA_full_state.json",
+        "experiments_verifiers/results/E3_designA_state.json",
+        "experiments_verifiers/results/E3_llm_cache.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19b_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_*.py",
+        "experiments_verifiers/harness/e19b_gradient_duel.py",
+        "experiments_verifiers/results/E19b_*",
+        "experiments_verifiers/results/E19b_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_claims_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md",
+        "experiments_verifiers/results/E19b_scorers_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scorers_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e19b_diagnosis_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_dryrun_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e24_reexec.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_gradient_duel.py",
+        "experiments_verifiers/harness/e24_reexec.py",
+        "experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md",
+        "experiments_verifiers/results/_e24_gates_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_keys_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_holdout_pilot_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_pilot_2026-09-24.json",
+        "experiments_verifiers/results/_e24_reexec_det_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_reexec_ledger_2026-09-24.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19_bt_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19_*.py",
+        "experiments_verifiers/harness/e19_bt_eval.py",
+        "experiments_verifiers/results/E19_*",
+        "experiments_verifiers/results/E19_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_claims_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E19_gradient_duel_2026-09-23.md",
+        "experiments_verifiers/results/E19_hybrid_bt_2026-09-23.json",
+        "experiments_verifiers/results/E19_hybrid_bt_2026-09-23.md",
+        "experiments_verifiers/results/E19_scorers_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_scores_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e19_determinism_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e19_pilot1_gate_FAILED.json",
+        "experiments_verifiers/results/_e19_pilot1_scorers_archived.jsonl",
+        "experiments_verifiers/results/_e19_pilot1_scores_archived.jsonl",
+        "experiments_verifiers/results/_e19_pilot_2026-09-23.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19b_dryrun.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_*.py",
+        "experiments_verifiers/harness/e19b_dryrun.py",
+        "experiments_verifiers/results/E19b_*",
+        "experiments_verifiers/results/E19b_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_claims_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md",
+        "experiments_verifiers/results/E19b_scorers_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scorers_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e19b_diagnosis_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_dryrun_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_harness_init.html": {
+      "covers": [
+        "experiments_verifiers/harness/__init__.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e5c_curve.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5b_splits.py",
+        "experiments_verifiers/harness/e5c_curve.py",
+        "experiments_verifiers/harness/e8_blast_radius.py",
+        "experiments_verifiers/harness/e9_deployment.py",
+        "experiments_verifiers/results/E5b_*",
+        "experiments_verifiers/results/E5c_*",
+        "experiments_verifiers/results/E5c_data_efficiency.png",
+        "experiments_verifiers/results/E5c_data_efficiency.svg",
+        "experiments_verifiers/results/E5c_data_efficiency_2026-09-21.json",
+        "experiments_verifiers/results/E5c_data_efficiency_2026-09-21.md",
+        "experiments_verifiers/results/E8_*",
+        "experiments_verifiers/results/E9_*"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_claims_pattern_analysis.html": {
+      "covers": [
+        "experiments_verifiers/harness/claims_pattern_analysis.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e5b_splits.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5b_splits.py",
+        "experiments_verifiers/harness/e5c_curve.py",
+        "experiments_verifiers/harness/e8_blast_radius.py",
+        "experiments_verifiers/harness/e9_deployment.py",
+        "experiments_verifiers/results/E5b_*",
+        "experiments_verifiers/results/E5b_L3_splits_2026-09-21.json",
+        "experiments_verifiers/results/E5b_L3_splits_2026-09-21.md",
+        "experiments_verifiers/results/E5c_*",
+        "experiments_verifiers/results/E8_*",
+        "experiments_verifiers/results/E9_*"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e24_iomap.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_common.py",
+        "experiments_verifiers/harness/e24_eval.py",
+        "experiments_verifiers/harness/e24_holdout.py",
+        "experiments_verifiers/harness/e24_iomap.py",
+        "experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md",
+        "experiments_verifiers/results/_e24_*.json*",
+        "experiments_verifiers/results/_e24_gates_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_keys_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_holdout_pilot_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_pilot_2026-09-24.json",
+        "experiments_verifiers/results/_e24_reexec_det_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_reexec_ledger_2026-09-24.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e5_run.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5_common.py",
+        "experiments_verifiers/harness/e5_embed.py",
+        "experiments_verifiers/harness/e5_md.py",
+        "experiments_verifiers/harness/e5_run.py",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.*",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.json",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e5_md.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5_common.py",
+        "experiments_verifiers/harness/e5_embed.py",
+        "experiments_verifiers/harness/e5_md.py",
+        "experiments_verifiers/harness/e5_run.py",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.*",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.json",
+        "experiments_verifiers/results/E5_learned_importance_2026-09-21.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e12_falsifier.html": {
+      "covers": [
+        "experiments_verifiers/harness/e12_falsifier.py",
+        "experiments_verifiers/harness/e13_common.py",
+        "experiments_verifiers/harness/e13_l3_extreme.py",
+        "experiments_verifiers/harness/e13_umap.py",
+        "experiments_verifiers/results/E12_*",
+        "experiments_verifiers/results/E12_instability_falsifier_2026-09-23.json",
+        "experiments_verifiers/results/E12_instability_falsifier_2026-09-23.md",
+        "experiments_verifiers/results/E13_*"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e24_common.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_common.py",
+        "experiments_verifiers/harness/e24_eval.py",
+        "experiments_verifiers/harness/e24_holdout.py",
+        "experiments_verifiers/harness/e24_iomap.py",
+        "experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md",
+        "experiments_verifiers/results/_e24_*.json*",
+        "experiments_verifiers/results/_e24_gates_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_keys_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_holdout_pilot_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_pilot_2026-09-24.json",
+        "experiments_verifiers/results/_e24_reexec_det_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_reexec_ledger_2026-09-24.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e14_bt_enabler.html": {
+      "covers": [
+        "experiments_verifiers/harness/e14_bt_enabler.py",
+        "experiments_verifiers/harness/e15_bt_eval.py",
+        "experiments_verifiers/harness/e15_bt_pilot.py",
+        "experiments_verifiers/results/E14_*",
+        "experiments_verifiers/results/E14_bt_enabler_2026-09-23.json",
+        "experiments_verifiers/results/E14_bt_enabler_2026-09-23.md",
+        "experiments_verifiers/results/E14_bt_population.json",
+        "experiments_verifiers/results/E15_*"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_harness_import.html": {
+      "covers": [
+        "experiments_verifiers/harness/harness_import.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e18_scripted_bt.html": {
+      "covers": [
+        "experiments_verifiers/harness/e18_*.py",
+        "experiments_verifiers/harness/e18_scripted_bt.py",
+        "experiments_verifiers/results/E18_*",
+        "experiments_verifiers/results/E18_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl",
+        "experiments_verifiers/results/E18_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E18_gradient_duel_2026-09-23.md",
+        "experiments_verifiers/results/E18_scripted_bt_2026-09-23.json",
+        "experiments_verifiers/results/E18_scripted_bt_2026-09-23.md",
+        "experiments_verifiers/results/_e18_determinism_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e18_pilot_2026-09-23.json",
+        "experiments_verifiers/results/_e18_symmetric_2026-09-23.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e13_common.html": {
+      "covers": [
+        "experiments_verifiers/harness/e12_falsifier.py",
+        "experiments_verifiers/harness/e13_common.py",
+        "experiments_verifiers/harness/e13_l3_extreme.py",
+        "experiments_verifiers/harness/e13_umap.py",
+        "experiments_verifiers/results/E12_*",
+        "experiments_verifiers/results/E13_*",
+        "experiments_verifiers/results/E13_l3_extreme_2026-09-23.json",
+        "experiments_verifiers/results/E13_l3_extreme_2026-09-23.md",
+        "experiments_verifiers/results/E13_umap_claims_2026-09-23.png"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e24_holdout.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_common.py",
+        "experiments_verifiers/harness/e24_eval.py",
+        "experiments_verifiers/harness/e24_holdout.py",
+        "experiments_verifiers/harness/e24_iomap.py",
+        "experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md",
+        "experiments_verifiers/results/_e24_*.json*",
+        "experiments_verifiers/results/_e24_gates_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_keys_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_holdout_pilot_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_pilot_2026-09-24.json",
+        "experiments_verifiers/results/_e24_reexec_det_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_reexec_ledger_2026-09-24.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19b_extract.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_*.py",
+        "experiments_verifiers/harness/e19b_extract.py",
+        "experiments_verifiers/results/E19b_*",
+        "experiments_verifiers/results/E19b_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_claims_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md",
+        "experiments_verifiers/results/E19b_scorers_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scorers_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e19b_diagnosis_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_dryrun_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19c_confirm.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_*.py",
+        "experiments_verifiers/harness/e19c_confirm.py",
+        "experiments_verifiers/results/E19c_*",
+        "experiments_verifiers/results/E19c_bt_cost_ledger_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_claims_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_digests_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.json",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.md",
+        "experiments_verifiers/results/E19c_scorers_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_scores_2026-09-25.jsonl",
+        "experiments_verifiers/results/_e19c_label_free_2026-09-25.json",
+        "experiments_verifiers/results/_e19c_scores_archive_2026-09-25.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19c_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_*.py",
+        "experiments_verifiers/harness/e19c_gradient_duel.py",
+        "experiments_verifiers/results/E19c_*",
+        "experiments_verifiers/results/E19c_bt_cost_ledger_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_claims_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_digests_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json",
+        "experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.json",
+        "experiments_verifiers/results/E19c_ratchet_2026-09-25.md",
+        "experiments_verifiers/results/E19c_scorers_2026-09-25.jsonl",
+        "experiments_verifiers/results/E19c_scores_2026-09-25.jsonl",
+        "experiments_verifiers/results/_e19c_label_free_2026-09-25.json",
+        "experiments_verifiers/results/_e19c_scores_archive_2026-09-25.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19b_diagnose.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_*.py",
+        "experiments_verifiers/harness/e19b_diagnose.py",
+        "experiments_verifiers/results/E19b_*",
+        "experiments_verifiers/results/E19b_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_claims_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E19b_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json",
+        "experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md",
+        "experiments_verifiers/results/E19b_scorers_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scorers_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v1c_2026-09-24.jsonl",
+        "experiments_verifiers/results/E19b_scores_v2_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e19b_diagnosis_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_dryrun_2026-09-24.json",
+        "experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e13_l3_extreme.html": {
+      "covers": [
+        "experiments_verifiers/harness/e12_falsifier.py",
+        "experiments_verifiers/harness/e13_common.py",
+        "experiments_verifiers/harness/e13_l3_extreme.py",
+        "experiments_verifiers/harness/e13_umap.py",
+        "experiments_verifiers/results/E12_*",
+        "experiments_verifiers/results/E13_*",
+        "experiments_verifiers/results/E13_l3_extreme_2026-09-23.json",
+        "experiments_verifiers/results/E13_l3_extreme_2026-09-23.md",
+        "experiments_verifiers/results/E13_umap_claims_2026-09-23.png"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e18_symmetric.html": {
+      "covers": [
+        "experiments_verifiers/harness/e18_*.py",
+        "experiments_verifiers/harness/e18_symmetric.py",
+        "experiments_verifiers/results/E18_*",
+        "experiments_verifiers/results/E18_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl",
+        "experiments_verifiers/results/E18_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E18_gradient_duel_2026-09-23.md",
+        "experiments_verifiers/results/E18_scripted_bt_2026-09-23.json",
+        "experiments_verifiers/results/E18_scripted_bt_2026-09-23.md",
+        "experiments_verifiers/results/_e18_determinism_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e18_pilot_2026-09-23.json",
+        "experiments_verifiers/results/_e18_symmetric_2026-09-23.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e17_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e16_gradient_audit.py",
+        "experiments_verifiers/harness/e17_gradient_duel.py",
+        "experiments_verifiers/harness/e18_bt_eval.py",
+        "experiments_verifiers/results/E16_*",
+        "experiments_verifiers/results/E17_*",
+        "experiments_verifiers/results/E17_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E17_gradient_duel_2026-09-23.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e9_deployment.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5b_splits.py",
+        "experiments_verifiers/harness/e5c_curve.py",
+        "experiments_verifiers/harness/e8_blast_radius.py",
+        "experiments_verifiers/harness/e9_deployment.py",
+        "experiments_verifiers/results/E5b_*",
+        "experiments_verifiers/results/E5c_*",
+        "experiments_verifiers/results/E8_*",
+        "experiments_verifiers/results/E9_*",
+        "experiments_verifiers/results/E9_l3_deployment_sane_2026-09-22.json",
+        "experiments_verifiers/results/E9_l3_deployment_sane_2026-09-22.md"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e24_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_gradient_duel.py",
+        "experiments_verifiers/harness/e24_reexec.py",
+        "experiments_verifiers/results/E24_bt_cost_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.json",
+        "experiments_verifiers/results/E24_gradient_duel_2026-09-24.md",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json",
+        "experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md",
+        "experiments_verifiers/results/_e24_gates_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_keys_2026-09-24.json",
+        "experiments_verifiers/results/_e24_holdout_ledger_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_holdout_pilot_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_pilot_2026-09-24.json",
+        "experiments_verifiers/results/_e24_reexec_det_2026-09-24.jsonl",
+        "experiments_verifiers/results/_e24_reexec_ledger_2026-09-24.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e16_gradient_audit.html": {
+      "covers": [
+        "experiments_verifiers/harness/e16_gradient_audit.py",
+        "experiments_verifiers/harness/e17_gradient_duel.py",
+        "experiments_verifiers/harness/e18_bt_eval.py",
+        "experiments_verifiers/results/E16_*",
+        "experiments_verifiers/results/E16_gradient_relevance_2026-09-23.json",
+        "experiments_verifiers/results/E16_gradient_relevance_2026-09-23.md",
+        "experiments_verifiers/results/E17_*",
+        "experiments_verifiers/results/_e16_judge_cache.jsonl",
+        "experiments_verifiers/results/_e16_phase1.json",
+        "experiments_verifiers/results/_e16_phase2.json",
+        "experiments_verifiers/results/_e16_population.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_run_e1.html": {
+      "covers": [
+        "experiments_verifiers/harness/e4_policy_replay.py",
+        "experiments_verifiers/harness/run_e1.py",
+        "experiments_verifiers/harness/run_e2.py",
+        "experiments_verifiers/results/E1_*",
+        "experiments_verifiers/results/E1_rubric_surgery_20260921.json",
+        "experiments_verifiers/results/E1_rubric_surgery_20260921.md",
+        "experiments_verifiers/results/E2_*",
+        "experiments_verifiers/results/E4_*"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_claims_pca_3d.html": {
+      "covers": [
+        "experiments_verifiers/harness/claims_pca_3d.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e3_run.html": {
+      "covers": [
+        "experiments_verifiers/harness/e3_*.py",
+        "experiments_verifiers/harness/e3_run.py",
+        "experiments_verifiers/results/E3_*",
+        "experiments_verifiers/results/E3_designA-pilot_20260921.json",
+        "experiments_verifiers/results/E3_designA-salvaged_20260921.json",
+        "experiments_verifiers/results/E3_designA_full_state.json",
+        "experiments_verifiers/results/E3_designA_state.json",
+        "experiments_verifiers/results/E3_llm_cache.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e19_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19_*.py",
+        "experiments_verifiers/harness/e19_gradient_duel.py",
+        "experiments_verifiers/results/E19_*",
+        "experiments_verifiers/results/E19_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_claims_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_gradient_duel_2026-09-23.json",
+        "experiments_verifiers/results/E19_gradient_duel_2026-09-23.md",
+        "experiments_verifiers/results/E19_hybrid_bt_2026-09-23.json",
+        "experiments_verifiers/results/E19_hybrid_bt_2026-09-23.md",
+        "experiments_verifiers/results/E19_scorers_2026-09-23.jsonl",
+        "experiments_verifiers/results/E19_scores_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e19_determinism_2026-09-23.jsonl",
+        "experiments_verifiers/results/_e19_pilot1_gate_FAILED.json",
+        "experiments_verifiers/results/_e19_pilot1_scorers_archived.jsonl",
+        "experiments_verifiers/results/_e19_pilot1_scores_archived.jsonl",
+        "experiments_verifiers/results/_e19_pilot_2026-09-23.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "exp_e15_bt_pilot.html": {
+      "covers": [
+        "experiments_verifiers/harness/e14_bt_enabler.py",
+        "experiments_verifiers/harness/e15_bt_eval.py",
+        "experiments_verifiers/harness/e15_bt_pilot.py",
+        "experiments_verifiers/results/E14_*",
+        "experiments_verifiers/results/E15_*",
+        "experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl",
+        "experiments_verifiers/results/E15_bt_pilot_2026-09-23.json",
+        "experiments_verifiers/results/E15_bt_pilot_2026-09-23.md",
+        "experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_init.html": {
+      "covers": [
+        "sources/core/__init__.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_code_features.html": {
+      "covers": [
+        "sources/core/code_features.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_evolution_engine.html": {
+      "covers": [
+        "sources/core/evolution_engine.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_factory.html": {
+      "covers": [
+        "sources/core/factory.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_failure_fingerprint.html": {
+      "covers": [
+        "sources/core/failure_fingerprint.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_genotype_embedding.html": {
+      "covers": [
+        "sources/core/genotype_embedding.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_lineage.html": {
+      "covers": [
+        "sources/core/lineage.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_llm_provider.html": {
+      "covers": [
+        "sources/core/llm_provider.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_orchestrator.html": {
+      "covers": [
+        "sources/core/orchestrator.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_planner.html": {
+      "covers": [
+        "sources/core/planner.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_schema.html": {
+      "covers": [
+        "sources/core/schema.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_selection.html": {
+      "covers": [
+        "sources/core/selection.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_single_agent_factory.html": {
+      "covers": [
+        "sources/core/single_agent_factory.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_tools_manager.html": {
+      "covers": [
+        "sources/core/tools_manager.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_variation_engine.html": {
+      "covers": [
+        "sources/core/variation_engine.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_workflow_factory.html": {
+      "covers": [
+        "sources/core/workflow_factory.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_workflow_info.html": {
+      "covers": [
+        "sources/core/workflow_info.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_workflow_runner.html": {
+      "covers": [
+        "sources/core/workflow_runner.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_core_workflow_selection.html": {
+      "covers": [
+        "sources/core/workflow_selection.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_init.html": {
+      "covers": [
+        "experiments_verifiers/harness/__init__.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_claims_pattern_analysis.html": {
+      "covers": [
+        "experiments_verifiers/harness/claims_pattern_analysis.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_claims_pca_3d.html": {
+      "covers": [
+        "experiments_verifiers/harness/claims_pca_3d.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e12_falsifier.html": {
+      "covers": [
+        "experiments_verifiers/harness/e12_falsifier.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e13_common.html": {
+      "covers": [
+        "experiments_verifiers/harness/e13_common.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e13_l3_extreme.html": {
+      "covers": [
+        "experiments_verifiers/harness/e13_l3_extreme.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e13_umap.html": {
+      "covers": [
+        "experiments_verifiers/harness/e13_umap.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e14_bt_enabler.html": {
+      "covers": [
+        "experiments_verifiers/harness/e14_bt_enabler.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e15_bt_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e15_bt_eval.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e15_bt_pilot.html": {
+      "covers": [
+        "experiments_verifiers/harness/e15_bt_pilot.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e16_gradient_audit.html": {
+      "covers": [
+        "experiments_verifiers/harness/e16_gradient_audit.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e17_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e17_gradient_duel.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e18_bt_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e18_bt_eval.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e18_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e18_gradient_duel.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e18_scripted_bt.html": {
+      "covers": [
+        "experiments_verifiers/harness/e18_scripted_bt.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e18_symmetric.html": {
+      "covers": [
+        "experiments_verifiers/harness/e18_symmetric.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19_bt_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19_bt_eval.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19_cascade_analysis.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19_cascade_analysis.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19_gradient_duel.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19_hybrid_bt.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19_hybrid_bt.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19b_diagnose.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_diagnose.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19b_dryrun.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_dryrun.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19b_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_eval.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19b_extract.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_extract.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19b_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19b_gradient_duel.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19c_confirm.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_confirm.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19c_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_eval.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19c_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_gradient_duel.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19c_online_bt.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_online_bt.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e19c_ratchet.html": {
+      "covers": [
+        "experiments_verifiers/harness/e19c_ratchet.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e24_common.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_common.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e24_eval.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_eval.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e24_gradient_duel.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_gradient_duel.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e24_holdout.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_holdout.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e24_iomap.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_iomap.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e24_reexec.html": {
+      "covers": [
+        "experiments_verifiers/harness/e24_reexec.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e3_common.html": {
+      "covers": [
+        "experiments_verifiers/harness/e3_common.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e3_md.html": {
+      "covers": [
+        "experiments_verifiers/harness/e3_md.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e3_run.html": {
+      "covers": [
+        "experiments_verifiers/harness/e3_run.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e3_run2.html": {
+      "covers": [
+        "experiments_verifiers/harness/e3_run2.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e4_policy_replay.html": {
+      "covers": [
+        "experiments_verifiers/harness/e4_policy_replay.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e5_common.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5_common.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e5_embed.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5_embed.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e5_md.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5_md.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e5_run.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5_run.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e5b_splits.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5b_splits.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e5c_curve.html": {
+      "covers": [
+        "experiments_verifiers/harness/e5c_curve.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e8_blast_radius.html": {
+      "covers": [
+        "experiments_verifiers/harness/e8_blast_radius.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e9_deployment.html": {
+      "covers": [
+        "experiments_verifiers/harness/e9_deployment.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_harness_import.html": {
+      "covers": [
+        "experiments_verifiers/harness/harness_import.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_metrics.html": {
+      "covers": [
+        "experiments_verifiers/harness/metrics.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_run_e1.html": {
+      "covers": [
+        "experiments_verifiers/harness/run_e1.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_run_e2.html": {
+      "covers": [
+        "experiments_verifiers/harness/run_e2.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_eval_base.html": {
+      "covers": [
+        "sources/evaluators/base.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_eval_bs_detection.html": {
+      "covers": [
+        "sources/evaluators/bs_detection.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_eval_evaluator.html": {
+      "covers": [
+        "sources/evaluators/evaluator.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_eval_generic.html": {
+      "covers": [
+        "sources/evaluators/generic.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_eval_grounding.html": {
+      "covers": [
+        "sources/evaluators/grounding.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_eval_scenario.html": {
+      "covers": [
+        "sources/evaluators/scenario.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_init.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/__init__.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_aggregation.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/aggregation.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_claims.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/claims.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_digest.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/digest.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_evaluator.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/evaluator.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_gradient.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/gradient.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_inventory.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/inventory.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_layers.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/layers.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_registry.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/registry.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_hybrid_scorers.html": {
+      "covers": [
+        "sources/evaluators/hybrid_verifier/scorers.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_index.html": {
+      "covers": [
+        "sources/core/*.py",
+        "experiments_verifiers/harness/*.py",
+        "sources/evaluators/*.py",
+        "sources/evaluators/hybrid_verifier/*.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": [
+        "sources/evaluators/verifier*.py (deprecated)"
+      ]
+    },
+    "exp_e25_creed.html": {
+      "covers": [
+        "experiments_verifiers/harness/e25_creed.py",
+        "experiments_verifiers/results/E25_creED_autopsy_2026-09-25.json",
+        "experiments_verifiers/results/E25_creED_autopsy_2026-09-25.md",
+        "experiments_verifiers/results/E25_creED_bt_cost_ledger_2026-09-25.jsonl",
+        "experiments_verifiers/results/E25_creED_judgments_2026-09-25.jsonl",
+        "experiments_verifiers/results/_e25_depth_llm_2026-09-25.jsonl",
+        "experiments_verifiers/results/_e25_depth_sample_2026-09-25.jsonl",
+        "experiments_verifiers/results/_e25_flip_cases_2026-09-25.json"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    },
+    "file_harness_e25_creed.html": {
+      "covers": [
+        "experiments_verifiers/harness/e25_creed.py"
+      ],
+      "commit": "7e8463b",
+      "date": "2026-10-02",
+      "skipped": []
+    }
+  },
+  "changelog": [
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "*"
+      ],
+      "note": "first build"
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "exp_*.html",
+        "exp_index.html"
+      ],
+      "note": "added one page per harness experiment script (53) plus the hub"
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "*"
+      ],
+      "note": "review pass: 7 reviewers re-checked structure, links, symbols, text budget and re-derived 1 625+ numbers from the results files; citations and counts corrected in ~120 places."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "data_runs.html"
+      ],
+      "note": "compliance pass: duplicate SVG marker id renamed so the second diagram's arrowheads take the mint colour."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "exp_run_e1.html"
+      ],
+      "note": "coordinator: full_metrics attributed to run_e1.py (L166), not harness/metrics.py."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "exp_index.html",
+        "exp_e5b_splits.html",
+        "exp_e5c_curve.html",
+        "exp_e8_blast_radius.html",
+        "exp_e9_deployment.html"
+      ],
+      "note": "coordinator: hub link target corrected; #L fragments removed from repo-file links."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "file_*.html",
+        "file_index.html"
+      ],
+      "note": "added one digest page per file (88) plus the hub, for sources/core, experiments_verifiers/harness and the current evaluator files"
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "*"
+      ],
+      "note": "file-digest phase reviewed: 4 reviewers checked structure, links, box budget, master-diagram edges and symbol-inventory completeness across 88 file pages plus the hub."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "file_*.html"
+      ],
+      "note": "file-digest review: 4 reviewers corrected 103 line citations, 700+ diagram edges, 3 malformed closing tags, and text-budget overruns."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "file_harness_e18_scripted_bt.html",
+        "file_core_genotype_embedding.html",
+        "file_core_lineage.html",
+        "file_core_llm_provider.html",
+        "file_core_planner.html"
+      ],
+      "note": "coordinator: fixed the last anchor-closed-with-</g> markup bug; worker had already split the 15-box planner diagram into 12/12/12."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "file_harness_e24_gradient_duel.html",
+        "area_security_transparency.html",
+        "file_core_tools_manager.html",
+        "file_core_workflow_factory.html",
+        "file_core_variation_engine.html",
+        "file_core_single_agent_factory.html",
+        "file_harness_e19c_gradient_duel.html"
+      ],
+      "note": "final compliance pass: escaped 2 SVG labels, closed 2 unclosed panel divs, added 2 heading anchors for dead fragments (#inv, #rw), normalised one covers path"
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "index.html",
+        "overview.html"
+      ],
+      "note": "final compliance pass: 8 mechanical fixes (escaped pseudo-tags, 2 unclosed divs, 5 missing #inv/#rw anchors, covers normalisation); all 9 checklist areas pass on 172 pages."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "exp_e25_creed.html",
+        "file_harness_e25_creed.html",
+        "exp_index.html",
+        "file_index.html",
+        "index.html",
+        "data_experiments.html"
+      ],
+      "note": "E25 'CREED' landed in experiments_verifiers/ (new harness script e25_creed.py, 2 038 lines, plus 6 result files): added its experiment page and file digest, refreshed both hubs, the menu and the experiments data page. experiments_verifiers/ is untracked, so HEAD is still 7e8463b."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7e8463b",
+      "pages": [
+        "exp_e25_creed.html",
+        "file_harness_e25_creed.html",
+        "data_experiments.html",
+        "exp_index.html",
+        "file_index.html",
+        "index.html"
+      ],
+      "note": "E25 update reviewed: 164 numbers re-derived; V2/V3 pilot arms, the 219-row snapshot and the 394-row cost ledger corrected, result-file listing and counts refreshed."
+    }
+  ],
+  "review": {
+    "reviewers": [
+      "review-core",
+      "review-eval",
+      "review-app",
+      "exp-review-a",
+      "exp-review-b",
+      "visual-clone-sync",
+      "visual-clone-final-sync",
+      "fd-rev-core",
+      "fd-rev-eval",
+      "fd-rev-harness-a",
+      "fd-rev-harness-b"
+    ],
+    "numbers_re_derived": 1625,
+    "checks": [
+      "offline",
+      "link resolution",
+      "symbol existence",
+      "numbers vs results files",
+      "diagram box budget",
+      "text budget",
+      "banned words",
+      "footer skips",
+      "no secrets"
+    ]
+  },
+  "counts": {
+    "pages": 174,
+    "html_files": 174,
+    "diagrams": 447,
+    "file_digest_pages": 89,
+    "file_digest_files_with_prefix": 90,
+    "experiment_pages": 54,
+    "experiment_files_with_prefix": 55,
+    "note": "prefix counts include the two hub pages file_index.html and exp_index.html"
+  }
+}

@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19b_dryrun.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > experiments_verifiers/harness > e19b_dryrun.py">
+<div class="wrap">
+
+<h1 class="hud">e19b_dryrun.py</h1>
+<p class="intro">This script picks the E19b variant without touching a single benchmark label. It loads five configs (two claim sets, three score ledgers), scores the planned generation pairs under three aggregation rules, writes V5 gradient texts and judges a declared 5-group pilot. It runs from the command line with three subcommands: proxies, gradients and pilot-judge.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; inputs, dispatch, three commands, three outputs</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 430" role="img" aria-label="e19b_dryrun: three input groups, main dispatch, helper rules, three commands, three outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="i1" href="../../experiments_verifiers/results/E19_claims_2026-09-23.jsonl">
+    <title>E19 v1 claim and score ledgers, one of the five configs</title>
+    <rect x="20" y="40" width="170" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="105" y="64" text-anchor="middle">E19 v1 ledgers</text>
+    <text class="box-sub" x="105" y="80" text-anchor="middle">E19H.CLAIMS, SCORES</text>
+  </a>
+  <a class="box" id="i2" href="../../experiments_verifiers/results/E19b_claims_v2_2026-09-24.jsonl">
+    <title>E19b ledgers written by e19b_extract.py</title>
+    <rect x="20" y="130" width="170" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="105" y="154" text-anchor="middle">E19b ledgers</text>
+    <text class="box-sub" x="105" y="170" text-anchor="middle">XB.CLAIMS2, SCORES2, SCORES1C</text>
+  </a>
+  <a class="box" id="i3" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>E14 plan plus the E16 judge population</title>
+    <rect x="20" y="220" width="170" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="105" y="244" text-anchor="middle">plan and population</text>
+    <text class="box-sub" x="105" y="260" text-anchor="middle">E18.load_plan, E16.POP_JSON</text>
+  </a>
+
+  <a class="box" id="mn" href="../../experiments_verifiers/harness/e19b_dryrun.py">
+    <title>main() parses three subcommands with argparse</title>
+    <rect x="230" y="150" width="160" height="64" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="310" y="176" text-anchor="middle">main()</text>
+    <text class="box-sub" x="310" y="194" text-anchor="middle">line 441, three subcommands</text>
+  </a>
+
+  <a class="box" id="hx" href="../../experiments_verifiers/harness/e19b_dryrun.py">
+    <title>Shared label-free rules used by both counting commands</title>
+    <rect x="440" y="140" width="170" height="84" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="525" y="166" text-anchor="middle">surviving / decisive</text>
+    <text class="box-label" x="525" y="184" text-anchor="middle">winner_of</text>
+    <text class="box-sub" x="525" y="204" text-anchor="middle">lines 92, 105, 120</text>
+  </a>
+
+  <a class="box" id="c1" href="../../experiments_verifiers/harness/e19b_dryrun.py">
+    <title>proxies: per-config counts over 19 groups and 667 pairs</title>
+    <rect x="660" y="30" width="220" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="54" text-anchor="middle">proxies(config)</text>
+    <text class="box-sub" x="770" y="72" text-anchor="middle">line 135, all 5 configs</text>
+  </a>
+  <a class="box" id="c2" href="../../experiments_verifiers/harness/e19b_dryrun.py">
+    <title>write_gradients_v2: V5 assembly of one text file per generation</title>
+    <rect x="660" y="150" width="220" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="174" text-anchor="middle">write_gradients_v2(config)</text>
+    <text class="box-sub" x="770" y="192" text-anchor="middle">line 240, returns file count</text>
+  </a>
+  <a class="box" id="c3" href="../../experiments_verifiers/harness/e19b_dryrun.py">
+    <title>pilot_judge: E16 judge calls on the declared pilot groups</title>
+    <rect x="660" y="250" width="220" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="274" text-anchor="middle">pilot_judge(config)</text>
+    <text class="box-sub" x="770" y="292" text-anchor="middle">line 362, paid calls</text>
+  </a>
+
+  <a class="box" id="o1" href="../../experiments_verifiers/results/_e19b_dryrun_2026-09-24.json">
+    <title>Proxy table for the five configs</title>
+    <rect x="20" y="340" width="240" height="60" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="140" y="364" text-anchor="middle">_e19b_dryrun json</text>
+    <text class="box-sub" x="140" y="382" text-anchor="middle">OUT line 43, write line 449</text>
+  </a>
+  <a class="box" id="o2" href="../../experiments_verifiers/results/E19b_bt_gradients_v2">
+    <title>One V5 gradient text per generation uuid</title>
+    <rect x="300" y="340" width="270" height="60" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="435" y="364" text-anchor="middle">GRAD_ROOT uuid.txt</text>
+    <text class="box-sub" x="435" y="382" text-anchor="middle">line 44, write line 354</text>
+  </a>
+  <a class="box" id="o3" href="../../experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json">
+    <title>Pilot relevance table against the cached v1 judgments</title>
+    <rect x="610" y="340" width="270" height="60" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="745" y="364" text-anchor="middle">_e19b_pilot_judge json</text>
+    <text class="box-sub" x="745" y="382" text-anchor="middle">PILOT_OUT line 45, write 434</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="i1" data-to="mn" d="M190,70 L230,160" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="i2" data-to="mn" d="M190,158 H230" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="i3" data-to="mn" d="M190,246 L230,206" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="200" y="118" text-anchor="start">E19H.load_jsonl</text>
+
+  <path class="edge" data-from="mn" data-to="c1" d="M390,168 C520,150 540,60 660,60" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="mn" data-to="c2" d="M390,182 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="mn" data-to="c3" d="M390,196 C520,220 540,280 660,280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="418" y="126" text-anchor="start">dispatch</text>
+
+  <path class="edge" data-from="c1" data-to="hx" d="M660,72 H610 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="hx" d="M660,158 H610" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="612" y="120" text-anchor="middle">calls</text>
+  <text class="edge-label" x="612" y="150" text-anchor="middle">calls</text>
+
+  <path class="edge" data-from="c1" data-to="o1" d="M700,90 C420,120 260,330 160,340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="o2" d="M760,210 C700,300 500,330 450,340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c3" data-to="o3" d="M780,310 L760,340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="240" y="320" text-anchor="start">writes</text>
+  <text class="edge-label" x="500" y="326" text-anchor="start">writes</text>
+
+  <text class="box-sub" x="20" y="422">pilot_judge draws no arrow into the shared rules box: it calls the E16 instrument directly (lines 367-404).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the three subcommands share one entry point but not one code path. Real symbols: <code>e19b_dryrun.py::main</code> (line 441), <code>::proxies</code> (line 135), <code>::write_gradients_v2</code> (line 240), <code>::pilot_judge</code> (line 362), <code>::surviving</code> (line 92), <code>::decisive</code> (line 105), <code>::winner_of</code> (line 120). <code>proxies</code> calls the three helpers at lines 152, 168 and 172; <code>write_gradients_v2</code> calls them at lines 251, 256 and 261.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: reads, writes, return values</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 330" role="img" aria-label="e19b_dryrun data flow: no config field, five read groups, three write targets">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="cf">
+    <title>No config.py field is read; the string config is a variant name</title>
+    <rect x="20" y="10" width="200" height="50" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="31" text-anchor="middle">config.py</text>
+    <text class="box-sub" x="120" y="47" text-anchor="middle">no field read (lines 26-40)</text>
+  </g>
+
+  <a class="box" id="r1" href="../../experiments_verifiers/results/E19_claims_2026-09-23.jsonl">
+    <title>v1 claims and 870 v1 score cells</title>
+    <rect x="20" y="90" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="114" text-anchor="middle">v1 claims and scores</text>
+    <text class="box-sub" x="120" y="130" text-anchor="middle">lines 67, 78 config v1</text>
+  </a>
+  <a class="box" id="r2" href="../../experiments_verifiers/results/E19b_claims_v2_2026-09-24.jsonl">
+    <title>E19b claims ledger, V4 score ledgers, v1c ledgers</title>
+    <rect x="20" y="160" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="184" text-anchor="middle">E19b ledgers</text>
+    <text class="box-sub" x="120" y="200" text-anchor="middle">lines 70, 80, 81</text>
+  </a>
+  <a class="box" id="r3" href="../../experiments_verifiers/results/E19_gradient_duel_2026-09-23.json">
+    <title>E19 v1 duel judgments for the pilot pairing</title>
+    <rect x="20" y="230" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="254" text-anchor="middle">duel json</text>
+    <text class="box-sub" x="120" y="270" text-anchor="middle">line 46, read line 373</text>
+  </a>
+
+  <a class="box" id="mn" href="../../experiments_verifiers/harness/e19b_dryrun.py">
+    <title>Each command returns a dict or an int; nothing is returned to the shell</title>
+    <rect x="330" y="140" width="200" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="430" y="166" text-anchor="middle">commands</text>
+    <text class="box-sub" x="430" y="184" text-anchor="middle">proxies dict, pilot dict,</text>
+    <text class="box-sub" x="430" y="200" text-anchor="middle">gradient count int</text>
+  </a>
+
+  <a class="box" id="o1" href="../../experiments_verifiers/results/_e19b_dryrun_2026-09-24.json">
+    <title>Proxy JSON, written by main for all five configs</title>
+    <rect x="620" y="60" width="260" height="56" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="750" y="84" text-anchor="middle">_e19b_dryrun json</text>
+    <text class="box-sub" x="750" y="100" text-anchor="middle">write line 449</text>
+  </a>
+  <a class="box" id="o2" href="../../experiments_verifiers/results/E19b_bt_gradients_v2">
+    <title>V5 gradient text files, one per generation uuid</title>
+    <rect x="620" y="150" width="260" height="56" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="750" y="174" text-anchor="middle">gradient txt files</text>
+    <text class="box-sub" x="750" y="190" text-anchor="middle">write line 354, 148 files now</text>
+  </a>
+  <a class="box" id="o3" href="../../experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json">
+    <title>Pilot judge JSON, only when the pilot-judge command runs</title>
+    <rect x="620" y="240" width="260" height="56" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="750" y="264" text-anchor="middle">_e19b_pilot_judge json</text>
+    <text class="box-sub" x="750" y="280" text-anchor="middle">write line 434, paid calls</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="r1" data-to="mn" d="M220,112 L330,165" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="r2" data-to="mn" d="M220,188 H330" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="r3" data-to="mn" d="M220,258 L330,205" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="232" y="142" text-anchor="start">read_jsonl</text>
+  <text class="edge-label" x="232" y="240" text-anchor="start">read_text</text>
+
+  <path class="edge" data-from="mn" data-to="o1" d="M530,160 C580,120 580,90 620,88" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="mn" data-to="o2" d="M530,182 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="mn" data-to="o3" d="M530,200 C580,240 580,270 620,268" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="140" text-anchor="start">write_text</text>
+  <text class="edge-label" x="540" y="224" text-anchor="start">write_text</text>
+
+  <text class="box-sub" x="20" y="318">The dashed config.py box has no outgoing edge: the script never imports config.py (imports lines 26-40).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; reads go through <code>e19_hybrid_bt.load_jsonl</code> and <code>read_text</code>; writes go through <code>Path.write_text</code> at lines 354, 434 and 449. The variant name comes from the CLI, not from a config field: <code>main</code> declares <code>choices=("v1", "v1c", "v2r0", "v2r1", "v2r2")</code> (lines 444-445).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; config to claim set, and the pair winner rule</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 520" role="img" aria-label="e19b_dryrun logic: config to claim set mapping, then winner_of escalation chain">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-label" x="20" y="26" text-anchor="start">claim set by config</text>
+  <g class="box" id="c0">
+    <title>Branch on the two v1 configs</title>
+    <rect x="20" y="40" width="270" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="155" y="68" text-anchor="middle">config is v1 or v1c?</text>
+  </g>
+  <g class="box" id="e0">
+    <title>v1 claim set reused as-is</title>
+    <rect x="360" y="40" width="300" height="46" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="68" text-anchor="middle">E19H.CLAIMS, one record per group</text>
+  </g>
+  <g class="box" id="c1">
+    <title>Round cap per v2 config</title>
+    <rect x="20" y="110" width="270" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="155" y="138" text-anchor="middle">round cap per config</text>
+  </g>
+  <g class="box" id="e1">
+    <title>Later records overwrite earlier ones</title>
+    <rect x="360" y="110" width="300" height="46" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="138" text-anchor="middle">latest round within cap wins</text>
+  </g>
+
+  <text class="box-label" x="20" y="196" text-anchor="start">pair winner rule (line 120)</text>
+  <g class="box" id="d1">
+    <title>Sign-sum arm</title>
+    <rect x="20" y="210" width="270" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="155" y="238" text-anchor="middle">mode == sign_sum? (line 122)</text>
+  </g>
+  <g class="box" id="oA">
+    <title>Count of won claims decides</title>
+    <rect x="360" y="210" width="300" height="46" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="238" text-anchor="middle">sign of d, else 0</text>
+  </g>
+  <g class="box" id="d2">
+    <title>Mean-difference arm</title>
+    <rect x="20" y="280" width="270" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="155" y="308" text-anchor="middle">mode == mean_diff? (line 124)</text>
+  </g>
+  <g class="box" id="oB">
+    <title>Magnitude decides</title>
+    <rect x="360" y="280" width="300" height="46" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="308" text-anchor="middle">sign of dm, else 0</text>
+  </g>
+  <g class="box" id="d3">
+    <title>Escalation arm: sign-sum first</title>
+    <rect x="20" y="350" width="270" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="155" y="378" text-anchor="middle">escalation and d nonzero?</text>
+  </g>
+  <g class="box" id="oC">
+    <title>Tie broken by mean difference</title>
+    <rect x="360" y="350" width="300" height="46" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="378" text-anchor="middle">sign of d, else dm</text>
+  </g>
+
+  <path class="edge" data-from="c0" data-to="e0" d="M290,63 H360" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge dashed-edge" data-from="c0" data-to="c1" d="M155,86 V110" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="56" text-anchor="start">yes</text>
+  <text class="edge-label" x="163" y="102" text-anchor="start">no</text>
+  <path class="edge" data-from="c1" data-to="e1" d="M290,133 H360" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="126" text-anchor="start">yes</text>
+
+  <path class="edge" data-from="d1" data-to="oA" d="M290,233 H360" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="226" text-anchor="start">yes</text>
+  <path class="edge" data-from="d2" data-to="oB" d="M290,303 H360" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="296" text-anchor="start">yes</text>
+  <path class="edge" data-from="d3" data-to="oC" d="M290,373 H360" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="366" text-anchor="start">yes</text>
+  <path class="edge dashed-edge" data-from="d1" data-to="d2" d="M155,256 V280" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="d2" data-to="d3" d="M155,326 V350" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="163" y="272" text-anchor="start">no</text>
+  <text class="edge-label" x="163" y="342" text-anchor="start">no</text>
+
+  <text class="box-sub" x="20" y="424">Both rules are reused downstream: e19b_eval.py calls decisive and winner_of per arm (lines 84-88).</text>
+  <text class="box-sub" x="20" y="446">Stop test in surviving(): a claim with no observation, or with zero variance, is dropped (lines 92-103).</text>
+  <text class="box-sub" x="20" y="468">pilot_judge asserts every declared pilot group is present in the plan (line 378).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; two decision rules and two stop tests. The claim-set rule is the round cap map <code>{"v2r0": 0, "v2r1": 1, "v2r2": 2}</code> (line 68) with later records overwriting earlier ones (line 72). The winner rule is the escalation chain of <code>winner_of</code> (lines 122-129). The dead-claim rule lives in <code>surviving</code> (lines 96-103).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>read</td><td>v1 claims</td><td class="sym">E19H.CLAIMS via <a href="../../experiments_verifiers/results/E19_claims_2026-09-23.jsonl">results/E19_claims_2026-09-23.jsonl</a></td><td>config v1 and v1c claim sets</td><td class="size">67</td></tr>
+<tr><td>read</td><td>v1 scores</td><td class="sym">E19H.SCORES via <a href="../../experiments_verifiers/results/E19_scores_2026-09-23.jsonl">results/E19_scores_2026-09-23.jsonl</a></td><td>config v1 score cells</td><td class="size">78</td></tr>
+<tr><td>read</td><td>E19b claims</td><td class="sym">XB.CLAIMS2 via <a href="../../experiments_verifiers/results/E19b_claims_v2_2026-09-24.jsonl">results/E19b_claims_v2_2026-09-24.jsonl</a></td><td>configs v2r0, v2r1, v2r2</td><td class="size">70-72</td></tr>
+<tr><td>read</td><td>V4 score ledgers</td><td class="sym">XB.SCORES2, XB.SCORES1C</td><td>configs v1c, v2r0 to v2r2</td><td class="size">80-81</td></tr>
+<tr><td>read</td><td>E14 plan</td><td class="sym">E18.load_plan, E18.enrich_inventories</td><td>19 groups, judging order, gens</td><td class="size">136, 460</td></tr>
+<tr><td>read</td><td>E19 v1 duel</td><td class="sym"><a href="../../experiments_verifiers/results/E19_gradient_duel_2026-09-23.json">results/E19_gradient_duel_2026-09-23.json</a></td><td>cached v1 pilot judgments</td><td class="size">46, 373-374</td></tr>
+<tr><td>read</td><td>E16 population</td><td class="sym">E16.POP_JSON</td><td>judge input items for the pilot</td><td class="size">370-372</td></tr>
+<tr><td>read</td><td>config.py fields</td><td class="sym">none</td><td>not imported</td><td class="size">26-40</td></tr>
+<tr><td>write</td><td>proxy JSON</td><td class="sym"><a href="../../experiments_verifiers/results/_e19b_dryrun_2026-09-24.json">results/_e19b_dryrun_2026-09-24.json</a></td><td>one proxy block per config</td><td class="size">43, 449</td></tr>
+<tr><td>write</td><td>V5 gradients</td><td class="sym"><a href="../../experiments_verifiers/results/E19b_bt_gradients_v2">results/E19b_bt_gradients_v2/</a></td><td>one text file per generation</td><td class="size">44, 354</td></tr>
+<tr><td>write</td><td>pilot judge JSON</td><td class="sym"><a href="../../experiments_verifiers/results/_e19b_pilot_judge_2026-09-24.json">results/_e19b_pilot_judge_2026-09-24.json</a></td><td>relevance v2 against v1</td><td class="size">45, 434</td></tr>
+<tr><td>write</td><td>console lines</td><td class="sym">stdout only</td><td>proxy table and file count</td><td class="size">450-465</td></tr>
+</tbody>
+</table>
+<p class="note say">State is not mutated: the gradient command writes into the same tree that <a href="exp_e19b_gradient_duel.html">e19b_gradient_duel</a> later reads back as text.</p>
+<p class="note">The declared pilot groups are five literal group ids (lines 51-57); the script never reads a label column when choosing them.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>11 top-level functions, no classes</summary><div class="dbody">
+<pre>claims_for_config(config: str) -&gt; dict[str, list[dict]]   line 65   claim set per group
+scores_for_config(config: str) -&gt; list[dict]              line 76   score ledger per config
+score_matrix(scores) -&gt; dict[group][claim][uuid8]         line 84   nested score lookup
+surviving(claims_g, cells, n_gens) -&gt; list[dict]          line 92   drop dead claims
+decisive(cells, claims, a, b) -&gt; tuple[int, float, int]   line 105  sign sum, diff, count
+winner_of(d: int, dm: float, mode: str) -&gt; str            line 120  +1 / -1 / 0 for A
+proxies(config: str) -&gt; dict                              line 135  label-free proxy block
+_sign(sa, sb) -&gt; str                                      line 234  +, - or = for a transcript
+write_gradients_v2(config, plan_groups) -&gt; int            line 240  V5 text per generation
+pilot_judge(config: str) -&gt; dict                          line 362  E16 judge on 5 groups
+main() -&gt; None                                            line 441  argparse dispatch</pre>
+<p>Module-level values: <code>TODAY</code> (line 42), <code>OUT</code>, <code>GRAD_ROOT</code>, <code>PILOT_OUT</code>, <code>DUEL_JSON</code> (lines 43-46), <code>PILOT_GROUPS</code> (lines 51-57), <code>N_BOOT = 0</code> (line 59), and the header template <code>GRAD_HEADER_V2</code> with its five numbered sections (lines 211-231).</p>
+<p>Inside <code>write_gradients_v2</code> two closures exist: <code>tline</code> (line 329) renders one comparison line, and the nested loop at lines 277-356 builds the lost, won and transcript blocks. <code>pilot_judge</code> uses the closure <code>one</code> (line 380) over a <code>ThreadPoolExecutor</code> with 8 workers (line 409).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Relation</th><th>Who</th><th>Where</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>importer</td><td><a href="../../experiments_verifiers/harness/e19b_eval.py">e19b_eval.py</a></td><td class="sym">line 32</td><td><code>import e19b_dryrun as DR</code></td></tr>
+<tr><td>calls</td><td>e19b_eval.py</td><td class="sym">lines 55, 56, 58</td><td><code>DR.claims_for_config</code>, <code>DR.score_matrix</code>, <code>DR.scores_for_config</code></td></tr>
+<tr><td>calls</td><td>e19b_eval.py</td><td class="sym">lines 84-88</td><td><code>DR.decisive</code>, <code>DR.winner_of</code> per arm</td></tr>
+<tr><td>mentions</td><td><a href="../../experiments_verifiers/harness/e19b_extract.py">e19b_extract.py</a></td><td class="sym">line 6, docstring</td><td>pilot judging &quot;run by e19b_dryrun.py&quot;</td></tr>
+<tr><td>test</td><td>none found</td><td class="sym">tests/</td><td>no test file in tests/ names it</td></tr>
+</tbody>
+</table>
+<p class="note flag">It also runs standalone: three subcommands (<code>proxies</code>, <code>gradients</code>, <code>pilot-judge</code>) with an optional config argument, default <code>v2r2</code> (lines 443-445).</p>
+<p class="note">A local import of <code>e16_gradient_audit</code> sits inside <code>pilot_judge</code> (line 367), so the paid path is imported only when that command runs.</p>
+</div>
+
+<footer>
+<p>Sources: <code>experiments_verifiers/harness/e19b_dryrun.py</code> (read in full, 469 lines); the E19b ledger paths and constants of <code>e19b_extract.py</code> (lines 56-70); symbol names only in <code>e15_bt_eval.py</code>, <code>e18_scripted_bt.py</code>, <code>e19_hybrid_bt.py</code>, <code>e16_gradient_audit.py</code>; <code>docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>; hub <a href="file_index.html">file_index.html</a>; sibling pages <a href="exp_e19b_dryrun.html">exp_e19b_dryrun.html</a> and <a href="file_harness_e19b_extract.html">file_harness_e19b_extract.html</a>.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> (secrets, never opened); the 148 V5 gradient files and the 39 pilot rows (counted, values owned by <a href="exp_e19b_dryrun.html">exp_e19b_dryrun.html</a>); the E14 plan JSON and <code>_e16_population.json</code> (foreign inputs, reached through imports); <code>_e16_judge_cache.jsonl</code> (E16 cache, owned by the E16 page); the four other scripts in this batch (own pages).</p>
+<p class="skips">Volatility: <code>experiments_verifiers/</code> is untracked by git and its result files change between runs; file counts here were measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

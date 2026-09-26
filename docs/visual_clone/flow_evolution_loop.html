@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Evolution loop - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > flows > evolution loop">
+<div class="wrap">
+
+<h1 class="hud">Evolution loop</h1>
+<p class="intro">One round of <code>EvolutionEngine.evolve_generation</code> turns generation N into generation N+1. The verifier scores the workspace, writes a textual gradient, the archive accepts or rejects the offspring, and <code>VariationEngine</code> builds the prompt for the next genotype. This page follows that cycle and the QD filter that decides which genotypes stay.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>The loop: generation N becomes N+1</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="Closed evolution loop: prompt, generate, run, verify, gradient, archive, parent draw">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1_A" href="mod_core_variation.html">
+    <title>VariationEngine builds the mutation, crossover or seed prompt.</title>
+    <rect x="15" y="60" width="165" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="97" y="86" text-anchor="middle">build next prompt</text>
+    <text class="box-sub" x="97" y="102" text-anchor="middle">variation_engine.py</text>
+  </a>
+
+  <a class="box" id="d1_B" href="mod_core_runner.html">
+    <title>WorkflowOrchestrator._generate_workflow_code asks the LLM for the genotype.</title>
+    <rect x="245" y="60" width="165" height="64" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="327" y="86" text-anchor="middle">write genotype</text>
+    <text class="box-sub" x="327" y="102" text-anchor="middle">orchestrator.py</text>
+  </a>
+
+  <a class="box" id="d1_C" href="mod_core_runner.html">
+    <title>WorkflowOrchestrator._execute_in_sandbox runs the genotype in the pinned sandbox.</title>
+    <rect x="475" y="60" width="165" height="64" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="557" y="86" text-anchor="middle">sandbox run</text>
+    <text class="box-sub" x="557" y="102" text-anchor="middle">workflow_runner.py</text>
+  </a>
+
+  <a class="box" id="d1_D" href="mod_evaluators_hybrid_verifier.html">
+    <title>HybridVerifierEvaluator.evaluate scores the workspace.</title>
+    <rect x="705" y="60" width="175" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="792" y="86" text-anchor="middle">score workspace</text>
+    <text class="box-sub" x="792" y="102" text-anchor="middle">hybrid verifier</text>
+  </a>
+
+  <a class="box" id="d1_E" href="mod_evaluators_hybrid_verifier.html">
+    <title>gradient.build_gradient writes the textual gradient and evaluation.txt.</title>
+    <rect x="705" y="310" width="175" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="792" y="336" text-anchor="middle">write gradient</text>
+    <text class="box-sub" x="792" y="352" text-anchor="middle">gradient.py</text>
+  </a>
+
+  <a class="box" id="d1_F" href="mod_core_selection.html">
+    <title>SelectionPressure.validate_survivor admits or rejects the offspring.</title>
+    <rect x="475" y="310" width="165" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="557" y="336" text-anchor="middle">validate survivor</text>
+    <text class="box-sub" x="557" y="352" text-anchor="middle">selection.py</text>
+  </a>
+
+  <a class="box" id="d1_G" href="mod_core_selection.html">
+    <title>WorkflowSelector.select_parent_workflows draws the parents for the next prompt.</title>
+    <rect x="245" y="310" width="165" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="327" y="336" text-anchor="middle">draw parents</text>
+    <text class="box-sub" x="327" y="352" text-anchor="middle">workflow_selection.py</text>
+  </a>
+
+  <a class="box" id="d1_L" href="mod_core_lineage.html">
+    <title>lineage.record_lineage writes lineage_&lt;uuid&gt;.json for the evolution tree.</title>
+    <rect x="445" y="190" width="175" height="50" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+    <text class="box-label" x="532" y="212" text-anchor="middle">record lineage</text>
+    <text class="box-sub" x="532" y="228" text-anchor="middle">lineage.py</text>
+  </a>
+
+  <path class="edge" data-from="d1_A" data-to="d1_B" d="M180,92 H245" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="212" y="84" text-anchor="middle">prompt str</text>
+  <path class="edge" data-from="d1_B" data-to="d1_C" d="M410,92 H475" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="442" y="84" text-anchor="middle">genotype</text>
+  <path class="edge" data-from="d1_C" data-to="d1_D" d="M640,92 H705" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="672" y="84" text-anchor="middle">workspace</text>
+
+  <path class="edge" data-from="d1_D" data-to="d1_E" d="M792,124 V310" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="802" y="215" text-anchor="start">claim scores</text>
+
+  <path class="edge" data-from="d1_E" data-to="d1_F" d="M705,342 H640" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="672" y="334" text-anchor="middle">gradient</text>
+  <path class="edge" data-from="d1_F" data-to="d1_G" d="M475,342 H410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="442" y="334" text-anchor="middle">qd verdict</text>
+  <path class="edge" data-from="d1_G" data-to="d1_A" d="M245,342 H97 V124" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="171" y="334" text-anchor="middle">parent uuid</text>
+  <path class="edge dashed-edge" data-from="d1_B" data-to="d1_L" d="M327,124 V215 H445" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="386" y="207" text-anchor="middle">lineage json</text>
+
+  <text class="box-sub" x="15" y="440">solid = call | dashed = reads/writes data | one pass round the cycle = one evolve_generation() call</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - the closed loop. The dashed grey <code>gradient text</code> path is the only feedback the mutator receives: it reads <code>WorkflowInfo.abstracted_textual_gradient</code> and never touches the verifier's score vectors.</p>
+
+<p class="note say">The reward travelling from the verifier to the archive is a scalar; the per-claim scores behind it stay in the verifier, and the mutation prompt sees the gradient text only, cut to 2 048 characters.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Archive and QD selection filter</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 268" role="img" aria-label="QD filter: candidate, embedding, novelty, qd_score, admit, archive, evict, survivors">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d2_1" href="mod_core_selection.html">
+    <title>The offspring run just scored, with its genotype source and reward.</title>
+    <rect x="15" y="60" width="165" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="97" y="86" text-anchor="middle">offspring run</text>
+    <text class="box-sub" x="97" y="102" text-anchor="middle">IndividualRun</text>
+  </a>
+
+  <a class="box" id="d2_2" href="mod_core_selection.html">
+    <title>code_features.genotype_embedding_descriptor embeds run.code to a unit vector.</title>
+    <rect x="245" y="60" width="165" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="327" y="86" text-anchor="middle">embed genotype</text>
+    <text class="box-sub" x="327" y="102" text-anchor="middle">genotype_embedding.py</text>
+  </a>
+
+  <a class="box" id="d2_3" href="mod_core_selection.html">
+    <title>SelectionPressure._compute_novelty takes the mean of the k nearest cosine distances.</title>
+    <rect x="475" y="60" width="165" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="557" y="86" text-anchor="middle">k-NN novelty</text>
+    <text class="box-sub" x="557" y="102" text-anchor="middle">_compute_novelty</text>
+  </a>
+
+  <a class="box" id="d2_4" href="mod_core_selection.html">
+    <title>SelectionPressure._compose_qd_score blends quality, novelty and a length penalty.</title>
+    <rect x="705" y="60" width="175" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="792" y="86" text-anchor="middle">compose qd_score</text>
+    <text class="box-sub" x="792" y="102" text-anchor="middle">_compose_qd_score</text>
+  </a>
+
+  <a class="box" id="d2_5" href="mod_core_selection.html">
+    <title>SelectionPressure._try_admit: valid when reward improves, or qd_score beats admit_threshold.</title>
+    <rect x="15" y="190" width="165" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="97" y="216" text-anchor="middle">admit check</text>
+    <text class="box-sub" x="97" y="232" text-anchor="middle">_try_admit</text>
+  </a>
+
+  <a class="box" id="d2_6" href="mod_core_selection.html">
+    <title>SelectionPressure._add_to_archive appends the member and refreshes all scores.</title>
+    <rect x="245" y="190" width="165" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="327" y="216" text-anchor="middle">archive insert</text>
+    <text class="box-sub" x="327" y="232" text-anchor="middle">_add_to_archive</text>
+  </a>
+
+  <a class="box" id="d2_7" href="mod_core_selection.html">
+    <title>The lowest-qd_score member is evicted when the archive passes population_size.</title>
+    <rect x="475" y="190" width="165" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="557" y="216" text-anchor="middle">evict weakest</text>
+    <text class="box-sub" x="557" y="232" text-anchor="middle">min qd_score</text>
+  </a>
+
+  <a class="box" id="d2_8" href="mod_core_selection.html">
+    <title>Archive members sampled as parents for the next generation.</title>
+    <rect x="705" y="190" width="175" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="792" y="216" text-anchor="middle">survivors</text>
+    <text class="box-sub" x="792" y="232" text-anchor="middle">SelectionPressure.archive</text>
+  </a>
+
+  <path class="edge" data-from="d2_1" data-to="d2_2" d="M180,92 H245" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="212" y="84" text-anchor="middle">code str</text>
+  <path class="edge" data-from="d2_2" data-to="d2_3" d="M410,92 H475" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="442" y="84" text-anchor="middle">unit vector</text>
+  <path class="edge" data-from="d2_3" data-to="d2_4" d="M640,92 H705" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="672" y="84" text-anchor="middle">k = 16 mean</text>
+  <path class="edge" data-from="d2_4" data-to="d2_5" d="M792,124 V157 H97 V190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="445" y="150" text-anchor="middle">qd_score</text>
+  <path class="edge" data-from="d2_5" data-to="d2_6" d="M180,222 H245" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="212" y="214" text-anchor="middle">if valid</text>
+  <path class="edge" data-from="d2_6" data-to="d2_7" d="M410,222 H475" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="442" y="214" text-anchor="middle">archive full</text>
+  <path class="edge" data-from="d2_7" data-to="d2_8" d="M640,222 H705" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="672" y="214" text-anchor="middle">survivors</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - the QD filter inside <code>SelectionPressure.validate_survivor</code>. A rejected offspring returns <code>admit_rejected = True</code> and the archive keeps its previous members. <code>novelty_comparison = "previous_n"</code> swaps the archive k-NN peers for the last N genotypes.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Loop knobs</h2>
+<p class="sub">Defaults read from <code class="path">config.py</code> in the working tree at build time; each field is overridable from the JSON config file.</p>
+<table>
+<thead><tr><th>Config field</th><th class="size">Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td class="sym"><code>selection_strategy</code><br><span class="sub">config.py:131</span></td><td class="size">qd</td><td>Picks the selection pressure class: qd, novelty, tournament or greedy.</td></tr>
+<tr><td class="sym"><code>learned_score_threshold</code><br><span class="sub">config.py:133</span></td><td class="size">0.9</td><td>Stops evolving when a score reaches this value (checked in <code>evolve_generation</code>).</td></tr>
+<tr><td class="sym"><code>max_learning_evolve_iterations</code><br><span class="sub">config.py:134</span></td><td class="size">16</td><td>Maximum generations per task in <code>--learn</code> mode.</td></tr>
+<tr><td class="sym"><code>novelty_comparison</code><br><span class="sub">config.py:136</span></td><td class="size">archive_knn</td><td>Novelty peers: the archive k-NN, or the last N genotypes.</td></tr>
+<tr><td class="sym"><code>novelty_previous_n</code><br><span class="sub">config.py:137</span></td><td class="size">16</td><td>Window size for the <code>previous_n</code> comparison mode.</td></tr>
+<tr><td class="sym"><code>length_penalty_baseline_chars</code><br><span class="sub">config.py:139</span></td><td class="size">8 000</td><td>Genotype size where the qd_score length penalty starts.</td></tr>
+<tr><td class="sym"><code>length_penalty_lambda</code><br><span class="sub">config.py:140</span></td><td class="size">0.05</td><td>Weight of the length penalty term in <code>qd_score</code>.</td></tr>
+<tr><td class="sym"><code>min_improvement_threshold</code><br><span class="sub">config.py:142</span></td><td class="size">0.01</td><td>Relative reward gain that counts as valid in greedy mode.</td></tr>
+<tr><td class="sym"><code>population_size</code><br><span class="sub">config.py:143</span></td><td class="size">16</td><td>Archive cap; above it the lowest <code>qd_score</code> member is evicted.</td></tr>
+<tr><td class="sym"><code>novelty_k_neighbours</code><br><span class="sub">config.py:144</span></td><td class="size">16</td><td>k for the k-NN cosine-distance novelty.</td></tr>
+<tr><td class="sym"><code>novelty_weight</code><br><span class="sub">config.py:145</span></td><td class="size">0.25</td><td>Weight w of novelty in <code>qd_score</code>.</td></tr>
+<tr><td class="sym"><code>admit_threshold</code><br><span class="sub">config.py:146</span></td><td class="size">0.3</td><td>Minimum <code>qd_score</code> for admission when reward does not improve.</td></tr>
+<tr><td class="sym"><code>initial_population</code><br><span class="sub">config.py:148</span></td><td class="size">2</td><td>Runs before mutation or crossover can start; below it, seeds.</td></tr>
+<tr><td class="sym"><code>crossover_rate</code><br><span class="sub">config.py:149</span></td><td class="size">0.4</td><td>Chance to recombine two parents instead of mutating one.</td></tr>
+<tr><td class="sym"><code>n_parents</code><br><span class="sub">config.py:150</span></td><td class="size">2</td><td>Parents drawn when crossover fires.</td></tr>
+<tr><td class="sym"><code>parent_threshold_similarity</code><br><span class="sub">config.py:152</span></td><td class="size">0.95</td><td>Cold-start goal-similarity floor for candidate parents.</td></tr>
+<tr><td class="sym"><code>parent_threshold_score</code><br><span class="sub">config.py:154</span></td><td class="size">0.01</td><td>Cold-start minimum score for candidate parents.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_pairwise_mode</code><br><span class="sub">config.py:86</span></td><td class="size">temporal</td><td>Decides each pair at the earliest differing ladder stage.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_reward</code><br><span class="sub">config.py:94</span></td><td class="size">win_rate</td><td>Reward over pairs: win rate, or Bradley&ndash;Terry strengths.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_num_claims</code><br><span class="sub">config.py:78</span></td><td class="size">10</td><td>Target key-claim count per task; extraction accepts plus or minus 2.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_scorer_timeout_s</code><br><span class="sub">config.py:82</span></td><td class="size">60 s</td><td>Timeout for one policy-scorer subprocess.</td></tr>
+</tbody>
+</table>
+
+<p class="note">Amber note: <code class="path">config_default.json</code> overrides two of these built-in defaults when used as a config file (<code>learned_score_threshold</code> 0.92 and <code>crossover_rate</code> 0.25, lines 64 and 79), so the effective value depends on the config file in use.</p>
+<p class="note flag">Red note: <code class="path">sources/core/selection.py</code>:72 states that greedy is the default mode, but the default in code is <code>SelectionStrategy.QUALITY_DIVERSITY</code> (selection.py:87) and <code>selection_strategy = "qd"</code> (config.py:131).</p>
+
+<details><summary>is the gradient fed whole or summarized?</summary><div class="dbody">
+<p><strong>Stored whole, fed summarized on the mutation path.</strong></p>
+<ul>
+<li>The verifier stores the full text under <code>abstracted_textual_gradient</code> in the run's <code>state_result.json</code> (<code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>:492) and writes it to <code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/textual_gradient.txt</code> (<code>HybridVerifierEvaluator._write_artifacts</code>).</li>
+<li><code>WorkflowInfo.abstracted_textual_gradient</code> (<code class="path">sources/core/workflow_info.py</code>:166) reads the state key first, the sidecar file second.</li>
+<li>Mutation path: <code>VariationEngine.mutation_prompt</code> cuts the text to <strong>2 048 characters</strong> and replaces <code>_</code> with a space (<code class="path">sources/core/variation_engine.py</code>:402-407). No other summary is computed.</li>
+<li>Crossover path: each parent's gradient goes in whole, with no character cap; only the fallback (stderr tail) is cut to the last 1 024 characters (<code class="path">sources/core/variation_engine.py</code>:486-489).</li>
+<li>Measured size: the gradient quoted below is 4 428 characters, so the mutation prompt received roughly the first 46 % of it.</li>
+</ul>
+<blockquote>1: # Hybrid verifier gradient (E19/E19b, temporal ladder) — 20260925_093314_281402bd
+6: Bottom line: reward 0.7222 | win-rate (ties=0.5) 0.722 over
+7: 0 comparisons (0W/0L/0T) | 9 of
+8: 9 claims discriminate the candidates (0 dropped as
+9: non-discriminative) | mean claim score 0.722.
+11: ## 1. ELIMINATION POINT — earliest stage where this generation lost
+12: (none — no rival eliminated this generation at an earlier stage)</blockquote>
+<p>Lines 2-5 and 10 omitted. Path: <code class="path">sources/workflows/20260925_093314_281402bd/textual_gradient.txt</code> &#183; my computation of the length: 4 428 characters.</p>
+</div></details>
+
+<details><summary>where the raw scores stay inside the verifier</summary><div class="dbody">
+<ul>
+<li>Per-claim score vectors live in the per-task registry <code class="path">hybrid_registry_&lt;16-hex&gt;.json</code> (<code>TaskRegistry.load</code>, <code class="path">sources/evaluators/hybrid_verifier/registry.py</code>:74), written by <code>TaskRegistry.record_generation</code> and read back by <code>TaskRegistry.previous_generations</code> on the next round.</li>
+<li>The LLM-written policy-scorer scripts are stored in that same registry (<code>TaskRegistry.set_scorer</code>, registry.py:207), and the scorer runs as a subprocess with a 60 s timeout (<code>hybrid_verifier_scorer_timeout_s</code>).</li>
+<li>The engine reads only two values from the verifier: the scalar <code>overall_score</code> (<code>WorkflowInfo.overall_score</code>, workflow_info.py:122) and the gradient text. No module in <code class="path">sources/core/</code> imports <code class="path">sources/evaluators/hybrid_verifier/</code>; the engine reaches it only through <code>sources/evaluators/evaluator.py::WorkflowEvaluator.evaluate</code>.</li>
+<li>Inside the verifier, <code>sources/evaluators/hybrid_verifier/aggregation.py::win_rate_reward</code> turns the score vectors into the reward (<code>temporal_winner</code> decides each pair at the earliest differing stage).</li>
+<li>Leak to state clearly: the gradient text itself does contain claim scores and evidence lines (for example <code>score: 1.000</code>). The mutator sees those numbers inside the gradient, but never the scorer code or the score vectors.</li>
+</ul>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Files that run one round</h2>
+<div class="grid2">
+
+<div class="card l2">
+<h4><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></h4>
+<p class="role">Drives one generation: runs it, evaluates it, validates the survivor, then builds the next prompt.</p>
+<p class="meta">1 109 lines &#183; class: EvolutionEngine &#183; <code>evolve_generation</code> recurses into the next round</p>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/core/variation_engine.py">sources/core/variation_engine.py</a></h4>
+<p class="role">Builds the seed, mutation and crossover prompts, and records each offspring's gradient and score for the search-state block.</p>
+<p class="meta">609 lines &#183; class: VariationEngine &#183; <code>mutation_prompt</code>, <code>crossover_prompt</code></p>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/core/selection.py">sources/core/selection.py</a></h4>
+<p class="role">Keeps the QD archive: k-NN cosine novelty, <code>qd_score</code>, admission, eviction, and parent draw from the archive.</p>
+<p class="meta">842 lines &#183; classes: SelectionPressure, PopulationMember &#183; <code>validate_survivor</code>, <code>select_parents</code></p>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/core/genotype_embedding.py">sources/core/genotype_embedding.py</a></h4>
+<p class="role">Embeds a genotype with all-MiniLM-L6-v2 in chunks below 900 characters, mean-pooled and L2-normalised.</p>
+<p class="meta">329 lines &#183; classes: GenotypeEmbedder, _LocalMiniLMEmbedder &#183; default backend <code>all-MiniLM-L6-v2</code></p>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/core/workflow_selection.py">sources/core/workflow_selection.py</a></h4>
+<p class="role">Draws parents from the live archive; cold start falls back to a goal-similarity disk scan of stored workflows.</p>
+<p class="meta">396 lines &#183; class: WorkflowSelector &#183; <code>select_parent_workflows</code></p>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/core/lineage.py">sources/core/lineage.py</a></h4>
+<p class="role">Writes <code class="path">lineage_&lt;uuid&gt;.json</code> per run with parents, <code>evolution_kind</code> and iteration for the evolution tree.</p>
+<p class="meta">173 lines &#183; <code>record_lineage</code>, <code>scan_all</code> &#183; kinds: seed, mutation, crossover</p>
+</div>
+
+<div class="card l4">
+<h4><a href="../../sources/evaluators/hybrid_verifier/gradient.py">sources/evaluators/hybrid_verifier/gradient.py</a></h4>
+<p class="role">Renders the textual gradient and <code>evaluation.txt</code> from measured claim scores, leading with the elimination point.</p>
+<p class="meta">294 lines &#183; <code>build_gradient</code>, <code>build_evaluation_report</code></p>
+</div>
+
+<div class="card l4">
+<h4><a href="../../sources/evaluators/hybrid_verifier/aggregation.py">sources/evaluators/hybrid_verifier/aggregation.py</a></h4>
+<p class="role">Turns per-claim score vectors into the pairwise reward; <code>temporal_winner</code> decides at the earliest differing stage.</p>
+<p class="meta">434 lines &#183; <code>win_rate_reward</code>, <code>bradley_terry_reward</code>, <code>claim_stats</code></p>
+</div>
+
+</div>
+<p class="sub">Deeper pages: <a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a> &#183; <a href="mod_core_selection.html">mod_core_selection.html</a> &#183; <a href="mod_core_variation.html">mod_core_variation.html</a> &#183; <a href="mod_core_lineage.html">mod_core_lineage.html</a> &#183; <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> &#183; <a href="flow_task_run.html">flow_task_run.html</a> &#183; <a href="flow_verification.html">flow_verification.html</a></p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What one round writes</h2>
+<table>
+<thead><tr><th>Path</th><th>Written by</th><th>Holds</th></tr></thead>
+<tbody>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py</code></td><td>Orchestrator</td><td>The genotype source for this generation.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/evolution_prompt_&lt;uuid&gt;.md</code></td><td><code>_save_evolution_prompt_artifact</code></td><td>The prompt that produced this genotype.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json</code></td><td><code>lineage.record_lineage</code></td><td>Parents, <code>evolution_kind</code>, iteration, goal snippet.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/evaluation.txt</code></td><td><code>_write_artifacts</code></td><td>Per-claim verdicts with stage headers.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/textual_gradient.txt</code></td><td><code>_write_artifacts</code></td><td>The gradient text quoted above.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/run_metrics.json</code></td><td><code>run_metrics.write_run_metrics</code></td><td>Score, qd_score, novelty, variation state, cost.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/qd_archive.jsonl</code></td><td><code>_persist_qd_archive</code></td><td>One QD verdict row per admitted or rejected offspring.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/variation_log.jsonl</code></td><td><code>_persist_variation_log</code></td><td>Mutation scope: <code>from_uuid</code>, kind, agent budget.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/evolution_tree.png</code></td><td><code>render_evolution_tree</code></td><td>The lineage tree after each round.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/archive_pca.png</code></td><td><code>render_archive_pca</code></td><td>PCA projection of the archive descriptors.</td></tr>
+</tbody>
+</table>
+<p class="sub">Token counts for the archive files: see <a href="data_runs.html">data_runs.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources read for this page: <code class="path">UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/core/selection.py</code>, <code class="path">sources/core/variation_engine.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/workflow_selection.py</code>, <code class="path">sources/core/lineage.py</code>, <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/utils/run_metrics.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/hybrid_verifier/gradient.py</code>, <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code>, <code class="path">sources/evaluators/hybrid_verifier/registry.py</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, and one real gradient file under <code class="path">sources/workflows/</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/core/factory.py</code>, <code>workflow_factory.py</code>, <code>single_agent_factory.py</code> and <code>schema.py</code> (builder helpers, not the loop) &#183; <code class="path">sources/core/failure_fingerprint.py</code> (written by the verifier, not read by the loop) &#183; <code class="path">sources/core/orchestrator.py</code> in depth (one arrow here; its own flow is <a href="flow_task_run.html">flow_task_run.html</a>) &#183; <code class="path">sources/evaluators/hybrid_verifier/claims.py</code>, <code>layers.py</code>, <code>scorers.py</code>, <code>inventory.py</code>, <code>digest.py</code> (verifier internals; <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>) &#183; <code>sources/evaluators/verifier*.py</code> (deprecated legacy verifier) &#183; <code>webui/</code>, <code>datasets/</code>, <code>logs/</code>, <code>CLA/</code>, lock files and secret files (Tier D) &#183; <code class="path">diversity_experiments/code_reference/selection.py</code> (a frozen copy of selection.py for an experiment, not the runtime loop).</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time: <code class="path">sources/evaluators/hybrid_verifier/</code> is untracked, and <code class="path">config.py</code>, <code class="path">main.py</code>, several <code class="path">sources/evaluators/*</code> files and many <code class="path">docs/</code> files are modified, so every default and line number above was read from the working tree, not from commit <code>7e8463b</code>.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

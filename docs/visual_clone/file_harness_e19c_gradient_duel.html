@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19c_gradient_duel.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; experiments_verifiers/harness &gt; e19c_gradient_duel.py">
+<div class="wrap">
+
+<h1 class="hud">e19c_gradient_duel.py</h1>
+<p class="intro">This experiment script joins the E19c production gradients to the E16 population, then judges seven feedback channels for the same generations with one fixed judge prompt. It runs only from the command line, behind the guard at L245. It writes one JSON and one markdown report under <code class="path">experiments_verifiers/results/</code>.</p>
+
+<p class="sub">Source: <a href="../../experiments_verifiers/harness/e19c_gradient_duel.py">experiments_verifiers/harness/e19c_gradient_duel.py</a> &#183; 246 lines &#183; no class &#183; one entry point</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the script does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 400" role="img" aria-label="e19c_gradient_duel.py work order">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="m1">
+    <title>Six gradient directories plus the E16 population file</title>
+    <rect x="20" y="30" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="58" text-anchor="middle">gradient + population</text>
+    <text class="box-sub" x="120" y="76" text-anchor="middle">E19c dirs &#183; E16 POP_JSON</text>
+    <text class="box-sub" x="120" y="92" text-anchor="middle">L29&#8211;34, L44</text>
+  </g>
+
+  <a class="box" id="m2" href="#sym">
+    <title>main() is the entry point, reached through the __main__ guard</title>
+    <rect x="250" y="30" width="170" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="335" y="58" text-anchor="middle">main() entry</text>
+    <text class="box-sub" x="335" y="76" text-anchor="middle">guard L245</text>
+    <text class="box-sub" x="335" y="92" text-anchor="middle">L95</text>
+  </a>
+
+  <a class="box" id="m3" href="#sym">
+    <title>build_join pairs E19c gradient files with the E16 population items</title>
+    <rect x="450" y="30" width="170" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="535" y="58" text-anchor="middle">build_join()</text>
+    <text class="box-sub" x="535" y="76" text-anchor="middle">joins seven sides</text>
+    <text class="box-sub" x="535" y="92" text-anchor="middle">L42</text>
+  </a>
+
+  <a class="box" id="m4" href="#sym">
+    <title>one(k) judges a single generation; ten worker threads run the map</title>
+    <rect x="650" y="30" width="170" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735" y="58" text-anchor="middle">one(k) fan-out</text>
+    <text class="box-sub" x="735" y="76" text-anchor="middle">pool of 10</text>
+    <text class="box-sub" x="735" y="92" text-anchor="middle">L102, L111</text>
+  </a>
+
+  <a class="box" id="m5" href="#sym">
+    <title>judge_with_text swaps only the gradient text block of the E16 prompt</title>
+    <rect x="20" y="150" width="200" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="178" text-anchor="middle">judge_with_text()</text>
+    <text class="box-sub" x="120" y="196" text-anchor="middle">one call per side</text>
+    <text class="box-sub" x="120" y="212" text-anchor="middle">L79</text>
+  </a>
+
+  <a class="box" id="m6" href="#sym">
+    <title>paired builds the per-row delta list and runs a cluster bootstrap</title>
+    <rect x="250" y="150" width="170" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="335" y="178" text-anchor="middle">paired() bootstrap</text>
+    <text class="box-sub" x="335" y="196" text-anchor="middle">999 resamples</text>
+    <text class="box-sub" x="335" y="212" text-anchor="middle">L121</text>
+  </a>
+
+  <a class="box" id="m7" href="#sym">
+    <title>Stats loop adds direction counts and mean values for every side</title>
+    <rect x="450" y="150" width="170" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="535" y="178" text-anchor="middle">stats aggregation</text>
+    <text class="box-sub" x="535" y="196" text-anchor="middle">10 pairs, 7 sides</text>
+    <text class="box-sub" x="535" y="212" text-anchor="middle">L148&#8211;161</text>
+  </a>
+
+  <a class="box" id="m8" href="#sym">
+    <title>New calls and new cost are counted from the cached flags</title>
+    <rect x="650" y="150" width="170" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735" y="178" text-anchor="middle">cost tally</text>
+    <text class="box-sub" x="735" y="196" text-anchor="middle">cached flags</text>
+    <text class="box-sub" x="735" y="212" text-anchor="middle">L163&#8211;165</text>
+  </a>
+
+  <g class="box" id="m9">
+    <title>OUT_JSON holds population, stats, pairs and calls</title>
+    <rect x="20" y="270" width="200" height="76" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="120" y="298" text-anchor="middle">writes OUT_JSON</text>
+    <text class="box-sub" x="120" y="316" text-anchor="middle">results/*_2026-09-25.json</text>
+    <text class="box-sub" x="120" y="332" text-anchor="middle">L35, L192</text>
+  </g>
+
+  <g class="box" id="m10">
+    <title>_write_md renders the four report tables and writes OUT_MD</title>
+    <rect x="250" y="270" width="170" height="76" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="335" y="298" text-anchor="middle">_write_md()</text>
+    <text class="box-sub" x="335" y="316" text-anchor="middle">markdown report</text>
+    <text class="box-sub" x="335" y="332" text-anchor="middle">L202, L242</text>
+  </g>
+
+  <g class="box" id="m11">
+    <title>Two print calls report the population size and the final cost</title>
+    <rect x="450" y="270" width="170" height="76" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="535" y="298" text-anchor="middle">stdout summary</text>
+    <text class="box-sub" x="535" y="316" text-anchor="middle">population, cost</text>
+    <text class="box-sub" x="535" y="332" text-anchor="middle">L98, L194&#8211;195</text>
+  </g>
+
+  <g class="box" id="m12">
+    <title>e16_gradient_audit supplies the prompt, the judge call and the cache</title>
+    <rect x="670" y="270" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="770" y="298" text-anchor="middle">E16 instrument</text>
+    <text class="box-sub" x="770" y="316" text-anchor="middle">prompt + cache</text>
+    <text class="box-sub" x="770" y="332" text-anchor="middle">e16_gradient_audit.py</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="m1" data-to="m2" d="M220,68 H250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="235" y="60" text-anchor="middle">reads</text>
+  <path class="edge" data-from="m2" data-to="m3" d="M420,68 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="435" y="60" text-anchor="middle">calls L97</text>
+  <path class="edge" data-from="m3" data-to="m4" d="M620,68 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="635" y="60" text-anchor="middle">quads</text>
+  <path class="edge" data-from="m4" data-to="m5" d="M700,106 V115 H120 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="410" y="132" text-anchor="middle">6 text sides each</text>
+  <path class="edge" data-from="m5" data-to="m6" d="M220,188 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="235" y="180" text-anchor="middle">js dict</text>
+  <path class="edge" data-from="m6" data-to="m7" d="M420,188 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="435" y="180" text-anchor="middle">deltas</text>
+  <path class="edge" data-from="m7" data-to="m8" d="M620,188 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="635" y="180" text-anchor="middle">stats dict</text>
+  <path class="edge" data-from="m8" data-to="m9" d="M700,226 V245 H120 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="410" y="252" text-anchor="middle">calls + cost</text>
+  <path class="edge" data-from="m9" data-to="m10" d="M220,308 H250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="235" y="300" text-anchor="middle">then L193</text>
+  <path class="edge" data-from="m10" data-to="m11" d="M420,308 H450" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="435" y="300" text-anchor="middle">prints</text>
+  <path class="edge dashed-edge" data-from="m5" data-to="m12" d="M120,226 V250 H770 V270" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="445" y="244" text-anchor="middle">judge prompt, _llm, cache</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 12 boxes. Dashed = data or external module, solid cyan = a call inside the file, blue = write. Order of work: read the six gradient directories and the E16 population JSON, <code>build_join()</code> (L42), judge each generation in a 10-worker pool (L111), bootstrap the paired deltas (L121), aggregate the per-side stats (L148&ndash;161), count the new calls (L163&ndash;165), then write <code>OUT_JSON</code> (L192) and the markdown (L242). <code>judge_with_text</code> depends on <code>e16_gradient_audit</code> for the prompt, the <code>_llm</code> call and the cache.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; what goes in and what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 380" role="img" aria-label="e19c_gradient_duel.py inputs and outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1" href="#rw">
+    <title>19 task folders of E19c gradient txt files, named campaign__task</title>
+    <rect x="20" y="20" width="230" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="46" text-anchor="middle">E19c_bt_gradients/*.txt</text>
+    <text class="box-sub" x="135" y="64" text-anchor="middle">campaign__task/&lt;ts&gt;_&lt;uuid8&gt;.txt (L29, L52&#8211;53)</text>
+  </a>
+
+  <a class="box" id="d2" href="#rw">
+    <title>Five sibling gradient trees, matched by directory name and file name</title>
+    <rect x="20" y="100" width="230" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="126" text-anchor="middle">5 sibling gradient dirs</text>
+    <text class="box-sub" x="135" y="144" text-anchor="middle">E19b/E19/E18/E15/E24 dirs (L30&#8211;34)</text>
+  </a>
+
+  <a class="box" id="d3" href="#rw">
+    <title>E16 population JSON supplies the judged item: goal, gold, tier</title>
+    <rect x="20" y="180" width="230" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="206" text-anchor="middle">E16.POP_JSON</text>
+    <text class="box-sub" x="135" y="224" text-anchor="middle">results/_e16_population.json (L44)</text>
+  </a>
+
+  <a class="box" id="d4" href="#rw">
+    <title>Shared judge cache avoids a second call for the same prompt</title>
+    <rect x="20" y="260" width="230" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="286" text-anchor="middle">E16 judge cache</text>
+    <text class="box-sub" x="135" y="304" text-anchor="middle">_e16_judge_cache.jsonl via _llm (L84)</text>
+  </a>
+
+  <a class="box" id="d5" href="#sym">
+    <title>main() runs the join, the judge fan-out and the statistics</title>
+    <rect x="340" y="100" width="240" height="140" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="140" text-anchor="middle">main()</text>
+    <text class="box-sub" x="460" y="162" text-anchor="middle">build_join -> one -> paired</text>
+    <text class="box-sub" x="460" y="180" text-anchor="middle">returns None (L95)</text>
+    <text class="box-sub" x="460" y="198" text-anchor="middle">model comes from E16.MODEL (L169)</text>
+    <text class="box-sub" x="460" y="216" text-anchor="middle">no Config field is read</text>
+  </a>
+
+  <a class="box" id="d6" href="#rw">
+    <title>OUT_JSON holds population, stats, the 123 rows and the call counts</title>
+    <rect x="700" y="20" width="240" height="90" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="820" y="46" text-anchor="middle">OUT_JSON</text>
+    <text class="box-sub" x="820" y="64" text-anchor="middle">results/E19c_gradient_duel_2026-09-25.json</text>
+    <text class="box-sub" x="820" y="82" text-anchor="middle">keys: population, stats, pairs, calls</text>
+    <text class="box-sub" x="820" y="100" text-anchor="middle">L35, L192</text>
+  </a>
+
+  <a class="box" id="d7" href="#rw">
+    <title>OUT_MD holds four tables built from the same stats dict</title>
+    <rect x="700" y="150" width="240" height="90" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="820" y="176" text-anchor="middle">OUT_MD</text>
+    <text class="box-sub" x="820" y="194" text-anchor="middle">results/E19c_gradient_duel_2026-09-25.md</text>
+    <text class="box-sub" x="820" y="212" text-anchor="middle">sides, deltas, reference pairs, cost</text>
+    <text class="box-sub" x="820" y="230" text-anchor="middle">L36, L242</text>
+  </a>
+
+  <a class="box" id="d8" href="#rw">
+    <title>Two print lines report the population and the final cost</title>
+    <rect x="700" y="280" width="240" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="820" y="306" text-anchor="middle">stdout</text>
+    <text class="box-sub" x="820" y="324" text-anchor="middle">population size, new calls, cost (L98, L195)</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d5" d="M250,50 H300 V130 H340" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="d2" data-to="d5" d="M250,130 H340" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="d3" data-to="d5" d="M250,210 H300 V190 H340" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="d4" data-to="d5" d="M250,290 H320 V225 H340" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="285" y="122" text-anchor="middle">read</text>
+  <text class="edge-label" x="285" y="182" text-anchor="middle">read</text>
+  <text class="edge-label" x="285" y="242" text-anchor="middle">read</text>
+  <text class="edge-label" x="285" y="302" text-anchor="middle">read/write</text>
+  <path class="edge dashed-edge" data-from="d5" data-to="d6" d="M580,130 H640 V65 H700" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="d5" data-to="d7" d="M580,190 H700" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="d5" data-to="d8" d="M580,220 H660 V310 H700" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="640" y="57" text-anchor="middle">write</text>
+  <text class="edge-label" x="640" y="182" text-anchor="middle">write</text>
+  <text class="edge-label" x="640" y="302" text-anchor="middle">print</text>
+  <text class="box-sub" x="340" y="278">config fields read: none in this file; the judge model is taken from E16.MODEL (L169).</text>
+  <text class="box-sub" x="340" y="300">state keys read: none &#8212; the run state comes from the population JSON (L45&#8211;46).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; dashed arrows are reads and writes; the value chain inside <code>main()</code> is <code>quads, drops, pop = build_join()</code> (L76, L97), per-side verdict dicts from <code>one(k)</code> (L109), and the stats dict from <code>paired()</code> (L142&ndash;146) or <code>None</code> when a pair has no rows (L130). Both report files are written into the same directory that holds the inputs: <code class="path">experiments_verifiers/results/</code>. Measured run on disk: n=123 rows, 19 task groups, drops <code>no_population_join: 25</code>, 123 new e19c-side calls, 0 new calls on the other six sides, cost $0.3084 (<code class="path">results/E19c_gradient_duel_2026-09-25.json</code>, keys <code>population</code> and <code>calls</code>; my computation).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the join filters, the fan-out and the skip rules</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 500" role="img" aria-label="decision tree of the join, the fan-out and the paired skip">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="c1">
+    <title>Loop over sorted entries of the E19c gradient directory</title>
+    <rect x="20" y="16" width="300" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170" y="38" text-anchor="middle">for each entry in E19c_bt_gradients</text>
+    <text class="box-sub" x="170" y="55" text-anchor="middle">dir + *.txt loop (L48&#8211;52)</text>
+  </g>
+
+  <g class="box" id="c2">
+    <title>A folder must be a directory and carry a double underscore name</title>
+    <rect x="20" y="86" width="300" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170" y="108" text-anchor="middle">dir name has &quot;__&quot; ?</text>
+    <text class="box-sub" x="170" y="125" text-anchor="middle">L49</text>
+  </g>
+
+  <g class="box" id="c3">
+    <title>The (campaign, task, uuid8) triple must exist in the E16 population index</title>
+    <rect x="20" y="156" width="300" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170" y="178" text-anchor="middle">key in E16 population ?</text>
+    <text class="box-sub" x="170" y="195" text-anchor="middle">L54</text>
+  </g>
+
+  <g class="box" id="c4">
+    <title>Every one of the five sibling channels must hold the same file name</title>
+    <rect x="20" y="226" width="300" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170" y="248" text-anchor="middle">all five siblings exist ?</text>
+    <text class="box-sub" x="170" y="265" text-anchor="middle">loop with break (L64&#8211;72)</text>
+  </g>
+
+  <g class="box" id="c5">
+    <title>The survivor is stored under the population task name, not the folder name</title>
+    <rect x="20" y="296" width="300" height="50" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="318" text-anchor="middle">store quads[(camp, item task, u8)]</text>
+    <text class="box-sub" x="170" y="335" text-anchor="middle">L75</text>
+  </g>
+
+  <g class="box" id="c6">
+    <title>ThreadPoolExecutor maps one(k) over the surviving keys</title>
+    <rect x="20" y="366" width="300" height="50" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170" y="388" text-anchor="middle">10-worker map over keys</text>
+    <text class="box-sub" x="170" y="405" text-anchor="middle">L111&#8211;112</text>
+  </g>
+
+  <g class="box" id="c7">
+    <title>paired skips a row when either side has a None value for the axis</title>
+    <rect x="20" y="436" width="300" height="50" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170" y="458" text-anchor="middle">x or y None ?</text>
+    <text class="box-sub" x="170" y="475" text-anchor="middle">skip row (L126)</text>
+  </g>
+
+  <text class="box-sub" id="c8" x="525" y="112" text-anchor="middle">a failed first test is skipped with no drop counter (L49&#8211;50)</text>
+
+  <g class="box" id="c9">
+    <title>One unique match on campaign and uuid8 is accepted, otherwise the file is dropped</title>
+    <rect x="400" y="156" width="250" height="50" rx="2" fill="none" stroke="#FFB547" stroke-dasharray="5 4"/>
+    <text class="box-label" x="525" y="178" text-anchor="middle">one (camp, u8) match ?</text>
+    <text class="box-sub" x="525" y="195" text-anchor="middle">else drop no_population_join (L56&#8211;61)</text>
+  </g>
+
+  <g class="box" id="c10">
+    <title>The first missing sibling file stops the check and counts one drop</title>
+    <rect x="400" y="226" width="250" height="50" rx="2" fill="none" stroke="#FFB547" stroke-dasharray="5 4"/>
+    <text class="box-label" x="525" y="248" text-anchor="middle">drop no_&lt;side&gt;_gradient</text>
+    <text class="box-sub" x="525" y="265" text-anchor="middle">break, then continue (L68&#8211;74)</text>
+  </g>
+
+  <g class="box" id="c11">
+    <title>The verifier side does not read a gradient file; it calls E16.judge_item</title>
+    <rect x="400" y="296" width="250" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="525" y="320" text-anchor="middle">ver side uses E16.judge_item</text>
+    <text class="box-sub" x="525" y="338" text-anchor="middle">texts skip &quot;ver&quot;; js[&quot;ver&quot;] set later</text>
+    <text class="box-sub" x="525" y="354" text-anchor="middle">L105, L108</text>
+  </g>
+
+  <g class="box" id="c12">
+    <title>Cluster bootstrap resamples the task groups 999 times</title>
+    <rect x="400" y="380" width="250" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="525" y="404" text-anchor="middle">999 resamples of groups</text>
+    <text class="box-sub" x="525" y="422" text-anchor="middle">no vals -> return None</text>
+    <text class="box-sub" x="525" y="438" text-anchor="middle">L130&#8211;131, L137&#8211;139</text>
+  </g>
+
+  <g class="box" id="c13">
+    <title>CAP_USD is recorded in the output but never stops a call</title>
+    <rect x="690" y="226" width="270" height="64" rx="2" fill="none" stroke="#FF4D6A" stroke-dasharray="5 4"/>
+    <text class="box-label" x="825" y="250" text-anchor="middle">CAP_USD = 2.0 recorded only</text>
+    <text class="box-sub" x="825" y="268" text-anchor="middle">within_cap = new_cost &lt;= 2.0</text>
+    <text class="box-sub" x="825" y="284" text-anchor="middle">L37, L188&#8211;190: no stop branch</text>
+  </g>
+
+  <path class="edge" data-from="c1" data-to="c2" d="M170,66 V86" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="c3" d="M170,136 V156" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="176" y="150" text-anchor="start">yes</text>
+  <path class="edge dashed-edge" data-from="c2" data-to="c8" d="M320,111 H400" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="356" y="103" text-anchor="middle">no</text>
+  <path class="edge" data-from="c3" data-to="c4" d="M170,206 V226" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="176" y="220" text-anchor="start">yes</text>
+  <path class="edge dashed-edge" data-from="c3" data-to="c9" d="M320,181 H400" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="356" y="173" text-anchor="middle">no</text>
+  <path class="edge" data-from="c4" data-to="c5" d="M170,276 V296" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="176" y="290" text-anchor="start">yes</text>
+  <path class="edge dashed-edge" data-from="c4" data-to="c10" d="M320,251 H400" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="356" y="243" text-anchor="middle">no</text>
+  <path class="edge" data-from="c5" data-to="c6" d="M170,346 V366" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c6" data-to="c7" d="M170,416 V436" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c6" data-to="c11" d="M320,391 H400" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c7" data-to="c12" d="M320,455 H360 V412 H400" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge dashed-edge" data-from="c12" data-to="c13" d="M650,412 H670 V258 H690" fill="none" stroke="#FF4D6A" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="676" y="340" text-anchor="middle">cost</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the real branches, with their lines: the join filters (L49, L54, L67&ndash;74), the drop counters <code>no_population_join</code> (L60) and <code>no_&lt;side&gt;_gradient</code> (L69), the two closures that carry the fan-out and the bootstrap (L102, L121), and the skip rule inside <code>paired</code> (L126). One decision is a stated limit, not a branch: <code>CAP_USD = 2.0</code> (L37) reaches the report as <code>within_cap</code> (L190) but no code path stops a call when the cost passes it.</p>
+<p class="note flag">The failure branch at L68&ndash;71 stops at the first missing sibling file, so the drop counter names only one side per file even when several are missing; the JSON shows <code>no_population_join: 25</code> and no sibling drop (measured on disk, my computation).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="rw">What it reads and writes</h2>
+<table>
+<thead><tr><th>kind</th><th>name</th><th>where</th><th>used for</th></tr></thead>
+<tbody>
+<tr><td>read</td><td class="sym">E19c gradient text</td><td><code class="path">results/E19c_bt_gradients/&lt;camp&gt;__&lt;task&gt;/&lt;ts&gt;_&lt;uuid8&gt;.txt</code> (L29)</td><td>join key and judge text (L53, L104)</td></tr>
+<tr><td>read</td><td class="sym">five sibling gradients</td><td><code class="path">E19b_bt_gradients_v2</code>, <code class="path">E19_bt_gradients</code>, <code class="path">E18_bt_gradients</code>, <code class="path">E15_bt_gradients</code>, <code class="path">E24_bt_gradients</code> (L30&ndash;34)</td><td>matched by dir and file name (L67&ndash;68)</td></tr>
+<tr><td>read</td><td class="sym">E16 population JSON</td><td><code class="path">E16.POP_JSON</code> = <code class="path">results/_e16_population.json</code> (L44)</td><td>builds <code>by_key</code> and the judged item (L45&ndash;46)</td></tr>
+<tr><td>read/write</td><td class="sym">E16 judge cache</td><td><code class="path">E16.CACHE_JSONL</code> (L84, inside <code>_llm</code>)</td><td>serves the six prior sides, avoids repeat calls</td></tr>
+<tr><td>read</td><td class="sym">run environment</td><td><code>E16._load_env()</code> call (L96)</td><td>loads the API key; contents not read here</td></tr>
+<tr><td>read</td><td class="sym">E16.MODEL</td><td>module constant, quoted in the report (L169)</td><td>names the judge model in the output</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no <code>Config</code> field is touched</td><td>thresholds are literals in this file (L37)</td></tr>
+<tr><td>state</td><td class="sym">none</td><td>no state key; <code>quads</code> is a local dict (L47)</td><td>run state lives in the population JSON</td></tr>
+<tr><td>value</td><td class="sym">build_join()</td><td>returns <code>(quads, drops, pop)</code> (L76)</td><td>paired generations and drop counts</td></tr>
+<tr><td>value</td><td class="sym">one(k) / judge_with_text()</td><td>verdict dicts (L92, L109)</td><td>per-side scores for one generation</td></tr>
+<tr><td>value</td><td class="sym">paired()</td><td><code>n</code>, <code>mean_delta</code>, <code>ci95</code>, win counts (L142&ndash;146)</td><td>one delta record per pair and axis</td></tr>
+<tr><td>write</td><td class="sym">OUT_JSON</td><td><code class="path">results/E19c_gradient_duel_2026-09-25.json</code> (L35, L192)</td><td>population, stats, pairs, calls</td></tr>
+<tr><td>write</td><td class="sym">OUT_MD</td><td><code class="path">results/E19c_gradient_duel_2026-09-25.md</code> (L36, L242)</td><td>four report tables, 53 lines on disk</td></tr>
+<tr><td>write</td><td class="sym">stdout</td><td>prints at L98&ndash;99 and L194&ndash;195</td><td>population size, new calls, new cost</td></tr>
+</tbody>
+</table>
+<p class="sub">Line numbers from <code class="path">experiments_verifiers/harness/e19c_gradient_duel.py</code> (246 lines, <code>wc -l</code>). The 53-line markdown length is measured on disk.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details id="sym"><summary>7 symbols: 5 top-level defs, 2 closures, no class</summary><div class="dbody">
+<pre>build_join() -&gt; (dict, Counter, dict)                  L42   joins seven gradient channels
+judge_with_text(item, grad_text, role) -&gt; dict         L79   swaps gradient text, judges once
+main() -&gt; None                                         L95   runs the whole duel
+  one(k) -&gt; dict[str, dict]                            L102  judges one generation, six sides
+  paired(side_x, side_y, field, boot=999, seed=0)      L121  cluster bootstrap on one axis
+_fmt(x, nd=3) -&gt; str                                   L198  formats a float or an em dash
+_write_md(out) -&gt; None                                 L202  writes the markdown report</pre>
+<p>Modules imported (L16&ndash;22): <code>collections</code>, <code>json</code>, <code>sys</code>, <code>ThreadPoolExecutor</code>, <code>Path</code>, <code>numpy as np</code>; then <code>e16_gradient_audit as E16</code> (L26) after <code>sys.path.insert</code> (L25).</p>
+<p>E16 symbols called: <code>POP_JSON</code> (L44), <code>judge_messages</code> (L81), <code>gradient_text</code> (L82), <code>_llm</code> (L84), <code>parse_judgment</code> (L86), <code>judge_item</code> (L108), <code>_load_env</code> (L96), <code>MODEL</code> (L169).</p>
+<p>Module constants: <code>TODAY = "2026-09-25"</code> (L28), <code>CAP_USD = 2.0</code> (L37), <code>SIDES</code> = seven channel names (L39), the seven directories (L29&ndash;34) and the two output paths (L35&ndash;36).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Relation</th><th>Where</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>importer</td><td class="sym">no importer found</td><td>grep over the repo finds no <code>import e19c_gradient_duel</code></td></tr>
+<tr><td>caller</td><td class="sym">__main__ guard</td><td>only <code>main()</code> at L245&ndash;246</td></tr>
+<tr><td>tests</td><td class="sym">none</td><td>grep over <code>tests/</code> returns no match</td></tr>
+<tr><td>doc link</td><td><a href="exp_e19c_gradient_duel.html">exp_e19c_gradient_duel.html</a></td><td>experiment page cites this script</td></tr>
+<tr><td>doc link</td><td><a href="file_index.html">file_index.html</a></td><td>lists this script at 246 lines</td></tr>
+</tbody>
+</table>
+<p>Related pages: <a href="exp_e16_gradient_audit.html">exp_e16_gradient_audit.html</a> (the instrument), <a href="exp_e19c_ratchet.html">exp_e19c_ratchet.html</a>, <a href="data_experiments.html">data_experiments.html</a>, <a href="exp_index.html">exp_index.html</a>.</p>
+<p class="sub">File digests in this batch: <a href="file_harness_e19c_confirm.html">file_harness_e19c_confirm.html</a> &#183; <a href="file_harness_e19c_eval.html">file_harness_e19c_eval.html</a> &#183; <a href="file_harness_e19c_gradient_duel.html">file_harness_e19c_gradient_duel.html</a> &#183; <a href="file_harness_e19c_online_bt.html">file_harness_e19c_online_bt.html</a> &#183; <a href="file_harness_e19c_ratchet.html">file_harness_e19c_ratchet.html</a> &#183; hub <a href="file_index.html">file_index.html</a>.</p>
+<p class="note say">Why it matters: the six prior sides are served from the E16 cache, so a delta in this report measures the gradient text, not a second judge run.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19c_gradient_duel.py</code> (all 246 lines, <code>wc -l</code>), <code class="path">experiments_verifiers/harness/e16_gradient_audit.py</code> (constants L44&ndash;78, <code>gradient_text</code> L493, <code>judge_messages</code> L498, <code>judge_item</code> L556), <code class="path">experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json</code> (keys <code>population</code>, <code>calls</code>, <code>stats</code>), <code class="path">experiments_verifiers/results/E19c_gradient_duel_2026-09-25.md</code> (53 lines), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>. Directory listings checked for the seven gradient trees. Greps over the repo and over <code>tests/</code> for the module name. Numbers labelled "my computation" come from the on-disk JSON.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/harness/e16_gradient_audit.py</code> in full (1571 lines, <code>wc -l</code>; only the called symbols were read, the rest belongs to <a href="exp_e16_gradient_audit.html">exp_e16_gradient_audit.html</a>). Skipped: the gradient text files themselves (no chemistry or wording read). Skipped: <code>e19b_gradient_duel.py</code> and <code>e19_gradient_duel.py</code>, which the docstring names as the pattern source; only the <code>build_quads</code> definition lines were checked (L33 in <code>e19b_gradient_duel.py</code>, L37 in <code>e19_gradient_duel.py</code>). Not opened: any <code>.env</code> file, the API key, the full <code>pairs</code> array of the JSON. No experiment, no pytest and no application run, per the build rules.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e18_bt_eval.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e18_bt_eval.py">
+<div class="wrap">
+
+<h1 class="hud">e18_bt_eval.py</h1>
+<p class="intro">This file is the evaluation half of E18: it reads the frozen E14 pair plan and the written E18 verdict ledger, fits one Bradley-Terry strength per generation, then compares that ranking with the E15 preference ranking and the recorded verifier reward. It also writes one execution-grounded gradient text per generation under <code class="path">results/E18_bt_gradients/</code> (L135, L187). It runs as <code>uv run python experiments_verifiers/harness/e18_bt_eval.py</code> and re-uses the Bradley-Terry fit and paired statistics of <code>e15_bt_eval.py</code>, imported as <code>E15E</code> (L36).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does: ledger in, BT strengths, gradient texts, four readouts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 500" role="img" aria-label="e18_bt_eval.py: load_all reads the pair plan, the verdict ledger and the claim file, main fits Bradley-Terry strengths, writes gradient texts, computes four readouts and writes a json and md report">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="i1">
+    <title>Every file the script reads</title>
+    <rect x="20" y="30" width="300" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="170" y="56" text-anchor="middle">inputs</text>
+    <text class="box-sub" x="170" y="78" text-anchor="middle">results/E14_bt_population.json L39 L57</text>
+    <text class="box-sub" x="170" y="96" text-anchor="middle">results/E18_bt_judgments_*.jsonl L40 L58</text>
+    <text class="box-sub" x="170" y="114" text-anchor="middle">data/verifier_claims_sane.jsonl L65</text>
+    <text class="box-sub" x="170" y="132" text-anchor="middle">results/E15_bt_pilot_*.json L43 L70</text>
+    <text class="box-sub" x="170" y="150" text-anchor="middle">results/_e18_determinism_*.jsonl L41 L375</text>
+    <text class="box-sub" x="170" y="168" text-anchor="middle">results/_e18_pilot_*.json L42 L405</text>
+  </g>
+
+  <a class="box" id="b1" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>load_all parses plan, ledger, claim uniformity and the E15 table</title>
+    <rect x="370" y="30" width="240" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="490" y="56" text-anchor="middle">load_all L56</text>
+    <text class="box-sub" x="490" y="76" text-anchor="middle">main-phase records only L60</text>
+    <text class="box-sub" x="490" y="94" text-anchor="middle">uniform score per uuid L65&#8211;L68</text>
+    <text class="box-sub" x="490" y="112" text-anchor="middle">e15_bt lookup by (gid, uuid) L70&#8211;L73</text>
+  </a>
+
+  <a class="box" id="b2" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>main fits one Bradley-Terry strength per generation and turns it into a reward</title>
+    <rect x="650" y="30" width="260" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="780" y="56" text-anchor="middle">per-group BT fit L205</text>
+    <text class="box-sub" x="780" y="76" text-anchor="middle">E15E.bt_fit_weighted L221</text>
+    <text class="box-sub" x="780" y="94" text-anchor="middle">beta centred on mean L225</text>
+    <text class="box-sub" x="780" y="112" text-anchor="middle">reward = expit(beta - mu) L227</text>
+  </a>
+
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>write_gradients renders one transcript per generation</title>
+    <rect x="650" y="180" width="260" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="780" y="206" text-anchor="middle">write_gradients L135</text>
+    <text class="box-sub" x="780" y="226" text-anchor="middle">GRAD_HEADER L84, format L175</text>
+    <text class="box-sub" x="780" y="244" text-anchor="middle">wins, losses, ties L156&#8211;L158</text>
+    <text class="box-sub" x="780" y="262" text-anchor="middle">theme_tokens L114, fmt_metrics L126</text>
+    <text class="box-sub" x="780" y="280" text-anchor="middle">writes &lt;gid&gt;/&lt;uuid&gt;.txt L187</text>
+  </a>
+
+  <a class="box" id="b4" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>Readout A: within-task pairs-correct on the contrast groups</title>
+    <rect x="370" y="200" width="240" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="490" y="226" text-anchor="middle">readout A L283&#8211;L299</text>
+    <text class="box-sub" x="490" y="246" text-anchor="middle">pairs_correct per policy L283</text>
+    <text class="box-sub" x="490" y="264" text-anchor="middle">cluster_boot CIs L287&#8211;L290</text>
+    <text class="box-sub" x="490" y="282" text-anchor="middle">paired_boot_diff L291&#8211;L299</text>
+  </a>
+
+  <a class="box" id="b5" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>Readout B: which policy ships a successful generation per group</title>
+    <rect x="60" y="230" width="260" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="190" y="256" text-anchor="middle">readout B L302&#8211;L325</text>
+    <text class="box-sub" x="190" y="276" text-anchor="middle">argmax_ship per policy L306&#8211;L309</text>
+    <text class="box-sub" x="190" y="294" text-anchor="middle">SR of the pick L311</text>
+    <text class="box-sub" x="190" y="312" text-anchor="middle">oracle, ship_rate L312 L323</text>
+  </a>
+
+  <a class="box" id="b6" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>Readouts C and D: independence and execution diagnostics</title>
+    <rect x="60" y="370" width="300" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="210" y="396" text-anchor="middle">readouts C and D L327&#8211;L382</text>
+    <text class="box-sub" x="210" y="416" text-anchor="middle">Spearman per group L241&#8211;L249</text>
+    <text class="box-sub" x="210" y="434" text-anchor="middle">outcome mix, repairs L335&#8211;L341</text>
+    <text class="box-sub" x="210" y="452" text-anchor="middle">order bias L345, swap flips L351&#8211;L371</text>
+    <text class="box-sub" x="210" y="470" text-anchor="middle">determinism L373&#8211;L382</text>
+  </a>
+
+  <a class="box" id="b7" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>the out dict and the markdown report</title>
+    <rect x="420" y="370" width="280" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="560" y="396" text-anchor="middle">out dict L407</text>
+    <text class="box-sub" x="560" y="416" text-anchor="middle">readout_a L445, readout_b L463</text>
+    <text class="box-sub" x="560" y="434" text-anchor="middle">readout_c L469, readout_d L481</text>
+    <text class="box-sub" x="560" y="452" text-anchor="middle">cost L497, per_group L507</text>
+    <text class="box-sub" x="560" y="470" text-anchor="middle">bt_table L508</text>
+  </a>
+
+  <g class="box" id="o1">
+    <title>Files written by the run</title>
+    <rect x="770" y="340" width="330" height="140" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7" stroke-dasharray="5 4"/>
+    <text class="box-label" x="935" y="366" text-anchor="middle">writes</text>
+    <text class="box-sub" x="935" y="388" text-anchor="middle">results/E18_scripted_bt_2026-09-23.json L517</text>
+    <text class="box-sub" x="935" y="406" text-anchor="middle">results/E18_scripted_bt_2026-09-23.md L621</text>
+    <text class="box-sub" x="935" y="424" text-anchor="middle">results/E18_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt L187</text>
+    <text class="box-sub" x="935" y="442" text-anchor="middle">printed counts L622&#8211;L625</text>
+    <text class="box-sub" x="935" y="460" text-anchor="middle">note the file names, not E18_bt_eval_*</text>
+  </g>
+
+  <text class="box-sub" x="20" y="20" text-anchor="start">entry: main L195 &#183; no argparse, no subcommands &#183; E15E supplies the fit and the statistics</text>
+
+  <path class="edge dashed-edge" data-from="i1" data-to="b1" d="M320,105 H370" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="345" y="97" text-anchor="middle">parse</text>
+  <path class="edge" data-from="b1" data-to="b2" d="M610,80 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="630" y="72" text-anchor="middle">plan + verdicts</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M780,130 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="790" y="158" text-anchor="start">bt_rewards L263</text>
+  <path class="edge" data-from="b2" data-to="b4" d="M650,110 C600,140 560,180 520,200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="580" y="160" text-anchor="middle">groups_data L239</text>
+  <path class="edge" data-from="b2" data-to="b5" d="M650,90 C500,150 380,220 320,260" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="410" y="196" text-anchor="middle">groups_data</text>
+  <path class="edge" data-from="b4" data-to="b6" d="M420,290 C380,330 340,340 300,370" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="330" text-anchor="middle">per_group_rows L251</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M360,425 H420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="390" y="417" text-anchor="middle">stats</text>
+  <path class="edge" data-from="b3" data-to="b7" d="M780,290 C760,330 720,350 700,370" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="745" y="336" text-anchor="start">n_grad L263</text>
+  <path class="edge dashed-edge" data-from="b7" data-to="o1" d="M700,440 C730,440 740,430 770,430" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="736" y="420" text-anchor="middle">json + md</text>
+  <path class="edge dashed-edge" data-from="b3" data-to="o1" d="M910,290 V340" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="920" y="320" text-anchor="start">gradient txt</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 9 boxes. The whole script is one <code>main</code> plus three helpers; <code>write_gradients</code> runs before any label is used (L263), which matches the protocol key <code>gold_hygiene</code> (L432&#8211;L433): the gradient text carries script verdicts and metric numbers only.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: seven read paths in, three write paths out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 340" role="img" aria-label="data flow of e18_bt_eval.py: no CLI argument, seven input files, one out dict, two report files and a directory of gradient texts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="g1">
+    <title>No CLI arguments and no repository config field</title>
+    <rect x="20" y="30" width="250" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="56" text-anchor="middle">no CLI arguments</text>
+    <text class="box-sub" x="145" y="78" text-anchor="middle">main takes no arguments L195</text>
+    <text class="box-sub" x="145" y="96" text-anchor="middle">SCORE_MAP tie/unsure L50</text>
+    <text class="box-sub" x="145" y="114" text-anchor="middle">N_BOOT 10 000 L48, seed L49</text>
+    <text class="box-sub" x="145" y="132" text-anchor="middle">config.py: no field read</text>
+  </g>
+
+  <g class="box" id="g2">
+    <title>Every file opened by the script</title>
+    <rect x="20" y="170" width="250" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="196" text-anchor="middle">reads</text>
+    <text class="box-sub" x="145" y="218" text-anchor="middle">E14_bt_population.json L57</text>
+    <text class="box-sub" x="145" y="236" text-anchor="middle">E18_bt_judgments_*.jsonl L58 L351</text>
+    <text class="box-sub" x="145" y="254" text-anchor="middle">verifier_claims_sane.jsonl L65</text>
+    <text class="box-sub" x="145" y="272" text-anchor="middle">E15_bt_pilot_*.json L70</text>
+    <text class="box-sub" x="145" y="290" text-anchor="middle">_e18_determinism_*.jsonl L375</text>
+    <text class="box-sub" x="145" y="308" text-anchor="middle">_e18_pilot_*.json L405</text>
+  </g>
+
+  <a class="box" id="g3" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>main owns every readout and the out dict</title>
+    <rect x="330" y="40" width="250" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="455" y="66" text-anchor="middle">main L195</text>
+    <text class="box-sub" x="455" y="86" text-anchor="middle">coverage and outcomes L437&#8211;L444</text>
+    <text class="box-sub" x="455" y="104" text-anchor="middle">cost ledger L386&#8211;L403</text>
+    <text class="box-sub" x="455" y="122" text-anchor="middle">pilot gate echoed L436</text>
+  </a>
+
+  <a class="box" id="g4" href="../../experiments_verifiers/harness/e18_bt_eval.py">
+    <title>The out dict and the markdown body</title>
+    <rect x="330" y="170" width="250" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="455" y="196" text-anchor="middle">out + markdown L407 L519</text>
+    <text class="box-sub" x="455" y="216" text-anchor="middle">Q1 rule L558, Q2 rule L565</text>
+    <text class="box-sub" x="455" y="234" text-anchor="middle">per-group table L576</text>
+    <text class="box-sub" x="455" y="252" text-anchor="middle">gaps section L609</text>
+  </a>
+
+  <g class="box" id="g5">
+    <title>What the run leaves on disk</title>
+    <rect x="650" y="40" width="330" height="140" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7" stroke-dasharray="5 4"/>
+    <text class="box-label" x="815" y="66" text-anchor="middle">writes</text>
+    <text class="box-sub" x="815" y="88" text-anchor="middle">results/E18_scripted_bt_2026-09-23.json L517</text>
+    <text class="box-sub" x="815" y="106" text-anchor="middle">results/E18_scripted_bt_2026-09-23.md L621</text>
+    <text class="box-sub" x="815" y="124" text-anchor="middle">results/E18_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt L187</text>
+    <text class="box-sub" x="815" y="142" text-anchor="middle">counted in coverage.gradient_files L441</text>
+    <text class="box-sub" x="815" y="160" text-anchor="middle">printed line with all three names L622</text>
+  </g>
+
+  <g class="box" id="g6">
+    <title>Returned value</title>
+    <rect x="650" y="210" width="330" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="815" y="236" text-anchor="middle">returns None</text>
+    <text class="box-sub" x="815" y="256" text-anchor="middle">no return statement; __main__ guard L628</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="g1" data-to="g3" d="M270,85 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="300" y="77" text-anchor="middle">constants L48</text>
+  <path class="edge dashed-edge" data-from="g2" data-to="g3" d="M270,240 C300,240 300,110 330,104" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="296" y="160" text-anchor="start">load_all L196</text>
+  <path class="edge" data-from="g3" data-to="g4" d="M455,140 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="465" y="160" text-anchor="start">readouts</text>
+  <path class="edge dashed-edge" data-from="g4" data-to="g5" d="M580,205 C615,205 620,150 650,120" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="180" text-anchor="start">json + md</text>
+  <path class="edge dashed-edge" data-from="g3" data-to="g5" d="M580,70 C615,70 620,66 650,66" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="615" y="56" text-anchor="middle">gradients L263</text>
+  <path class="edge" data-from="g4" data-to="g6" d="M580,240 H650" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="615" y="232" text-anchor="middle">end of main</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the script reads a frozen plan, a written ledger and the claim file, and it reads the label-free E15 table and the pilot gate for context. The output names are <code>E18_scripted_bt_*</code>, not <code>E18_bt_eval_*</code> (L44&#8211;L45), which matches the producer file <code>e18_scripted_bt.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the logic: the BT match rule and the guard on the per-group rank</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 340" role="img" aria-label="logic of e18_bt_eval.py: how each pair record becomes BT matches, the guard on the per-group Spearman, and the Q1 verdict rule">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="20" y="20" text-anchor="start">1. one pair record becomes one or two BT matches (main L212&#8211;L223)</text>
+  <g class="box" id="m1">
+    <title>a main-phase record from the ledger</title>
+    <rect x="20" y="40" width="200" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="64" text-anchor="middle">record L212</text>
+    <text class="box-sub" x="120" y="84" text-anchor="middle">winner_ij field</text>
+  </g>
+  <g class="box" id="m2">
+    <title>the tie test comes first</title>
+    <rect x="270" y="40" width="210" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="375" y="64" text-anchor="middle">winner_ij == tie? L213</text>
+    <text class="box-sub" x="375" y="84" text-anchor="middle">else must be a known uuid L216</text>
+  </g>
+  <g class="box" id="m3">
+    <title>a tie adds two half-weight matches</title>
+    <rect x="540" y="40" width="230" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="655" y="64" text-anchor="middle">two matches, weight 0.5 L214</text>
+    <text class="box-sub" x="655" y="84" text-anchor="middle">one each direction</text>
+  </g>
+  <g class="box" id="m4">
+    <title>a decisive verdict adds one match</title>
+    <rect x="540" y="130" width="230" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="655" y="154" text-anchor="middle">one match, weight 1.0 L217</text>
+    <text class="box-sub" x="655" y="174" text-anchor="middle">winner listed first</text>
+  </g>
+  <g class="box" id="m5">
+    <title>no usable record leaves a flat group</title>
+    <rect x="540" y="220" width="230" height="60" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="655" y="244" text-anchor="middle">theta = zeros L223</text>
+    <text class="box-sub" x="655" y="264" text-anchor="middle">every generation then ties</text>
+  </g>
+  <path class="edge" data-from="m1" data-to="m2" d="M220,70 H270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="m2" data-to="m3" d="M480,60 H540" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="52" text-anchor="middle">yes</text>
+  <path class="edge" data-from="m2" data-to="m4" d="M480,84 C510,100 515,140 540,150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="508" y="120" text-anchor="middle">no</text>
+  <path class="edge" data-from="m4" data-to="m5" d="M770,190 C800,205 820,230 770,240" fill="none" stroke="#FF4D6A" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="820" y="220" text-anchor="start">empty ms list</text>
+
+  <line x1="20" y1="164" x2="500" y2="164" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="20" y="186" text-anchor="start">2. the per-group rank guard (sp L241&#8211;L249)</text>
+  <g class="box" id="s1">
+    <title>too few generations or a missing value</title>
+    <rect x="20" y="204" width="220" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="228" text-anchor="middle">fewer than 3 gens L242</text>
+    <text class="box-sub" x="130" y="248" text-anchor="middle">or any value None L246</text>
+  </g>
+  <g class="box" id="s2">
+    <title>the guard returns None instead of a number</title>
+    <rect x="20" y="284" width="220" height="50" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="130" y="312" text-anchor="middle">returns None L243 L247</text>
+  </g>
+  <g class="box" id="s3">
+    <title>otherwise a rounded Spearman</title>
+    <rect x="280" y="204" width="220" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="390" y="228" text-anchor="middle">spearmanr, 3 decimals L248</text>
+    <text class="box-sub" x="390" y="248" text-anchor="middle">NaN also becomes None L249</text>
+  </g>
+  <path class="edge" data-from="s1" data-to="s2" d="M130,264 V284" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="140" y="280" text-anchor="start">yes</text>
+  <path class="edge" data-from="s1" data-to="s3" d="M240,234 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="260" y="226" text-anchor="middle">no</text>
+
+  <line x1="540" y1="130" x2="540" y2="334" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="560" y="304" text-anchor="start">3. the Q1 verdict rule in the markdown (L558&#8211;L559)</text>
+  <g class="box" id="q1">
+    <title>is E18 above both baselines</title>
+    <rect x="560" y="180" width="180" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="650" y="204" text-anchor="middle">E18 &gt; max(E15, reward)?</text>
+    <text class="box-sub" x="650" y="224" text-anchor="middle">point estimates L558</text>
+  </g>
+  <g class="box" id="q2">
+    <title>the strict answer also needs the interval</title>
+    <rect x="890" y="120" width="280" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1030" y="144" text-anchor="middle">CI low &gt; 0: YES</text>
+    <text class="box-sub" x="1030" y="164" text-anchor="middle">rule at L558, beats E15</text>
+  </g>
+  <g class="box" id="q3">
+    <title>a higher point estimate alone</title>
+    <rect x="890" y="200" width="280" height="60" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="1030" y="224" text-anchor="middle">DIRECTIONALLY L559</text>
+    <text class="box-sub" x="1030" y="244" text-anchor="middle">interval spans 0</text>
+  </g>
+  <g class="box" id="q4">
+    <title>no advantage at all</title>
+    <rect x="890" y="280" width="280" height="60" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="1030" y="304" text-anchor="middle">NO L559</text>
+    <text class="box-sub" x="1030" y="324" text-anchor="middle">E18 not above both baselines</text>
+  </g>
+  <path class="edge" data-from="q1" data-to="q2" d="M740,204 C800,180 840,155 890,150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="812" y="164" text-anchor="middle">yes + CI</text>
+  <path class="edge" data-from="q1" data-to="q3" d="M740,212 C800,212 840,220 890,228" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="812" y="204" text-anchor="middle">yes only</text>
+  <path class="edge" data-from="q1" data-to="q4" d="M740,222 C800,250 840,290 890,308" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="812" y="262" text-anchor="middle">no</text>
+  <text class="box-sub" x="560" y="330" text-anchor="start">11 boxes &#183; red = a missing measurement or the negative answer; amber = a wide interval</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; 12 boxes. The Q2 rule is the same shape: a mean Spearman above <code>0.6</code> against the E15 ranking is called convergent, otherwise a different channel (L564&#8211;L566). The BT fit re-uses <code>e15_bt_eval.bt_fit_weighted</code> with ridge <code>1.0</code> (protocol string L430).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">E14_bt_population.json</td><td><code class="path">results/</code></td><td>the frozen 667-pair plan and group list</td><td class="size">L39 L57</td></tr>
+<tr><td>reads</td><td class="sym">E18_bt_judgments_2026-09-23.jsonl</td><td><code class="path">results/</code></td><td>main-phase verdicts, then swap records</td><td class="size">L40 L58 L351</td></tr>
+<tr><td>reads</td><td class="sym">verifier_claims_sane.jsonl</td><td><code class="path">data/</code></td><td>uniform claim pass rate per uuid</td><td class="size">L65</td></tr>
+<tr><td>reads</td><td class="sym">E15_bt_pilot_2026-09-23.json</td><td><code class="path">results/</code></td><td>E15 BT reward per (gid, uuid)</td><td class="size">L43 L70</td></tr>
+<tr><td>reads</td><td class="sym">_e18_determinism_2026-09-23.jsonl</td><td><code class="path">results/</code></td><td>verbatim re-run results</td><td class="size">L41 L375</td></tr>
+<tr><td>reads</td><td class="sym">_e18_pilot_2026-09-23.json</td><td><code class="path">results/</code></td><td>pilot gate echoed into the report</td><td class="size">L42 L405</td></tr>
+<tr><td>reads</td><td class="sym">E18_bt_cost_ledger_2026-09-23.jsonl</td><td><code class="path">results/</code></td><td>cost per model and per role</td><td class="size">L386&#8211;L403</td></tr>
+<tr><td>writes</td><td class="sym">E18_scripted_bt_2026-09-23.json</td><td><code class="path">results/</code></td><td>four readouts, cost, per-group and BT tables</td><td class="size">L517</td></tr>
+<tr><td>writes</td><td class="sym">E18_scripted_bt_2026-09-23.md</td><td><code class="path">results/</code></td><td>the written report with Q1, Q2 and Q3</td><td class="size">L621</td></tr>
+<tr><td>writes</td><td class="sym">E18_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</td><td><code class="path">results/</code></td><td>one execution-grounded gradient per generation</td><td class="size">L141 L142 L187</td></tr>
+<tr><td>prints</td><td class="sym">counts and outcome mix</td><td>console</td><td>pairs-correct, M2 shipped, outcomes, cost</td><td class="size">L622&#8211;L625</td></tr>
+<tr><td>returns</td><td class="sym">None</td><td><code>main</code></td><td>no return statement; guard at L628</td><td class="size">L195</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no field of <code>config.py</code>, no env read</td><td>every path is built from <code>EV</code> L32</td><td class="size">&#8212;</td></tr>
+<tr><td>state</td><td class="sym">none</td><td>no LangGraph state key</td><td>the out dict is local and written once</td><td class="size">L407</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the same verdict ledger can be re-read without new LLM calls, and the file writes the gradient texts before it touches any label (L263 before L283), which is what the protocol key <code>gold_hygiene</code> records (L432&#8211;L433).</p>
+<p class="note">Amber: <code>e15_bt_eval</code> is imported through <code>__import__("sys")</code> followed by <code>sys_path.path.insert(...)</code> (L35&#8211;L36) instead of a plain <code>import sys</code>. The result is the same, but a reader searching for the standard import finds no match.</p>
+<p class="note flag">Red: the markdown text says "See the three-way gradient duel table below" (L572&#8211;L573), but this file writes no duel table; that table belongs to <a href="file_harness_e18_gradient_duel.html">e18_gradient_duel.py</a>. Inside this md the reader finds only the per-group table (L576) and the diagnostics (L587).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>6 top-level functions, 8 nested functions, 0 classes &mdash; signatures and roles</summary><div class="dbody">
+<pre>load_all()                                  L56    parse plan, ledger, claims, E15 rewards
+expit(x)                                    L78    1 / (1 + exp(-x)) for the reward
+theme_tokens(verdicts: list[str]) -&gt; str    L114   frequent words in lost or tied verdicts
+fmt_metrics(m) -&gt; str                       L126   up to 6 metric values, 300 chars
+write_gradients(plan, judgments, bt_rewards) -&gt; int   L135   one gradient text per generation
+main()                                      L195   BT fit, readouts, reports</pre>
+<p>Nested functions: <code>quote(m)</code> L160 and <code>tline(m)</code> L168 (inside <code>write_gradients</code>), <code>sp(a_key, b_key, gd=gd)</code> L241, <code>to_pairfn(key)</code> L268 with its inner <code>f(gd, a, b)</code> L269, <code>sc_val(key)</code> L277, <code>sc_rew(gd, u)</code> L280 and <code>ship_rate(key)</code> L323 (all inside <code>main</code>).</p>
+<p>Module constants: <code>EV</code> L32, <code>REPO</code> L33, <code>TODAY</code> L38, <code>PLAN_PATH</code> L39, <code>JUDGMENTS</code> L40, <code>DETS</code> L41, <code>PILOT_JSON</code> L42, <code>E15_JSON</code> L43, <code>OUT_JSON</code> L44, <code>OUT_MD</code> L45, <code>GRAD_ROOT</code> L46, <code>N_BOOT</code> L48, <code>BOOT_SEED</code> L49, <code>SCORE_MAP = {"pass": 1.0, "fail": 0.0, "unsure": 0.5}</code> L50, <code>GRAD_HEADER</code> L84, <code>STOPWORDS = E15E.STOPWORDS</code> L111.</p>
+<p>Imports: <code>numpy</code> L29, <code>scipy.stats.spearmanr</code> L30, and <code>e15_bt_eval as E15E</code> L36, which supplies <code>bt_fit_weighted</code> (L221), <code>pairs_correct</code> (L283&#8211;L286), <code>cluster_boot</code> (L287&#8211;L290), <code>paired_boot_diff</code> (L291&#8211;L298), <code>argmax_ship</code> (L306&#8211;L309) and <code>STOPWORDS</code> (L111).</p>
+<p>Readout keys in the out dict: <code>readout_a_pairs_correct_contrast</code> L445, <code>readout_b_m2_replay</code> L463, <code>readout_c_independence</code> L469, <code>readout_d_execution_diagnostics</code> L481, <code>cost</code> L497, <code>per_group</code> L507, <code>bt_table</code> L508. The protocol block (L411&#8211;L435) is a literal description of the producer protocol, including the 25.0 dollar cap (L504) and the tie-break string (L434).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">no importer found</td><td>a repo-wide grep for <code>import e18_bt_eval</code> returns no file</td><td class="sym">&#8212;</td></tr>
+<tr><td class="sym">documented run</td><td><code>uv run python experiments_verifiers/harness/e18_bt_eval.py</code></td><td class="sym">L21</td></tr>
+<tr><td class="sym">it imports</td><td><code>e15_bt_eval</code> as <code>E15E</code> for the BT fit and the statistics</td><td class="sym">L36</td></tr>
+<tr><td class="sym">it reads the output of</td><td><a href="file_harness_e18_scripted_bt.html">e18_scripted_bt.py</a>, which writes the judgment ledger</td><td class="sym">L40</td></tr>
+<tr><td class="sym">a neighbour mirrors it</td><td>e18_symmetric.py notes that its fit mirrors <code>e18_bt_eval.main</code></td><td class="sym">e18_symmetric.py L178</td></tr>
+<tr><td class="sym">consumer page</td><td><a href="exp_e18_bt_eval.html">exp_e18_bt_eval.html</a> quotes the numbers this file produced</td><td class="sym">page scope</td></tr>
+</tbody>
+</table>
+<p>Tests: no test found. A grep of <code class="path">tests/</code> for <code>e18_bt_eval</code>, <code>write_gradients</code> and <code>theme_tokens</code> returns no file.</p>
+<p>Line count: 629 lines (<code>wc -l</code>). The contrast-group count is read from the plan at run time (L266, L446); the docstring's "9 contrast groups" (L10) is the value that held when it was written.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e18_bt_eval.py</code> (629 lines, read in full: docstring, constants, all six top-level functions, all eight nested functions, the BT match rule, the four readouts, the cost block and the markdown builder), the docstring citations from <code class="path">harness/e18_scripted_bt.py</code> (producer contract, not re-read in full here) and the E15 symbols named by the import, repo-wide grep for <code>e18_bt_eval</code>, grep of <code class="path">tests/</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> and the repo <code class="path">.env</code> (key material, never opened; this file reads no env at all); <code class="path">results/E18_bt_judgments_2026-09-23.jsonl</code> (5.9 MB ledger, read by the script, size and line count only), <code class="path">results/E18_bt_cost_ledger_2026-09-23.jsonl</code> (533 KB, line count only), <code class="path">results/E14_bt_population.json</code> (plan; key names only), <code class="path">results/E18_scripted_bt_2026-09-23.{json,md}</code> and <code class="path">results/E18_bt_gradients/</code> (read-only evidence owned by <a href="exp_e18_bt_eval.html">exp_e18_bt_eval.html</a>); <code class="path">harness/e15_bt_eval.py</code> beyond the symbols it exports to this file. No script was run, no pytest, no application start.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

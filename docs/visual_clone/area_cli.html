@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interactive front ends (sources/cli) - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > cli">
+<div class="wrap">
+
+<h1 class="hud">Interactive front ends</h1>
+<p class="intro">Three wizards cover the terminal: <a href="../../sources/cli/onboard_cli.py"><code>OnboardCLI</code></a> runs when no mode flag is given, <code>EvaluationCLI</code> when <code>--evaluation_cli</code> is given, and <code>MemoryChatCLI</code> when <code>--memory_cli</code> is given. All three are chosen in <a href="../../main.py"><code>main.py::main</code></a> before the argument-driven path starts. Two shared modules draw the output: <code>theme.py</code> for the wizards, <code>pretty_print.py</code> for the rest of the codebase.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Entry dispatch</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 330" role="img" aria-label="main.py dispatch to the three CLIs and the argument-driven path">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1a" href="area_entry_config.html">
+    <title>Cli entry point</title>
+    <rect x="18" y="140" width="190" height="58" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="113" y="164" text-anchor="middle">main.py::main</text>
+    <text class="box-sub" x="113" y="180" text-anchor="middle">argparse + config load</text>
+  </a>
+
+  <a class="box" id="d1b" href="../../main.py">
+    <title>Flag check before dispatch</title>
+    <rect x="250" y="40" width="170" height="250" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="335" y="158" text-anchor="middle">no_mode_selected</text>
+    <text class="box-sub" x="335" y="174" text-anchor="middle">checks 9 flags</text>
+  </a>
+
+  <a class="box" id="d1c" href="#card-onboard">
+    <title>Zero-argument wizard</title>
+    <rect x="520" y="20" width="250" height="52" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="645" y="42" text-anchor="middle">OnboardCLI</text>
+    <text class="box-sub" x="645" y="58" text-anchor="middle">9 setup steps</text>
+  </a>
+
+  <a class="box" id="d1d" href="#card-eval">
+    <title>Benchmark launcher</title>
+    <rect x="520" y="95" width="250" height="52" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="645" y="117" text-anchor="middle">EvaluationCLI</text>
+    <text class="box-sub" x="645" y="133" text-anchor="middle">7 setup steps</text>
+  </a>
+
+  <a class="box" id="d1e" href="#card-memory">
+    <title>Memory RAG chat</title>
+    <rect x="520" y="170" width="250" height="52" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="645" y="192" text-anchor="middle">MemoryChatCLI</text>
+    <text class="box-sub" x="645" y="208" text-anchor="middle">curses, reads memory</text>
+  </a>
+
+  <a class="box" id="d1f" href="flow_task_run.html">
+    <title>Argument-driven modes</title>
+    <rect x="520" y="245" width="250" height="52" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="645" y="267" text-anchor="middle">argument-driven path</text>
+    <text class="box-sub" x="645" y="283" text-anchor="middle">--task, --goal, --papers</text>
+  </a>
+
+  <path class="edge" data-from="d1a" data-to="d1b" d="M208,169 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="229" y="162" text-anchor="middle">args</text>
+  <path class="edge" data-from="d1b" data-to="d1c" d="M420,46 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="39" text-anchor="middle">no args</text>
+  <path class="edge" data-from="d1b" data-to="d1d" d="M420,121 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="114" text-anchor="middle">--evaluation_cli</text>
+  <path class="edge" data-from="d1b" data-to="d1e" d="M420,196 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="189" text-anchor="middle">--memory_cli</text>
+  <path class="edge" data-from="d1b" data-to="d1f" d="M420,271 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="264" text-anchor="middle">--task, --goal</text>
+
+  <text class="box-sub" x="18" y="316">dispatch order: evaluation_cli, memory_cli, then no args</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - one dispatch, three wizards. The flag checks sit in <code class="path">main.py</code> at <code>main.py::main</code>; no wizard is imported by another.</p>
+
+<table>
+<thead><tr><th>Flag</th><th>main.py symbol</th><th>Class run</th><th>Call</th></tr></thead>
+<tbody>
+<tr><td class="sym">(none)</td><td class="sym">main.py::main</td><td class="sym">OnboardCLI</td><td class="sym">OnboardCLI.run</td></tr>
+<tr><td class="sym">--evaluation_cli</td><td class="sym">main.py::main</td><td class="sym">EvaluationCLI</td><td class="sym">EvaluationCLI.run</td></tr>
+<tr><td class="sym">--memory_cli</td><td class="sym">main.py::main</td><td class="sym">MemoryChatCLI</td><td class="sym">MemoryChatCLI.run</td></tr>
+<tr><td class="sym">--memory_uuid</td><td class="sym">main.py::main</td><td class="sym">MemoryChatCLI</td><td class="sym">run_uuid argument</td></tr>
+</tbody>
+</table>
+<p class="sub">All four rows: <code class="path">main.py</code>, function <code>main()</code>, lines 342-381 (working tree, uncommitted).</p>
+<p class="note">Amber note: <code class="path">docs/DEVELOPER_GUIDE.md</code> lines 146-149 list three files under <code class="path">sources/cli/</code> and omit <code>memory_chat_cli.py</code> and <code>theme.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>How one wizard is built</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="Wizard structure: prompt, validate, write config, start run">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d2a" href="../../sources/cli/theme.py">
+    <title>Prompt helper</title>
+    <rect x="18" y="40" width="250" height="56" rx="13" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="143" y="72" text-anchor="middle">theme.ask()</text>
+  </a>
+
+  <a class="box" id="d2b" href="#card-onboard">
+    <title>Per-step validators</title>
+    <rect x="320" y="40" width="250" height="56" rx="13" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="445" y="66" text-anchor="middle">step validators</text>
+    <text class="box-sub" x="445" y="82" text-anchor="middle">re-prompt until valid</text>
+  </a>
+
+  <a class="box" id="d2c" href="../../config.py">
+    <title>Persisted config write</title>
+    <rect x="622" y="40" width="250" height="56" rx="13" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="747" y="66" text-anchor="middle">Config.dump()</text>
+    <text class="box-sub" x="747" y="82" text-anchor="middle">writes config_default.json</text>
+  </a>
+
+  <a class="box" id="d2d" href="../../config.py">
+    <title>Path check before launch</title>
+    <rect x="622" y="200" width="250" height="56" rx="13" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="747" y="232" text-anchor="middle">Config.validate_paths()</text>
+  </a>
+
+  <a class="box" id="d2e" href="mod_core_planner.html">
+    <title>Execution entry points</title>
+    <rect x="320" y="200" width="250" height="56" rx="12" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="445" y="226" text-anchor="middle">Planner / EvolutionEngine</text>
+    <text class="box-sub" x="445" y="242" text-anchor="middle">start_planner, start_workflow_evolution</text>
+  </a>
+
+  <a class="box" id="d2f" href="data_runs.html">
+    <title>Final workspace archive</title>
+    <rect x="18" y="200" width="250" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="143" y="226" text-anchor="middle">LocalTransfer</text>
+    <text class="box-sub" x="143" y="242" text-anchor="middle">archives capsule</text>
+  </a>
+
+  <path class="edge" data-from="d2a" data-to="d2b" d="M268,68 H320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="294" y="61" text-anchor="middle">typed answer</text>
+  <path class="edge" data-from="d2b" data-to="d2c" d="M570,68 H622" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="596" y="61" text-anchor="middle">accepted values</text>
+  <path class="edge" data-from="d2c" data-to="d2d" d="M747,96 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="752" y="152">fields saved</text>
+  <path class="edge" data-from="d2d" data-to="d2e" d="M622,228 H570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="596" y="221" text-anchor="middle">paths valid</text>
+  <path class="edge" data-from="d2e" data-to="d2f" d="M320,228 H268" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="294" y="221" text-anchor="middle">run finished</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - the shape both wizards share. <code>OnboardCLI.run()</code> repeats steps 6-9 in a loop so a finished run can be relaunched without restarting the wizard.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The three CLIs</h2>
+
+<div class="card ice" id="card-onboard">
+<h4><a href="../../sources/cli/onboard_cli.py">sources/cli/onboard_cli.py</a></h4>
+<p class="role">Setup wizard when no mode flag is given: keys, workspace, models, MCP scan, objective refinement, then planner or evolution engine.</p>
+<p class="meta">1 611 lines &#183; class: <code>OnboardCLI</code> &#183; <code>TOTAL_STEPS = 9</code> &#183; called by <a href="../../main.py">main.py</a>::main</p>
+<details><summary>the nine steps (<code>OnboardCLI.run</code>)</summary><div class="dbody">
+<pre>1  API Key Check              _check_api_keys
+2  Configuration              _load_config
+   workspace resolve          _verify_workspace_dir
+3  LLM Model Selection        _choose_models
+4  Toolomics MCP Connectivity _check_toolomics
+5  Workspace Setup            _setup_workspace_files
+6  Your Research Objective    _collect_objective
+7  Clarification &amp; Refinement _clarify_and_refine
+8  Mode Selection (Goal/Task) _classify_and_confirm
+9  Options &amp; Launch           _collect_options, _launch</pre>
+<p>Reads <code>os.getenv</code> for 6 API keys; writes the env file via <code>paths.user_env_file()</code>. Persists with <code>Config.dump()</code> to <code>config_default.json</code> (installed runs: <code>~/.config/mimosa/config.json</code>, <code>_persisted_config_path</code>). Objectives go to <code>_save_objective_to_history</code>.</p>
+</div></details>
+<details><summary>launch and failure paths</summary><div class="dbody">
+<pre>OnboardCLI._launch()          -&gt; config.validate_paths(), exit 1 on AssertionError
+OnboardCLI._launch_goal()     -&gt; Planner.start_planner(goal, judge=True)
+OnboardCLI._launch_task()     -&gt; EvolutionEngine.start_workflow_evolution(goal, judge=True, enable_evolution=self._learn)
+OnboardCLI._verify_workspace_dir() raises no skip: path must contain "toolomics"
+_clarify_and_refine()         max_clarification_rounds = 5, then manual fallback
+_check_toolomics()            retries every 15 s until one MCP answers, or user types "skip"</pre>
+</div></details>
+</div>
+
+<div class="card ice" id="card-eval">
+<h4><a href="../../sources/cli/evaluation_cli.py">sources/cli/evaluation_cli.py</a></h4>
+<p class="role">Guided ScienceAgentBench launcher: queues runs, records each spec as JSON notes, then starts <code>CsvEvaluationMode</code> one run at a time.</p>
+<p class="meta">1 159 lines &#183; classes: <code>EvaluationCLI</code>, <code>EvalRunSpec</code> &#183; <code>TOTAL_STEPS = 7</code> &#183; called by <a href="../../main.py">main.py</a>::main</p>
+<details><summary>the seven steps (<code>EvaluationCLI.run</code>)</summary><div class="dbody">
+<pre>1  Configuration            _load_config
+   workspace resolve        _resolve_workspace
+2  Agent Model Selection    _choose_agent_model      (only smolagent_model_id)
+3  Toolomics / Workspace    _setup_connectivity      (port range, MCP scan)
+4  Evaluation Mode          _choose_eval_mode        1 single_agent | 2 one_shot | 3 iterative
+5  Task Limit               _ask_csv_runs_limit      default 200
+   recovery options         _ask_recovery_options    start row, restore cache
+6  Advanced / Ablation      _configure_advanced_options
+7  Queue Summary &amp; Launch   _print_queue_summary, _launch_queue</pre>
+<p>Each run is a deep copy of the base config (<code>copy.deepcopy</code>). Per-run dirs are set in <code>_run_single_eval</code>: <code>sources/workflows/run_&lt;id&gt;</code>, <code>sources/memory/run_&lt;id&gt;</code>, <code>./tmp/run_&lt;id&gt;</code>, <code>runs_capsule/run_&lt;id&gt;</code>. Notes are written by <code>_save_start_notes</code> and merged by <code>_update_notes</code> into <code>run_notes/evaluations/&lt;ts&gt;_run&lt;id&gt;_&lt;model&gt;_&lt;mode&gt;.json</code>. A failing run is recorded and the queue continues; a run aborted by a network outage is marked <code>network_failure</code> (<code>_network_aborted</code>).</p>
+</div></details>
+<details><summary>advanced knobs offered (<code>_configure_advanced_options</code>)</summary><div class="dbody">
+<pre>workflow_llm_model, orchestrator_choose_model, literrature_grounding
+selection_strategy (qd | tournament | greedy | novelty)
+novelty_weight (0.0-1.0), max_learning_evolve_iterations, learned_score_threshold
+crossover_rate, population_size</pre>
+<p>Four knobs are tagged "learning only" and are ignored unless the run is <code>iterative</code>. Strategy values match <code class="path">sources/core/selection.py</code>.</p>
+</div></details>
+</div>
+
+<div class="card ice" id="card-memory">
+<h4><a href="../../sources/cli/memory_chat_cli.py">sources/cli/memory_chat_cli.py</a></h4>
+<p class="role">Read-only curses chat over one finished run: loads memory JSON chunks, embeds them, retrieves the top 5, answers through <code>judge_model</code>.</p>
+<p class="meta">652 lines &#183; classes: <code>MemoryChatCLI</code>, <code>MemoryIndex</code>, <code>MemoryChunk</code> &#183; called by <a href="../../main.py">main.py</a>::main</p>
+<details><summary>how it reads a run's memory</summary><div class="dbody">
+<pre>MemoryChatCLI.__init__      -&gt; resolve_run_dir(config, run_uuid): uuid, else newest mtime
+MemoryChatCLI.run           -&gt; _bootstrap(): load_memory_chunks, MemoryIndex, _build_llm
+load_memory_chunks(dir)     -&gt; one chunk per smolagent step, or one per single-call file
+MemoryIndex.search(query)   -&gt; cosine top 5, TOP_K = 5
+MemoryChatCLI._ask          -&gt; rewrite_query, then answer_with_context
+MemoryChatCLI._loop         -&gt; keys: a ask, arrows scroll/navigate, c code, r reload, q quit
+MemoryChatCLI._handle_reload-&gt; re-reads dir, rebuilds the embedding index</pre>
+<p>Embedding model: <code>sentence-transformers/all-MiniLM-L6-v2</code> (<code>DEFAULT_EMBED_MODEL</code>), downloaded on first use. Two LLM calls per question, both on <code>config.judge_model</code> (<code>_build_llm</code>). Chunk code/trim primitives come from <code>sources.transparency.memory_trace</code> (<code>extract_code</code>, <code>trim</code>). The CLI writes nothing.</p>
+</div></details>
+<p class="note flag">Red note: <code class="path">docs/usage/transparency.md</code> line 13 tells users to run <code>uv run memory_explorer.py &lt;uuid&gt;</code>, but no such file exists in the repository (<code>git ls-files</code> finds none).</p>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Shared chrome</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Imported by</th><th>Main symbols</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/cli/pretty_print.py">pretty_print.py</a></td><td>Status lines, banners, boxes for the running engine.</td><td class="size">313</td><td class="sym">main.py, sources/core, evaluators</td><td class="sym">print_ok, print_phase, print_box</td></tr>
+<tr><td class="sym"><a href="../../sources/cli/theme.py">theme.py</a></td><td>Amber flight-console chrome for the wizards.</td><td class="size">242</td><td class="sym">onboard_cli, evaluation_cli</td><td class="sym">ask, kv, banner, step_header</td></tr>
+<tr><td class="sym"><a href="../../sources/cli/__init__.py">__init__.py</a></td><td>Re-exports the three CLIs and the print helpers.</td><td class="size">44</td><td class="sym">main.py</td><td class="sym">OnboardCLI, MemoryChatCLI, print_ok</td></tr>
+</tbody>
+</table>
+
+<details><summary>where pretty_print.py is imported (grep, 2026-10-02)</summary><div class="dbody">
+<pre>main.py:28                                  print_err, print_info, print_ok, print_phase, print_warn
+sources/core/evolution_engine.py:15, planner.py:10, orchestrator.py:14, workflow_factory.py:17, variation_engine.py:9, tools_manager.py:14
+sources/benchmark_evaluation/csv_mode.py:23
+sources/evaluators/verifier.py:22, verifier_claims.py:22, verifier_per_claim.py:25, generic.py:24
+sources/evaluators/hybrid_verifier/evaluator.py:46
+sources/transparency/astra_exporter.py:69, sources/utils/pricing.py:331, sources/utils/ensure_env.py:53
+sources/utils/workspace_management.py:19</pre>
+<p><code>theme.py</code> has exactly two importers: <code>onboard_cli.py</code> and <code>evaluation_cli.py</code>. <code>memory_chat_cli.py</code> imports neither; it draws with <code>curses</code> and plain <code>print</code>.</p>
+</div></details>
+<details><summary>theme.py knobs and behaviour</summary><div class="dbody">
+<pre>MAX_WIDTH = 62                 chrome is capped at 62 columns
+ansi_enabled()                 False when stdout is not a TTY or NO_COLOR is set
+term_width()                   max(40, min(cols - 4, MAX_WIDTH))
+banner(console, tagline)       figlet MIMOSA banner
+step_header(step, total, title, show_progress)   progress track ▰▰▱
+kv(label, value, accent)       dot-leader row, wraps long values
+ask(prompt, default)           sys.exit(0) on Ctrl-C / EOF
+ask_yn(prompt, default)        y/n, returns bool</pre>
+<p><code>FORCE_COLOR</code> turns styling back on. Colour support is decided once at import time (<code>_ENABLED</code>), so the env vars must be set before the import.</p>
+</div></details>
+<p class="note">Amber note: two parallel chrome layers exist - <code>pretty_print.py</code> (green/yellow/red symbols, fixed width 120) and <code>theme.py</code> (amber, width 62) - and <code class="path">sources/cli/__init__.py</code> exports only the first.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Tests that cover this area</h2>
+<table>
+<thead><tr><th>Test file</th><th>Covers</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/onboard_cli_test.py">tests/onboard_cli_test.py</a></td><td class="sym">OnboardCLI helpers, 7 tests</td></tr>
+<tr><td class="sym"><a href="../../tests/evaluation_cli_test.py">tests/evaluation_cli_test.py</a></td><td class="sym">EvaluationCLI, EvalRunSpec, 15 tests</td></tr>
+<tr><td class="sym"><a href="../../tests/theme_test.py">tests/theme_test.py</a></td><td class="sym">theme rendering and TTY gating, 12 tests</td></tr>
+</tbody>
+</table>
+<p class="sub">No test file imports <code>memory_chat_cli</code>; it ships a <code>_smoke()</code> self-check instead (<code>python -m sources.cli.memory_chat_cli</code>). Full matrix: <a href="area_tests.html">area_tests.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/cli/onboard_cli.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/cli/memory_chat_cli.py</code>, <code class="path">sources/cli/pretty_print.py</code>, <code class="path">sources/cli/theme.py</code>, <code class="path">sources/cli/__init__.py</code>, <code>main.py</code>, <code>config.py</code>, <code class="path">sources/core/planner.py</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/core/tools_manager.py</code>, <code class="path">sources/core/selection.py</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code>, <code class="path">sources/transparency/memory_trace.py</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/list_files.py</code>, <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">docs/DEVELOPER_GUIDE.md</code>, <code class="path">docs/reference/cli.md</code>, <code class="path">docs/usage/transparency.md</code>, <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>. Line counts from <code>wc -l</code>; <code>pretty_print.py</code> reports 313 because the file has no trailing newline.</p>
+<p class="skips">Skipped: <code class="path">sources/cli/__pycache__/</code> (build artifacts) &#183; <code>tests/*</code> other than the three CLI test files (own page <a href="area_tests.html">area_tests.html</a>) &#183; <code class="path">webui/backend/mimosa_bridge.py</code> (re-uses <code>onboard_cli</code> helpers; web UI is out of scope) &#183; <code>workflow_evolution_anim.py</code> (outside <code class="path">sources/cli/</code>) &#183; <code class="path">docs/site/</code> (generated) &#183; secrets (<code>.env</code>, <code>token.json</code>) never opened.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time: <code>main.py</code> is modified, so the dispatch lines cited above come from the working tree, not from the commit. The <code>sources/cli/*</code> files are unmodified by that diff (<code>git status --porcelain</code>).</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

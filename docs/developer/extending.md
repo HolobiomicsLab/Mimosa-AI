@@ -29,22 +29,31 @@ public surface is small:
 ## Add an evaluator backend
 
 The verifier facade is
-[`evaluators/evaluator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/evaluator.py).
+[`evaluators/evaluator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/evaluator.py).
 To add a new scoring strategy:
 
 1. Subclass `BaseEvaluator` in `evaluators/base.py`.
-2. Implement `evaluate(state, workflow_code, task) → EvaluationResult`.
+2. Implement `evaluate(uuid)` and persist scores via `_save_results`.
 3. Register it in `WorkflowEvaluator`'s `evaluator_type` switch.
 
-The returned `EvaluationResult` must include at minimum:
+The returned scores must include at minimum:
 
-- `overall_score: float ∈ [0, 1]`
-- `overall_score_uncapped: float ∈ [0, 1]` — still surfaced as
-  `reward_uncapped` on the in-memory run; the pre-cap value is logged for
-  analysis, but QD ranking uses the capped `overall_score`. Pass through
-  unchanged (or set equal to `overall_score`) for backends without a cap.
-- `abstracted_prompt_gradient: str` — the **only** signal fed back to the
-  mutator.
+- `overall_score: float ∈ [0, 1]` — the reward QD ranks on (under the
+  default hybrid verifier, the pairwise win-rate over the task's
+  previous generations).
+- `overall_score_uncapped: float ∈ [0, 1]` — surfaced as
+  `reward_uncapped` on the in-memory run for analysis; pass through
+  unchanged (or set equal to `overall_score`) for backends without a
+  cap.
+- `abstracted_textual_gradient: str` — the **only** signal fed back to
+  the mutator.
+
+To extend the *default* verifier with a new evidence channel instead of
+replacing it, implement the `EvidenceLayer` protocol from
+[`hybrid_verifier/layers.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/layers.py)
+(`collect` / optional `revise` / optional `gate`) and pass
+`extra_layers=[...]` to `HybridVerifierEvaluator` — no aggregation,
+registry, reward, or gradient code needs to change.
 
 Anything else you put on the result is fine — it's just persisted to
 `state_result.json` for auditing.

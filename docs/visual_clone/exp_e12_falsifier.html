@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e12_falsifier - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e12_falsifier">
+<div class="wrap">
+
+<h1 class="hud">e12_falsifier &mdash; instability-discounted weights falsifier</h1>
+<p class="intro">E12 asked whether flaky claim verdicts mislead the within-task picker, and whether discounting the flaky claims fixes it. The gate was pre-registered: net &ge; +2 shipped tasks over v0 and within-task pairs-correct &ge; 0.754. The answer was no, so the E11 line (within-task weight fitting) closed.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 330" role="img" aria-label="E12 falsifier design: hypothesis, frozen inputs, stage functions, result files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="x1">
+    <title>Hypothesis: claims that flip verdict between generations carry noisy weight</title>
+    <rect x="500" y="30" width="230" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="615" y="54" text-anchor="middle">hypothesis: flaky claims</text>
+    <text class="box-sub" x="615" y="70" text-anchor="middle">weights carry noise</text>
+  </g>
+
+  <a class="box" id="x2" href="../../experiments_verifiers/data/verifier_claims_sane.jsonl">
+    <title>Frozen verdict rows: claim name, importance, status, SR label</title>
+    <rect x="250" y="30" width="215" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="357" y="54" text-anchor="middle">verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="357" y="70" text-anchor="middle">565 rows, 128 task units</text>
+  </a>
+
+  <a class="box" id="x3" href="../../experiments_verifiers/harness/e12_falsifier.py">
+    <title>order_units reads run_notes evolved_workflows_uuids for each task</title>
+    <rect x="20" y="30" width="210" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="54" text-anchor="middle">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</text>
+    <text class="box-sub" x="125" y="70" text-anchor="middle">evolved_workflows_uuids</text>
+  </a>
+
+  <a class="box" id="s1" href="../../experiments_verifiers/harness/e12_falsifier.py">
+    <title>order_units L64 orders generations oldest to newest per task</title>
+    <rect x="20" y="130" width="230" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="156" text-anchor="middle">order_units()</text>
+    <text class="box-sub" x="135" y="172" text-anchor="middle">oldest &rarr; newest order</text>
+  </a>
+
+  <a class="box" id="s2" href="../../experiments_verifiers/harness/e12_falsifier.py">
+    <title>flip_rates L104 counts verdict flips inside the first-k window</title>
+    <rect x="290" y="130" width="200" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="156" text-anchor="middle">flip_rates()</text>
+    <text class="box-sub" x="390" y="172" text-anchor="middle">flips / consecutive pairs</text>
+  </a>
+
+  <a class="box" id="s3" href="../../experiments_verifiers/harness/e12_falsifier.py">
+    <title>discounted_scores L120 freezes w(c) = base * (1 - flip_rate) after the window</title>
+    <rect x="530" y="130" width="230" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="645" y="156" text-anchor="middle">discounted_scores()</text>
+    <text class="box-sub" x="645" y="172" text-anchor="middle">w = base &middot; (1 &minus; flip)</text>
+  </a>
+
+  <a class="box" id="s4" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>Reuses e9_deployment.replay L159: argmax over generations, latest tie-break</title>
+    <rect x="20" y="250" width="250" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="276" text-anchor="middle">e9_deployment.replay()</text>
+    <text class="box-sub" x="145" y="292" text-anchor="middle">argmax pick per task</text>
+  </a>
+
+  <a class="box" id="o1" href="../../experiments_verifiers/results/E12_instability_falsifier_2026-09-23.json">
+    <title>Data of record: pickers, gate verdict, bootstrap CIs, per-task picks</title>
+    <rect x="320" y="250" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="445" y="276" text-anchor="middle">E12_instability_falsifier.json</text>
+    <text class="box-sub" x="445" y="292" text-anchor="middle">pickers, gate, per-task picks</text>
+  </a>
+
+  <a class="box" id="o2" href="../../experiments_verifiers/results/E12_instability_falsifier_2026-09-23.md">
+    <title>write_md L511 renders the same numbers as a readable report</title>
+    <rect x="620" y="250" width="230" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="735" y="276" text-anchor="middle">E12_instability_falsifier.md</text>
+    <text class="box-sub" x="735" y="292" text-anchor="middle">write_md() report</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="x3" data-to="s1" d="M125,86 V130" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="132" y="112" text-anchor="start">reads order</text>
+  <path class="edge dashed-edge" data-from="x2" data-to="s2" d="M357,86 L390,130" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="398" y="112" text-anchor="start">reads verdicts</text>
+  <path class="edge dashed-edge" data-from="x1" data-to="s3" d="M615,86 L645,130" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="653" y="112" text-anchor="start">pre-registered gate</text>
+  <path class="edge" data-from="s1" data-to="s2" d="M250,158 H290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="270" y="150" text-anchor="middle">ordered gens</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M490,158 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="150" text-anchor="middle">flip rates</text>
+  <path class="edge" data-from="s3" data-to="s4" d="M645,186 V215 H145 V250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="210" text-anchor="middle">frozen weights, all generations</text>
+  <path class="edge" data-from="s4" data-to="o1" d="M270,278 H320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="295" y="270" text-anchor="middle">picks, gate</text>
+  <path class="edge dashed-edge" data-from="o1" data-to="o2" d="M570,278 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="595" y="270" text-anchor="middle">report text</text>
+  <text class="box-sub" x="20" y="325">9 boxes &#183; solid = call &#183; dashed = reads/writes &#183; rounded = function</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. Every stage box is a real symbol in <code class="path">../../experiments_verifiers/harness/e12_falsifier.py</code>: <code>order_units</code> (L64), <code>flip_rates</code> (L104), <code>discounted_scores</code> (L120), <code>main</code> (L188) driving <code>e9_deployment.replay</code> (L159). Two picker bases exist per window: <code>selfreport</code> (importance clamped to [1, 10], 0.89 hard-fail cap kept) and <code>uniform</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e12_falsifier.py">experiments_verifiers/harness/e12_falsifier.py</a></h4>
+<p class="role">Orders generations per task, measures claim flip-rates in the first k generations, freezes discounted weights, picks one generation per task, and gates the result.</p>
+<p class="meta">618 lines &#183; 8 functions, no classes &#183; entry <code>main()</code> L188, guard L617 &#183; no CLI arguments (<code>sys.argv</code> not read)</p>
+<details><summary>constants, symbol line numbers, what it imports</summary><div class="dbody">
+<pre>KS = [3, 5, 8]            # L48 window sizes k
+B_BOOT = 2000             # L49 task-cluster bootstrap resamples
+BOOT_SEED = 0             # L50
+GATE_NET = 2              # L51 pre-registered: net &gt;= +2 tasks vs v0
+GATE_PAIRS = 0.754        # L52 pre-registered: uniform 0.704 + 0.05
+NOISE_BAND = 4            # L53 asleep band (+-4 tasks)
+
+umatch(a, b)                       # L56  uuid suffix join
+order_units(exs)                   # L64  -&gt; ordered, stats
+flip_rates(window)                 # L104 -&gt; {name: (flips, pairs)}, dup_names
+discounted_scores(ordered, k, base)# L120 -&gt; scores, per_unit_fr, stats
+pairs_correct(scores, units, keys) # L157 ties count 0.5
+per_unit_pairs(...)                # L174 arrays for the cluster bootstrap
+main()                             # L188
+write_md(out)                      # L511</pre>
+<p>Imports: <code>e5_common as C</code> (L41) and <code>e9_deployment as E9</code> (L42), both from <code>experiments_verifiers/harness/</code>. <code>TODAY = "2026-09-23"</code> (L44) fixes the two output names.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>565 sane rows: claim name, importance, status, SR</td><td>&mdash;</td><td class="sym"><a href="../../experiments_verifiers/data/verifier_claims_sane.jsonl">experiments_verifiers/data/verifier_claims_sane.jsonl</a></td></tr>
+<tr><td>uuid_long join keys per generation</td><td>&mdash;</td><td class="sym"><a href="../../experiments_verifiers/data/manifest_sane.json">experiments_verifiers/data/manifest_sane.json</a></td></tr>
+<tr><td>evolved_workflows_uuids generation order</td><td>&mdash;</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td></tr>
+<tr><td>&mdash;</td><td>pickers, gate verdict, bootstrap, per-task picks</td><td class="sym"><a href="../../experiments_verifiers/results/E12_instability_falsifier_2026-09-23.json">results/E12_instability_falsifier_2026-09-23.json</a></td></tr>
+<tr><td>&mdash;</td><td>the same numbers as a report</td><td class="sym"><a href="../../experiments_verifiers/results/E12_instability_falsifier_2026-09-23.md">results/E12_instability_falsifier_2026-09-23.md</a></td></tr>
+</tbody>
+</table>
+<p class="sub">Reads cite <code>main()</code> L190 (sane rows), L192&ndash;201 (uuid_long), L64&ndash;98 (<code>order_units</code>, run_notes join). Writes cite <code>OUT_JSON.write_text</code> at L504 and <code>OUT_MD.write_text</code> inside <code>write_md</code> at L614.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; what the frozen replay shipped</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 400" role="img" aria-label="Bar chart of SR shipped per picker and within-task pairs-correct">
+  <defs><filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <text x="20" y="22" font-size="11" fill="#8FB8C9">A &mdash; SR shipped, all 128 sane task units (bar height = tasks, scale 0&ndash;60)</text>
+  <path d="M60,160.0 H840.0" fill="none" stroke="#1B4B6B" stroke-width="1.2"/>
+  <rect x="77.3" y="60.0" width="52.0" height="100.0" fill="#00E5FF" stroke="#00E5FF" fill-opacity="0.22"/>
+  <text x="103.3" y="56.0" text-anchor="middle" font-size="9.5">50</text>
+  <text x="103.3" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">recorded</text>
+  <rect x="164.0" y="54.0" width="52.0" height="106.0" fill="#00E5FF" stroke="#00E5FF" fill-opacity="0.22"/>
+  <text x="190.0" y="50.0" text-anchor="middle" font-size="9.5">53</text>
+  <text x="190.0" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">uniform</text>
+  <rect x="250.7" y="56.0" width="52.0" height="104.0" fill="#00E5FF" stroke="#00E5FF" fill-opacity="0.22"/>
+  <text x="276.7" y="52.0" text-anchor="middle" font-size="9.5">52</text>
+  <text x="276.7" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">v0</text>
+  <rect x="337.3" y="56.0" width="52.0" height="104.0" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="363.3" y="52.0" text-anchor="middle" font-size="9.5">52</text>
+  <text x="363.3" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k3_self</text>
+  <rect x="424.0" y="58.0" width="52.0" height="102.0" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="450.0" y="54.0" text-anchor="middle" font-size="9.5">51</text>
+  <text x="450.0" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k3_unif</text>
+  <rect x="510.7" y="54.0" width="52.0" height="106.0" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="536.7" y="50.0" text-anchor="middle" font-size="9.5">53</text>
+  <text x="536.7" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k5_self</text>
+  <rect x="597.3" y="56.0" width="52.0" height="104.0" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="623.3" y="52.0" text-anchor="middle" font-size="9.5">52</text>
+  <text x="623.3" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k5_unif</text>
+  <rect x="684.0" y="54.0" width="52.0" height="106.0" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="710.0" y="50.0" text-anchor="middle" font-size="9.5">53</text>
+  <text x="710.0" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k8_self</text>
+  <rect x="770.7" y="56.0" width="52.0" height="104.0" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="796.7" y="52.0" text-anchor="middle" font-size="9.5">52</text>
+  <text x="796.7" y="174.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k8_unif</text>
+  <text x="20" y="212" font-size="11" fill="#8FB8C9">B &mdash; within-task pairs-correct on the 29 contrast units (scale 0&ndash;0.80; gate bar 0.754)</text>
+  <path d="M60,248.1 H840" fill="none" stroke="#FF4D6A" stroke-width="1" stroke-dasharray="4 3"/>
+  <text x="846" y="251.1" font-size="8.5" fill="#FF4D6A" text-anchor="start">gate 0.754</text>
+  <path d="M60,380 H840" fill="none" stroke="#1B4B6B" stroke-width="1.2"/>
+  <path d="M60,380.0 H840.0" fill="none" stroke="#1B4B6B" stroke-width="1.2"/>
+  <rect x="77.3" y="271.5" width="52.0" height="108.5" fill="#00E5FF" stroke="#00E5FF" fill-opacity="0.22"/>
+  <text x="103.3" y="267.5" text-anchor="middle" font-size="9.5">0.6198</text>
+  <text x="103.3" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">recorded</text>
+  <rect x="164.0" y="259.1" width="52.0" height="120.9" fill="#00E5FF" stroke="#00E5FF" fill-opacity="0.22"/>
+  <text x="190.0" y="255.1" text-anchor="middle" font-size="9.5">0.6910</text>
+  <text x="190.0" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">uniform</text>
+  <rect x="250.7" y="261.5" width="52.0" height="118.5" fill="#00E5FF" stroke="#00E5FF" fill-opacity="0.22"/>
+  <text x="276.7" y="257.5" text-anchor="middle" font-size="9.5">0.6771</text>
+  <text x="276.7" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">v0</text>
+  <rect x="337.3" y="268.5" width="52.0" height="111.5" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="363.3" y="264.5" text-anchor="middle" font-size="9.5">0.6372</text>
+  <text x="363.3" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k3_self</text>
+  <rect x="424.0" y="263.9" width="52.0" height="116.1" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="450.0" y="259.9" text-anchor="middle" font-size="9.5">0.6632</text>
+  <text x="450.0" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k3_unif</text>
+  <rect x="510.7" y="263.3" width="52.0" height="116.7" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="536.7" y="259.3" text-anchor="middle" font-size="9.5">0.6667</text>
+  <text x="536.7" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k5_self</text>
+  <rect x="597.3" y="259.4" width="52.0" height="120.6" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="623.3" y="255.4" text-anchor="middle" font-size="9.5">0.6892</text>
+  <text x="623.3" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k5_unif</text>
+  <rect x="684.0" y="263.0" width="52.0" height="117.0" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="710.0" y="259.0" text-anchor="middle" font-size="9.5">0.6684</text>
+  <text x="710.0" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k8_self</text>
+  <rect x="770.7" y="260.3" width="52.0" height="119.7" fill="#4D9FFF" stroke="#4D9FFF" fill-opacity="0.22"/>
+  <text x="796.7" y="256.3" text-anchor="middle" font-size="9.5">0.6840</text>
+  <text x="796.7" y="394.0" text-anchor="middle" font-size="8.5" fill="#8FB8C9">k8_unif</text>
+  <text x="20" y="332" font-size="9" fill="#4F7486">cyan = baselines &#183; blue = discounted pickers (all inside the &plusmn;4-task band)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; values read from <code class="path">results/E12_instability_falsifier_2026-09-23.json</code>: <code>pickers.&lt;name&gt;.sr_shipped_all_units</code> (L365&ndash;485) and <code>pickers.&lt;name&gt;.pairs_correct_contrast29</code> (L368&ndash;488). No value is recomputed or estimated here.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Sane population: rows / units / contrast units</td><td class="size">565 / 128 / 29</td><td class="sym">results/E12_instability_falsifier_2026-09-23.json L39, L41, L59</td></tr>
+<tr><td>Oracle winnable units (any SR-true generation)</td><td class="size">60</td><td class="sym">same file, L68</td></tr>
+<tr><td>v0 recompute ships</td><td class="size">52</td><td class="sym">same file, L395</td></tr>
+<tr><td>Best net vs v0 across 128 units</td><td class="size">+1</td><td class="sym">E12_instability_falsifier_2026-09-23.md L9</td></tr>
+<tr><td>Best pairs-correct on the 29 contrast units</td><td class="size">0.689</td><td class="sym">same md, L9</td></tr>
+<tr><td>Gate bar (pre-registered)</td><td class="size">net +2 and pairs 0.754</td><td class="sym">e12_falsifier.py L46&ndash;47</td></tr>
+<tr><td>Mean claim flip-rate at k=5</td><td class="size">0.211</td><td class="sym">E12_...json L185</td></tr>
+<tr><td>Share of windowed claims flipping at least once, k=5</td><td class="size">35.8%</td><td class="sym">same file, L187</td></tr>
+<tr><td>Reproduction: reward / uniform / v0 / oracle on asb</td><td class="size">35 / 36 / 36 / 40</td><td class="sym">same file, L27&ndash;34 (all asserted true, L36)</td></tr>
+<tr><td>All discounted pickers inside the band</td><td class="size">true</td><td class="sym">same file, L728</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the discount changed 2&ndash;9 picks of 128 and gained at most one task, so the reward signal, not the weights, bounds this line. See <a href="exp_e9_deployment.html">exp_e9_deployment.html</a> for the replay protocol E12 reuses and <a href="exp_e5_common.html">exp_e5_common.html</a> for the v0 and uniform scores.</p>
+<p class="note">Amber: 6 discounted variants were tested with no multiple-comparison correction; the report states that the gate needs both thresholds, so a marginal pass would be flagged as uncorrected (md L57).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>8 key lines from the E12 result files</summary><div class="dbody">
+<blockquote>**FAIL &mdash; every instability-discounted picker lands inside the &plusmn;4-task noise band: within-task weight fitting is CLOSED**</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E12_instability_falsifier_2026-09-23.md</code> line 7.</p>
+<blockquote>- Best net vs v0 across all 128 sane tasks: **+1**; best within-task pairs-correct on the 29 contrast tasks: **0.689** (gate bar 0.754; uniform reference 0.691 on this population, 0.704 on E9's asb-contrast measurement).</blockquote>
+<p class="sub">Same file, line 9.</p>
+<blockquote>- Cycle-1 reproduction assertions all passed (E9 replay: recorded reward 35, uniform 36, v0 36, oracle 40, on 93 asb tasks / 411 gens; 29 contrast units; uniform asb-contrast pairs 0.704 over 201 pairs).</blockquote>
+<p class="sub">Same file, line 10.</p>
+<blockquote>- Every discounted picker sits inside the &plusmn;4-task noise band (k3_selfreport=+0, k3_uniform=-1, k5_selfreport=+1, k5_uniform=+0, k8_selfreport=+1, k8_uniform=+0). Per the pre-registration, **within-task weight fitting is CLOSED** &mdash; budget moves to claim content / non-claims evidence (static checks, execution, preferences).</blockquote>
+<p class="sub">Same file, line 32.</p>
+<blockquote>| `disc_k3_uniform` | 51 | 20 | 35 | 0.6632 | -1 [-3.0, +0.0] | -0.0278 [-0.082, +0.024] | fail |</blockquote>
+<p class="sub">Same file, line 21 (one picker row of the table on L15&ndash;25).</p>
+<blockquote>Flakiest claims at k=5 (mean flip-rate across task instances): `reproducibility_seed` 1.00 (n=2), `model_weights_saved` 1.00 (n=1), `model_weights_saved_e` 1.00 (n=1), `model_file_exists` 1.00 (n=1), `script_loads_model` 1.00 (n=1), `rsp_plot_valid_png` 1.00 (n=1), `script_uses_rsp_plot` 1.00 (n=1), `save_ecg_plot` 1.00 (n=1).</blockquote>
+<p class="sub">Same file, line 42.</p>
+<blockquote> "verdict": "FAIL \u2014 every instability-discounted picker lands inside the \u00b14-task noise band: within-task weight fitting is CLOSED"</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E12_instability_falsifier_2026-09-23.json</code> line 729 (the double quotes are the JSON encoding of an em dash).</p>
+<blockquote>- many units have fewer than k+1 generations (median 3 gens/unit), so at k=5/8 the window covers the whole task and there is no held-out inference side &mdash; weights are label-free, but the large-k arms are mostly in-window (units with &gt;k gens per k are in instability_summary)</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E12_instability_falsifier_2026-09-23.md</code> line 53.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e12_falsifier.py</code> (618 lines, all functions and constants), <code class="path">experiments_verifiers/harness/e5_common.py</code> (<code>load_examples</code> L34, <code>SCORE_MAP</code> L22, <code>uniform_score</code>, <code>v0_reward</code>), <code class="path">experiments_verifiers/harness/e9_deployment.py</code> (<code>load_sane</code> L46, <code>replay</code> L159, <code>ASB</code> L38), <code class="path">experiments_verifiers/results/E12_instability_falsifier_2026-09-23.md</code> (57 lines), <code class="path">experiments_verifiers/results/E12_instability_falsifier_2026-09-23.json</code> (6 556 lines, read by <code>json.load</code> and by line), <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code> (codename table: E12 = HAL). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped, with reason: <code>experiments_verifiers/.env</code> (key material, never opened); <code>experiments_verifiers/data/verifier_claims.jsonl</code> and <code>manifest.json</code> (the raw, contamination-flagged pair; E12 reads the <code>*_sane</code> files); <code>experiments_verifiers/ablations/</code> (462 note copies, joined only through run_notes); the per-task pick lists in the JSON (<code>per_task_picks</code>, 128 keys &times; 9 pickers, not quoted here); <code>results/_cache_e5_embeddings.npz</code> and every other E-experiment script (outside the E12 page scope); no experiment, application, or pytest run, per the build rules.</p>
+<p>experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

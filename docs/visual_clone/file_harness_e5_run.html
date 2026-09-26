@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5_run.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; experiments_verifiers/harness &gt; e5_run.py">
+<div class="wrap">
+
+<h1 class="hud">e5_run.py</h1>
+<p class="intro">This 524-line script is the E5 experiment: it fits four rungs of a claim-importance ladder (source means, kind-by-importance groups, lexical features, name embeddings) under task-level leave-one-task-out and writes one results JSON. It runs by hand, <code>uv run python experiments_verifiers/harness/e5_run.py</code> (docstring L3), and uses <a href="file_harness_e5_common.html">e5_common.py</a> for loading, provenance and metrics. Every number it stores is labelled "my computation" (L495).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does: load, classify provenance, build four feature sets, LOTO-fit each, write the record</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 470" role="img" aria-label="e5_run.py flow from frozen data through features and LOTO evaluation to the results JSON">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="uIn1">
+    <title>Frozen claims, manifest rows and the embedding cache</title>
+    <rect x="20" y="40" width="180" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="64" text-anchor="middle">verifier_claims.jsonl</text>
+    <text class="box-sub" x="110" y="82" text-anchor="middle">manifest.json L47</text>
+    <text class="box-sub" x="110" y="98" text-anchor="middle">_cache_e5_embeddings.npz L56</text>
+  </g>
+  <g class="box" id="uIn2">
+    <title>Goal texts and rubric caches, joined by goal hash</title>
+    <rect x="20" y="150" width="180" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="174" text-anchor="middle">ablations/*.json</text>
+    <text class="box-sub" x="110" y="192" text-anchor="middle">rubric_cache_*.json</text>
+    <text class="box-sub" x="110" y="208" text-anchor="middle">via e5_common L45&#8211;L46</text>
+  </g>
+
+  <a class="box" id="uLoad" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>load_all: examples, rubric join, manifest rows, embeddings</title>
+    <rect x="230" y="90" width="180" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="320" y="114" text-anchor="middle">load_all</text>
+    <text class="box-sub" x="320" y="132" text-anchor="middle">examples, rstats, descs</text>
+    <text class="box-sub" x="320" y="150" text-anchor="middle">mf_rows, embz, emb_idx</text>
+    <text class="box-sub" x="320" y="168" text-anchor="middle">L42</text>
+  </a>
+
+  <a class="box" id="uClf" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>claim_x builds the vector; fit_source_classifier fits; classifier_cv_accuracy measures</title>
+    <rect x="440" y="30" width="190" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="535" y="54" text-anchor="middle">source classifier</text>
+    <text class="box-sub" x="535" y="72" text-anchor="middle">claim_x L68 &#183; caches L65</text>
+    <text class="box-sub" x="535" y="90" text-anchor="middle">fit_source_classifier L80</text>
+    <text class="box-sub" x="535" y="108" text-anchor="middle">classifier_cv_accuracy L99</text>
+  </a>
+
+  <a class="box" id="uFeat" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>Four feature builders, one per rung</title>
+    <rect x="440" y="150" width="190" height="106" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="535" y="174" text-anchor="middle">feature rungs</text>
+    <text class="box-sub" x="535" y="192" text-anchor="middle">make_f_src L132</text>
+    <text class="box-sub" x="535" y="210" text-anchor="middle">group_features, f_l1 L156 L173</text>
+    <text class="box-sub" x="535" y="228" text-anchor="middle">build_lexicon, make_f_l2 L176 L186</text>
+    <text class="box-sub" x="535" y="246" text-anchor="middle">make_f_l3 L204</text>
+  </a>
+
+  <a class="box" id="uLoto" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>loto_eval holds out one task at a time; learning_curve and permutation_test reuse it</title>
+    <rect x="660" y="90" width="180" height="106" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="750" y="114" text-anchor="middle">LOTO machinery</text>
+    <text class="box-sub" x="750" y="132" text-anchor="middle">loto_eval L216</text>
+    <text class="box-sub" x="750" y="150" text-anchor="middle">learning_curve L260</text>
+    <text class="box-sub" x="750" y="168" text-anchor="middle">permutation_test L292</text>
+    <text class="box-sub" x="750" y="186" text-anchor="middle">pooled decision scores</text>
+  </a>
+
+  <a class="box" id="uC" href="file_harness_e5_common.html">
+    <title>Metrics and baselines imported from e5_common</title>
+    <rect x="230" y="230" width="180" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="320" y="254" text-anchor="middle">e5_common metrics</text>
+    <text class="box-sub" x="320" y="272" text-anchor="middle">standard_metrics L380</text>
+    <text class="box-sub" x="320" y="290" text-anchor="middle">cluster_bootstrap_auc L435</text>
+    <text class="box-sub" x="320" y="308" text-anchor="middle">v0_reward, uniform_score</text>
+  </a>
+
+  <a class="box" id="uW" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>rubric_top_source, mode_imp and spearmanr over the refit L3 weights</title>
+    <rect x="230" y="350" width="180" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="320" y="374" text-anchor="middle">weights analysis</text>
+    <text class="box-sub" x="320" y="392" text-anchor="middle">refit logistic L451</text>
+    <text class="box-sub" x="320" y="410" text-anchor="middle">spearmanr L459</text>
+    <text class="box-sub" x="320" y="428" text-anchor="middle">rubric_top_source L325</text>
+  </a>
+
+  <a class="box" id="uMain" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>main: build every rung, print the digest, assemble the payload</title>
+    <rect x="440" y="350" width="190" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="535" y="374" text-anchor="middle">main</text>
+    <text class="box-sub" x="535" y="392" text-anchor="middle">baselines then rungs</text>
+    <text class="box-sub" x="535" y="410" text-anchor="middle">payload L493</text>
+    <text class="box-sub" x="535" y="428" text-anchor="middle">L346</text>
+  </a>
+
+  <g class="box" id="uOut">
+    <title>The results JSON written at the end</title>
+    <rect x="660" y="350" width="180" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="750" y="374" text-anchor="middle">E5_learned_importance_DATE.json</text>
+    <text class="box-sub" x="750" y="392" text-anchor="middle">written L518</text>
+    <text class="box-sub" x="750" y="410" text-anchor="middle">stdout digest L358&#8211;L520</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="uIn1" data-to="uLoad" d="M200,78 C215,78 220,110 230,118" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="uIn2" data-to="uLoad" d="M200,188 H230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="215" y="180" text-anchor="middle">reads</text>
+  <path class="edge" data-from="uLoad" data-to="uClf" d="M410,120 C425,120 430,80 440,75" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="430" y="100" text-anchor="start">examples</text>
+  <path class="edge" data-from="uLoad" data-to="uFeat" d="M410,150 H440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="425" y="142" text-anchor="middle">embz</text>
+  <path class="edge" data-from="uClf" data-to="uFeat" d="535,120 V150" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="545" y="140" text-anchor="start">clf fill</text>
+  <path class="edge" data-from="uFeat" data-to="uLoto" d="M630,200 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="645" y="192" text-anchor="middle">feats_fn</text>
+  <path class="edge" data-from="uLoto" data-to="uC" d="M660,175 C640,220 450,255 410,262" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="240" text-anchor="middle">pooled scores L380</text>
+  <path class="edge" data-from="uFeat" data-to="uW" d="M440,250 C400,290 360,320 340,350" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="380" y="310" text-anchor="middle">f_l3d L451</text>
+  <path class="edge" data-from="uC" data-to="uMain" d="M410,275 C430,300 440,360 440,378" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="uW" data-to="uMain" d="M410,393 H440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="425" y="385" text-anchor="middle">weights</text>
+  <path class="edge" data-from="uLoto" data-to="uMain" d="M750,196 C760,300 700,340 630,370" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="740" y="300" text-anchor="start">rung results</text>
+  <path class="edge" data-from="uMain" data-to="uOut" d="M630,393 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="645" y="385" text-anchor="middle">write_text</text>
+
+  <text class="box-sub" x="20" y="460">solid = call  |  dashed = reads  |  10 boxes  |  every rung reuses loto_eval with a different feats_fn</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. <code>main</code> is the only caller of the rung code; <code>loto_eval</code> is the shared engine, and the four feature builders are passed into it as <code>feats_fn</code> (L399&ndash;L424). The classifier is optional: <code>make_f_src(..., predicted_fill=True)</code> (L398) is the only rung that needs it.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in, data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 340" role="img" aria-label="e5_run.py data flow: five frozen inputs, one results JSON written, payload returned">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="vR1">
+    <title>Claim verdict rows</title>
+    <rect x="20" y="30" width="215" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="127" y="56" text-anchor="middle">data/verifier_claims.jsonl</text>
+    <text class="box-sub" x="127" y="74" text-anchor="middle">via e5_common L43</text>
+  </g>
+  <g class="box" id="vR2">
+    <title>Goal texts per task</title>
+    <rect x="20" y="110" width="215" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="127" y="136" text-anchor="middle">ablations/*.json</text>
+    <text class="box-sub" x="127" y="154" text-anchor="middle">via e5_common L44</text>
+  </g>
+  <g class="box" id="vR3">
+    <title>Per-generation rows with reward and uuid</title>
+    <rect x="20" y="186" width="215" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="127" y="212" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="127" y="230" text-anchor="middle">reward_manifest &#183; L47</text>
+  </g>
+  <g class="box" id="vR4">
+    <title>The precomputed MiniLM cache</title>
+    <rect x="20" y="262" width="215" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="127" y="288" text-anchor="middle">results/_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="127" y="306" text-anchor="middle">np.load L56</text>
+  </g>
+
+  <a class="box" id="vStep" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>main and the module-level constants that name the output</title>
+    <rect x="290" y="110" width="200" height="150" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="136" text-anchor="middle">e5_run.py main</text>
+    <text class="box-sub" x="390" y="154" text-anchor="middle">RNG seed 21 L26</text>
+    <text class="box-sub" x="390" y="172" text-anchor="middle">TODAY L27</text>
+    <text class="box-sub" x="390" y="190" text-anchor="middle">OUT_JSON L28</text>
+    <text class="box-sub" x="390" y="208" text-anchor="middle">10 rung variants L385&#8211;L424</text>
+    <text class="box-sub" x="390" y="226" text-anchor="middle">gaps list L505&#8211;L515</text>
+  </a>
+
+  <g class="box" id="vW1">
+    <title>The results JSON, written with indent=1</title>
+    <rect x="550" y="40" width="230" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="665" y="66" text-anchor="middle">E5_learned_importance_DATE.json</text>
+    <text class="box-sub" x="665" y="84" text-anchor="middle">payload keys L493&#8211;L517</text>
+    <text class="box-sub" x="665" y="102" text-anchor="middle">written L518</text>
+  </g>
+  <g class="box" id="vW2">
+    <title>Console digest: counts, per-rung metric lines, CIs, curves, permutations, weights</title>
+    <rect x="550" y="150" width="230" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="665" y="176" text-anchor="middle">stdout</text>
+    <text class="box-sub" x="665" y="194" text-anchor="middle">print at L358, L375, L378, L409,</text>
+    <text class="box-sub" x="665" y="212" text-anchor="middle">L427, L437, L443, L448, L480, L519</text>
+  </g>
+  <g class="box" id="vRet">
+    <title>main returns the payload for interactive use</title>
+    <rect x="550" y="260" width="230" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="665" y="286" text-anchor="middle">payload dict</text>
+    <text class="box-sub" x="665" y="304" text-anchor="middle">returned L520</text>
+  </g>
+  <g class="box" id="vDown">
+    <title>The markdown renderer reads the JSON afterwards</title>
+    <rect x="820" y="150" width="180" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="910" y="176" text-anchor="middle">e5_md.py</text>
+    <text class="box-sub" x="910" y="194" text-anchor="middle">reads the JSON later</text>
+    <text class="box-sub" x="910" y="212" text-anchor="middle">separate script, not a call</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="vR1" data-to="vStep" d="M235,63 C265,63 275,130 290,140" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="vR2" data-to="vStep" d="M235,141 H290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="vR3" data-to="vStep" d="M235,217 H290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="262" y="209" text-anchor="middle">rows</text>
+  <path class="edge dashed-edge" data-from="vR4" data-to="vStep" d="M235,293 C265,293 275,230 290,220" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="vStep" data-to="vW1" d="M490,140 C520,120 530,85 550,83" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="110" text-anchor="middle">json.dumps</text>
+  <path class="edge" data-from="vStep" data-to="vW2" d="M490,190 H550" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="182" text-anchor="middle">print</text>
+  <path class="edge" data-from="vStep" data-to="vRet" d="M490,240 C520,260 530,275 550,283" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="262" text-anchor="middle">return</text>
+  <path class="edge dashed-edge" data-from="vW1" data-to="vDown" d="M780,83 C810,83 815,150 820,170" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="800" y="120" text-anchor="middle">read later</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; four frozen reads, one write, one return. <code>OUT_MD</code> is built at L29 but never used: the markdown file comes from <a href="file_harness_e5_md.html">e5_md.py</a>, which this script does not call.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the leave-one-task-out loop and its stop tests</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 430" role="img" aria-label="e5_run.py loto_eval loop: hold one task out, guard single-class folds, optional inner C grid, fit and score">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="wEntry" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>loto_eval(exs, feats_fn, model_fn, inner_C=None, y=None), L216</title>
+    <rect x="30" y="26" width="940" height="46" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="500" y="48" text-anchor="middle">hold one task out, fit, score</text>
+    <text class="box-sub" x="500" y="64" text-anchor="middle">scores = np.full(len(exs), nan) L222</text>
+  </a>
+
+  <g class="box" id="w1">
+    <title>Guard: one class left in the training labels, L231</title>
+    <rect x="30" y="110" width="290" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="175" y="134" text-anchor="middle">len(set(ytr)) &lt; 2 ?</text>
+    <text class="box-sub" x="175" y="152" text-anchor="middle">yes &#8594; scores[test] = 0.0, next task</text>
+    <text class="box-sub" x="175" y="168" text-anchor="middle">L231&#8211;L233</text>
+  </g>
+  <g class="box" id="w2">
+    <title>Optional inner grid over the regularisation strength, L242</title>
+    <rect x="340" y="110" width="300" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="490" y="134" text-anchor="middle">inner_C given ?</text>
+    <text class="box-sub" x="490" y="152" text-anchor="middle">yes &#8594; 4 position-mod folds, pick best C</text>
+    <text class="box-sub" x="490" y="168" text-anchor="middle">L242&#8211;L253</text>
+  </g>
+  <g class="box" id="w3">
+    <title>Inner fold guard, L244</title>
+    <rect x="660" y="110" width="310" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="815" y="134" text-anchor="middle">fold empty or one class ?</text>
+    <text class="box-sub" x="815" y="152" text-anchor="middle">yes &#8594; that fold is skipped</text>
+    <text class="box-sub" x="815" y="168" text-anchor="middle">L244</text>
+  </g>
+
+  <g class="box" id="w4">
+    <title>Fit and score, L254</title>
+    <rect x="30" y="230" width="290" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="175" y="254" text-anchor="middle">clf.fit(Xtr, ytr)</text>
+    <text class="box-sub" x="175" y="272" text-anchor="middle">scores[test] = decision_function</text>
+    <text class="box-sub" x="175" y="290" text-anchor="middle">L255 L256</text>
+  </g>
+  <g class="box" id="w5">
+    <title>learning_curve: 10 repeats, fixed 25% test tasks, four training fractions</title>
+    <rect x="340" y="230" width="300" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="490" y="254" text-anchor="middle">n_rep = 10, fracs 0.25 to 1.0</text>
+    <text class="box-sub" x="490" y="272" text-anchor="middle">skip rep if test has one class</text>
+    <text class="box-sub" x="490" y="290" text-anchor="middle">L260&#8211;L289</text>
+  </g>
+  <g class="box" id="w6">
+    <title>permutation_test: 200 cyclic shifts of the task-grouped label vector</title>
+    <rect x="660" y="230" width="310" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="815" y="254" text-anchor="middle">200 shifts, seed 7</text>
+    <text class="box-sub" x="815" y="272" text-anchor="middle">p = P(null &gt;= observed) + 1/(n+1)</text>
+    <text class="box-sub" x="815" y="290" text-anchor="middle">L292&#8211;L319</text>
+  </g>
+
+  <a class="box" id="wOut" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>Pooled scores feed e5_common.standard_metrics</title>
+    <rect x="230" y="344" width="560" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="368" text-anchor="middle">mets = lambda s: C.standard_metrics(s, y, yver, tid, contrast) &#183; L380</text>
+    <text class="box-sub" x="510" y="388" text-anchor="middle">nan rows dropped by the callee, L158&#8211;L162 of e5_common</text>
+  </a>
+
+  <path class="edge" data-from="wEntry" data-to="w1" d="M300,72 C250,90 200,100 175,110" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="w1" data-to="w2" d="M320,145 H340" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="137" text-anchor="middle">else</text>
+  <path class="edge" data-from="w2" data-to="w3" d="M640,145 H660" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="w1" data-to="w4" d="M175,180 V230" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="185" y="207" text-anchor="start">two classes</text>
+  <path class="edge" data-from="w2" data-to="w5" d="M490,180 V230" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="205" text-anchor="start">same policy</text>
+  <path class="edge" data-from="w3" data-to="w6" d="M815,180 V230" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="825" y="205" text-anchor="start">reused, 200x</text>
+  <path class="edge" data-from="w4" data-to="wOut" d="M175,306 C175,335 220,355 230,362" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="w5" data-to="wOut" d="M490,306 V344" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="330" text-anchor="start">auc per point</text>
+  <path class="edge" data-from="w6" data-to="wOut" d="M815,306 C815,335 790,355 790,362" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+
+  <text class="box-sub" x="30" y="422">no retry and no early stop: the Loop ends when every held-out task has a score</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; one loop body, three guards. <code>permutation_test</code> calls <code>loto_eval</code> once per shift (L307), which is why the 200 permutations dominate the runtime the payload reports at L516.</p>
+
+<p class="note flag">Red: <code>OUT_MD</code> is defined at L29 (<code>EV / "results" / f"E5_learned_importance_{TODAY}.md"</code>) and never read again; the docstring at L4 also promises that this script writes the <code>.md</code>, but the markdown is produced by <a href="file_harness_e5_md.html">e5_md.py</a>.</p>
+<p class="note">Amber: the split policy is positional, not random, inside <code>loto_eval</code> &mdash; the inner folds are <code>j % 4</code> over the sorted task list (L242&ndash;L243, L269), so the same task always lands in the same inner fold.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">verifier_claims.jsonl</td><td>file, via <code>e5_common.load_examples</code></td><td>claims, SR and VER labels</td><td class="size">L43</td></tr>
+<tr><td>reads</td><td class="sym">ablations/*.json</td><td>file, via <code>e5_common.load_goals</code></td><td>goal texts for the rubric join</td><td class="size">L44</td></tr>
+<tr><td>reads</td><td class="sym">manifest_run_notes.json</td><td>file, via <code>e5_common.load_eval_paths</code></td><td>eval.txt path per example</td><td class="size">L45</td></tr>
+<tr><td>reads</td><td class="sym">rubric_cache_*.json</td><td>glob, via <code>e5_common.build_rubric_join</code></td><td>claim name to source letter</td><td class="size">L46</td></tr>
+<tr><td>reads</td><td class="sym">manifest.json</td><td>file, <code class="path">experiments_verifiers/manifest.json</code></td><td><code>reward_manifest</code> per example</td><td class="size">L47 L55</td></tr>
+<tr><td>reads</td><td class="sym">_cache_e5_embeddings.npz</td><td>file, written by <a href="file_harness_e5_embed.html">e5_embed.py</a></td><td>name and name+desc vectors</td><td class="size">L56</td></tr>
+<tr><td>reads</td><td class="sym">evaluation.txt</td><td>file, via <code>e5_common.parse_descriptions</code></td><td>top-30 weight table text</td><td class="size">L49 L470</td></tr>
+<tr><td>reads</td><td class="sym">KINDS, BUCKETS</td><td>module constants L31 L32</td><td>kind one-hot, importance buckets</td><td class="size">L31 L35 L74</td></tr>
+<tr><td>reads</td><td class="sym">RNG, TODAY</td><td>module, seed 21 L26, date L27</td><td>fold shuffle, output file name</td><td class="size">L26&#8211;L28</td></tr>
+<tr><td>reads</td><td class="sym">config field</td><td>none</td><td>no config import in this file</td><td class="size">L8&#8211;L24</td></tr>
+<tr><td>state</td><td class="sym">_CLAIM_X_CACHE</td><td>module dict, L65</td><td>cached name+kind feature rows</td><td class="size">L65 L71</td></tr>
+<tr><td>returns</td><td class="sym">payload dict</td><td>return of <code>main</code></td><td>metrics, CIs, curves, weights</td><td class="size">L493 L520</td></tr>
+<tr><td>returns</td><td class="sym">scores array</td><td>return of <code>loto_eval</code></td><td>nan where no fold scored a row</td><td class="size">L257</td></tr>
+<tr><td>writes</td><td class="sym">E5_learned_importance_&lt;TODAY&gt;.json</td><td>file, <code class="path">experiments_verifiers/results/</code></td><td>the E5 record, indent=1</td><td class="size">L28 L518</td></tr>
+<tr><td>writes</td><td class="sym">stdout digest</td><td>console</td><td>counts, per-rung metrics, CIs</td><td class="size">L358&#8211;L480</td></tr>
+<tr><td>writes</td><td class="sym">OUT_MD</td><td>constant only, L29</td><td>never used, dead binding</td><td class="size">L29</td></tr>
+</tbody>
+</table>
+<p class="sub">Twelve metric entries are stored in the payload at L385&ndash;L424: four baselines (<code>const_0.5</code>, <code>ver_bit</code>, <code>uniform_passrate</code>, <code>v0_recompute</code>), <code>baseline_manifest_reward</code> with its 159/607 note (L390), <code>L0.5_source_direct</code>, <code>L0.5_source_pred</code>, <code>L1_group_logistic</code>, <code>L2_lexical_gbm</code>, <code>L2_lexical_logistic</code>, <code>L3_embed_name_logistic</code> and <code>L3_embed_name_desc_logistic</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>16 functions, no class &mdash; signatures, lines, roles</summary><div class="dbody">
+<pre>imp_bucket(imp: int) -&gt; str                                     L35   lo / mid / hi bucket
+load_all()                                                      L42   all frozen inputs in one call
+claim_x(c, embz, emb_idx)                                       L68   name+desc vector plus kind one-hot
+fit_source_classifier(exs, train_tasks, embz, emb_idx)          L80   logistic on labeled claims
+classifier_cv_accuracy(exs, embz, emb_idx, n_folds=5)           L99   task-grouped CV accuracy
+make_f_src(exs, embz, emb_idx, predicted_fill: bool)            L132  feats_fn: mean s per source
+group_features(claims)                                          L156  kind x bucket means plus 5 counts
+f_l1(e, ctx)                                                    L173  L1 rung, group_features bound
+build_lexicon(exs, min_df=15)                                   L176  claim-name tokens in &gt;= 15 examples
+make_f_l2(lex_index)                                            L186  feats_fn: token means and presence
+make_f_l3(embz, emb_idx, key)                                   L204  feats_fn: score-weighted embedding
+loto_eval(exs, feats_fn, model_fn, inner_C=None, y=None)        L216  leave-one-task-out scores
+learning_curve(exs, feats_fn, model_fn, fracs=(0.25, 0.5, 0.75, 1.0), n_rep=10)  L260  AUC versus training fraction
+permutation_test(exs, feats_fn, model_fn, n_perm=200, seed=7)   L292  cyclic-shift null for AUC
+rubric_top_source(n, exs)                                       L325  most common source of a name
+mode_imp(n, exs)                                                L334  most common importance of a name
+main()                                                          L346  build rungs, write the record</pre>
+<p>Module constants and lambdas: <code>RNG = np.random.default_rng(21)</code> L26, <code>TODAY</code> L27, <code>OUT_JSON</code> L28, <code>OUT_MD</code> L29 (unused), <code>KINDS</code> L31, <code>BUCKETS</code> L32, <code>_CLAIM_X_CACHE</code> L65, <code>f_l1</code> L173, <code>logit</code> L393, <code>gbm</code> L394, <code>mets</code> L380.</p>
+<p>Models used: <code>LogisticRegression(max_iter=3000, C=...)</code> L393 with inner grids <code>[0.1, 1.0, 10.0]</code> L399 and <code>[0.01, 0.1, 1.0]</code> L414, <code>[0.01, 0.03, 0.1, 0.3, 1.0]</code> L420, and <code>HistGradientBoostingClassifier(max_depth=3, max_iter=150, learning_rate=0.06, l2_regularization=1.0, random_state=0)</code> L394. The refit for the weight table uses <code>C=0.1</code> on all 607 examples (L451&ndash;L452). Payload keys are listed at L493&ndash;L517; the gaps list (5 entries) is at L505&ndash;L515.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym"><code>e5b_splits.py</code></td><td>imports <code>e5_run as R</code> inside a function to reproduce the LOTO machinery</td><td class="size">L298</td></tr>
+<tr><td class="sym"><code>e13_l3_extreme.py</code> and <code>e13_common.py</code></td><td>Name <code>e5_run.loto_eval</code> as the policy they mirror; no import statement</td><td class="size">e13_l3 L4 L1413 &#183; e13_common L83 L86</td></tr>
+<tr><td class="sym"><a href="file_harness_e5_common.html">e5_common.py</a></td><td>Imported by this file, not a caller of it</td><td class="size">L24</td></tr>
+<tr><td class="sym"><a href="file_harness_e5_md.html">e5_md.py</a></td><td>Formats the JSON this file writes; separate script</td><td class="size">L12</td></tr>
+<tr><td class="sym"><a href="exp_e5_run.html">exp_e5_run.html</a></td><td>Experiment page that carries the measured numbers</td><td class="size">page scope</td></tr>
+</tbody>
+</table>
+<p>No importer found apart from the lazy <code>import e5_run as R</code> in <code>e5b_splits.py</code> L298. The module runs as a script (<code>if __name__ == "__main__"</code> L523).</p>
+<p>Tests: <code>unknown</code> &mdash; a grep of <code class="path">tests/</code> for <code>e5_run</code>, <code>loto_eval</code>, <code>learning_curve</code>, <code>permutation_test</code> and <code>build_lexicon</code> returns no file. The only mention of the folder is a background comment in <code class="path">tests/test_sandbox_provisioning_pins.py</code> L5.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e5_run.html">exp_e5_run.html</a>, <a href="file_harness_e5_common.html">e5_common.py</a> (loading and metrics), <a href="file_harness_e5_embed.html">e5_embed.py</a> (the embedding cache), <a href="file_harness_e5_md.html">e5_md.py</a> (the markdown renderer) and <a href="exp_index.html">exp_index.html</a>.</p><p>Sources read: <code class="path">experiments_verifiers/harness/e5_run.py</code> (524 lines, whole file), <code class="path">experiments_verifiers/harness/e5_common.py</code> (the call targets L34&#8211;L222), <code class="path">experiments_verifiers/harness/e5_md.py</code> L12&ndash;L13 (the downstream reader), <code class="path">experiments_verifiers/README.md</code> (codename table, L26 and L127), grep hits in <code class="path">e5b_splits.py</code> and <code class="path">e13_l3_extreme.py</code> for <code>e5_run</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> and repo <code class="path">.env</code> (never opened, secrets); <code class="path">experiments_verifiers/results/E5_learned_importance_*.json</code>, the <code class="path">.md</code> summaries and <code class="path">_cache_e5_embeddings.npz</code> bodies (recorded numbers and a binary cache; the exp pages carry the numbers, and this page cites the keys from the code); <code class="path">data/verifier_claims.jsonl</code> and <code class="path">ablations/*.json</code> contents (read through <code>e5_common</code>, described there); the bodies of <code class="path">e5b_splits.py</code>, <code class="path">e5c_curve.py</code> and <code class="path">e13_l3_extreme.py</code> beyond their <code>e5_run</code> mentions; the remaining <code class="path">harness/*.py</code> scripts (grep shows no import of this file); <code class="path">__pycache__</code>; no pytest run and no script executed, as instructed.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>file_core_selection - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; core &gt; selection.py">
+<div class="wrap">
+
+<h1 class="hud">selection.py</h1>
+<p class="intro">This file holds <code>SelectionPressure</code>, the part of the <a href="flow_evolution_loop.html">evolution loop</a> that decides which generated workflow survives, plus the four selection strategies (greedy, tournament, novelty, quality-diversity) and the in-memory QD archive. It runs twice per generation: once after scoring, when <code>EvolutionEngine.validate_survivor</code> is called (<a href="../../sources/core/evolution_engine.py">evolution_engine.py:563</a>), and once before mutation, when a parent is drawn (<a href="../../sources/core/workflow_selection.py">workflow_selection.py:279</a>). It reads run objects and config fields, stores state in memory, and writes nothing to disk.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 — what the file does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 620" role="img" aria-label="selection.py: candidate runs enter validate_survivor, the qd path computes novelty and qd_score, admits to the archive, and select_parents draws parents">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="18" y="30">lane 1: dispatch (L177–184)</text>
+
+  <g class="box" id="bIn">
+    <title>Input of validate_survivor: the runs of the current and previous generations</title>
+    <rect x="18" y="250" width="168" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="102" y="286" text-anchor="middle">new_runs,</text>
+    <text class="box-label" x="102" y="302" text-anchor="middle">baseline_runs</text>
+    <text class="box-sub" x="102" y="322" text-anchor="middle">reward, code, uuid</text>
+  </g>
+
+  <a class="box" id="bV" href="#sym-inventory">
+    <title>validate_survivor dispatches on the configured strategy</title>
+    <rect x="212" y="250" width="168" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="296" y="286" text-anchor="middle">validate_survivor()</text>
+    <text class="box-sub" x="296" y="306" text-anchor="middle">strategy dispatch, L177</text>
+    <text class="box-sub" x="296" y="322" text-anchor="middle">threshold L171</text>
+  </a>
+
+  <a class="box" id="bGT" href="#sym-inventory">
+    <title>Greedy and tournament validators, one per strategy value</title>
+    <rect x="406" y="80" width="248" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="530" y="112" text-anchor="middle">_validate_greedy()</text>
+    <text class="box-label" x="530" y="130" text-anchor="middle">_validate_tournament()</text>
+    <text class="box-sub" x="530" y="150" text-anchor="middle">L297 and L332</text>
+  </a>
+
+  <a class="box" id="bO" href="#sym-inventory">
+    <title>Open-ended validator: the default qd path and the novelty path</title>
+    <rect x="406" y="250" width="178" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="495" y="286" text-anchor="middle">_validate_open_ended()</text>
+    <text class="box-sub" x="495" y="306" text-anchor="middle">qd and novelty, L381</text>
+  </a>
+
+  <a class="box" id="bAd" href="#sym-inventory">
+    <title>Admission gate and archive insert</title>
+    <rect x="610" y="250" width="178" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="699" y="282" text-anchor="middle">_try_admit()</text>
+    <text class="box-label" x="699" y="300" text-anchor="middle">_add_to_archive()</text>
+    <text class="box-sub" x="699" y="322" text-anchor="middle">gate, then evict, L554</text>
+  </a>
+
+  <g class="box" id="bArc">
+    <title>The population archive, an in-memory list of PopulationMember</title>
+    <rect x="814" y="250" width="168" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="898" y="286" text-anchor="middle">_archive</text>
+    <text class="box-sub" x="898" y="306" text-anchor="middle">list[PopulationMember]</text>
+    <text class="box-sub" x="898" y="322" text-anchor="middle">in memory, L140</text>
+  </g>
+
+  <text class="box-sub" x="406" y="370">lane 2: the QD numbers</text>
+
+  <a class="box" id="bD" href="#sym-inventory">
+    <title>Behaviour descriptor from the genotype embedding</title>
+    <rect x="360" y="400" width="220" height="84" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="470" y="430" text-anchor="middle">_extract_behaviour_descriptor</text>
+    <text class="box-sub" x="470" y="450" text-anchor="middle">run.code to vector, L468</text>
+  </a>
+
+  <a class="box" id="bN" href="#sym-inventory">
+    <title>Mean cosine distance to the comparison set</title>
+    <rect x="650" y="400" width="180" height="84" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="740" y="430" text-anchor="middle">_compute_novelty()</text>
+    <text class="box-sub" x="740" y="450" text-anchor="middle">cosine k-NN, L490</text>
+  </a>
+
+  <a class="box" id="bQD" href="#sym-inventory">
+    <title>Scalarised quality plus novelty minus length penalty</title>
+    <rect x="900" y="400" width="200" height="84" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1000" y="426" text-anchor="middle">_compose_qd_score()</text>
+    <text class="box-sub" x="1000" y="446" text-anchor="middle">(1-w)quality + w novelty</text>
+    <text class="box-sub" x="1000" y="462" text-anchor="middle">- lambda*length, L620</text>
+  </a>
+
+  <text class="box-sub" x="18" y="480">lane 3: the next generation</text>
+
+  <a class="box" id="bPar" href="#sym-inventory">
+    <title>Parent draw for mutation or crossover</title>
+    <rect x="300" y="500" width="240" height="84" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="420" y="530" text-anchor="middle">select_parent()</text>
+    <text class="box-label" x="420" y="548" text-anchor="middle">select_parents()</text>
+    <text class="box-sub" x="420" y="568" text-anchor="middle">weight qd/(1+children), L240</text>
+  </a>
+
+  <g class="box" id="bOut">
+    <title>Returned values: the verdict dict and the chosen parents</title>
+    <rect x="680" y="500" width="240" height="84" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="800" y="530" text-anchor="middle">verdict dict, parents</text>
+    <text class="box-sub" x="800" y="550" text-anchor="middle">19 keys, L448–457</text>
+    <text class="box-sub" x="800" y="566" text-anchor="middle">(list, use_crossover), L286</text>
+  </g>
+
+  <g class="box" id="bCode">
+    <title>External module that produces the embedding</title>
+    <rect x="980" y="500" width="182" height="84" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1071" y="530" text-anchor="middle">code_features.py</text>
+    <text class="box-sub" x="1071" y="550" text-anchor="middle">genotype_embedding_descriptor</text>
+    <text class="box-sub" x="1071" y="566" text-anchor="middle">imported at L22</text>
+  </g>
+
+  <path class="edge" data-from="bIn" data-to="bV" d="M186,295 H212" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="199" y="288" text-anchor="middle">one generation</text>
+
+  <path class="edge" data-from="bV" data-to="bGT" d="M380,280 H530 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="272" text-anchor="middle">greedy or tournament</text>
+
+  <path class="edge" data-from="bV" data-to="bO" d="M380,295 H406" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="393" y="288" text-anchor="middle">novelty or qd</text>
+
+  <path class="edge" data-from="bGT" data-to="bOut" d="M560,170 H606 V545 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="360" text-anchor="middle">verdict dict</text>
+
+  <path class="edge" data-from="bO" data-to="bD" d="M495,340 V400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="375">best_new</text>
+
+  <path class="edge" data-from="bD" data-to="bN" d="M580,442 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="615" y="435" text-anchor="middle">descriptor</text>
+
+  <path class="edge" data-from="bN" data-to="bQD" d="M830,442 H900" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="865" y="435" text-anchor="middle">novelty</text>
+
+  <path class="edge" data-from="bQD" data-to="bAd" d="M1000,400 V370 H699 V340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="860" y="380" text-anchor="middle">above admit_threshold</text>
+
+  <path class="edge" data-from="bAd" data-to="bArc" d="M788,295 H814" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="801" y="288" text-anchor="middle">append, evict</text>
+
+  <path class="edge" data-from="bArc" data-to="bPar" d="M950,340 V505 H540 V500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="497" text-anchor="middle">draw parent</text>
+
+  <path class="edge" data-from="bPar" data-to="bOut" d="M540,542 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="610" y="535" text-anchor="middle">parents, use_crossover</text>
+
+  <path class="edge dashed-edge" data-from="bD" data-to="bCode" d="M470,484 V512 H1080 V500" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="508" text-anchor="middle">embedding</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 — lane 1 flows left to right (dispatch and admission), lane 2 covers the QD numbers, lane 3 hands the next generation back. Every arrow is a real call or a real read of <code>selection.py</code>: <code>validate_survivor</code> routes greedy and tournament to <code>_validate_greedy</code>/<code>_validate_tournament</code> (L177–180) and both open-ended values to <code>_validate_open_ended</code> (L181–182). Greedy and tournament never call <code>_try_admit</code>; only the open-ended path admits to <code>_archive</code> (L439). <code>_archive</code> is only filled in the open-ended modes, so the parent lane is archive-driven only there (L219–235).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 — what goes in, what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 450" role="img" aria-label="data flow: run objects and config fields enter SelectionPressure, which keeps in-memory state and returns a verdict dict; the caller writes the disk files">
+  <defs>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+  </defs>
+
+  <g class="box" id="d1">
+    <title>Run attributes read by the validators</title>
+    <rect x="18" y="30" width="240" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="138" y="58" text-anchor="middle">run.reward, run.code</text>
+    <text class="box-sub" x="138" y="78" text-anchor="middle">IndividualRun (schema.py:43)</text>
+    <text class="box-sub" x="138" y="94" text-anchor="middle">read at L314, L487, L794</text>
+  </g>
+
+  <g class="box" id="d2">
+    <title>Optional pre-computed descriptor</title>
+    <rect x="18" y="126" width="240" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="138" y="154" text-anchor="middle">run.behaviour_descriptor</text>
+    <text class="box-sub" x="138" y="174" text-anchor="middle">test stubs only, L484</text>
+    <text class="box-sub" x="138" y="190" text-anchor="middle">not a schema field</text>
+  </g>
+
+  <g class="box" id="d3">
+    <title>Per-uuid child counts from the workflow selector</title>
+    <rect x="18" y="222" width="240" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="138" y="250" text-anchor="middle">child_counts</text>
+    <text class="box-sub" x="138" y="270" text-anchor="middle">{uuid: n_children}</text>
+    <text class="box-sub" x="138" y="286" text-anchor="middle">read at L227 and L232</text>
+  </g>
+
+  <a class="box" id="d4" href="#io-table">
+    <title>Ten config fields, wired by the evolution engine</title>
+    <rect x="18" y="318" width="240" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="138" y="346" text-anchor="middle">config fields (10)</text>
+    <text class="box-sub" x="138" y="366" text-anchor="middle">selection_strategy, novelty_weight,</text>
+    <text class="box-sub" x="138" y="382" text-anchor="middle">population_size, admit_threshold, ...</text>
+    <text class="box-sub" x="138" y="398" text-anchor="middle">evolution_engine.py:97–106</text>
+  </a>
+
+  <a class="box" id="d5" href="#sym-inventory">
+    <title>The pressure object, one per evolution session</title>
+    <rect x="330" y="180" width="250" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="455" y="212" text-anchor="middle">SelectionPressure</text>
+    <text class="box-sub" x="455" y="232" text-anchor="middle">__init__ L83, self.config L119</text>
+    <text class="box-sub" x="455" y="248" text-anchor="middle">strategy coerced L123–125</text>
+  </a>
+
+  <g class="box" id="d6">
+    <title>In-memory state written by admission</title>
+    <rect x="330" y="300" width="250" height="90" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="455" y="328" text-anchor="middle">_archive</text>
+    <text class="box-label" x="455" y="346" text-anchor="middle">_previous_descriptors</text>
+    <text class="box-sub" x="455" y="366" text-anchor="middle">_n_admit_rejected L142</text>
+    <text class="box-sub" x="455" y="382" text-anchor="middle">_last_evicted_uuid L145</text>
+  </g>
+
+  <g class="box" id="d7">
+    <title>The returned verdict dictionary</title>
+    <rect x="330" y="30" width="250" height="90" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="455" y="58" text-anchor="middle">verdict dict</text>
+    <text class="box-sub" x="455" y="78" text-anchor="middle">9 keys from _build_result L665</text>
+    <text class="box-sub" x="455" y="94" text-anchor="middle">plus 10 QD keys L448–457</text>
+  </g>
+
+  <a class="box" id="d8" href="mod_core_evolution_engine.html">
+    <title>Caller: the evolution engine stores selection_log and the qd row</title>
+    <rect x="660" y="30" width="320" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="820" y="58" text-anchor="middle">verdict consumed by caller</text>
+    <text class="box-sub" x="820" y="78" text-anchor="middle">SelectionLog L567, run_metrics.json L1015</text>
+    <text class="box-sub" x="820" y="94" text-anchor="middle">evolution_engine.py</text>
+    <text class="box-sub" x="820" y="110" text-anchor="middle">absolute_improvement, confidence</text>
+  </a>
+
+  <a class="box" id="d9" href="mod_core_evolution_engine.html">
+    <title>Disk file appended by the caller, one row per generation</title>
+    <rect x="660" y="140" width="320" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="820" y="168" text-anchor="middle">&lt;workflow_dir&gt;/qd_archive.jsonl</text>
+    <text class="box-sub" x="820" y="188" text-anchor="middle">append at evolution_engine.py:1081</text>
+    <text class="box-sub" x="820" y="204" text-anchor="middle">14 of the verdict keys, L1023</text>
+  </a>
+
+  <a class="box" id="d10" href="mod_core_evolution_engine.html">
+    <title>PNG projection of the archive descriptors</title>
+    <rect x="660" y="250" width="320" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="820" y="278" text-anchor="middle">&lt;workflow_dir&gt;/archive_pca.png</text>
+    <text class="box-sub" x="820" y="298" text-anchor="middle">render_archive_pca, caller L961</text>
+    <text class="box-sub" x="820" y="314" text-anchor="middle">reads self.selection.archive L962</text>
+  </a>
+
+  <g class="box" id="d11">
+    <title>Log lines emitted on every decision</title>
+    <rect x="660" y="360" width="320" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="820" y="388" text-anchor="middle">logger lines (stdout/log file)</text>
+    <text class="box-sub" x="820" y="408" text-anchor="middle">ACCEPTED L697, REJECTED L703, ADMIT L567</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d5" d="M258,68 H300 V225 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path class="edge dashed-edge" data-from="d2" data-to="d5" d="M258,164 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path class="edge dashed-edge" data-from="d3" data-to="d5" d="M258,260 H300 V245 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <path class="edge dashed-edge" data-from="d4" data-to="d5" d="M258,365 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+
+  <path class="edge" data-from="d5" data-to="d7" d="M455,180 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="462" y="150">returns</text>
+  <path class="edge" data-from="d5" data-to="d6" d="M455,270 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="462" y="290">stores</text>
+  <path class="edge" data-from="d5" data-to="d11" d="M580,255 H620 V395 H660" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="600" y="150">logs</text>
+
+  <path class="edge" data-from="d7" data-to="d8" d="M580,75 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="620" y="68" text-anchor="middle">caller reads</text>
+  <path class="edge dashed-edge" data-from="d6" data-to="d9" d="M580,345 V185 H660" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="620" y="178" text-anchor="middle">caller writes</text>
+  <path class="edge dashed-edge" data-from="d6" data-to="d10" d="M580,365 V295 H660" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="620" y="288" text-anchor="middle">caller reads</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 — dashed boxes are reads or writes; the blue boxes are values this file returns or stores. <code>selection.py</code> opens no file: the three dashed artefacts on the right (<code>qd_archive.jsonl</code>, <code>archive_pca.png</code>, log lines) are written by <code>EvolutionEngine</code> from the returned verdict and the public <code>archive</code> property (L289). The <code>config</code> dict passed to <code>__init__</code> is stored as <code>self.config</code> (L119) and never read again in this file — the ten knobs are read by the caller instead (<code>evolution_engine.py:97–106</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 — control flow: three strategy branches, one admission loop</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 560" role="img" aria-label="decision tree: strategy dispatch, the three validity conditions, the admit and eviction loop, and the parent draw weights">
+  <defs>
+    <marker id="arw5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+  </defs>
+
+  <a class="box" id="c0" href="#sym-inventory">
+    <title>Entry: one dispatch per scored generation</title>
+    <rect x="380" y="14" width="240" height="54" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="500" y="38" text-anchor="middle">validate_survivor()</text>
+    <text class="box-sub" x="500" y="56" text-anchor="middle">threshold defaults to 0.01, L171</text>
+  </a>
+
+  <g class="box" id="c1">
+    <title>Greedy branch</title>
+    <rect x="30" y="100" width="270" height="70" rx="12" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="165" y="126" text-anchor="middle">strategy == GREEDY</text>
+    <text class="box-sub" x="165" y="146" text-anchor="middle">_validate_greedy, L297</text>
+  </g>
+
+  <g class="box" id="c2">
+    <title>Tournament branch</title>
+    <rect x="360" y="100" width="280" height="70" rx="12" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="500" y="126" text-anchor="middle">strategy == TOURNAMENT</text>
+    <text class="box-sub" x="500" y="146" text-anchor="middle">_validate_tournament, L332</text>
+  </g>
+
+  <g class="box" id="c3">
+    <title>Open-ended branch: novelty and qd share it</title>
+    <rect x="700" y="100" width="280" height="70" rx="12" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="840" y="126" text-anchor="middle">in (NOVELTY, QUALITY_DIVERSITY)</text>
+    <text class="box-sub" x="840" y="146" text-anchor="middle">_validate_open_ended, L381</text>
+  </g>
+
+  <g class="box" id="c4">
+    <title>Greedy condition</title>
+    <rect x="30" y="200" width="270" height="76" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="165" y="226" text-anchor="middle">relative_improvement &gt; threshold</text>
+    <text class="box-sub" x="165" y="246" text-anchor="middle">new best vs mean baseline, L318</text>
+    <text class="box-sub" x="165" y="262" text-anchor="middle">confidence = |r| / threshold, L319</text>
+  </g>
+
+  <g class="box" id="c5">
+    <title>Tournament acceptance rules: three cases on the relative improvement</title>
+    <rect x="360" y="196" width="280" height="112" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="500" y="220" text-anchor="middle">tournament acceptance rules</text>
+    <text class="box-sub" x="500" y="240" text-anchor="middle">r &gt; threshold: accepted, L358</text>
+    <text class="box-sub" x="500" y="256" text-anchor="middle">|r| &lt;= threshold: random() &lt; 0.5, L362</text>
+    <text class="box-sub" x="500" y="272" text-anchor="middle">else: random() &lt; exp(-10*|r|), L366</text>
+    <text class="box-sub" x="500" y="290" text-anchor="middle">baseline = 3 sampled runs, L349</text>
+  </g>
+
+  <g class="box" id="c6">
+    <title>Open-ended validity test</title>
+    <rect x="700" y="200" width="280" height="90" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="840" y="222" text-anchor="middle">relative_improvement &gt; threshold</text>
+    <text class="box-label" x="840" y="240" text-anchor="middle">or qd_score &gt; admit_threshold</text>
+    <text class="box-sub" x="840" y="260" text-anchor="middle">admit_threshold default 0.3</text>
+    <text class="box-sub" x="840" y="276" text-anchor="middle">is_valid at L427</text>
+  </g>
+
+  <g class="box" id="c7">
+    <title>Fallback branch for an unknown strategy value</title>
+    <rect x="30" y="320" width="270" height="70" rx="12" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="165" y="346" text-anchor="middle">any other value</text>
+    <text class="box-sub" x="165" y="366" text-anchor="middle">falls back to _validate_greedy, L184</text>
+  </g>
+
+  <a class="box" id="c8" href="#sym-inventory">
+    <title>Admission gate, then archive insert with eviction</title>
+    <rect x="700" y="330" width="280" height="90" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="840" y="356" text-anchor="middle">_try_admit()</text>
+    <text class="box-sub" x="840" y="376" text-anchor="middle">not is_valid: reject, counter += 1, L566</text>
+    <text class="box-sub" x="840" y="392" text-anchor="middle">else _add_to_archive, L573</text>
+  </a>
+
+  <g class="box" id="c9">
+    <title>Capacity rule inside the archive</title>
+    <rect x="700" y="450" width="280" height="90" rx="2" fill="rgba(0,229,255,0.05)" stroke="#1B4B6B"/>
+    <text class="box-label" x="840" y="476" text-anchor="middle">len(_archive) &gt; population_size</text>
+    <text class="box-sub" x="840" y="496" text-anchor="middle">evict min qd_score, L584</text>
+    <text class="box-sub" x="840" y="512" text-anchor="middle">then _refresh_member_metrics,</text>
+    <text class="box-sub" x="840" y="526" text-anchor="middle">skipped when len &lt; 2, L597</text>
+  </g>
+
+  <a class="box" id="c10" href="#sym-inventory">
+    <title>Parent draw: crossover coin flip, then weighted choice</title>
+    <rect x="30" y="420" width="600" height="104" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="330" y="446" text-anchor="middle">select_parents()</text>
+    <text class="box-sub" x="330" y="466" text-anchor="middle">crossover when len(candidates) &gt;= 2 and random() &lt; crossover_rate</text>
+    <text class="box-sub" x="330" y="482" text-anchor="middle">else one parent, use_crossover False, L265–271</text>
+    <text class="box-sub" x="330" y="500" text-anchor="middle">weights = max(qd_score, 0.01) / (1 + n_children), L230</text>
+    <text class="box-sub" x="330" y="516" text-anchor="middle">eligible = n_children &lt; max_children (8), else all members, L225</text>
+  </a>
+
+  <path class="edge" data-from="c0" data-to="c1" d="M380,45 H165 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="200" y="70" text-anchor="middle">GREEDY</text>
+  <path class="edge" data-from="c0" data-to="c2" d="M500,68 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="530" y="88">TOURNAMENT</text>
+  <path class="edge" data-from="c0" data-to="c3" d="M620,45 H840 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="800" y="70" text-anchor="middle">NOVELTY or QD</text>
+  <path class="edge" data-from="c0" data-to="c7" d="M380,30 H14 V355 H30" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw6)"/>
+  <text class="edge-label" x="70" y="46">unknown value</text>
+
+  <path class="edge" data-from="c1" data-to="c4" d="M165,170 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <path class="edge" data-from="c2" data-to="c5" d="M500,170 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <path class="edge" data-from="c3" data-to="c6" d="M840,170 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <path class="edge" data-from="c6" data-to="c8" d="M840,290 V330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="870" y="314">is_valid</text>
+  <path class="edge" data-from="c8" data-to="c9" d="M840,420 V450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="870" y="440">admitted</text>
+  <path class="edge" data-from="c9" data-to="c0" d="M980,495 V8 H620 V14" fill="none" stroke="#4D9FFF" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arw6)"/>
+  <text class="edge-label" x="700" y="6" text-anchor="middle">next generation</text>
+  <path class="edge" data-from="c2" data-to="c10" d="M360,140 H330 V420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="290" y="300" text-anchor="middle">select_parents</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 — the real conditions, thresholds and defaults. <code>novelty</code> and <code>qd</code> share every box in the right column: <code>validate_survivor</code> routes both to <code>_validate_open_ended</code> (L181) and <code>select_parent</code> treats them as one case (L218). The dashed edge is the loop: one admission per scored generation, repeated by the <a href="mod_core_evolution_engine.html">evolution engine</a>. Two random draws make the result non-deterministic in tournament mode (L362, L366) and in the crossover coin flip (L267).</p>
+</div>
+
+<div class="panel" id="io-table"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">config</td><td class="sym">__init__ arg, selection.py:83</td><td>Stored as <code>self.config</code> (L119); never read again in this file.</td></tr>
+<tr><td>reads</td><td class="sym">selection_strategy</td><td class="sym">config.py:131 &rarr; evolution_engine.py:98</td><td>Chooses the validator and the parent draw.</td></tr>
+<tr><td>reads</td><td class="sym">population_size</td><td class="sym">config.py:143 &rarr; evolution_engine.py:99</td><td>Archive capacity; over capacity evicts lowest qd_score (L584).</td></tr>
+<tr><td>reads</td><td class="sym">novelty_k_neighbours</td><td class="sym">config.py:144 &rarr; evolution_engine.py:100</td><td>k for the k-NN cosine novelty (L516).</td></tr>
+<tr><td>reads</td><td class="sym">novelty_weight</td><td class="sym">config.py:145 &rarr; evolution_engine.py:101</td><td>The <code>w</code> in qd_score; 0 is pure quality (L632).</td></tr>
+<tr><td>reads</td><td class="sym">admit_threshold</td><td class="sym">config.py:146 &rarr; evolution_engine.py:102</td><td>Admission gate (L427) and confidence scale (L442).</td></tr>
+<tr><td>reads</td><td class="sym">novelty_comparison</td><td class="sym">config.py:136 &rarr; evolution_engine.py:103</td><td>Peer set: whole archive or recent window (L514, L521).</td></tr>
+<tr><td>reads</td><td class="sym">novelty_previous_n</td><td class="sym">config.py:137 &rarr; evolution_engine.py:104</td><td>Window size for <code>previous_n</code> mode (L530).</td></tr>
+<tr><td>reads</td><td class="sym">length_penalty_baseline_chars</td><td class="sym">config.py:139 &rarr; evolution_engine.py:105</td><td>Size at which the length penalty starts (L788).</td></tr>
+<tr><td>reads</td><td class="sym">length_penalty_lambda</td><td class="sym">config.py:140 &rarr; evolution_engine.py:106</td><td>Weight of the penalty term in qd_score (L634).</td></tr>
+<tr><td>reads</td><td class="sym">run.reward</td><td class="sym">run object, L314 and L410</td><td>Mean-versus-best comparison and QD quality term.</td></tr>
+<tr><td>reads</td><td class="sym">run.code</td><td class="sym">run object, L487 and L794</td><td>Genotype text: embedding source and character count.</td></tr>
+<tr><td>reads</td><td class="sym">run.behaviour_descriptor</td><td class="sym">run object, L484</td><td>Pre-computed descriptor; test stubs only, not a schema field.</td></tr>
+<tr><td>reads</td><td class="sym">iteration_count, cost, current_uuid</td><td class="sym">run object, L430–433</td><td>Copied into the new PopulationMember fields.</td></tr>
+<tr><td>reads</td><td class="sym">child_counts</td><td class="sym">argument, L227 and L232</td><td>Inverse-child penalty for the parent weight.</td></tr>
+<tr><td>reads</td><td class="sym">genotype embedding backend</td><td class="sym">code_features.py:10 &rarr; genotype_embedding.py:299</td><td>Builds the unit-norm vector; backend by env var (genotype_embedding.py:274).</td></tr>
+<tr><td>writes</td><td class="sym">verdict dict</td><td class="sym">returned, L448–457 and L665–675</td><td>All decision fields handed to the caller.</td></tr>
+<tr><td>writes</td><td class="sym">_archive</td><td class="sym">state key, L140 and L582</td><td>Appends the admitted member; capacity eviction inside.</td></tr>
+<tr><td>writes</td><td class="sym">_previous_descriptors</td><td class="sym">state key, L141 and L529</td><td>Sliding window for <code>previous_n</code> novelty.</td></tr>
+<tr><td>writes</td><td class="sym">_n_admit_rejected</td><td class="sym">state key, L142 and L566</td><td>Counts refusals; returned as <code>admit_rejected_total</code>.</td></tr>
+<tr><td>writes</td><td class="sym">_last_evicted_uuid</td><td class="sym">state key, L145 and L587</td><td>UUID dropped by this admission; returned as <code>evicted_uuid</code>.</td></tr>
+<tr><td>writes</td><td class="sym">logger lines</td><td class="sym">L461, L567, L588, L697, L703</td><td>Operator log: accepted, rejected, admitted, evicted.</td></tr>
+<tr><td>writes</td><td class="sym">no file</td><td class="sym">whole module</td><td>No <code>open()</code>, no path constant, no disk write.</td></tr>
+<tr><td>writes</td><td class="sym">qd_archive.jsonl</td><td class="sym">caller, evolution_engine.py:1081</td><td>Append-only QD trail built from the verdict.</td></tr>
+<tr><td>writes</td><td class="sym">archive_pca.png</td><td class="sym">caller, evolution_engine.py:961</td><td>PCA picture of the descriptor vectors.</td></tr>
+</tbody>
+</table>
+<p class="sub">Verdict dictionary keys, verbatim: <code>valid</code>, <code>relative_improvement</code>, <code>absolute_improvement</code>, <code>baseline_reward</code>, <code>new_reward</code>, <code>validated_at</code>, <code>confidence</code>, <code>threshold_used</code>, <code>strategy</code> (L665–675); the open-ended branch adds <code>novelty_score</code>, <code>qd_score</code>, <code>quality_norm</code>, <code>novelty_norm</code>, <code>length_penalty</code>, <code>behaviour_descriptor</code>, <code>archive_size</code>, <code>admit_rejected</code>, <code>admit_rejected_total</code>, <code>evicted_uuid</code> (L448–457).</p>
+</div>
+
+<div class="panel" id="sym-inventory"><span class="br"></span>
+<h2>The module at a glance</h2>
+<div class="grid2">
+<div class="card l2">
+<h4><a href="../../sources/core/selection.py">sources/core/selection.py</a></h4>
+<p class="role">Four selection strategies, one in-memory QD archive, and the novelty and length terms of qd_score.</p>
+<p class="meta">842 lines &#183; classes: SelectionPressure, PopulationMember, SelectionStrategy &#183; 19 methods, 6 module functions</p>
+<p class="meta">imports: logging, math, random, dataclasses, datetime, enum, typing, code_features</p>
+</div>
+<div class="card l2">
+<h4>Default constants</h4>
+<p class="role"><code>MAX_CHILDREN_PER_PARENT = 8</code> (L24), <code>NOVELTY_ARCHIVE_KNN = "archive_knn"</code> (L27), <code>NOVELTY_PREVIOUS_N = "previous_n"</code> (L28).</p>
+<p class="meta">An unknown <code>novelty_comparison</code> value falls back to <code>archive_knn</code> (L132–135); <code>previous_n</code> and <code>length_penalty_baseline_chars</code> are floored at 1 (L136–137).</p>
+</div>
+</div>
+
+<details><summary>every class, method and top-level function (30 rows)</summary><div class="dbody">
+<pre>class SelectionStrategy(Enum)                                    L31   GREEDY, TOURNAMENT, NOVELTY, QUALITY_DIVERSITY = "qd"
+
+@dataclass
+class PopulationMember                                          L40   iteration, reward, cost, uuid, behaviour_descriptor,
+                                                                      genotype_chars, novelty_score, qd_score, created_at
+
+class SelectionPressure                                         L69   holds the archive, the strategy and all thresholds
+  __init__(config: dict[str, Any], min_improvement_threshold: float = 0.01,
+           strategy: str | SelectionStrategy = SelectionStrategy.QUALITY_DIVERSITY,
+           population_size: int = 25, novelty_k_neighbours: int = 10,
+           novelty_weight: float = 0.25, admit_threshold: float = 0.3,
+           max_children: int = MAX_CHILDREN_PER_PARENT,
+           novelty_comparison: str = NOVELTY_ARCHIVE_KNN, previous_n: int = 5,
+           length_penalty_baseline_chars: int = 5000,
+           length_penalty_lambda: float = 0.05) -&gt; None             L83
+  validate_survivor(baseline_runs: list[Any] | Any, new_runs: list[Any] | Any,
+                    threshold: float | None = None) -&gt; dict[str, Any]   L147
+  select_parent(runs: list[Any],
+                child_counts: dict[str, int] | None = None) -&gt; Any      L186
+  select_parents(candidates: list[Any], n_parents: int = 2,
+                 crossover_rate: float = 0.4,
+                 child_counts: dict[str, int] | None = None)
+                 -&gt; tuple[list[Any], bool]                              L240
+  archive -&gt; list[PopulationMember]        (property, returns a copy)   L289
+  _validate_greedy(baseline_list, new_list, threshold: float) -&gt; dict   L297
+  _validate_tournament(baseline_list, new_list, threshold: float) -&gt; dict   L332
+  _validate_open_ended(baseline_list, new_list, threshold: float) -&gt; dict   L381
+  _extract_behaviour_descriptor(run: Any) -&gt; list[float] | None         L468
+  _compute_novelty(descriptor: list[float] | None) -&gt; float             L490
+  _comparison_peers() -&gt; list[list[float]]                              L519
+  _record_previous(descriptor: list[float] | None) -&gt; None              L525
+  _novelty_range() -&gt; float                                             L533
+  _try_admit(member: PopulationMember, is_valid: bool) -&gt; bool          L554
+  _add_to_archive(member: PopulationMember) -&gt; None                     L576
+  _refresh_member_metrics() -&gt; None                                     L595
+  _knn_novelty_against_peers(m: PopulationMember) -&gt; float               L610
+  _compose_qd_score(reward: float, novelty: float, genotype_chars: int,
+                    novelty_range: float) -&gt; float                      L620
+  _build_result(is_valid: bool, relative_improvement: float,
+                absolute_improvement: float, baseline_reward: float,
+                new_reward: float, confidence: float, threshold: float)
+                -&gt; dict[str, Any]                                       L641
+  _log_validation(is_valid: bool, relative_improvement: float,
+                  baseline_reward: float, new_reward: float,
+                  confidence: float, threshold: float) -&gt; None          L677
+
+_safe_attr(obj: Any, attr: str, default: Any = 0.0) -&gt; Any              L714
+_mean_reward(runs: list[Any]) -&gt; float                                  L728
+_best_reward(runs: list[Any]) -&gt; float                                  L741
+_cosine_distance(a: list[float], b: list[float]) -&gt; float               L754
+_length_penalty(chars: int, baseline_chars: int) -&gt; float               L776
+_genotype_chars(run: Any) -&gt; int                                        L792
+
+if __name__ == "__main__":   smoke block, two SelectionPressure instances, asserts, L798–842</pre>
+<table>
+<thead><tr><th>Symbol</th><th>Role (8 words max)</th></tr></thead>
+<tbody>
+<tr><td class="sym">SelectionStrategy</td><td>Enum naming the four strategy values.</td></tr>
+<tr><td class="sym">PopulationMember</td><td>One archive individual with reward, descriptor, qd_score.</td></tr>
+<tr><td class="sym">SelectionPressure.__init__</td><td>Coerces strategy and thresholds, creates empty archive.</td></tr>
+<tr><td class="sym">validate_survivor</td><td>Public dispatch to the strategy validator.</td></tr>
+<tr><td class="sym">select_parent</td><td>Picks one parent, archive-weighted in QD mode.</td></tr>
+<tr><td class="sym">select_parents</td><td>Draws one or two parents, decides crossover.</td></tr>
+<tr><td class="sym">archive</td><td>Copy of the internal population list.</td></tr>
+<tr><td class="sym">_validate_greedy</td><td>Best-of-new beats mean-of-baseline by threshold.</td></tr>
+<tr><td class="sym">_validate_tournament</td><td>Probabilistic accept against three sampled baselines.</td></tr>
+<tr><td class="sym">_validate_open_ended</td><td>Computes novelty and qd_score, then admits.</td></tr>
+<tr><td class="sym">_extract_behaviour_descriptor</td><td>Descriptor from run or genotype embedding.</td></tr>
+<tr><td class="sym">_compute_novelty</td><td>Mean cosine distance to the peer set.</td></tr>
+<tr><td class="sym">_comparison_peers</td><td>Archive descriptors or the recent window.</td></tr>
+<tr><td class="sym">_record_previous</td><td>Appends to the previous_n sliding window.</td></tr>
+<tr><td class="sym">_novelty_range</td><td>Scale estimate for normalising novelty.</td></tr>
+<tr><td class="sym">_try_admit</td><td>Gate: admit or count the refusal.</td></tr>
+<tr><td class="sym">_add_to_archive</td><td>Append, evict, refresh member metrics.</td></tr>
+<tr><td class="sym">_refresh_member_metrics</td><td>Recomputes novelty and qd_score for all members.</td></tr>
+<tr><td class="sym">_knn_novelty_against_peers</td><td>k-NN novelty of one archive member.</td></tr>
+<tr><td class="sym">_compose_qd_score</td><td>Single place computing quality, novelty, penalty.</td></tr>
+<tr><td class="sym">_build_result</td><td>Builds the nine common verdict keys.</td></tr>
+<tr><td class="sym">_log_validation</td><td>One info or warning line per decision.</td></tr>
+<tr><td class="sym">_safe_attr</td><td>getattr with default, None-safe.</td></tr>
+<tr><td class="sym">_mean_reward</td><td>Arithmetic mean of run rewards.</td></tr>
+<tr><td class="sym">_best_reward</td><td>Maximum run reward, 0.0 when empty.</td></tr>
+<tr><td class="sym">_cosine_distance</td><td>1 minus cosine similarity, 1.0 on mismatch.</td></tr>
+<tr><td class="sym">_length_penalty</td><td>Relative excess above baseline, clipped to 1.</td></tr>
+<tr><td class="sym">_genotype_chars</td><td>len(run.code) or 0.</td></tr>
+</tbody>
+</table>
+</div></details>
+
+<p class="note flag">Docstring drift, my reading only: <code>__init__</code> documents <code>min_improvement_threshold</code> as "Minimum relative improvement for greedy mode (5% default)" (L101), while the signature default is <code>0.01</code> (L86) and <a href="../../config.py">config.py:142</a> sets <code>0.01</code>. The 5 % figure appears nowhere in the code path. Not verified by a run.</p>
+<p class="note">Amber, unused and test-only paths: the <code>config</code> argument is stored as <code>self.config</code> (L119) and never read in this file. The pre-computed branch of <code>_extract_behaviour_descriptor</code> (L484) reads <code>run.behaviour_descriptor</code>, but <code>IndividualRun</code> (<a href="../../sources/core/schema.py">schema.py:43–72</a>) has no such field, so at runtime the embedding path at L488 always runs; the injected path is used by <a href="../../tests/selection_test.py">tests/selection_test.py</a> stubs (L49–65).</p>
+<p class="note say">Signature defaults versus wired defaults differ, so the Config values are what count in production: <code>population_size</code> 25 in the signature (L88) against 16 in <a href="../../config.py">config.py:143</a>, <code>novelty_k_neighbours</code> 10 (L89) against 16 (config.py:144), <code>previous_n</code> 5 (L94) against <code>novelty_previous_n</code> 16 (config.py:137). <code>evolution_engine.py:97–106</code> always passes explicit values, and <code>config_default.json</code> repeats the Config numbers.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Consumer</th><th>Site</th><th>What it uses</th></tr></thead>
+<tbody>
+<tr><td class="sym">sources/core/__init__.py</td><td class="sym">L28–32, __all__ L71–73</td><td>Re-exports <code>SelectionPressure</code>, <code>SelectionStrategy</code>, <code>PopulationMember</code>.</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a></td><td class="sym">L39 import, L95–106 constructor</td><td>Builds the one pressure object, passing all ten config fields.</td></tr>
+<tr><td class="sym">evolution_engine.py</td><td class="sym">L563 <code>validate_survivor</code></td><td>Baseline is <code>runs[:-1]</code>, new is the last run.</td></tr>
+<tr><td class="sym">evolution_engine.py</td><td class="sym">L567–575</td><td>Copies the verdict into a <code>SelectionLog</code> (delta_reward, is_validated, confidence).</td></tr>
+<tr><td class="sym">evolution_engine.py</td><td class="sym">L310, L380, L962</td><td>Reads <code>strategy.value</code>, resets <code>_archive = []</code> per task, reads <code>archive</code> for the PCA plot.</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a></td><td class="sym">L9 import, L277–283</td><td>Reads <code>_archive</code>, passes it to <code>select_parents</code> with <code>child_counts</code>.</td></tr>
+<tr><td class="sym">workflow_selection.py</td><td class="sym">L357–362</td><td>Cold start: wraps disk candidates in <code>_WorkflowScoreAdapter</code>, then <code>select_parents</code>.</td></tr>
+<tr><td class="sym">workflow_selection.py</td><td class="sym">L288</td><td><code>isinstance(m, PopulationMember)</code> then <code>m.uuid</code> for rehydration.</td></tr>
+<tr><td class="sym">diversity_experiments/code_reference/selection.py</td><td class="sym">whole file</td><td>A frozen copy of this module; not imported by the package.</td></tr>
+</tbody>
+</table>
+<h3>Tests</h3>
+<table>
+<thead><tr><th>Test</th><th>Line</th><th>Exercises</th></tr></thead>
+<tbody>
+<tr><td class="sym">test_first_run_admitted</td><td class="sym">tests/selection_test.py:67</td><td>Cold start admits the seed member.</td></tr>
+<tr><td class="sym">test_distinct_genotype_embedding_sibling_is_admitted</td><td class="sym">:77</td><td>Novel sibling admitted despite lower reward.</td></tr>
+<tr><td class="sym">test_invalid_candidate_rejected</td><td class="sym">:101</td><td>Refusal path and <code>admit_rejected</code> counter.</td></tr>
+<tr><td class="sym">test_capacity_eviction_keeps_highest_qd</td><td class="sym">:113</td><td>Eviction at <code>population_size</code>.</td></tr>
+<tr><td class="sym">test_length_penalty_reduces_qd_for_bloated_genotype</td><td class="sym">:125</td><td>Length penalty term in qd_score.</td></tr>
+<tr><td class="sym">test_previous_n_mode_uses_recent_window</td><td class="sym">:145</td><td><code>novelty_comparison="previous_n"</code> window.</td></tr>
+<tr><td class="sym">test_cosine_distance_helpers</td><td class="sym">:161</td><td><code>_cosine_distance</code> edge cases.</td></tr>
+<tr><td class="sym">test_qd_quality_uses_capped_reward_not_uncapped</td><td class="sym">:173</td><td>Quality term reads <code>reward</code>, not <code>reward_uncapped</code>.</td></tr>
+</tbody>
+</table>
+<p>The test file loads the module by path with <code>importlib</code> (L19–31) to avoid the <code>litellm</code> and <code>sentence-transformers</code> imports in <code>sources/core/__init__.py</code>, and injects stub descriptors through <code>run.behaviour_descriptor</code> (L49–65). My reading: every test uses <code>strategy="qd"</code>, so <code>_validate_greedy</code> (L297), <code>_validate_tournament</code> (L332), <code>select_parent</code> (L186) and <code>select_parents</code> (L240) have no test in <code>tests/</code>. The smoke block in the module itself (L798–842) covers only the <code>qd</code> path and <code>_length_penalty</code>.</p>
+</div>
+
+<footer>
+<p>Sources: <code>sources/core/selection.py</code> (all 842 lines: module docstring, every constant, class, <code>def</code>, the branching and loop conditions, the smolagent-free <code>__main__</code> block), <code>config.py</code> (selection_strategy L131, novelty_comparison L136, novelty_previous_n L137, length_penalty_baseline_chars L139, length_penalty_lambda L140, min_improvement_threshold L142, population_size L143, novelty_k_neighbours L144, novelty_weight L145, admit_threshold L146, crossover_rate L149), <code>config_default.json</code> (L65–79), <code>sources/core/evolution_engine.py</code> (import L39, constructor L95–106, archive reset L380, <code>validate_survivor</code> call L563–575, log L310, PCA call L949–962, run-metrics keys L1015, <code>_build_qd_archive_entry</code> L1023, append L1078–1081), <code>sources/core/workflow_selection.py</code> (import L9, <code>select_parents</code> calls L279 and L357, <code>PopulationMember</code> check L288), <code>sources/core/code_features.py</code> (L10), <code>sources/core/genotype_embedding.py</code> (model names L35–36, env switch L274, <code>embed_genotype</code> L297), <code>sources/core/schema.py</code> (SelectionLog L25, IndividualRun L43–72), <code>sources/utils/archive_projection.py</code> (name only), <code>tests/selection_test.py</code> (all 220 lines), <code>sources/core/__init__.py</code> (L26–32, __all__), <code>docs/visual_clone/mod_core_selection.html</code> and <code>docs/visual_clone/file_core_planner.html</code> (house style and link convention only). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the internals of <code>sources/core/genotype_embedding.py</code>, <code>sources/utils/archive_projection.py</code> and <code>sources/core/evolution_engine.py</code> (read only for the import and call sites; they have their own pages: <a href="mod_core_selection.html">mod_core_selection.html</a>, <a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a>). The OpenAI embedding branch needs a key, so it was not exercised. <code>diversity_experiments/code_reference/selection.py</code> was only confirmed to be a copy of this file by symbol comparison, not read line by line. <code>experiments_verifiers/results/_e24_venv/</code> matches for the bare word <code>selection</code> are a vendored virtualenv and were ignored. <code>.env</code>, <code>token.json</code> and <code>credentials.json</code> were not opened. No pytest run and no application run, by the build rules; the runtime findings above are my reading of the code text only.</p>
+<p>Written to <code>docs/visual_clone/file_core_selection.html</code>; the digest index links this name from <a href="file_index.html">file_index.html</a> (L95) and <a href="index.html">index.html</a>. Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes; <code>git status --porcelain sources/core/</code> shows no modification under <code>sources/core/</code>, so <code>selection.py</code> matches the commit while other paths in the tree do not.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

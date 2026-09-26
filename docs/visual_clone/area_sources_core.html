@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/core map - Mimosa-AI</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > core">
+<div class="wrap">
+
+<h1 class="hud">sources/core</h1>
+<p class="intro">Twenty files hold the engine that synthesizes, selects and runs workflows. This page maps them; the seven <code>mod_core_*.html</code> pages hold the file cards. Every arrow below is a real import.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>L1 - module map</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 520" role="img" aria-label="Module map of sources/core">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arwP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#B79CFF"/></marker>
+    <marker id="arwS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <a class="box" id="g-plan" href="mod_core_planner.html">
+    <title>Planner drives the engine in goal mode</title>
+    <rect x="20" y="24" width="190" height="54" rx="2" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="115" y="46" text-anchor="middle">planner.py</text>
+    <text class="box-sub" x="115" y="64" text-anchor="middle">goal mode</text>
+  </a>
+
+  <a class="box" id="g-engine" href="mod_core_evolution_engine.html">
+    <title>The engine hub</title>
+    <rect x="20" y="150" width="190" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="115" y="176" text-anchor="middle">evolution_engine.py</text>
+    <text class="box-sub" x="115" y="194" text-anchor="middle">1 109 lines, the hub</text>
+    <text class="box-sub" x="115" y="212" text-anchor="middle">start_workflow_evolution</text>
+  </a>
+
+  <a class="box" id="g-sel" href="mod_core_selection.html">
+    <title>Archive, novelty, parent choice</title>
+    <rect x="330" y="24" width="270" height="68" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="465" y="48" text-anchor="middle">selection group</text>
+    <text class="box-sub" x="465" y="66" text-anchor="middle">selection.py, workflow_selection.py</text>
+    <text class="box-sub" x="465" y="82" text-anchor="middle">select_parent, select_parent_workflows</text>
+  </a>
+
+  <a class="box" id="g-var" href="mod_core_variation.html">
+    <title>Mutation, crossover, embeddings</title>
+    <rect x="330" y="110" width="270" height="68" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="465" y="134" text-anchor="middle">variation group</text>
+    <text class="box-sub" x="465" y="152" text-anchor="middle">variation_engine.py, genotype_embedding.py,</text>
+    <text class="box-sub" x="465" y="168" text-anchor="middle">code_features.py</text>
+  </a>
+
+  <a class="box" id="g-exec" href="mod_core_runner.html">
+    <title>Synthesis and sandboxed execution</title>
+    <rect x="330" y="196" width="270" height="82" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="465" y="220" text-anchor="middle">execution group</text>
+    <text class="box-sub" x="465" y="238" text-anchor="middle">orchestrator.py, workflow_factory.py, factory.py,</text>
+    <text class="box-sub" x="465" y="254" text-anchor="middle">single_agent_factory.py, workflow_runner.py</text>
+    <text class="box-sub" x="465" y="270" text-anchor="middle">orchestrate_workflow</text>
+  </a>
+
+  <a class="box" id="g-book" href="mod_core_lineage.html">
+    <title>Identity and records</title>
+    <rect x="330" y="296" width="270" height="68" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="465" y="320" text-anchor="middle">bookkeeping group</text>
+    <text class="box-sub" x="465" y="338" text-anchor="middle">lineage.py, workflow_info.py, schema.py</text>
+    <text class="box-sub" x="465" y="354" text-anchor="middle">record_lineage, WorkflowInfo</text>
+  </a>
+
+  <a class="box" id="g-io" href="mod_core_tools_llm.html">
+    <title>Model access and MCP tools</title>
+    <rect x="330" y="382" width="270" height="68" rx="2" fill="rgba(60,240,210,0.08)" stroke="#3CF0D2"/>
+    <text class="box-label" x="465" y="406" text-anchor="middle">agents and IO group</text>
+    <text class="box-sub" x="465" y="424" text-anchor="middle">llm_provider.py, tools_manager.py</text>
+    <text class="box-sub" x="465" y="440" text-anchor="middle">LLMProvider, ToolManager</text>
+  </a>
+
+  <g class="box" id="g-out"><title>Everything outside sources/core that it imports</title>
+    <rect x="680" y="110" width="260" height="230" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="810" y="140" text-anchor="middle">outside sources/core</text>
+    <text class="box-sub" x="810" y="164" text-anchor="middle">benchmark_evaluation.scenario_loader</text>
+    <text class="box-sub" x="810" y="184" text-anchor="middle">cli.pretty_print</text>
+    <text class="box-sub" x="810" y="204" text-anchor="middle">evaluators.evaluator</text>
+    <text class="box-sub" x="810" y="224" text-anchor="middle">modules.state_schema</text>
+    <text class="box-sub" x="810" y="244" text-anchor="middle">utils: notify, pricing, run_metrics,</text>
+    <text class="box-sub" x="810" y="262" text-anchor="middle">perspicacite_client, workspace_management</text>
+    <text class="box-sub" x="810" y="282" text-anchor="middle">extensibility.text_to_speech</text>
+    <text class="box-sub" x="810" y="302" text-anchor="middle">transparency.AstraExporter</text>
+    <text class="box-sub" x="810" y="322" text-anchor="middle">langgraph, litellm, pydantic, numpy</text>
+  </g>
+
+  <g class="box" id="g-fail"><title>Deprecated, still imported by the verifier</title>
+    <rect x="330" y="470" width="270" height="40" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="465" y="488" text-anchor="middle" fill="#4F7486">failure_fingerprint.py</text>
+    <text class="box-sub" x="465" y="503" text-anchor="middle">deprecated, written by the verifier</text>
+  </g>
+
+  <path class="edge" data-from="g-plan" data-to="g-engine" d="M115,78 V150" fill="none" stroke="#B79CFF" stroke-width="1.5" marker-end="url(#arwP)"/>
+  <text class="edge-label" x="123" y="118">task</text>
+
+  <path class="edge" data-from="g-engine" data-to="g-sel" d="M210,170 H270 V58 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="222" y="164">pick parents</text>
+  <path class="edge" data-from="g-engine" data-to="g-var" d="M210,190 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="240" y="184">mutate</text>
+  <path class="edge" data-from="g-engine" data-to="g-exec" d="M210,210 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="240" y="226">run round</text>
+  <path class="edge" data-from="g-engine" data-to="g-book" d="M210,230 H270 V330 H330" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arwS)"/>
+  <text class="edge-label" x="222" y="330">record</text>
+  <path class="edge" data-from="g-engine" data-to="g-io" d="M210,122 H300 V416 H330" fill="none" stroke="#3CF0D2" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="308" y="200">prompts + tools</text>
+  <path class="edge dotted-edge" data-from="g-engine" data-to="g-out" d="M210,150 H620 V140 H680" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arwS)"/>
+  <text class="edge-label" x="430" y="132">imports 11 modules</text>
+
+  <path class="edge" data-from="g-sel" data-to="g-var" d="M465,92 V110" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="472" y="106">genotype_embedding_descriptor</text>
+  <path class="edge" data-from="g-exec" data-to="g-out" d="M600,236 H680" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arwS)"/>
+  <path class="edge" data-from="g-io" data-to="g-out" d="M600,416 H640 V300 H680" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arwS)"/>
+  <path class="edge dashed-edge" data-from="g-out" data-to="g-fail" d="M680,340 H620 V490 H600" fill="none" stroke="#4F7486" stroke-width="1.25" marker-end="url(#arwS)"/>
+  <text class="edge-label" x="620" y="470">writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - eleven import edges out of the 20-file folder, grouped. Import lines: <code class="path">evolution_engine.py:36-42</code>, <code class="path">orchestrator.py:18-20</code>, <code class="path">planner.py:31-34</code>, <code class="path">selection.py:22</code>, <code class="path">code_features.py:7</code>, <code class="path">workflow_factory.py:12-16</code>, <code class="path">workflow_selection.py:9-11</code>, <code class="path">factory.py:13</code>, <code class="path">single_agent_factory.py:11-12</code>, <code class="path">variation_engine.py:12-14</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>All twenty files</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a></td><td>Runs the per-task generation loop.</td><td class="size">1 109</td><td class="sym">EvolutionEngine.start_workflow_evolution, evolve_generation</td></tr>
+<tr><td class="sym"><a href="../../sources/core/selection.py">selection.py</a></td><td>Scores candidates and picks parents.</td><td class="size">842</td><td class="sym">SelectionPressure, SelectionStrategy, select_parent</td></tr>
+<tr><td class="sym"><a href="../../sources/core/planner.py">planner.py</a></td><td>Turns a goal into an ordered task list.</td><td class="size">1 053</td><td class="sym">Planner, Plan, PlanStep</td></tr>
+<tr><td class="sym"><a href="../../sources/core/tools_manager.py">tools_manager.py</a></td><td>Finds MCP servers and their tools.</td><td class="size">679</td><td class="sym">ToolManager, MCP, Tool, normalize_mcp_endpoint</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_runner.py">workflow_runner.py</a></td><td>Runs one workflow as a subprocess.</td><td class="size">650</td><td class="sym">WorkflowRunner, ExecutionResult, RuntimeConfig</td></tr>
+<tr><td class="sym"><a href="../../sources/core/llm_provider.py">llm_provider.py</a></td><td>Wraps litellm calls, retries and cost.</td><td class="size">643</td><td class="sym">LLMProvider, LLMConfig</td></tr>
+<tr><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a></td><td>Mutates or crosses genotypes with the LLM.</td><td class="size">609</td><td class="sym">VariationEngine, seed_genome_prompt</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_factory.py">workflow_factory.py</a></td><td>Builds the workflow source and its state graph.</td><td class="size">514</td><td class="sym">WorkflowFactory</td></tr>
+<tr><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a></td><td>Grounds, generates and runs one round.</td><td class="size">427</td><td class="sym">WorkflowOrchestrator.orchestrate_workflow</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a></td><td>Reads past workflows and offers parents.</td><td class="size">396</td><td class="sym">WorkflowSelector.select_parent_workflows</td></tr>
+<tr><td class="sym"><a href="../../sources/core/genotype_embedding.py">genotype_embedding.py</a></td><td>Embeds workflow code for novelty.</td><td class="size">329</td><td class="sym">GenotypeEmbedder, embed_genotype, load_sentence_transformer</td></tr>
+<tr><td class="sym"><a href="../../sources/core/single_agent_factory.py">single_agent_factory.py</a></td><td>Builds the one-agent baseline.</td><td class="size">315</td><td class="sym">SingleAgentFactory</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_info.py">workflow_info.py</a></td><td>Carries one workflow's identity and score.</td><td class="size">271</td><td class="sym">WorkflowInfo</td></tr>
+<tr><td class="sym"><a href="../../sources/core/factory.py">factory.py</a></td><td>Shared base: prompts, files, tools.</td><td class="size">207</td><td class="sym">Factory</td></tr>
+<tr><td class="sym"><a href="../../sources/core/failure_fingerprint.py">failure_fingerprint.py</a></td><td>Deprecated. Builds a failure vector from results.</td><td class="size">195</td><td class="sym">compute_failure_fingerprint</td></tr>
+<tr><td class="sym"><a href="../../sources/core/lineage.py">lineage.py</a></td><td>Writes and reads parent records.</td><td class="size">173</td><td class="sym">record_lineage, load_lineage, scan_all</td></tr>
+<tr><td class="sym"><a href="../../sources/core/schema.py">schema.py</a></td><td>Dataclasses shared with runners and the planner.</td><td class="size">163</td><td class="sym">Plan, PlanStep, Task, IndividualRun, SelectionLog</td></tr>
+<tr><td class="sym"><a href="../../sources/core/__init__.py">__init__.py</a></td><td>Re-exports only.</td><td class="size">77</td><td class="sym">-</td></tr>
+<tr><td class="sym"><a href="../../sources/core/code_features.py">code_features.py</a></td><td>One descriptor vector per genotype.</td><td class="size">37</td><td class="sym">genotype_embedding_descriptor</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a> (2)</td><td>Also rehydrates workflow info from disk.</td><td class="size">396</td><td class="sym">_rehydrate_workflow_info</td></tr>
+</tbody>
+</table>
+<p class="note say">Nineteen modules, <code>__init__.py</code> included; <code>__pycache__/</code> is not counted. <code>failure_fingerprint.py</code> says deprecated in its own docstring, but <a href="../../sources/evaluators/verifier.py">sources/evaluators/verifier.py:32</a> still imports it.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Where the detail lives</h2>
+<table>
+<thead><tr><th>Page</th><th>Covers</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a></td><td>evolution_engine.py, code_features.py, failure_fingerprint.py, orchestrator.py</td></tr>
+<tr><td class="sym"><a href="mod_core_selection.html">mod_core_selection.html</a></td><td>selection.py, workflow_selection.py</td></tr>
+<tr><td class="sym"><a href="mod_core_variation.html">mod_core_variation.html</a></td><td>variation_engine.py, genotype_embedding.py, code_features.py</td></tr>
+<tr><td class="sym"><a href="mod_core_lineage.html">mod_core_lineage.html</a></td><td>lineage.py, workflow_info.py, schema.py</td></tr>
+<tr><td class="sym"><a href="mod_core_runner.html">mod_core_runner.html</a></td><td>workflow_runner.py, workflow_factory.py, factory.py, single_agent_factory.py, orchestrator.py</td></tr>
+<tr><td class="sym"><a href="mod_core_planner.html">mod_core_planner.html</a></td><td>planner.py</td></tr>
+<tr><td class="sym"><a href="mod_core_tools_llm.html">mod_core_tools_llm.html</a></td><td>tools_manager.py, llm_provider.py</td></tr>
+<tr><td class="sym"><a href="flow_task_run.html">flow_task_run.html</a></td><td>the calls in time order</td></tr>
+<tr><td class="sym"><a href="flow_evolution_loop.html">flow_evolution_loop.html</a></td><td>the loop across generations</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/core/*.py</code> (import lines, <code>wc -l</code>, top-level <code>class</code>/<code>def</code>), <code class="path">sources/evaluators/verifier.py</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/core/__pycache__/</code> (bytecode); method bodies (owned by the seven L2 pages); the <code>__main__</code> smoke blocks. First write of this page failed inside the coordinator's worker, so the coordinator wrote it directly from the same evidence.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

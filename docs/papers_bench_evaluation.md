@@ -7,7 +7,7 @@
     reproduction outputs using its own scaffolded judge and runtime.
 
     The Mimosa-internal verifier ([Evaluation pipeline](concepts/evaluation-pipeline.md))
-    runs *during* workflow evolution, produces the prompt gradient that
+    runs *during* workflow evolution, produces the textual gradient that
     drives the mutator, and is separate from PaperBench. When you run
     PaperBench on a Mimosa capsule, you are sending an artefact that
     Mimosa's evolution loop produced into a grading system Mimosa has

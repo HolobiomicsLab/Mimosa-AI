@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>run_e1.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; run_e1.py">
+<div class="wrap">
+
+<h1 class="hud">run_e1.py</h1>
+<p class="intro">This is the E1 rubric-surgery runner: it re-reads the frozen claim parse, re-scores the 607 examples under aggregation variants, measures every variant with <a href="file_harness_metrics.html">metrics.py</a>, and writes one dated JSON. It runs on demand, never on import, through <code>uv run python -m experiments_verifiers.harness.run_e1</code> (L7). E1 touches no artifacts, so it ships no sabotage control (L447).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; frozen claims in, variant scores measured, one JSON out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 470" role="img" aria-label="run_e1.py: frozen claim parse feeds variant scores, each variant is measured, gated and written to one dated JSON">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="rIn">
+    <title>Frozen inputs: data/verifier_claims.jsonl and manifest.json, read only</title>
+    <rect x="20" y="30" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="58" text-anchor="middle">frozen inputs</text>
+    <text class="box-sub" x="120" y="76" text-anchor="middle">verifier_claims.jsonl L44</text>
+    <text class="box-sub" x="120" y="94" text-anchor="middle">manifest.json L54</text>
+  </g>
+
+  <a class="box" id="rLoad" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>load_examples L42: parse jsonl, drop its reward, merge the manifest copy</title>
+    <rect x="260" y="30" width="200" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="360" y="58" text-anchor="middle">load_examples</text>
+    <text class="box-sub" x="360" y="76" text-anchor="middle">drop reward, merge L53&#8211;L61</text>
+    <text class="box-sub" x="360" y="94" text-anchor="middle">one row per example</text>
+  </a>
+
+  <g class="box" id="rAgg">
+    <title>scorers/e1_aggregators: claim_group_features L366 and score_all_variants L85</title>
+    <rect x="500" y="30" width="230" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="615" y="58" text-anchor="middle">e1_aggregators</text>
+    <text class="box-sub" x="615" y="76" text-anchor="middle">imported L31 &#183; other file</text>
+    <text class="box-sub" x="615" y="94" text-anchor="middle">feature dict + static scores</text>
+  </g>
+
+  <g class="box" id="rExt">
+    <title>metrics.py supplies every measurement used below</title>
+    <rect x="770" y="30" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="870" y="58" text-anchor="middle">metrics.py</text>
+    <text class="box-sub" x="870" y="76" text-anchor="middle">imported as M L36</text>
+    <text class="box-sub" x="870" y="94" text-anchor="middle">auc, tau, CI, McNemar</text>
+  </g>
+
+  <a class="box" id="rStatic" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>variant_scores_static L83 wraps score_all_variants; None becomes NaN</title>
+    <rect x="20" y="160" width="210" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="125" y="188" text-anchor="middle">variant_scores_static</text>
+    <text class="box-sub" x="125" y="206" text-anchor="middle">static variants L83</text>
+    <text class="box-sub" x="125" y="224" text-anchor="middle">None &#8594; NaN L87</text>
+  </a>
+
+  <a class="box" id="rLoto" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>fit_loto L65 with a logistic-regression pipeline L372 and a GBM L380</title>
+    <rect x="260" y="160" width="230" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="188" text-anchor="middle">fit_loto</text>
+    <text class="box-sub" x="375" y="206" text-anchor="middle">logreg L372 &#183; gbm L380</text>
+    <text class="box-sub" x="375" y="224" text-anchor="middle">one score per example L65</text>
+  </a>
+
+  <a class="box" id="rMetrics" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>full_metrics L166 per variant, inside the loop at L464</title>
+    <rect x="520" y="160" width="230" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="635" y="188" text-anchor="middle">full_metrics</text>
+    <text class="box-sub" x="635" y="206" text-anchor="middle">AUC, Brier, tau, WTR L166</text>
+    <text class="box-sub" x="635" y="224" text-anchor="middle">loop at L464</text>
+  </a>
+
+  <a class="box" id="rFold" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>per_fold_stats L91: per held-out task tau and top-quartile tau</title>
+    <rect x="780" y="160" width="220" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="890" y="188" text-anchor="middle">per_fold_stats</text>
+    <text class="box-sub" x="890" y="206" text-anchor="middle">fold tau + q75 cut L91</text>
+    <text class="box-sub" x="890" y="224" text-anchor="middle">fold details kept</text>
+  </a>
+
+  <a class="box" id="rMcn" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>mcnemar_vs_baseline L199: median split per task, exact test against v0</title>
+    <rect x="20" y="300" width="230" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="328" text-anchor="middle">mcnemar_vs_baseline</text>
+    <text class="box-sub" x="135" y="346" text-anchor="middle">median split L211</text>
+    <text class="box-sub" x="135" y="364" text-anchor="middle">vs v0_recomputed L468</text>
+  </a>
+
+  <a class="box" id="rGate" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>Paired AUC bootstrap L473 and the success gate at L482</title>
+    <rect x="280" y="300" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400" y="328" text-anchor="middle">paired AUC diff + gate</text>
+    <text class="box-sub" x="400" y="346" text-anchor="middle">bootstrap L473</text>
+    <text class="box-sub" x="400" y="364" text-anchor="middle">gate_pass rule L499&#8211;L507</text>
+  </a>
+
+  <a class="box" id="rExtra" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>_additional_analyses L311 and its five sub-analyses</title>
+    <rect x="560" y="300" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="680" y="328" text-anchor="middle">_additional_analyses</text>
+    <text class="box-sub" x="680" y="346" text-anchor="middle">per campaign L220</text>
+    <text class="box-sub" x="680" y="364" text-anchor="middle">cap plateau L242 &#183; WTR L266</text>
+  </a>
+
+  <g class="box" id="rOut">
+    <title>writes results/E1_rubric_surgery_&lt;date&gt;.json at L530-L536</title>
+    <rect x="840" y="300" width="230" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="955" y="328" text-anchor="middle">results JSON</text>
+    <text class="box-sub" x="955" y="346" text-anchor="middle">E1_rubric_surgery_&lt;date&gt;</text>
+    <text class="box-sub" x="955" y="364" text-anchor="middle">written L530&#8211;L536</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="rIn" data-to="rLoad" d="M220,68 H260" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="240" y="60" text-anchor="middle">reads</text>
+  <path class="edge" data-from="rLoad" data-to="rAgg" d="M460,68 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="60" text-anchor="middle">records</text>
+  <path class="edge" data-from="rAgg" data-to="rStatic" d="M615,106 C615,130 125,130 125,160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="150" text-anchor="middle">score_all_variants L85</text>
+  <path class="edge" data-from="rAgg" data-to="rLoto" d="M615,106 C615,135 375,135 375,160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="128" text-anchor="middle">features L366</text>
+  <path class="edge" data-from="rStatic" data-to="rMetrics" d="M230,198 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="375" y="190" text-anchor="middle">static scores</text>
+  <path class="edge" data-from="rLoto" data-to="rMetrics" d="M490,198 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="505" y="215" text-anchor="middle">fitted</text>
+  <path class="edge" data-from="rMetrics" data-to="rFold" d="M750,198 H780" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="765" y="190" text-anchor="middle">vector</text>
+  <path class="edge" data-from="rMetrics" data-to="rMcn" d="M635,236 C635,270 135,270 135,300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="380" y="262" text-anchor="middle">score vector L468</text>
+  <path class="edge" data-from="rMetrics" data-to="rGate" d="M600,236 C560,270 400,270 400,300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="288" text-anchor="middle">all_scores L474</text>
+  <path class="edge" data-from="rFold" data-to="rGate" d="M890,236 C890,278 520,262 520,300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="258" text-anchor="middle">fold fractions L484</text>
+  <path class="edge" data-from="rMetrics" data-to="rExtra" d="M665,236 C700,262 680,272 680,300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="722" y="286" text-anchor="middle">per_example L528</text>
+  <path class="edge dashed-edge" data-from="rGate" data-to="rOut" d="M520,338 H840" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="680" y="330" text-anchor="middle">gate rows</text>
+  <path class="edge dashed-edge" data-from="rExtra" data-to="rOut" d="M800,338 H840" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="rExt" data-to="rMetrics" d="M870,106 V160" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="905" y="140" text-anchor="middle">M.* calls</text>
+
+  <text class="box-sub" x="20" y="445">solid = call  |  dashed = reads / writes  |  dotted = import only  |  max 12 boxes per diagram</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; order of work in <code>main()</code> L364: load, features, variants, then one measurement pass per variant L464, then the gate L482 and the extra analyses L528, then the single write L530.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: two frozen files in, one dated JSON out, console digest</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 320" role="img" aria-label="run_e1.py data flow: reads verifier_claims.jsonl and manifest.json, writes results/E1_rubric_surgery_date.json and prints a digest">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="f1" href="../../experiments_verifiers/data/verifier_claims.jsonl">
+    <title>Frozen claim parse, one JSON object per line, read at L44</title>
+    <rect x="20" y="30" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="60" text-anchor="middle">data/verifier_claims.jsonl</text>
+    <text class="box-sub" x="135" y="78" text-anchor="middle">read L44, 607 rows</text>
+  </a>
+
+  <a class="box" id="f2" href="../../experiments_verifiers/manifest.json">
+    <title>Manifest rows supply reward and CBS, merged at L56-L61</title>
+    <rect x="20" y="180" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="210" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="135" y="228" text-anchor="middle">reward, CBS &#183; read L54</text>
+  </a>
+
+  <a class="box" id="fmid" href="../../experiments_verifiers/harness/run_e1.py">
+    <title>main L364: variant vectors, metrics, gate, per-example block</title>
+    <rect x="320" y="90" width="260" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="122" text-anchor="middle">main() L364</text>
+    <text class="box-sub" x="450" y="142" text-anchor="middle">SEED 7 &#183; N_BOOT 1000 L38</text>
+    <text class="box-sub" x="450" y="160" text-anchor="middle">no config field read</text>
+    <text class="box-sub" x="450" y="178" text-anchor="middle">returns None L364</text>
+  </a>
+
+  <g class="box" id="f3">
+    <title>Only file written: results/E1_rubric_surgery_&lt;YYYYMMDD&gt;.json</title>
+    <rect x="660" y="30" width="340" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="830" y="60" text-anchor="middle">results/E1_rubric_surgery_&lt;date&gt;.json</text>
+    <text class="box-sub" x="830" y="78" text-anchor="middle">json.dump indent 1 &#183; L530&#8211;L536</text>
+  </g>
+
+  <g class="box" id="f4">
+    <title>Console digest of two variant metric blocks, L537-L539</title>
+    <rect x="660" y="180" width="340" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="830" y="210" text-anchor="middle">stdout digest</text>
+    <text class="box-sub" x="830" y="228" text-anchor="middle">v0 and fitted_group_lr_loto L537</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="f1" data-to="fmid" d="M250,65 H320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="285" y="56" text-anchor="middle">claims</text>
+  <path class="edge dashed-edge" data-from="f2" data-to="fmid" d="M250,215 H320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="285" y="206" text-anchor="middle">reward, CBS</text>
+  <path class="edge dashed-edge" data-from="fmid" data-to="f3" d="M580,125 C620,125 620,65 660,65" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="620" y="108" text-anchor="middle">results dict</text>
+  <path class="edge dashed-edge" data-from="fmid" data-to="f4" d="M580,165 C620,165 620,215 660,215" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="620" y="205" text-anchor="middle">two prints</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; both inputs are opened read-only; the docstring says "Frozen inputs are only ever read" L5. Config keys read: none. State keys read: none.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the four decision rules that shape the output</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1060 400" role="img" aria-label="run_e1.py decision rules: leave-one-task-out fallback, per-fold threshold, neutral fill, family median split, success gate">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="q1">
+    <title>fit_loto L71: one task held out at a time</title>
+    <rect x="20" y="30" width="230" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="58" text-anchor="middle">training fold: 2 classes?</text>
+    <text class="box-sub" x="135" y="76" text-anchor="middle">fit_loto L73</text>
+  </g>
+  <g class="box" id="q1n">
+    <title>Single-class training fold falls back to the training mean</title>
+    <rect x="330" y="30" width="250" height="64" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="455" y="58" text-anchor="middle">predict the training mean</text>
+    <text class="box-sub" x="455" y="76" text-anchor="middle">no model fitted &#183; L74</text>
+  </g>
+  <path class="edge" data-from="q1" data-to="q1n" d="M250,62 H330" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="290" y="54" text-anchor="middle">no</text>
+
+  <g class="box" id="q1y">
+    <title>Otherwise the builder is fitted and predict_proba[:,1] is stored</title>
+    <rect x="330" y="120" width="250" height="64" rx="2" fill="none" stroke="#39FF88"/>
+    <text class="box-label" x="455" y="148" text-anchor="middle">fit, then predict_proba</text>
+    <text class="box-sub" x="455" y="166" text-anchor="middle">held-out score &#183; L77&#8211;L78</text>
+  </g>
+  <path class="edge" data-from="q1" data-to="q1y" d="M135,94 C135,160 240,152 330,152" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="240" y="130" text-anchor="middle">yes</text>
+
+  <g class="box" id="q2">
+    <title>per_fold_stats L108: fold cut from the other tasks</title>
+    <rect x="20" y="220" width="230" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="248" text-anchor="middle">other tasks &#8805; 4 rows?</text>
+    <text class="box-sub" x="135" y="266" text-anchor="middle">per_fold_stats L108</text>
+  </g>
+  <g class="box" id="q2y">
+    <title>Threshold is q75 of the other tasks' scores; leakage-free</title>
+    <rect x="330" y="220" width="250" height="64" rx="2" fill="none" stroke="#39FF88"/>
+    <text class="box-label" x="455" y="248" text-anchor="middle">thr = q75 of other tasks</text>
+    <text class="box-sub" x="455" y="266" text-anchor="middle">passed as threshold &#183; L108&#8211;L109</text>
+  </g>
+  <g class="box" id="q2n">
+    <title>No cut means tau_top_quartile falls back to the fold's own q75</title>
+    <rect x="330" y="310" width="250" height="64" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="455" y="338" text-anchor="middle">threshold None</text>
+    <text class="box-sub" x="455" y="356" text-anchor="middle">metric uses q75 &#183; metrics L55</text>
+  </g>
+  <path class="edge" data-from="q2" data-to="q2y" d="M250,252 H330" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="290" y="244" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q2" data-to="q2n" d="M135,284 C135,342 240,342 330,342" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="240" y="322" text-anchor="middle">no</text>
+
+  <g class="box" id="q3">
+    <title>mcnemar_vs_baseline L211: family median split</title>
+    <rect x="650" y="30" width="230" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="765" y="58" text-anchor="middle">score &#8805; task median?</text>
+    <text class="box-sub" x="765" y="76" text-anchor="middle">per-example prediction L212</text>
+  </g>
+  <g class="box" id="q3y">
+    <title>Positive prediction feeds the exact McNemar test</title>
+    <rect x="650" y="130" width="230" height="64" rx="2" fill="none" stroke="#39FF88"/>
+    <text class="box-label" x="765" y="158" text-anchor="middle">predict SR=1</text>
+    <text class="box-sub" x="765" y="176" text-anchor="middle">else SR=0 &#183; L212</text>
+  </g>
+  <path class="edge" data-from="q3" data-to="q3y" d="M765,94 V130" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="790" y="116" text-anchor="middle">yes</text>
+
+  <g class="box" id="q4">
+    <title>Success gate L499-L507</title>
+    <rect x="650" y="230" width="230" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="765" y="258" text-anchor="middle">auc_sr &#8805; v0 + 0.05?</text>
+    <text class="box-sub" x="765" y="276" text-anchor="middle">gate L502</text>
+  </g>
+  <g class="box" id="q4n">
+    <title>Both AUC and fold-minority conditions must hold</title>
+    <rect x="650" y="320" width="230" height="64" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="765" y="348" text-anchor="middle">gate_pass false</text>
+    <text class="box-sub" x="765" y="366" text-anchor="middle">also needs 0.5 of folds L503</text>
+  </g>
+  <path class="edge" data-from="q4" data-to="q4n" d="M765,294 V320" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="790" y="312" text-anchor="middle">no</text>
+
+  <text class="box-sub" x="20" y="392">green = the path that continues, red = fallback or fail. The gate also needs a positive top-quartile tau in half the folds L503&#8211;L506.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; four rules carry the result: the leave-one-task-out fallback L73, the leakage-free fold cut L108, the per-task median split L211 and the two-part gate L499. Rows with no claim-group features are neutral-filled with zeros L392&#8211;L395 and counted in <code>n_examples_without_group_features</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">verifier_claims.jsonl</td><td>file, <code>data/</code> under the package dir</td><td>the 607-example claim parse</td><td class="size">L44</td></tr>
+<tr><td>reads</td><td class="sym">manifest.json</td><td>file, package dir</td><td>single source of reward and CBS</td><td class="size">L54</td></tr>
+<tr><td>reads</td><td class="sym">claims</td><td>row field from the jsonl</td><td>claim-group features</td><td class="size">L366</td></tr>
+<tr><td>reads</td><td class="sym">SR, VER, task, campaign, uuid</td><td>row fields</td><td>labels, clusters and grouping</td><td class="size">L413 L415 L515</td></tr>
+<tr><td>reads</td><td class="sym">snapshot manifest reward</td><td>merged column</td><td>baseline metrics, McNemar vs manifest</td><td class="size">L411 L319</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no Config object, no env var</td><td>constants SEED 7 and N_BOOT 1000 instead</td><td class="size">L38 L39</td></tr>
+<tr><td>writes</td><td class="sym">E1_rubric_surgery_&lt;date&gt;.json</td><td><code>experiments_verifiers/results/</code></td><td>the full result record, indent 1</td><td class="size">L530&#8211;L536</td></tr>
+<tr><td>writes</td><td class="sym">stdout digest</td><td>console</td><td>two metric blocks</td><td class="size">L537&#8211;L539</td></tr>
+<tr><td>writes</td><td class="sym">nothing to inputs</td><td>inputs opened read-only</td><td>the parse is frozen by design</td><td class="size">L44 L54</td></tr>
+</tbody>
+</table>
+<p class="note flag">Mismatch: the docstring says the run writes "results/E1_rubric_surgery_&lt;date&gt;.json plus a markdown summary" (L5&#8211;L6), but <code>main()</code> writes the JSON only (L530&#8211;L536). The on-disk <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.md</code> exists, yet grep over <code>experiments_verifiers/*.py</code> finds no writer for that path in this commit.</p>
+<p class="note">Stale reference: the docstring points at <code class="path">experiments_verifiers/EXPERIMENTS_PLAN.md</code> (L1). That file is not on disk (the package holds <code>EXPERIMENTS.md</code> instead). <code class="path">REPO</code> is computed at L28 and never used afterwards (grep).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>12 functions, no class &mdash; signatures and roles</summary><div class="dbody">
+<pre>load_examples() -&gt; pd.DataFrame                                        L42   parse claims, merge manifest
+fit_loto(df, model_builder, feat_names) -&gt; np.ndarray                  L65   leave-one-task-out scores
+variant_scores_static(df) -&gt; dict[str, np.ndarray]                     L83   score_all_variants wrapper
+per_fold_stats(scores, df) -&gt; dict                                     L91   fold tau and fold cut
+full_metrics(scores, df, with_ci=False) -&gt; dict                        L166  section-0 metrics per variant
+mcnemar_vs_baseline(scores_v, scores_b, df) -&gt; dict                    L199  exact test vs v0_recomputed
+_per_campaign(pe, col) -&gt; list[dict]                                   L220  per-campaign AUC and tau
+_cap_plateau_analysis(pe) -&gt; dict                                      L242  the 0.89-cap plateau check
+_wtr_task_level(pe, col) -&gt; dict                                       L266  task-level win-rate test
+_mcn_vs_manifest(pe, col) -&gt; dict                                      L287  McNemar vs recorded reward
+_additional_analyses(pe) -&gt; dict                                       L311  bundles the five extra analyses
+main() -&gt; None                                                         L364  the run: read, measure, write</pre>
+<p>Nested builders inside <code>main</code>: <code>logreg()</code> L372 (Pipeline of StandardScaler + LogisticRegression, C=1.0), <code>gbm()</code> L380 (HistGradientBoostingClassifier, max_depth 3, max_iter 150), and the inner <code>preds(scores)</code> L203 in <code>mcnemar_vs_baseline</code>. Module constants: <code>HERE</code> L26, <code>EXP</code> L27, <code>REPO</code> L28 (unused), <code>SEED = 7</code> L38, <code>N_BOOT = 1000</code> L39. Imports: <code>json</code>, <code>os</code>, <code>sys</code>, <code>date</code> L12&#8211;L15; <code>numpy</code> L17, <code>pandas</code> L18, <code>scipy.stats as st</code> L19; sklearn <code>HistGradientBoostingClassifier</code>, <code>LogisticRegression</code>, <code>roc_auc_score</code>, <code>Pipeline</code>, <code>StandardScaler</code> L20&#8211;L24; harness pieces L31&#8211;L36.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">nothing</td><td>no importer found; grep finds only its own docstring</td><td class="sym">L7</td></tr>
+<tr><td class="sym"><a href="exp_run_e1.html">exp_run_e1.html</a></td><td>the experiment page for E1; its recorded output is the 2026-09-21 JSON</td><td class="sym">page scope</td></tr>
+<tr><td class="sym">README</td><td><code class="path">experiments_verifiers/README.md</code> L124 lists it under "E1 rubric-surgery rescorers"</td><td class="sym">L124</td></tr>
+</tbody>
+</table>
+<p>Functions called from outside: none, because the file is a runner. Pressed from the command line as <code>python -m experiments_verifiers.harness.run_e1</code>, which reaches <code>main()</code> through the guard at L542&#8211;L543. Internally, <code>main</code> calls <code>load_examples</code> L365, <code>variant_scores_static</code> L369, <code>fit_loto</code> L397&#8211;L398, <code>full_metrics</code> L465, <code>per_fold_stats</code> L466, <code>mcnemar_vs_baseline</code> L468, the five private analyses through <code>_additional_analyses</code> L528, and <code>M.*</code> from <a href="file_harness_metrics.html">metrics.py</a>.</p>
+<p>Tests: <code>no test found</code>. A grep of <code>tests/</code> for <code>run_e1</code>, <code>harness.metrics</code> and <code>task_cluster_bootstrap_ci</code> returns nothing.</p>
+</div>
+
+<footer>
+<p>See also: the <a href="file_index.html">file digest index</a>, <a href="exp_run_e1.html">exp_run_e1.html</a>, the <a href="exp_index.html">harness experiment index</a>, and <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/run_e1.py</code> (543 lines, whole file), <code class="path">experiments_verifiers/harness/metrics.py</code> (177 lines, call sites only), <code class="path">experiments_verifiers/README.md</code> L124, <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.md</code> header lines 1&#8211;5 and L117&#8211;L118, <code class="path">experiments_verifiers/scorers/e1_aggregators.py</code> (import line only), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>, plus greps for importers and for <code class="path">tests/</code> coverage.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> and repo <code class="path">.env</code> (never opened, secrets); <code class="path">scorers/e1_aggregators.py</code> bodies (a different file, and the 11 variant names are cited from run_e1 L452&#8211;L463 instead); <code class="path">results/E1_rubric_surgery_20260921.json</code> values (recorded numbers belong to the E1 experiment page); the remaining 49 <code class="path">experiments_verifiers/harness/*.py</code> scripts (grep shows no import edge); <code class="path">sources/**</code> and <code class="path">datasets/**</code> (grep shows no importer, and E1 reads no dataset); <code class="path">EXPERIMENTS_PLAN.md</code> (cited by L1, absent from disk); compiled <code class="path">__pycache__</code>. The runner was not executed, and no pytest ran.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

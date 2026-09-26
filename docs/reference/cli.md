@@ -56,6 +56,12 @@ These override values from `--config`'s JSON or the defaults in
 | `--pushover_token <token>` | `config.pushover_token`. |
 | `--pushover_user <user>` | `config.pushover_user`. |
 | `--max_evolve_iterations N` | `config.max_learning_evolve_iterations`. |
+| `--verifier_kind <kind>` | `config.verifier_kind` (`hybrid` \| `legacy`). |
+| `--hybrid_verifier_num_claims <n>` | `config.hybrid_verifier_num_claims`. |
+| `--hybrid_verifier_refinement_rounds <n>` | `config.hybrid_verifier_refinement_rounds`. |
+| `--hybrid_verifier_scorer_timeout_s <s>` | `config.hybrid_verifier_scorer_timeout_s`. |
+| `--hybrid_verifier_pairwise_mode <mode>` | `config.hybrid_verifier_pairwise_mode`. |
+| `--hybrid_verifier_digest_max_files <n>` | `config.hybrid_verifier_digest_max_files`. |
 
 ## Examples
 

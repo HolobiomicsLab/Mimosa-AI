@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e16_gradient_audit - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e16_gradient_audit">
+<div class="wrap">
+
+<h1 class="hud">e16_gradient_audit &mdash; does the gradient point at gold?</h1>
+<p class="intro">E16 asked one question: when the verifier writes a textual gradient for generation N, does that feedback point at the properties the benchmark's gold program measures? It built a population of 577 gradient-bearing generations and validated a judge instrument against mutated controls. It then measured alignment on 565 gradients and the correlations with reward and SR; the reward line itself is scored by the <a href="mod_evaluators_hybrid_verifier.html">hybrid verifier</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 460" role="img" aria-label="E16 design: hypothesis, inputs, stages, artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bH">
+    <title>Hypothesis under test</title>
+    <rect x="20" y="20" width="210" height="52" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="42" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="125" y="58" text-anchor="middle">feedback points at gold</text>
+  </g>
+
+  <g class="box" id="bI1">
+    <title>Frozen labels and per-task run notes</title>
+    <rect x="20" y="110" width="210" height="60" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="130" text-anchor="middle">sane labels + run notes</text>
+    <text class="box-sub" x="125" y="146" text-anchor="middle">verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="125" y="160" text-anchor="middle">manifest_run_notes.json</text>
+  </g>
+
+  <g class="box" id="bI2">
+    <title>Gradients on disk plus the gold yardstick</title>
+    <rect x="20" y="210" width="210" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="230" text-anchor="middle">gradients + gold</text>
+    <text class="box-sub" x="125" y="246" text-anchor="middle">textual_gradient.txt</text>
+    <text class="box-sub" x="125" y="262" text-anchor="middle">gold_programs, scoring_rubrics</text>
+  </g>
+
+  <g class="box" id="bS1">
+    <title>build_population() walks run notes and disk dirs</title>
+    <rect x="270" y="20" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="42" text-anchor="middle">build_population()</text>
+    <text class="box-sub" x="375" y="58" text-anchor="middle">phase 0 &#183; tiers A/B</text>
+  </g>
+
+  <g class="box" id="bS2">
+    <title>judge_item() sends one judge call per gradient</title>
+    <rect x="270" y="110" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="132" text-anchor="middle">judge_item()</text>
+    <text class="box-sub" x="375" y="148" text-anchor="middle">one judge call, JSON</text>
+  </g>
+
+  <g class="box" id="bS3">
+    <title>mutate_gradient() builds the controls, _compute_gates() scores them</title>
+    <rect x="270" y="200" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="222" text-anchor="middle">mutate_gradient()</text>
+    <text class="box-sub" x="375" y="238" text-anchor="middle">+ _compute_gates()</text>
+  </g>
+
+  <g class="box" id="bS4">
+    <title>stage_full() judges every population gradient, _baseline() aggregates</title>
+    <rect x="270" y="290" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="312" text-anchor="middle">stage_full()</text>
+    <text class="box-sub" x="375" y="328" text-anchor="middle">&#8594; _baseline() phase 2</text>
+  </g>
+
+  <g class="box" id="bS5">
+    <title>stage_report() renders the numbers, _write_md() writes the markdown</title>
+    <rect x="270" y="380" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="402" text-anchor="middle">stage_report()</text>
+    <text class="box-sub" x="375" y="418" text-anchor="middle">&#8594; _write_md()</text>
+  </g>
+
+  <g class="box" id="bM">
+    <title>parse_judgment() reduces each call to three fields</title>
+    <rect x="530" y="290" width="170" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="615" y="310" text-anchor="middle">parse_judgment()</text>
+    <text class="box-sub" x="615" y="326" text-anchor="middle">gold_relevance</text>
+    <text class="box-sub" x="615" y="340" text-anchor="middle">direction, hallucination</text>
+  </g>
+
+  <a class="box" id="bA2" href="../../experiments_verifiers/results/_e16_population.json">
+    <title>Population and phase-1 gate intermediates</title>
+    <rect x="730" y="20" width="160" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="40" text-anchor="middle">_e16_population.json</text>
+    <text class="box-sub" x="810" y="56" text-anchor="middle">_e16_phase1.json</text>
+    <text class="box-sub" x="810" y="70" text-anchor="middle">_e16_phase2.json</text>
+  </a>
+
+  <a class="box" id="bA3" href="../../experiments_verifiers/results/_e16_judge_cache.jsonl">
+    <title>Judge cache, one JSON line per unique call</title>
+    <rect x="730" y="110" width="160" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="130" text-anchor="middle">_e16_judge_cache.jsonl</text>
+    <text class="box-sub" x="810" y="146" text-anchor="middle">written by _cache_put()</text>
+    <text class="box-sub" x="810" y="160" text-anchor="middle">1 423 lines</text>
+  </a>
+
+  <a class="box" id="bA1" href="../../experiments_verifiers/results/E16_gradient_relevance_2026-09-23.md">
+    <title>Results of record: metrics, CIs, gates, gaps</title>
+    <rect x="730" y="350" width="160" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="370" text-anchor="middle">E16_gradient_relevance</text>
+    <text class="box-sub" x="810" y="386" text-anchor="middle">*.json + *.md</text>
+    <text class="box-sub" x="810" y="400" text-anchor="middle">565 judged rows</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="bI1" data-to="bS1" d="M230,138 H246 V46 H270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="252" y="100" text-anchor="start">labels, goal text</text>
+  <path class="edge dashed-edge" data-from="bI2" data-to="bS2" d="M230,243 H258 V136 H270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="266" y="196" text-anchor="start">gradient, gold</text>
+
+  <path class="edge" data-from="bS1" data-to="bS2" d="M375,72 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="94" text-anchor="start">population items</text>
+  <path class="edge" data-from="bS2" data-to="bS3" d="M375,162 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="184" text-anchor="start">mutated copies</text>
+  <path class="edge" data-from="bS2" data-to="bM" d="M480,136 H505 V323 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="512" y="230" text-anchor="start">judge JSON</text>
+  <path class="edge" data-from="bS3" data-to="bS4" d="M375,252 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="274" text-anchor="start">controls, gates</text>
+  <path class="edge" data-from="bS4" data-to="bS5" d="M375,342 V380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="364" text-anchor="start">M4 baseline</text>
+  <path class="edge" data-from="bM" data-to="bS4" d="M530,316 H482" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="272" text-anchor="middle">signed alignment</text>
+  <path class="edge" data-from="bS1" data-to="bA2" d="M480,46 H730" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="605" y="38" text-anchor="middle">population json</text>
+  <path class="edge" data-from="bS5" data-to="bA1" d="M480,406 H730" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="605" y="398" text-anchor="middle">json + md</text>
+</svg>
+</div>
+<p class="figcap">12 boxes. Mint = E16 stage functions, steel = data files, dashed = reads, solid = calls. The hypothesis is measured, never proven as a mechanism: <code>judge_item()</code> reads the gradient plus gold and returns the three fields that <code>_baseline()</code> aggregates. Arrow labels name the data or the artifact; the three output paths are the constants <code>POP_JSON</code>, <code>CACHE_JSONL</code>, <code>OUT_JSON</code> (<code>e16_gradient_audit.py</code> L49&ndash;53).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/e16_gradient_audit.py">experiments_verifiers/harness/e16_gradient_audit.py</a></h4>
+<p class="role">Builds the gradient population, judges each gradient against gold with one model, runs three validation gates, then writes the M4 baseline and the report.</p>
+<p class="meta">1 571 lines &#183; entry point <code>main()</code> (L1548) &#183; 48 module-level functions, no classes &#183; model <code>openrouter/deepseek/deepseek-v4.1-flash</code> (L55)</p>
+<details><summary>CLI, stages and constants</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e16_gradient_audit.py --stage &lt;stage&gt;
+
+argparse: --stage, required=True,
+  choices=["phase0", "probe", "pilot", "topup", "v2gates", "full", "report"]   # L1549-1551
+</pre>
+<p>The docstring at L21 documents only <code>phase0|probe|pilot|full|report</code>; <code>topup</code> and <code>v2gates</code> exist in the parser but not in that line.</p>
+<p>Stage dispatch (L1553&ndash;1567): <code>phase0</code> &rarr; <code>build_population()</code>, <code>probe</code> &rarr; <code>stage_probe()</code>, <code>pilot</code> &rarr; <code>stage_pilot()</code>, <code>topup</code> &rarr; <code>stage_topup()</code>, <code>v2gates</code> &rarr; <code>stage_v2gates()</code>, <code>full</code> &rarr; <code>stage_full()</code>, else <code>stage_report()</code>.</p>
+<p>Budgets and thresholds: <code>CAP_CALLS = 1500</code> (L74), <code>PILOT_N = 40</code>, <code>MUT_N = 30</code>, <code>ROBUST_N = 12</code>, <code>BOOT_N = 999</code>, <code>SEED = 16</code>. Truncation budgets for judge input: <code>GOAL_CHARS = 2400</code>, <code>GOLD_LINES = 200</code>, <code>EVAL_LINES = 100</code>, <code>RUBRIC_LINES = 80</code>, <code>STATE_LINES = 150</code>, <code>SNAP_LINES = 60</code>, <code>GRAD_LINES = 80</code> (L58&ndash;65).</p>
+<p><code>_load_env()</code> (L337) reads <code>.env</code> from the repo root and from <code>experiments_verifiers/</code> and calls <code>os.environ.setdefault</code>; this page lists that file as skipped and did not open it.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Frozen labels (<code>load_sane</code> L89)</td><td>nothing</td><td class="sym">experiments_verifiers/data/verifier_claims_sane.jsonl</td></tr>
+<tr><td>Per-generation labels (<code>label_index</code> L95)</td><td>nothing</td><td class="sym">experiments_verifiers/data/manifest_run_notes.json</td></tr>
+<tr><td>Task goal text (<code>build_population</code> L221)</td><td>nothing</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td></tr>
+<tr><td>Gradient under audit, tier B state (<code>build_population</code>, <code>eval_state_lines</code> L170)</td><td>nothing</td><td class="sym">sources/workflows/&lt;campaign&gt;/&lt;uuid8&gt;/textual_gradient.txt + evaluation.txt</td></tr>
+<tr><td>Alive workspace listing (<code>snap_lines</code> L196)</td><td>nothing</td><td class="sym">experiments_verifiers/workspace_artefacts/snapshots/&lt;uuid8&gt;/</td></tr>
+<tr><td>Gold, eval and rubric yardstick (<code>gold_join</code> L114)</td><td>nothing</td><td class="sym">datasets/ScienceAgentBench/{gold_programs,eval_programs,scoring_rubrics}/</td></tr>
+<tr><td>API key (<code>_load_env</code> L337)</td><td>nothing</td><td class="sym">experiments_verifiers/.env &mdash; skipped, never opened</td></tr>
+<tr><td>nothing</td><td>Population of 577 items (<code>POP_JSON</code> L51, written L330)</td><td class="sym">experiments_verifiers/results/_e16_population.json</td></tr>
+<tr><td>Judge cache (<code>_cache_get</code> L347)</td><td>One line per unique call (<code>_cache_put</code> L360)</td><td class="sym">experiments_verifiers/results/_e16_judge_cache.jsonl</td></tr>
+<tr><td>nothing</td><td>Pilot gates and v2 gates (<code>PHASE1_JSON</code> L52, written L873, L910, L981)</td><td class="sym">experiments_verifiers/results/_e16_phase1.json</td></tr>
+<tr><td>nothing</td><td>Phase-2 judgment table (<code>stage_full</code> L1010)</td><td class="sym">experiments_verifiers/results/_e16_phase2.json</td></tr>
+<tr><td>Phase-1 and phase-2 files (<code>stage_report</code> L1022)</td><td>Results of record (<code>OUT_JSON</code> L49, L1122; <code>_write_md</code> L1270)</td><td class="sym">experiments_verifiers/results/E16_gradient_relevance_2026-09-23.{json,md}</td></tr>
+</tbody>
+</table>
+<p class="sub">Citation form: <code>path::Symbol</code>. Line numbers are <code>e16_gradient_audit.py</code>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; mean gold-relevance per slice</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 350" role="img" aria-label="Bar chart of mean gold-relevance per slice">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <line x1="230" y1="24" x2="230" y2="318" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="230" y="336" text-anchor="middle">0.00</text>
+  <line x1="360" y1="24" x2="360" y2="318" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="360" y="336" text-anchor="middle">0.25</text>
+  <line x1="490" y1="24" x2="490" y2="318" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="490" y="336" text-anchor="middle">0.50</text>
+  <line x1="620" y1="24" x2="620" y2="318" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="620" y="336" text-anchor="middle">0.75</text>
+  <line x1="750" y1="24" x2="750" y2="318" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="750" y="336" text-anchor="middle">1.00</text>
+  <text class="box-sub" x="14" y="44" text-anchor="start">overall</text>
+  <rect x="230" y="31" width="288.6" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="526.6" y="44" text-anchor="start">0.555  (n=565)</text>
+  <text class="box-sub" x="14" y="74" text-anchor="start">asb_full_iterative_1</text>
+  <rect x="230" y="61" width="278.7" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="516.7" y="74" text-anchor="start">0.536  (n=411)</text>
+  <text class="box-sub" x="14" y="104" text-anchor="start">chemistry_iterative_2_v3.2</text>
+  <rect x="230" y="91" width="423.8" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="661.8" y="104" text-anchor="start">0.815  (n=23)</text>
+  <text class="box-sub" x="14" y="134" text-anchor="start">chemistry_iterative_v4_flash</text>
+  <rect x="230" y="121" width="335.9" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="573.9" y="134" text-anchor="start">0.646  (n=66)</text>
+  <text class="box-sub" x="14" y="164" text-anchor="start">chemistry_oneshot_2_v3.2</text>
+  <rect x="230" y="151" width="299.0" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="537.0" y="164" text-anchor="start">0.575  (n=8)</text>
+  <text class="box-sub" x="14" y="194" text-anchor="start">run_1</text>
+  <rect x="230" y="181" width="248.6" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="486.6" y="194" text-anchor="start">0.478  (n=57)</text>
+  <text class="box-sub" x="14" y="224" text-anchor="start">contrast tasks</text>
+  <rect x="230" y="211" width="279.8" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="517.8" y="224" text-anchor="start">0.538  (n=186)</text>
+  <text class="box-sub" x="14" y="254" text-anchor="start">non-contrast</text>
+  <rect x="230" y="241" width="292.8" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="530.8" y="254" text-anchor="start">0.563  (n=379)</text>
+  <text class="box-sub" x="14" y="284" text-anchor="start">tier A</text>
+  <rect x="230" y="271" width="295.4" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="533.4" y="284" text-anchor="start">0.568  (n=123)</text>
+  <text class="box-sub" x="14" y="314" text-anchor="start">tier B</text>
+  <rect x="230" y="301" width="286.5" height="16" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+  <text class="box-sub" x="524.5" y="314" text-anchor="start">0.551  (n=442)</text>
+  <text class="box-sub" x="230" y="18" text-anchor="start">mean gold-relevance, 0 to 1</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; every value is read from <code class="path">experiments_verifiers/results/E16_gradient_relevance_2026-09-23.md</code> L76&ndash;85 (phase-2 table). No number here is recomputed. Bar length is linear in the value between 0 and 1.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Generations in the population</td><td class="size">577</td><td class="sym">_e16_population.json, checks.n_population; md L22</td></tr>
+<tr><td>Tier A / tier B generational items</td><td class="size">123 / 454</td><td class="sym">_e16_population.json, tier_counts; md L22</td></tr>
+<tr><td>Chain steps / SR-flip steps</td><td class="size">443 / 70</td><td class="sym">_e16_population.json, checks; md L22</td></tr>
+<tr><td>Gradients judged in phase 2</td><td class="size">565</td><td class="sym">E16_..._2026-09-23.json, phase2.n_judged; md L16</td></tr>
+<tr><td>Mean gold-relevance, overall</td><td class="size">0.555</td><td class="sym">md L16 and L76; json phase2.overall.mean_relevance</td></tr>
+<tr><td>Median signed alignment, overall</td><td class="size">0.400</td><td class="sym">md L16 and L76</td></tr>
+<tr><td>Direction toward / away / unsure</td><td class="size">0.52 / 0.35 / 0.13</td><td class="sym">md L16; json phase2.overall</td></tr>
+<tr><td>Hallucination rate, overall</td><td class="size">0.65</td><td class="sym">md L16 and L76</td></tr>
+<tr><td>Gradients ignoring &ge;1 measured property</td><td class="size">531 / 565</td><td class="sym">md L112</td></tr>
+<tr><td>Gate i predictive validity, best pairing</td><td class="size">rho 0.453 [0.066, 0.725]</td><td class="sym">md L10 and L34</td></tr>
+<tr><td>Gate ii calibration AUC, pooled (v1)</td><td class="size">0.708, FAIL</td><td class="sym">md L11 and L61</td></tr>
+<tr><td>v2 gate A AUC vs property-swap</td><td class="size">0.952 [0.865, 1.000]</td><td class="sym">md L12 and L62</td></tr>
+<tr><td>v2 gate B AUC vs negation</td><td class="size">1.000, n=7, degenerate CI</td><td class="sym">md L13 and L63</td></tr>
+<tr><td>Gate iii identical direction / kappa</td><td class="size">0.83 / 0.714</td><td class="sym">md L69</td></tr>
+<tr><td>Alignment vs recorded reward</td><td class="size">rho -0.015 [-0.120, 0.090]</td><td class="sym">md L17 and L91</td></tr>
+<tr><td>Alignment vs SR</td><td class="size">rho 0.083 [-0.048, 0.209]</td><td class="sym">md L17 and L92</td></tr>
+<tr><td>Unique judge calls / cap</td><td class="size">685 / 1500</td><td class="sym">md L3 and L153; json calls.n_calls_total</td></tr>
+<tr><td>Reported cost</td><td class="size">$1.169651</td><td class="sym">md L153; json calls.cost_reported_by_litellm_sum</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: the pooled v1 calibration gate failed at AUC 0.708 and the two-axis v2 gates replaced it (md L61&ndash;63). The original verdict is kept verbatim in the results file; this page reports both.</p>
+<p class="note flag">Red: the phase-2 alignment correlations with reward and SR sit at zero (rho -0.015 and 0.083, md L91&ndash;92). A gradient that points at gold only partially, and a reward that does not track gold alignment, are the two facts the later duel experiments pick up.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim lines from the results file</h2>
+<details><summary>7 quoted lines &mdash; gates, baseline, key_missing, cost</summary><div class="dbody">
+<blockquote>- **predictive_validity: PASS** &mdash; pass if ANY pairing has bootstrap CI entirely above 0 (rho&gt;0, ci_lo&gt;0).</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E16_gradient_relevance_2026-09-23.md</code> line 7</p>
+<blockquote>- **calibration_control: FAIL** &mdash; pass if AUC(original &gt; mutated, alignment_signed) &gt;= 0.75.</blockquote>
+<p class="sub">Same file, line 8</p>
+<blockquote>- **M4 baseline (instrument valid under v2 two-axis gates, n=565 gradients):** mean gold-relevance 0.555, median signed alignment 0.400, direction toward/away/unsure = 0.52/0.35/0.13, hallucination rate 0.65.</blockquote>
+<p class="sub">Same file, line 16</p>
+<blockquote>- **One-sentence answer &mdash; does the current verifier's feedback point at gold?** On average it partially points at gold: mean gold-relevance 0.555 with 0.52 of gradients judged direction=toward, hallucination rate 0.65, and 531/565 gradients still ignore at least one gold-measured property (see the key_missing table).</blockquote>
+<p class="sub">Same file, line 18</p>
+<blockquote>- AUC(original &gt; mutated) on alignment_signed: **0.708** (n=34 vs 34).</blockquote>
+<p class="sub">Same file, line 46</p>
+<blockquote>- 531/565 gradients ignore &ge;1 measured property; 1355 distinct phrases.</blockquote>
+<p class="sub">Same file, line 112</p>
+<blockquote>- 685 unique LLM calls ({'judge': 590, 'mutate_swap': 32, 'mutate_negate': 29, 'judge_mut': 34}); prompt tokens 1,900,777, completion tokens 1,378,472; litellm-reported cost sum $1.169651.</blockquote>
+<p class="sub">Same file, line 153</p>
+<p class="note say">These files are read-only evidence. Nothing under <code>experiments_verifiers/</code> was modified by this page; no experiment was re-run.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e16_gradient_audit.py</code> (full); <code class="path">experiments_verifiers/results/E16_gradient_relevance_2026-09-23.md</code> (full) and <code class="path">.json</code> (keys <code>phase0</code>, <code>phase1.gates</code>, <code>phase1.gates_v2</code>, <code>phase2</code>, <code>calls</code>); <code class="path">experiments_verifiers/results/_e16_population.json</code>, <code class="path">_e16_phase1.json</code>, <code class="path">_e16_phase2.json</code> (top-level keys and counts); <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (metric M4, constitution); <code class="path">experiments_verifiers/README.md</code> (codename table, joining rules); <code class="path">docs/visual_clone/_reference.html</code> and <code class="path">docs/visual_clone/_clone.css</code>. Line counts from <code>wc -l</code>. <code class="path">_e16_judge_cache.jsonl</code> counted with <code>wc -l</code> only (1 423 lines), not parsed.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> (&mdash; never opened, rule). <code>e16</code> phase-0 per-item rows inside <code class="path">_e16_population.json</code> (1.9 MB; only the <code>checks</code> and <code>tier_counts</code> keys were read). <code class="path">_e16_phase2.json</code> judgment rows (615 KB; only key names and length were read). <code class="path">experiments_verifiers/harness/e17_gradient_duel.py</code>, <code class="path">e18_bt_eval.py</code> and all other <code class="path">harness/*.py</code> &mdash; other pages. <code class="path">datasets/ScienceAgentBench/*</code> gold, eval and rubric files &mdash; read by the script, not opened by me; their role is stated from <code>gold_join</code> (L114). <code class="path">sources/workflows/*/textual_gradient.txt</code> and <code class="path">evaluation.txt</code> &mdash; read-only evidence, read by the script, not opened by me. <code class="path">run_notes/</code>, <code class="path">workspace_artefacts/</code>, <code class="path">audits/</code>, <code class="path">webui/</code> &mdash; outside this page's scope. No experiment, application or test run.</p>
+<p class="skips">Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02. <code>git ls-files experiments_verifiers</code> returns no files, so the script line numbers above describe the working tree.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

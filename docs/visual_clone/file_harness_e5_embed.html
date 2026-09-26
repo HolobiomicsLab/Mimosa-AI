@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5_embed.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; experiments_verifiers/harness &gt; e5_embed.py">
+<div class="wrap">
+
+<h1 class="hud">e5_embed.py</h1>
+<p class="intro">This 35-line script precomputes the MiniLM embeddings that the E5 ladder and its follow-up experiments read from disk. It takes the distinct claim names of the frozen claims file, encodes each name and each <code>name. description</code> string with <code>all-MiniLM-L6-v2</code>, and writes one compressed <code>.npz</code> cache. It runs once, by hand: <code>uv run python experiments_verifiers/harness/e5_embed.py</code> (docstring L3); no other Python file imports it.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the script does: load claims, list names, encode twice, cache to npz</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 380" role="img" aria-label="e5_embed.py flow from frozen claims through e5_common loaders and MiniLM to the npz cache">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="kIn1">
+    <title>Frozen claims file read through e5_common.load_examples</title>
+    <rect x="20" y="40" width="185" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="66" text-anchor="middle">data/verifier_claims.jsonl</text>
+    <text class="box-sub" x="112" y="84" text-anchor="middle">read by e5_common L35</text>
+    <text class="box-sub" x="112" y="100" text-anchor="middle">call L18</text>
+  </g>
+
+  <g class="box" id="kIn2">
+    <title>Descriptions parsed from the recorded evaluation.txt files</title>
+    <rect x="20" y="150" width="185" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="176" text-anchor="middle">manifest_run_notes.json</text>
+    <text class="box-sub" x="112" y="194" text-anchor="middle">paths &#8594; evaluation.txt</text>
+    <text class="box-sub" x="112" y="212" text-anchor="middle">calls L19 L20</text>
+  </g>
+
+  <a class="box" id="kLoad" href="file_harness_e5_common.html">
+    <title>e5_common loaders: load_examples, load_eval_paths, parse_descriptions</title>
+    <rect x="240" y="90" width="185" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="332" y="118" text-anchor="middle">e5_common loaders</text>
+    <text class="box-sub" x="332" y="136" text-anchor="middle">load_examples L18</text>
+    <text class="box-sub" x="332" y="154" text-anchor="middle">load_eval_paths L19</text>
+    <text class="box-sub" x="332" y="172" text-anchor="middle">parse_descriptions L20</text>
+  </a>
+
+  <g class="box" id="kNames">
+    <title>Distinct claim names, sorted, plus one text string per name</title>
+    <rect x="460" y="90" width="185" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="552" y="118" text-anchor="middle">names and texts</text>
+    <text class="box-sub" x="552" y="136" text-anchor="middle">sorted set of c["name"] L22</text>
+    <text class="box-sub" x="552" y="154" text-anchor="middle">"name. description" L23</text>
+    <text class="box-sub" x="552" y="172" text-anchor="middle">count printed L24</text>
+  </g>
+
+  <g class="box" id="kModel">
+    <title>SentenceTransformer loads all-MiniLM-L6-v2 from the local cache or the Hub</title>
+    <rect x="680" y="30" width="180" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="770" y="56" text-anchor="middle">SentenceTransformer</text>
+    <text class="box-sub" x="770" y="74" text-anchor="middle">all-MiniLM-L6-v2</text>
+    <text class="box-sub" x="770" y="92" text-anchor="middle">loaded L28</text>
+  </g>
+
+  <g class="box" id="kEnc">
+    <title>Two encode passes, batch 128, normalized vectors</title>
+    <rect x="680" y="150" width="180" height="80" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="770" y="176" text-anchor="middle">model.encode</text>
+    <text class="box-sub" x="770" y="194" text-anchor="middle">batch_size=128 L29 L30</text>
+    <text class="box-sub" x="770" y="212" text-anchor="middle">normalize_embeddings=True</text>
+  </g>
+
+  <g class="box" id="kOut">
+    <title>Compressed numpy archive with four arrays</title>
+    <rect x="680" y="270" width="180" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="296" text-anchor="middle">_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="770" y="314" text-anchor="middle">results/ &#183; written L33</text>
+    <text class="box-sub" x="770" y="332" text-anchor="middle">shape printed L35</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="kIn1" data-to="kLoad" d="M205,73 C220,73 225,100 240,105" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="kIn2" data-to="kLoad" d="M205,190 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="222" y="182" text-anchor="middle">reads</text>
+  <path class="edge" data-from="kLoad" data-to="kNames" d="M425,135 H460" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="442" y="127" text-anchor="middle">exs, descs</text>
+  <path class="edge" data-from="kNames" data-to="kEnc" d="M645,135 C660,135 665,160 680,170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="662" y="150" text-anchor="middle">text lists</text>
+  <path class="edge dotted-edge" data-from="kModel" data-to="kEnc" d="M770,110 V150" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="780" y="132" text-anchor="start">model handle</text>
+  <path class="edge" data-from="kEnc" data-to="kOut" d="M770,230 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="780" y="252" text-anchor="start">emb_n, emb_nd</text>
+
+  <text class="box-sub" x="20" y="350">solid = call  |  dashed = reads/writes  |  dotted = import only  |  7 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>7 boxes</code>. The script is straight-line: no function is defined, no branch, no loop with a stop test. <code>sentence_transformers</code> is imported late (L26) so the file would fail at that line, not at import of the module itself.</p>
+
+<details><summary>the 35 lines in order &mdash; statement, value, line</summary><div class="dbody">
+<pre>docstring: E5 precompute MiniLM embeddings                 L1-L5
+import sys, Path, numpy                                    L8-L11
+EV = parents[1], REPO = EV.parent                          L13-L14
+sys.path.insert(EV / "harness")                            L15
+import e5_common as C                                      L16
+exs = C.load_examples()                                    L18
+eval_paths = C.load_eval_paths()                           L19
+descs = C.parse_descriptions(exs, eval_paths)              L20
+names = sorted({c["name"] ...})                            L22
+texts_nd = [f"{n}. {desc}".strip() ...]                    L23
+print(name count, description count)                       L24
+from sentence_transformers import SentenceTransformer      L26
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")  L28
+emb_n = model.encode(names, ...)                           L29
+emb_nd = model.encode(texts_nd, ...)                       L30
+out = EV / "results" / "_cache_e5_embeddings.npz"          L32
+np.savez_compressed(out, name_emb=..., name_desc_emb=...,
+    names=..., has_desc=...)                               L33-L34
+print("wrote", out, shape, shape)                          L35</pre>
+<p><code>REPO</code> (L14) is assigned and never used again; only <code>EV</code> feeds the output path and the <code>sys.path</code> insert.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in, data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 300" role="img" aria-label="e5_embed.py data flow: three reads, one npz write, one printed line">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="nR1">
+    <title>verifier_claims.jsonl: claim names and their example grouping</title>
+    <rect x="20" y="30" width="220" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130" y="56" text-anchor="middle">experiments_verifiers/data/</text>
+    <text class="box-sub" x="130" y="74" text-anchor="middle">verifier_claims.jsonl</text>
+    <text class="box-sub" x="130" y="90" text-anchor="middle">read L18 &#8594; e5_common L35</text>
+  </g>
+  <g class="box" id="nR2">
+    <title>Manifest run notes give the eval.txt path per example</title>
+    <rect x="20" y="115" width="220" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130" y="141" text-anchor="middle">data/manifest_run_notes.json</text>
+    <text class="box-sub" x="130" y="159" text-anchor="middle">reads L19</text>
+  </g>
+  <g class="box" id="nR3">
+    <title>Recorded verifier reports, one claim description each</title>
+    <rect x="20" y="200" width="220" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130" y="226" text-anchor="middle">evaluation.txt per uuid</text>
+    <text class="box-sub" x="130" y="244" text-anchor="middle">description text</text>
+    <text class="box-sub" x="130" y="260" text-anchor="middle">read L20 &#8594; e5_common L74</text>
+  </g>
+
+  <a class="box" id="nStep" href="../../experiments_verifiers/harness/e5_embed.py">
+    <title>Module-level script statements, lines 18 to 35</title>
+    <rect x="300" y="90" width="200" height="120" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400" y="118" text-anchor="middle">e5_embed.py statements</text>
+    <text class="box-sub" x="400" y="138" text-anchor="middle">names L22 &#183; texts_nd L23</text>
+    <text class="box-sub" x="400" y="156" text-anchor="middle">encode L29&#8211;L30</text>
+    <text class="box-sub" x="400" y="174" text-anchor="middle">savez_compressed L33</text>
+    <text class="box-sub" x="400" y="192" text-anchor="middle">no function, no config field</text>
+  </a>
+
+  <g class="box" id="nW1">
+    <title>Four arrays: name_emb, name_desc_emb, names, has_desc</title>
+    <rect x="560" y="30" width="230" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="675" y="56" text-anchor="middle">results/_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="675" y="74" text-anchor="middle">name_emb, name_desc_emb, names</text>
+    <text class="box-sub" x="675" y="92" text-anchor="middle">has_desc &#183; written L32&#8211;L34</text>
+  </g>
+  <g class="box" id="nW2">
+    <title>One stdout line: number of names and how many have a description</title>
+    <rect x="560" y="150" width="230" height="72" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="675" y="176" text-anchor="middle">stdout line</text>
+    <text class="box-sub" x="675" y="194" text-anchor="middle">counts L24, path and shapes L35</text>
+  </g>
+
+  <g class="box" id="nCons">
+    <title>Read back by the E5 ladder and its follow-ups</title>
+    <rect x="830" y="90" width="170" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="915" y="126" text-anchor="middle">consumers</text>
+    <text class="box-sub" x="915" y="146" text-anchor="middle">e5_run.py L56</text>
+    <text class="box-sub" x="915" y="164" text-anchor="middle">e5b_splits.py L47</text>
+    <text class="box-sub" x="915" y="182" text-anchor="middle">e9_deployment.py L84</text>
+    <text class="box-sub" x="915" y="200" text-anchor="middle">e13_common.py L36</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="nR1" data-to="nStep" d="M240,66 C270,66 280,110 300,120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="nR2" data-to="nStep" d="M240,151 H300" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="270" y="143" text-anchor="middle">paths</text>
+  <path class="edge dashed-edge" data-from="nR3" data-to="nStep" d="M240,236 C270,236 280,180 300,170" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="nStep" data-to="nW1" d="M500,120 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="530" y="112" text-anchor="middle">np arrays</text>
+  <path class="edge" data-from="nStep" data-to="nW2" d="M500,190 C525,190 535,180 560,180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="530" y="182" text-anchor="middle">print</text>
+  <path class="edge dashed-edge" data-from="nW1" data-to="nCons" d="M790,73 C810,73 815,120 830,130" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="810" y="100" text-anchor="middle">np.load</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; no config object and no environment variable is read: the paths come from <code>__file__</code> via <code>EV</code> (L13). The arrow into consumers is a later read by other scripts, not a call from this file.</p>
+
+<p class="note flag">Red: the docstring says the cache holds <code>(name_emb, name_desc_emb, names, descs)</code> (L4), but <code>np.savez_compressed</code> at L33&ndash;L34 writes <code>has_desc</code>, a boolean array, not the description strings. Readers of the docstring would look for a key that is not there.</p>
+<p class="note">Amber: the script depends on <code>sentence_transformers</code> and on the <code>all-MiniLM-L6-v2</code> weights (L26&ndash;L28). If the model is not cached locally the first run downloads it; this page did not run the script (build rule).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control flow: none to draw</h2>
+<p>This file has no function, no class, no <code>if</code> statement, no loop and no retry. It is one straight-line pass: load (L18&ndash;L20), list names (L22), build texts (L23), encode twice (L29&ndash;L30), save (L33&ndash;L34), print (L35). The only conditional expression is the dictionary fallback <code>descs.get(n, {}).get('description', '')</code> at L23, which defaults to an empty description when a name has none.</p>
+<p>So there is no decision diagram on this page. The rule that would otherwise be drawn &mdash; "no description &#8594; encode the bare name" &mdash; lives in the caller's data, not in a branch of this file.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">verifier_claims.jsonl</td><td>file, via <code>e5_common.load_examples</code></td><td>the distinct claim names</td><td class="size">L18</td></tr>
+<tr><td>reads</td><td class="sym">manifest_run_notes.json</td><td>file, via <code>e5_common.load_eval_paths</code></td><td>eval.txt path per example</td><td class="size">L19</td></tr>
+<tr><td>reads</td><td class="sym">evaluation.txt</td><td>file, via <code>e5_common.parse_descriptions</code></td><td>description appended to each name</td><td class="size">L20</td></tr>
+<tr><td>reads</td><td class="sym">e5_common constants</td><td>module, through <code>import e5_common as C</code></td><td>loaders only, no constant touched</td><td class="size">L16 L18&#8211;L20</td></tr>
+<tr><td>reads</td><td class="sym">sys.path</td><td>process state, appended at L15</td><td>makes <code>import e5_common</code> work</td><td class="size">L15 L16</td></tr>
+<tr><td>reads</td><td class="sym">config field</td><td>none</td><td>no config import in this file</td><td class="size">L8&#8211;L16</td></tr>
+<tr><td>returns</td><td class="sym">nothing</td><td>module level, no function</td><td>the script has no return value</td><td class="size">&#8212;</td></tr>
+<tr><td>writes</td><td class="sym">_cache_e5_embeddings.npz</td><td>file, <code class="path">experiments_verifiers/results/</code></td><td>name and name+description vectors</td><td class="size">L32&#8211;L34</td></tr>
+<tr><td>writes</td><td class="sym">stdout</td><td>console</td><td>name count and written shapes</td><td class="size">L24 L35</td></tr>
+<tr><td>imports</td><td class="sym">SentenceTransformer</td><td>third-party module, L26</td><td>the encoder</td><td class="size">L26 L28</td></tr>
+</tbody>
+</table>
+<p class="sub">Arrays written (L33&ndash;L34): <code>name_emb</code>, <code>name_desc_emb</code>, <code>names</code>, <code>has_desc</code>. <code class="path">experiments_verifiers/README.md</code> L91 describes the same cache as "MiniLM embeddings for all 2,480 distinct claims" and names only the two vector arrays. Both encode calls use <code>batch_size=128</code>, <code>show_progress_bar=True</code> and <code>normalize_embeddings=True</code> (L29&ndash;L30), so the vectors are unit length and dot products equal cosine similarity in readers.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>no class, no method, no function &mdash; module-level names only</summary><div class="dbody">
+<pre>(no def, no class, no lambda, no decorator in the file)</pre>
+<p>Module-level bindings, in file order: <code>__doc__</code> L1, <code>sys</code> L8, <code>Path</code> L9, <code>np</code> L11, <code>EV</code> L13, <code>REPO</code> L14, <code>C</code> L16, <code>exs</code> L18, <code>eval_paths</code> L19, <code>descs</code> L20, <code>names</code> L22, <code>texts_nd</code> L23, <code>SentenceTransformer</code> L26, <code>model</code> L28, <code>emb_n</code> L29, <code>emb_nd</code> L30, <code>out</code> L32.</p>
+<p>Side effects: one <code>print</code> of the name and description counts (L24), one model download or cache hit (L28), one file write (L33), one final <code>print</code> with the output path and both shapes (L35). There is no <code>if __name__ == '__main__'</code> guard, so importing the file would execute all of it; nothing imports it.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<p>No importer found: a repo-wide grep for <code>import e5_embed</code> and for <code>e5_embed</code> in <code class="path">experiments_verifiers/</code> returns only the file itself, plus plain-text mentions in <code class="path">experiments_verifiers/README.md</code> and in other scripts' comments. The script is run by hand.</p>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_harness_e5_run.html">e5_run.py</a></td><td>Reads the cache it writes: <code>np.load(... "_cache_e5_embeddings.npz")</code></td><td class="size">L56</td></tr>
+<tr><td class="sym"><code>e5b_splits.py</code></td><td>Same read for the split study</td><td class="size">L47</td></tr>
+<tr><td class="sym"><code>e9_deployment.py</code></td><td>Same read for the deployment replay</td><td class="size">L84</td></tr>
+<tr><td class="sym"><code>e13_common.py</code></td><td>Same read for the embedding search, via <code>e13_common</code></td><td class="size">L36 &#183; e13 L33 L1268</td></tr>
+<tr><td class="sym"><code>results/_e10_oracle.py</code></td><td>Same read for the oracle-weights study</td><td class="size">L239</td></tr>
+<tr><td class="sym"><a href="exp_e5_embed.html">exp_e5_embed.html</a></td><td>Experiment page that documents this cache</td><td class="size">page scope</td></tr>
+</tbody>
+</table>
+<p>Tests: <code>unknown</code> &mdash; a grep of <code class="path">tests/</code> for <code>e5_embed</code>, <code>_cache_e5_embeddings</code> and <code>SentenceTransformer</code> returns no file. The suite never touches this script.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e5_embed.html">exp_e5_embed.html</a>, <a href="file_harness_e5_common.html">e5_common.py</a> (its loaders) and <a href="file_harness_e5_run.html">e5_run.py</a> (its main reader).</p><p>Sources read: <code class="path">experiments_verifiers/harness/e5_embed.py</code> (35 lines, whole file), <code class="path">experiments_verifiers/harness/e5_common.py</code> (call targets L34, L55, L67), grep hits in the six reader scripts for <code>_cache_e5_embeddings.npz</code>, <code class="path">experiments_verifiers/README.md</code> L91 (cache description), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> and repo <code class="path">.env</code> (never opened, secrets); <code class="path">experiments_verifiers/results/_cache_e5_embeddings.npz</code> body (binary, and the docstring and L33&ndash;L34 give the array names); <code class="path">experiments_verifiers/data/verifier_claims.jsonl</code> content (counted from the README, not parsed here); the reader scripts' own bodies beyond the <code>np.load</code> line and the calls into <code>e5_common</code>; <code class="path">__pycache__</code>; the model weights in the sentence-transformers cache; no pytest run and no script executed, as instructed.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/core/evolution_engine.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > core > evolution engine">
+<div class="wrap">
+
+<h1 class="hud">Evolution engine (core L2)</h1>
+<p class="intro">The evolution engine runs the per-task generation loop: it proposes a workflow, runs it in the sandbox, scores it with the verifier, and stores the result. This page maps the class, one generation, and the config knobs it reads. The generation budget is <code>max_learning_evolve_iterations</code> = 16 in <code>--learn</code> mode, and 1 otherwise.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Class map - EvolutionEngine and its collaborators</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 510" role="img" aria-label="EvolutionEngine class map">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1-callers" href="#callers">
+    <title>Callers of start_workflow_evolution</title>
+    <rect x="20" y="40" width="180" height="56" rx="2" fill="rgba(230,251,255,0.05)" stroke="#E6FBFF"/>
+    <text class="box-label" x="110" y="63" text-anchor="middle">callers</text>
+    <text class="box-sub" x="110" y="79" text-anchor="middle">main.py · csv_mode.py</text>
+  </a>
+
+  <a class="box" id="d1-config" href="area_entry_config.html">
+    <title>Config object read at construction</title>
+    <rect x="20" y="190" width="180" height="56" rx="2" fill="rgba(230,251,255,0.05)" stroke="#E6FBFF"/>
+    <text class="box-label" x="110" y="213" text-anchor="middle">Config</text>
+    <text class="box-sub" x="110" y="229" text-anchor="middle">22 fields read</text>
+  </a>
+
+  <a class="box" id="d1-engine" href="#card-engine">
+    <title>EvolutionEngine, sources/core/evolution_engine.py</title>
+    <rect x="280" y="100" width="310" height="300" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435" y="126" text-anchor="middle">EvolutionEngine</text>
+    <text class="box-sub" x="435" y="144" text-anchor="middle">evolution_engine.py · 1 109 lines</text>
+    <text class="box-sub" x="296" y="174">start_workflow_evolution(goal, ...)</text>
+    <text class="box-sub" x="296" y="194">evolve_generation(runs, ...)</text>
+    <text class="box-sub" x="296" y="214">select_parent_workflow(goal, ...)</text>
+    <text class="box-sub" x="296" y="234">_evaluate_workflow_phenotype(uuid, ...)</text>
+    <text class="box-sub" x="296" y="254">_build_run_metrics_snapshot(run, ...)</text>
+    <text class="box-sub" x="296" y="274">_persist_iteration_metrics(uuid, snap)</text>
+    <text class="box-sub" x="296" y="294">_refresh_evolution_tree(goal, uuid)</text>
+    <text class="box-sub" x="296" y="314">_export_astra(best_uuid, goal)</text>
+  </a>
+
+  <a class="box" id="d1-orch" href="mod_core_runner.html">
+    <title>WorkflowOrchestrator runs one workflow</title>
+    <rect x="670" y="20" width="330" height="46" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="686" y="40">WorkflowOrchestrator</text>
+    <text class="box-sub" x="686" y="56">orchestrate_workflow() -&gt; uuid</text>
+  </a>
+
+  <a class="box" id="d1-wsm" href="area_utils.html">
+    <title>WorkspaceManager snapshots the run workspace</title>
+    <rect x="670" y="76" width="330" height="46" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="686" y="96">WorkspaceManager</text>
+    <text class="box-sub" x="686" y="112">begin_session · save_run_snapshot</text>
+  </a>
+
+  <a class="box" id="d1-judge" href="mod_evaluators_hybrid_verifier.html">
+    <title>WorkflowEvaluator facade, verifier channel</title>
+    <rect x="670" y="132" width="330" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="686" y="152">WorkflowEvaluator (judge)</text>
+    <text class="box-sub" x="686" y="168">evaluate(evaluator_type="verifier")</text>
+  </a>
+
+  <a class="box" id="d1-sel" href="mod_core_selection.html">
+    <title>SelectionPressure validates the survivor</title>
+    <rect x="670" y="188" width="330" height="46" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="686" y="208">SelectionPressure</text>
+    <text class="box-sub" x="686" y="224">validate_survivor() -&gt; verdict</text>
+  </a>
+
+  <a class="box" id="d1-var" href="mod_core_variation.html">
+    <title>VariationEngine builds the next prompt</title>
+    <rect x="670" y="244" width="330" height="46" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="686" y="264">VariationEngine</text>
+    <text class="box-sub" x="686" y="280">mutation_prompt · crossover_prompt</text>
+  </a>
+
+  <a class="box" id="d1-wfs" href="mod_core_selection.html">
+    <title>WorkflowSelector picks parents</title>
+    <rect x="670" y="300" width="330" height="46" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="686" y="320">WorkflowSelector</text>
+    <text class="box-sub" x="686" y="336">select_parent_workflows()</text>
+  </a>
+
+  <a class="box" id="d1-wfi" href="area_sources_core.html">
+    <title>WorkflowInfo reads the workflow folder</title>
+    <rect x="670" y="356" width="330" height="46" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="686" y="376">WorkflowInfo</text>
+    <text class="box-sub" x="686" y="392">reads state_result.json</text>
+  </a>
+
+  <a class="box" id="d1-runs" href="#card-engine">
+    <title>Return value of the loop</title>
+    <rect x="280" y="430" width="310" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435" y="453" text-anchor="middle">runs: list[IndividualRun]</text>
+    <text class="box-sub" x="435" y="470" text-anchor="middle">returned to the caller after the last generation</text>
+  </a>
+
+  <a class="box" id="d1-files" href="data_runs.html">
+    <title>Artifacts written per task</title>
+    <rect x="670" y="428" width="330" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="686" y="450">artifacts written</text>
+    <text class="box-sub" x="686" y="466">run_metrics.json · qd_archive.jsonl</text>
+    <text class="box-sub" x="686" y="480">variation_log.jsonl · lineage_&lt;uuid&gt;.json</text>
+  </a>
+
+  <path class="edge" data-from="d1-callers" data-to="d1-engine" d="M200,68 H245 V130 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="204" y="60">task goal str</text>
+  <path class="edge dashed-edge" data-from="d1-config" data-to="d1-engine" d="M200,218 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="204" y="210">config fields</text>
+  <path class="edge" data-from="d1-engine" data-to="d1-orch" d="M590,196 H630 V43 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d1-engine" data-to="d1-wsm" d="M590,196 H630 V99 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d1-engine" data-to="d1-judge" d="M590,196 H630 V155 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d1-engine" data-to="d1-sel" d="M590,196 H630 V211 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d1-engine" data-to="d1-var" d="M590,196 H630 V267 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d1-engine" data-to="d1-wfs" d="M590,196 H630 V323 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d1-engine" data-to="d1-wfi" d="M590,196 H630 V379 H670" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="626" y="190" text-anchor="end">holds instances</text>
+  <path class="edge" data-from="d1-engine" data-to="d1-runs" d="M435,400 V430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge dashed-edge" data-from="d1-engine" data-to="d1-files" d="M560,400 V414 H835 V428" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="410">writes per round</text>
+
+</svg>
+</div>
+<p class="figcap">Diagram 1 - rounded = class, rectangle = file or object, dashed = data write. Symbol names on every box come from the cited file.</p>
+
+<table>
+<thead><tr><th>Collaborator</th><th>File</th><th class="size">Lines</th><th>Symbol the engine calls</th></tr></thead>
+<tbody>
+<tr><td>WorkflowOrchestrator</td><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a></td><td class="size">427</td><td class="sym">orchestrate_workflow</td></tr>
+<tr><td>WorkspaceManager</td><td class="sym"><a href="../../sources/utils/workspace_management.py">utils/workspace_management.py</a></td><td class="size">169</td><td class="sym">begin_session, save_run_snapshot</td></tr>
+<tr><td>WorkflowEvaluator (judge)</td><td class="sym"><a href="../../sources/evaluators/evaluator.py">evaluators/evaluator.py</a></td><td class="size">193</td><td class="sym">evaluate</td></tr>
+<tr><td>SelectionPressure</td><td class="sym"><a href="../../sources/core/selection.py">selection.py</a></td><td class="size">842</td><td class="sym">validate_survivor</td></tr>
+<tr><td>VariationEngine</td><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a></td><td class="size">609</td><td class="sym">mutation_prompt, crossover_prompt</td></tr>
+<tr><td>WorkflowSelector</td><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a></td><td class="size">396</td><td class="sym">select_parent_workflows</td></tr>
+<tr><td>WorkflowInfo</td><td class="sym"><a href="../../sources/core/workflow_info.py">workflow_info.py</a></td><td class="size">271</td><td class="sym">overall_score, abstracted_textual_gradient</td></tr>
+<tr><td>IndividualRun, SelectionLog</td><td class="sym"><a href="../../sources/core/schema.py">schema.py</a></td><td class="size">163</td><td class="sym">dataclasses exchanged per round</td></tr>
+</tbody>
+</table>
+
+<details><summary id="callers">who calls start_workflow_evolution</summary><div class="dbody">
+<p>Callers: <code class="path">main.py:232</code>, <code class="path">sources/core/planner.py:779</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py:1160</code> and <code class="path">:1457</code>, <code class="path">sources/cli/onboard_cli.py:1607</code>, <code class="path">webui/backend/mimosa_bridge.py:195</code>.</p>
+<p>The engine also builds <code>WorkflowOrchestrator</code> itself, so the runner layer is reached through this class. Deeper detail: <a href="mod_core_runner.html">mod_core_runner.html</a>.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>One generation, end to end</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 560" role="img" aria-label="Generation loop">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d2-start" href="#card-engine">
+    <title>Once per task, in start_workflow_evolution</title>
+    <rect x="250" y="8" width="520" height="52" rx="2" fill="rgba(230,251,255,0.05)" stroke="#E6FBFF"/>
+    <text class="box-label" x="266" y="30">start_workflow_evolution</text>
+    <text class="box-sub" x="266" y="48">reset archive · seed run 0</text>
+  </a>
+
+  <a class="box" id="d2-loop" href="#card-engine">
+    <title>Recursive loop body</title>
+    <rect x="250" y="72" width="520" height="52" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="266" y="94">evolve_generation</text>
+    <text class="box-sub" x="266" y="112">reset workspace to initial state</text>
+  </a>
+
+  <a class="box" id="d2-orch" href="mod_core_runner.html">
+    <title>Generation plus sandbox run</title>
+    <rect x="250" y="136" width="520" height="52" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="266" y="158">orchestrate_workflow</text>
+    <text class="box-sub" x="266" y="176">ground &gt; generate &gt; sandbox run</text>
+  </a>
+
+  <a class="box" id="d2-snap" href="area_utils.html">
+    <title>Workspace snapshot plus lineage sidecar</title>
+    <rect x="250" y="200" width="520" height="52" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="266" y="222">snapshot + lineage</text>
+    <text class="box-sub" x="266" y="240">save_run_snapshot · record_lineage</text>
+  </a>
+
+  <a class="box" id="d2-eval" href="mod_evaluators_hybrid_verifier.html">
+    <title>Verifier scoring channel</title>
+    <rect x="250" y="264" width="520" height="52" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="266" y="286">verifier evaluate</text>
+    <text class="box-sub" x="266" y="304">WorkflowEvaluator.evaluate(uuid)</text>
+  </a>
+
+  <a class="box" id="d2-arch" href="mod_core_selection.html">
+    <title>Survivor gate and archive admit</title>
+    <rect x="250" y="328" width="520" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="266" y="350">admit to archive</text>
+    <text class="box-sub" x="266" y="368">validate_survivor · qd_archive.jsonl</text>
+  </a>
+
+  <a class="box" id="d2-stop" href="area_entry_config.html">
+    <title>Two stop tests, both after the round</title>
+    <rect x="250" y="392" width="520" height="52" rx="12" fill="rgba(230,251,255,0.05)" stroke="#E6FBFF"/>
+    <text class="box-label" x="266" y="414">stop check</text>
+    <text class="box-sub" x="266" y="432">reward vs threshold · last depth</text>
+  </a>
+
+  <a class="box" id="d2-var" href="mod_core_variation.html">
+    <title>Next prompt: seed, mutation or crossover</title>
+    <rect x="250" y="456" width="520" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="266" y="478">seed | mutation | crossover</text>
+    <text class="box-sub" x="266" y="496">VariationEngine builds next prompt</text>
+  </a>
+
+  <path class="edge" data-from="d2-start" data-to="d2-loop" d="M510,60 V72" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="524" y="70">max_learning_evolve_iterations</text>
+  <path class="edge" data-from="d2-loop" data-to="d2-orch" d="M510,124 V136" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="524" y="134">prompt str</text>
+  <path class="edge" data-from="d2-orch" data-to="d2-snap" d="M510,188 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="524" y="198">uuid, executed</text>
+  <path class="edge dashed-edge" data-from="d2-snap" data-to="d2-eval" d="M510,252 V264" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="524" y="262">workflow folder</text>
+  <path class="edge" data-from="d2-eval" data-to="d2-arch" d="M510,316 V328" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="524" y="326">reward, gradient</text>
+  <path class="edge" data-from="d2-arch" data-to="d2-stop" d="M510,380 V392" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="524" y="390">qd_score</text>
+  <path class="edge" data-from="d2-stop" data-to="d2-var" d="M510,444 V456" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="524" y="454">learned_score_threshold</text>
+  <path class="edge" data-from="d2-var" data-to="d2-loop" d="M770,482 H900 V98 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="908" y="210" text-anchor="middle" transform="rotate(90 908,210)">crossover_rate, n_parents</text>
+  <text class="edge-label" x="908" y="360" text-anchor="middle" transform="rotate(90 908,360)">initial_population</text>
+  <path class="edge" data-from="d2-stop" d="M250,418 H120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="124" y="410">returns runs</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - the loop runs top to bottom; the right-hand arrow is the recursion into <code>evolve_generation</code>. Gate values on the arrows are the config fields read by that step. Sequence view: <a href="flow_evolution_loop.html">flow_evolution_loop.html</a>; selection detail: <a href="mod_core_selection.html">mod_core_selection.html</a>.</p>
+
+<table>
+<thead><tr><th>#</th><th>Step</th><th>Symbol (path::Class.method)</th><th>Reads or writes</th></tr></thead>
+<tbody>
+<tr><td class="size">1</td><td>Reset the session</td><td class="sym">evolution_engine.py::EvolutionEngine.start_workflow_evolution</td><td>clears <code>selection._archive</code> and 3 variation histories</td></tr>
+<tr><td class="size">2</td><td>Pick parent(s)</td><td class="sym">EvolutionEngine.select_parent_workflow</td><td>calls <code>WorkflowSelector.select_parent_workflows</code></td></tr>
+<tr><td class="size">3</td><td>Run the round</td><td class="sym">orchestrator.py::WorkflowOrchestrator.orchestrate_workflow</td><td>returns stdout, <code>uuid</code>, code, <code>executed</code></td></tr>
+<tr><td class="size">4</td><td>Snapshot and lineage</td><td class="sym">WorkspaceManager.save_run_snapshot, lineage.record_lineage</td><td>writes <code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code>, <code>lineage_&lt;uuid&gt;.json</code></td></tr>
+<tr><td class="size">5</td><td>Save the prompt</td><td class="sym">EvolutionEngine._save_evolution_prompt_artifact</td><td>writes <code>evolution_prompt_&lt;uuid&gt;.md</code></td></tr>
+<tr><td class="size">6</td><td>Score the run</td><td class="sym">EvolutionEngine._evaluate_and_calculate_cost</td><td><code>judge.evaluate(evaluator_type="verifier")</code>, only if <code>executed</code></td></tr>
+<tr><td class="size">7</td><td>Read the reward</td><td class="sym">workflow_info.py::WorkflowInfo.overall_score</td><td>reads <code>state_result.json</code>; default 0.0 when absent</td></tr>
+<tr><td class="size">8</td><td>Gate the survivor</td><td class="sym">selection.py::SelectionPressure.validate_survivor</td><td>returns verdict dict; stores <code>qd_archive.jsonl</code> row</td></tr>
+<tr><td class="size">9</td><td>Persist metrics</td><td class="sym">EvolutionEngine._persist_iteration_metrics</td><td>writes <code>run_metrics.json</code> in the uuid folder</td></tr>
+<tr><td class="size">10</td><td>Stop test 1: depth</td><td class="sym">EvolutionEngine.evolve_generation</td><td>returns when <code>iteration_count &gt;= max_depth - 1</code> and not <code>on_error</code></td></tr>
+<tr><td class="size">11</td><td>Stop test 2: score</td><td class="sym">EvolutionEngine.evolve_generation</td><td>returns when <code>overall_score &gt;= learned_score_threshold</code> in learn mode</td></tr>
+<tr><td class="size">12</td><td>Vary and recurse</td><td class="sym">VariationEngine.mutation_prompt, crossover_prompt, seed_genome_prompt</td><td>appends a new <code>IndividualRun</code>, calls <code>evolve_generation</code></td></tr>
+</tbody>
+</table>
+
+<p class="note say">Why it matters: the round is stored twice - the verifier reward drives selection, while <code>run_metrics.json</code> and the lineage files are what audits read later.</p>
+<p class="note">Amber note: <code>config.py</code> sets <code>crossover_rate = 0.4</code> while <code>config_default.json</code> ships <code>0.25</code>; runs that load the template get 0.25.</p>
+<p class="note flag">Red note: <code class="path">docs/concepts/evolution-engine.md</code> states <code>parent_threshold_similarity</code> default <code>0.8</code>, but <code>config.py:152</code> and <code>config_default.json</code> both set <code>0.95</code>; the <code>0.8</code> in the engine is only a <code>getattr</code> fallback.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File card - the engine</h2>
+<div class="card l2" id="card-engine">
+<h4><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></h4>
+<p class="role">Holds the per-task generation loop: picks parents, calls the orchestrator, scores the run, gates the survivor, writes the round artifacts, then varies and recurses.</p>
+<p class="meta">1 109 lines &#183; class: <code>EvolutionEngine</code> &#183; module functions: <code>_scalar</code>, <code>_to_jsonable</code> &#183; entry: <code>start_workflow_evolution</code> (line 338)</p>
+
+<details><summary>public method signatures</summary><div class="dbody">
+<pre>EvolutionEngine.__init__(config, viz_utils=None, process_id=None)
+EvolutionEngine.get_workspace_manager_session_id() -&gt; str | None
+async EvolutionEngine.mockup(wf: WorkflowInfo | None, goal: str) -&gt; list[IndividualRun]
+EvolutionEngine.load_phenotype_result(uuid: str) -&gt; Any
+EvolutionEngine.load_workflow_genotype_code(workflow_id: str) -&gt; str
+EvolutionEngine.get_total_rewards(wf_state, eval_type: str) -&gt; float
+EvolutionEngine.extract_agents_behavior(wf_state) -&gt; str
+EvolutionEngine.show_answers(agents_answers: str) -&gt; None
+EvolutionEngine.select_parent_workflow(goal, template_uuid=None, crossover_rate=None, n_parents=None) -&gt; tuple[list[WorkflowInfo], bool]
+EvolutionEngine.get_genotype_instructions(goal, wf=None, max_iterations=10) -&gt; str
+async EvolutionEngine.start_workflow_evolution(goal, template_uuid="20260512_162504_70ccefbf", judge=True, scenario_rubric=None, enable_evolution=False, original_task=None, single_agent_mode=False, mockup_mode=False) -&gt; list[IndividualRun]
+async EvolutionEngine.evolve_generation(runs, rewards_history=None, assertion_history=None, enable_evolution=False, single_agent_mode=False, workspace_mgr=None) -&gt; list[IndividualRun]</pre>
+<p>Private helpers: <code>_export_astra</code>, <code>_get_human_validation</code>, <code>_log_iteration_start</code>, <code>_evaluate_and_calculate_cost</code>, <code>_evaluate_workflow_phenotype</code>, <code>_update_assertion_history</code>, <code>_update_visualizations</code>, <code>_update_rewards_plot</code>, <code>_update_assertion_plot</code>, <code>_log_iteration_completion</code>, <code>_refresh_evolution_tree</code>, <code>_refresh_archive_projection</code>, <code>_save_evolution_prompt_artifact</code>, <code>_build_run_metrics_snapshot</code>, <code>_build_qd_archive_entry</code>, <code>_build_variation_log_entry</code>, <code>_persist_iteration_metrics</code>, <code>_persist_qd_archive</code>, <code>_persist_variation_log</code>, <code>_save_final_plots</code>.</p>
+</div></details>
+
+<details><summary>config fields read</summary><div class="dbody">
+<table>
+<thead><tr><th>Field</th><th>Default (config.py)</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">max_learning_evolve_iterations</td><td class="size">16</td><td>loop budget in learn mode</td></tr>
+<tr><td class="sym">learned_score_threshold</td><td class="size">0.9</td><td>early stop on reward</td></tr>
+<tr><td class="sym">initial_population</td><td class="size">2</td><td>rounds before mutation is enabled</td></tr>
+<tr><td class="sym">crossover_rate</td><td class="size">0.4</td><td>chance of crossover over mutation</td></tr>
+<tr><td class="sym">n_parents</td><td class="size">2</td><td>parents drawn when crossover fires</td></tr>
+<tr><td class="sym">parent_threshold_similarity</td><td class="size">0.95</td><td>parent-pool filter</td></tr>
+<tr><td class="sym">parent_threshold_score</td><td class="size">0.01</td><td>minimum parent score</td></tr>
+<tr><td class="sym">selection_strategy</td><td class="size">"qd"</td><td><code>SelectionPressure</code> mode</td></tr>
+<tr><td class="sym">min_improvement_threshold</td><td class="size">0.01</td><td>greedy validity test</td></tr>
+<tr><td class="sym">population_size</td><td class="size">16</td><td>archive cap</td></tr>
+<tr><td class="sym">novelty_k_neighbours</td><td class="size">16</td><td>k for k-NN novelty</td></tr>
+<tr><td class="sym">novelty_weight</td><td class="size">0.25</td><td>weight of novelty in <code>qd_score</code></td></tr>
+<tr><td class="sym">admit_threshold</td><td class="size">0.3</td><td>min <code>qd_score</code> to admit</td></tr>
+<tr><td class="sym">novelty_comparison</td><td class="size">"archive_knn"</td><td>comparison set</td></tr>
+<tr><td class="sym">novelty_previous_n</td><td class="size">16</td><td>window for <code>"previous_n"</code> mode</td></tr>
+<tr><td class="sym">length_penalty_baseline_chars</td><td class="size">8 000</td><td>start of the genotype length penalty</td></tr>
+<tr><td class="sym">length_penalty_lambda</td><td class="size">0.05</td><td>strength of that penalty</td></tr>
+<tr><td class="sym">export_astra</td><td class="size">False</td><td>opt-in ASTRA trace export</td></tr>
+<tr><td class="sym">workflow_dir</td><td class="size">paths.default_workflow_dir()</td><td>where runs and jsonl files land</td></tr>
+</tbody>
+</table>
+<p><code>learned_score_threshold</code> is <code>0.9</code> in <code>config.py:133</code> and <code>0.92</code> in <code>config_default.json</code>.</p>
+</div></details>
+
+<details><summary>files written</summary><div class="dbody">
+<table>
+<thead><tr><th>Path</th><th>Writer</th></tr></thead>
+<tbody>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/run_metrics.json</td><td class="sym">_persist_iteration_metrics -&gt; utils/run_metrics.write_run_metrics</td></tr>
+<tr><td class="sym">sources/workflows/qd_archive.jsonl</td><td class="sym">_persist_qd_archive -&gt; append_jsonl (one line per survivor)</td></tr>
+<tr><td class="sym">sources/workflows/variation_log.jsonl</td><td class="sym">_persist_variation_log -&gt; append_jsonl</td></tr>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/evolution_prompt_&lt;uuid&gt;.md</td><td class="sym">_save_evolution_prompt_artifact</td></tr>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json</td><td class="sym">core/lineage.record_lineage</td></tr>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/reward_progress.png, assertion_progress.png</td><td class="sym">_save_final_plots, _update_assertion_plot</td></tr>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/evolution_tree.png</td><td class="sym">_refresh_evolution_tree -&gt; utils/evolution_tree</td></tr>
+<tr><td class="sym">sources/workflows/archive_pca.png</td><td class="sym">_refresh_archive_projection -&gt; utils/archive_projection</td></tr>
+<tr><td class="sym">/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;/</td><td class="sym">WorkspaceManager.save_run_snapshot (not the engine directly)</td></tr>
+</tbody>
+</table>
+</div></details>
+
+<details><summary>error paths (on_error)</summary><div class="dbody">
+<ul>
+<li><code>executed = False</code> comes from <code>orchestrate_workflow</code>. Generation failure returns the placeholder uuid <code>generation_failed</code> (see <code>orchestrator.py::WorkflowOrchestrator._parse_generation_error</code>); execution failure returns the real uuid.</li>
+<li>The judge is skipped when <code>executed</code> is False (<code>evolution_engine.py:779</code>), but the cost is still computed.</li>
+<li>The depth stop test is skipped for <code>on_error</code> rounds, so a failed round keeps the loop running.</li>
+<li><code>record_lineage</code> writes nothing when the uuid folder is missing, so <code>generation_failed</code> rounds leave no lineage file.</li>
+<li>The observer call <code>variation.record_offspring_gradient</code> treats <code>on_error</code> or verifier <code>skipped_reason == "workflow_generation_or_execution_failed"</code> as a failure.</li>
+</ul>
+</div></details>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Helpers in core called by the loop</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 230" role="img" aria-label="helper descriptors">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4F7486"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d3-sel" href="mod_core_selection.html">
+    <title>Selection asks for a behaviour descriptor</title>
+    <rect x="20" y="30" width="190" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="34" y="53">selection.py</text>
+    <text class="box-sub" x="34" y="69">_extract_behaviour_descriptor</text>
+  </a>
+  <a class="box" id="d3-cf" href="#card-codefeatures">
+    <title>QD-facing shim</title>
+    <rect x="280" y="30" width="240" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="294" y="53">code_features.py</text>
+    <text class="box-sub" x="294" y="69">genotype_embedding_descriptor</text>
+  </a>
+  <a class="box" id="d3-ge" href="mod_core_selection.html">
+    <title>Embedding backend selector</title>
+    <rect x="560" y="30" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="574" y="53">genotype_embedding.py</text>
+    <text class="box-sub" x="574" y="69">embed_genotype</text>
+  </a>
+  <a class="box" id="d3-mini" href="mod_core_selection.html">
+    <title>Default local backend</title>
+    <rect x="830" y="30" width="170" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="844" y="53">all-MiniLM-L6-v2</text>
+    <text class="box-sub" x="844" y="69">local model</text>
+  </a>
+  <a class="box" id="d3-legacy" href="area_evaluators_legacy.html">
+    <title>Legacy claims verifier still computes the fingerprint</title>
+    <rect x="280" y="140" width="240" height="56" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="294" y="163">verifier.py (legacy)</text>
+    <text class="box-sub" x="294" y="179">VerifierEvaluator</text>
+  </a>
+  <a class="box" id="d3-ff" href="#card-fingerprint">
+    <title>Deprecated descriptor</title>
+    <rect x="560" y="140" width="200" height="56" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="574" y="163">failure_fingerprint.py</text>
+    <text class="box-sub" x="574" y="179">compute_failure_fingerprint</text>
+  </a>
+  <a class="box" id="d3-key" href="mod_evaluators_hybrid_verifier.html">
+    <title>Persisted fingerprint key</title>
+    <rect x="830" y="140" width="170" height="56" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="844" y="163">verifier scores</text>
+    <text class="box-sub" x="844" y="179">"failure_fingerprint" key</text>
+  </a>
+
+  <path class="edge" data-from="d3-sel" data-to="d3-cf" d="M210,58 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="245" y="50" text-anchor="middle">code str</text>
+  <path class="edge" data-from="d3-cf" data-to="d3-ge" d="M520,58 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="50" text-anchor="middle">code</text>
+  <path class="edge" data-from="d3-ge" data-to="d3-mini" d="M760,58 H830" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="795" y="50" text-anchor="middle">encode()</text>
+  <path class="edge" data-from="d3-legacy" data-to="d3-ff" d="M520,168 H560" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="540" y="160" text-anchor="middle">claims</text>
+  <path class="edge" data-from="d3-ff" data-to="d3-key" d="M760,168 H830" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="795" y="160" text-anchor="middle">7 floats</text>
+  <text class="box-sub" x="20" y="215">dashed grey = deprecated path | the hybrid verifier imports only DESCRIPTOR_DIM (evaluator.py:47)</text>
+  </svg>
+</div>
+<p class="figcap">Diagram 3 - the engine itself does not import these helpers; they are reached through <a href="mod_core_selection.html">mod_core_selection.html</a> and the verifier.</p>
+
+<div class="card l2" id="card-codefeatures">
+<h4><a href="../../sources/core/code_features.py">sources/core/code_features.py</a></h4>
+<p class="role">QD-facing shim: returns the unit-norm genotype embedding, or <code>None</code> when the source is missing, empty, or the backend fails.</p>
+<p class="meta">37 lines &#183; 1 function: <code>genotype_embedding_descriptor</code> &#183; calls: <code>genotype_embedding.embed_genotype</code> &#183; caller: <code>selection.py:488</code></p>
+<details><summary>signature and behaviour</summary><div class="dbody">
+<pre>genotype_embedding_descriptor(code: str | None) -&gt; list[float] | None</pre>
+<p>Returns a plain <code>list[float]</code> so the selection layer can fall back to a neutral novelty signal. A degenerate input gives <code>None</code>, never a maximum-novelty value. The <code>__main__</code> block asserts unit norm within <code>1e-4</code>.</p>
+</div></details>
+</div>
+
+<div class="card dep" id="card-fingerprint">
+<h4><a href="../../sources/core/failure_fingerprint.py">sources/core/failure_fingerprint.py</a> <span class="tag dep">DEPRECATED</span></h4>
+<p class="role">Per-source pass-rate descriptor (7 values, centered). The module docstring states it is no longer used in the archive.</p>
+<p class="meta">195 lines &#183; <code>compute_failure_fingerprint</code>, <code>failure_fingerprint_from_state_result</code>, <code>failure_fingerprint_from_workflow_dir</code>, <code>neutral_fingerprint</code> &#183; <code>DESCRIPTOR_DIM = 7</code></p>
+<details><summary>signatures and shape</summary><div class="dbody">
+<pre>SOURCES = ("a", "b", "c", "d", "e", "f", "g")
+compute_failure_fingerprint(per_claim) -&gt; {"vector", "presence_mask", "pass_rates"}
+failure_fingerprint_from_state_result(state_result) -&gt; list[float] | None
+failure_fingerprint_from_workflow_dir(workflow_dir, uuid) -&gt; list[float] | None
+neutral_fingerprint() -&gt; [0.0] * 7</pre>
+<p>Absent sources get pass rate <code>0.5</code> and mask <code>0.0</code>; the vector is centered on the mean of present sources, so all-pass and all-fail both give a zero vector. Still imported by <code>sources/evaluators/verifier.py:32</code> (legacy) and, for the constant only, by <code>sources/evaluators/hybrid_verifier/evaluator.py:47</code>.</p>
+</div></details>
+</div>
+
+<div class="card l3">
+<h4><a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a></h4>
+<p class="role">Runs one workflow for the engine: grounds the prompt, generates code through a factory, installs runner dependencies, then executes in the sandbox.</p>
+<p class="meta">427 lines &#183; class: <code>WorkflowOrchestrator</code> &#183; returns <code>(output, uuid, genotype_code, executed)</code></p>
+<details><summary>key methods and the executed flag</summary><div class="dbody">
+<pre>WorkflowOrchestrator.orchestrate_workflow(goal, craft_instructions, original_task=None, single_agent_mode=False, no_run=False) -&gt; tuple[str, str, str, bool]
+WorkflowOrchestrator.workflow_requirements_install() -&gt; None
+WorkflowOrchestrator.workflow_sandbox_run(workflow_genotype_code) -&gt; str
+WorkflowOrchestrator._parse_generation_error(error) -&gt; tuple[str, str]</pre>
+<p>Any generation or execution error becomes <code>executed = False</code> instead of an exception, which is the structural <code>on_error</code> signal the engine reads. Full card: <a href="mod_core_runner.html">mod_core_runner.html</a>.</p>
+</div></details>
+</div>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/core/evolution_engine.py</code> (1109 lines), <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/failure_fingerprint.py</code>, <code class="path">sources/core/selection.py</code>, <code class="path">sources/core/variation_engine.py</code>, <code class="path">sources/core/lineage.py</code>, <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/schema.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/core/workflow_selection.py</code>, <code class="path">sources/utils/run_metrics.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, <code class="path">docs/concepts/evolution-engine.md</code>.</p>
+<p class="skips">Skipped: webui, tests, docs/ (except <code class="path">docs/concepts/evolution-engine.md</code>, read only for the default values quoted in the red note), datasets, run_notes, runs_capsule, sources/workflows, sources/memory, logs (Tier D, or other pages). Read but not drawn as boxes, no cards: <code class="path">sources/utils/pricing.py</code> (cost), <code class="path">sources/utils/notify.py</code> (Pushover), <code class="path">sources/utils/visualization.py</code> (reward curve), <code class="path">sources/utils/evolution_tree.py</code> and <code class="path">sources/utils/archive_projection.py</code> (PNG refresh, both best-effort), <code class="path">sources/cli/pretty_print.py</code> (console output), <code class="path">sources/core/genotype_embedding.py</code> (only its entry point is shown in diagram 3), <code class="path">sources/evaluators/</code> beyond the facade (<a href="mod_evaluators_hybrid_verifier.html">hybrid verifier page</a> and <a href="area_evaluators_legacy.html">legacy page</a>). <code class="path">sources/utils/run_metrics.py</code> is covered inside the "files written" block instead of a card.</p>
+<p>No <code>run_task</code> method exists in this file; the entry point is <code>start_workflow_evolution</code>.</p>
+<p>The working tree had uncommitted changes when this page was built (<code>git status --porcelain</code> listed modified <code>config.py</code> and <code>main.py</code>). Line numbers are hints from that working tree.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

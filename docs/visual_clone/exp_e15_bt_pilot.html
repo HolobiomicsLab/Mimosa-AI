@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e15_bt_pilot - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e15_bt_pilot">
+<div class="wrap">
+
+<h1 class="hud">e15_bt_pilot &mdash; the live judging engine</h1>
+<p class="intro">E15 asked whether a paid LLM preference tournament over frozen generation artifacts is affordable and usable. This script executes the 667-pair plan written by <a href="exp_e14_bt_enabler.html">E14</a>: it judges every pair in both listed orders, breaks disagreement with a third vote, and appends one record per pair and one line per call. It spent $44.89 against a $40 cap because a duplicate judge process ran concurrently.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 360" role="img" aria-label="e15_bt_pilot stages and ledgers">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="h">
+    <title>Hypothesis: LLM preference between two workspaces can be bought cheaply and stably</title>
+    <rect x="30" y="20" width="165" height="54" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="112" y="44" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="112" y="60" text-anchor="middle">pairs are buyable</text>
+  </g>
+
+  <a class="box" id="bPlan" href="../../experiments_verifiers/harness/e15_bt_pilot.py">
+    <title>load_plan() re-asserts the E14 plan before any paid call</title>
+    <rect x="255" y="20" width="170" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="340" y="44" text-anchor="middle">load_plan()</text>
+    <text class="box-sub" x="340" y="60" text-anchor="middle">line 64, asserts 667 pairs</text>
+  </a>
+
+  <a class="box" id="bJudge" href="../../experiments_verifiers/harness/e15_bt_pilot.py">
+    <title>cmd_judge() queues pairs, resumes finished ones and enforces the cost cap</title>
+    <rect x="485" y="20" width="170" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="570" y="44" text-anchor="middle">cmd_judge()</text>
+    <text class="box-sub" x="570" y="60" text-anchor="middle">line 418, 6 workers</text>
+  </a>
+
+  <a class="box" id="bPair" href="../../experiments_verifiers/harness/e15_bt_pilot.py">
+    <title>run_pair() judges both orders and adds a third vote on disagreement</title>
+    <rect x="715" y="20" width="170" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="800" y="44" text-anchor="middle">run_pair()</text>
+    <text class="box-sub" x="800" y="60" text-anchor="middle">line 267</text>
+  </a>
+
+  <a class="box" id="iPlan" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>results/E14_bt_population.json - pair plan and pricing block</title>
+    <rect x="30" y="120" width="165" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="144" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="112" y="160" text-anchor="middle">plan + pricing</text>
+  </a>
+
+  <a class="box" id="iGoal" href="../../run_notes">
+    <title>run_notes/&lt;campaign&gt;/&lt;task&gt;.json - the task goal text</title>
+    <rect x="30" y="190" width="165" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="214" text-anchor="middle">run_notes goals</text>
+    <text class="box-sub" x="112" y="230" text-anchor="middle">goal field only</text>
+  </a>
+
+  <a class="box" id="iPng" href="../../experiments_verifiers/workspace_artefacts/snapshots">
+    <title>snapshot PNGs - up to two largest per generation</title>
+    <rect x="30" y="260" width="165" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="284" text-anchor="middle">snapshot PNGs</text>
+    <text class="box-sub" x="112" y="300" text-anchor="middle">2 largest per gen</text>
+  </a>
+
+  <a class="box" id="bCall" href="../../experiments_verifiers/harness/e15_bt_pilot.py">
+    <title>judge_call() builds text plus base64 images and appends one ledger line</title>
+    <rect x="485" y="130" width="170" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="570" y="154" text-anchor="middle">judge_call()</text>
+    <text class="box-sub" x="570" y="170" text-anchor="middle">line 193, ledger append</text>
+  </a>
+
+  <a class="box" id="bParse" href="../../experiments_verifiers/harness/e15_bt_pilot.py">
+    <title>parse_verdict() repairs and parses the strict JSON verdict</title>
+    <rect x="715" y="130" width="170" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="800" y="154" text-anchor="middle">parse_verdict()</text>
+    <text class="box-sub" x="800" y="170" text-anchor="middle">line 111</text>
+  </a>
+
+  <a class="box" id="oLed" href="../../experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl">
+    <title>results/E15_bt_cost_ledger_2026-09-23.jsonl - one line per call</title>
+    <rect x="485" y="270" width="200" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="294" text-anchor="middle">cost ledger jsonl</text>
+    <text class="box-sub" x="585" y="310" text-anchor="middle">2 146 lines</text>
+  </a>
+
+  <a class="box" id="oJud" href="../../experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl">
+    <title>results/E15_bt_pilot_judgments_2026-09-23.jsonl - one record per pair</title>
+    <rect x="715" y="270" width="200" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="815" y="294" text-anchor="middle">judgments jsonl</text>
+    <text class="box-sub" x="815" y="310" text-anchor="middle">667 pair records</text>
+  </a>
+
+  <path class="edge" data-from="h" data-to="bPlan" d="M195,47 L255,32" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="38" text-anchor="middle">drives</text>
+  <path class="edge dashed-edge" data-from="iPlan" data-to="bPlan" d="M195,147 L255,50" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="198" y="112" text-anchor="start">pair plan</text>
+  <path class="edge dashed-edge" data-from="iGoal" data-to="bJudge" d="M195,217 L485,62" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="198" y="184" text-anchor="start">goal text</text>
+  <path class="edge dashed-edge" data-from="iPng" data-to="bCall" d="M195,287 L485,160" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="198" y="254" text-anchor="start">PNG bytes</text>
+
+  <path class="edge" data-from="bPlan" data-to="bJudge" d="M425,47 H485" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="455" y="40" text-anchor="middle">queue</text>
+  <path class="edge" data-from="bJudge" data-to="bPair" d="M655,47 H715" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="685" y="40" text-anchor="middle">pairs</text>
+  <path class="edge" data-from="bPair" data-to="bCall" d="M800,74 V100 H570 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="94" text-anchor="middle">prompt + images</text>
+  <path class="edge" data-from="bCall" data-to="bParse" d="M655,157 H715" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="685" y="150" text-anchor="middle">raw reply</text>
+  <path class="edge dashed-edge" data-from="bCall" data-to="oLed" d="M570,184 V270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="578" y="232" text-anchor="start">call record</text>
+  <path class="edge dashed-edge" data-from="bPair" data-to="oJud" d="M885,47 H945 V297 H915" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="940" y="250" text-anchor="end">pair record</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. Purple = hypothesis, mint pills = functions, dashed grey = inputs on disk, cyan = the two append-only ledgers. One pair costs two calls; a disagreement adds a third. <code>run_pair()</code> appends the pair record and <code>judge_call()</code> appends the call line, so the two files have different granularity. The resume helper <code>load_done_pairs()</code> (line 362) is named in the card, not drawn.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e15_bt_pilot.py">experiments_verifiers/harness/e15_bt_pilot.py</a></h4>
+<p class="role">Runs the paid preference tournament: one text judge and one vision judge, both orders per pair, third vote on disagreement, two append-only ledgers.</p>
+<p class="meta">498 lines &#183; entry: <code>main()</code> (line 481) &#183; subcommands <code>dry</code> and <code>judge</code> &#183; 4 judge options</p>
+<details><summary>CLI, stages, constants</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e15_bt_pilot.py dry
+uv run python experiments_verifiers/harness/e15_bt_pilot.py judge [--workers 6]
+        [--cost-cap 34] [--only-group SUBSTR] [--limit N] [--include-images-from-start]
+
+load_plan()        line  64   asserts 19 groups and 667 pairs
+load_goals()       line  88   reads run_notes/&lt;campaign&gt;/&lt;task&gt;.json
+parse_verdict()    line 111   strips think blocks, scans balanced JSON
+_call_llm()        line 147   litellm, 5 attempts, reasoning disabled
+judge_call()       line 193   text or base64 images, appends the ledger
+png_dims()         line 236   reads the PNG header for width and height
+gen_images()       line 248   up to MAX_IMAGES_PER_GEN largest PNGs
+stable_coin()      line 263   sha256 decides the third-vote order
+run_pair()         line 267   both orders, third vote, majority, tie
+load_done_pairs()  line 362   resume by (group, i, j)
+cmd_dry()          line 396   prints plan size and prompt sizes, no calls
+cmd_judge()        line 418   thread pool, cost cap, resume
+main()             line 481   argparse dispatch</pre>
+<p>CLI facts as parsed by argparse: subcommand <code>dry</code> takes no options; subcommand <code>judge</code> takes <code>--workers</code> (default <code>DEFAULT_WORKERS = 6</code>, line 49), <code>--cost-cap</code> (default <code>DEFAULT_COST_CAP = 34.0</code>, line 50, &quot;hard cap is $40; stop margin below it&quot;), <code>--only-group</code> and <code>--limit</code> (both default None, lines 488-489). The docstring lists <code>--include-images-from-start</code> (line 18) but argparse defines no such flag.</p>
+<p>Models: <code>MODEL_TEXT = openrouter/deepseek/deepseek-v4.1-flash</code> (line 46) and <code>MODEL_VISION = openrouter/moonshotai/kimi-k3</code> (line 47); the vision path is chosen when either generation has images (line 272). Max output tokens are 2 000 for the vision judge and 600 for the text judge (line 202).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path (with code cite)</th></tr></thead>
+<tbody>
+<tr><td>Pair plan, pricing block, judge models</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/results/E14_bt_population.json</code> :: PLAN_PATH, line 41</td></tr>
+<tr><td>Task goal text per group</td><td>&mdash;</td><td class="sym"><code class="path">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</code> :: load_goals, line 91</td></tr>
+<tr><td>Snapshot artifacts and PNG headers</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/workspace_artefacts/snapshots/</code> :: gen_images, line 249</td></tr>
+<tr><td>Existing ledger, to resume and to total spend</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl</code> :: load_spent, line 375</td></tr>
+<tr><td>&mdash;</td><td>One line per call, appended</td><td class="sym"><code class="path">experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl</code> :: line 225</td></tr>
+<tr><td>&mdash;</td><td>One record per pair, appended</td><td class="sym"><code class="path">experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl</code> :: line 354</td></tr>
+</tbody>
+</table>
+<p class="note">Both files are append-only. A re-run skips pairs already present (line 362) and adds the new spend to the old total (line 373), so a single file can hold rows from more than one process. That is exactly what happened: see the cost flag below.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; where the money went</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="E15 spend by slice">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <path class="edge" d="M56,250 H470" fill="none" stroke="#1B4B6B" stroke-width="1.25"/>
+  <path class="edge dashed-edge" d="M56,250.0 H470" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="253.0" text-anchor="end">0</text>
+  <path class="edge dashed-edge" d="M56,210.4 H470" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="213.4" text-anchor="end">10</text>
+  <path class="edge dashed-edge" d="M56,170.8 H470" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="173.8" text-anchor="end">20</text>
+  <path class="edge dashed-edge" d="M56,131.2 H470" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="134.2" text-anchor="end">30</text>
+  <path class="edge dashed-edge" d="M56,91.7 H470" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="94.7" text-anchor="end">40</text>
+  <rect x="70" y="72.3" width="60" height="177.7" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="100" y="66.3" text-anchor="middle">$44.89</text>
+  <text class="box-sub" x="100" y="266" text-anchor="middle">total</text>
+  <rect x="150" y="147.1" width="60" height="102.9" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="180" y="141.1" text-anchor="middle">$25.99</text>
+  <text class="box-sub" x="180" y="266" text-anchor="middle">protocol</text>
+  <rect x="230" y="175.2" width="60" height="74.8" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="260" y="169.2" text-anchor="middle">$18.90</text>
+  <text class="box-sub" x="260" y="266" text-anchor="middle">overhead</text>
+  <rect x="310" y="79.5" width="60" height="170.5" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="340" y="73.5" text-anchor="middle">$43.08</text>
+  <text class="box-sub" x="340" y="266" text-anchor="middle">kimi-k3</text>
+  <rect x="390" y="242.8" width="60" height="7.2" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="420" y="236.8" text-anchor="middle">$1.81</text>
+  <text class="box-sub" x="420" y="266" text-anchor="middle">deepseek</text>
+  <text class="box-sub" x="56" y="284" text-anchor="start">USD; labels are costs from the ledger and the E15 cost block (see table for lines)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; cost slices in USD, all labeled. Total spend $44.89 splits into the protocol $25.99 (the 667 kept pair records) and $18.90 of extra calls. By model, kimi-k3 carries $43.08 and deepseek-v4.1-flash $1.81, so the 213 image-bearing pairs dominate. The $40 cap was breached.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Pairs judged</td><td class="size">667 of 667</td><td class="sym">E15_bt_pilot_2026-09-23.json lines 18-20, <code>coverage</code></td></tr>
+<tr><td>Calls in the kept pair records</td><td class="size">1 439</td><td class="sym">same file line 407, <code>cost.protocol_calls</code></td></tr>
+<tr><td>Image-bearing pairs</td><td class="size">213</td><td class="sym">same file line 408, <code>cost.protocol_image_pairs</code></td></tr>
+<tr><td>Protocol spend</td><td class="size">$25.9875</td><td class="sym">same file line 406, <code>cost.protocol_usd</code></td></tr>
+<tr><td>Overhead spend</td><td class="size">$18.9023</td><td class="sym">same file line 410, <code>cost.overhead_usd</code></td></tr>
+<tr><td>Total spend, cap $40</td><td class="size">$44.8898, breach true</td><td class="sym">same file lines 405 and 425</td></tr>
+<tr><td>Lines in the cost ledger</td><td class="size">2 146</td><td class="sym">my computation, <code>wc -l</code> plus json load over the ledger</td></tr>
+<tr><td>Ledger calls by model</td><td class="size">deepseek 1 430, kimi 716</td><td class="sym">same file lines 413-422, <code>cost.by_model</code></td></tr>
+<tr><td>Pair verdicts agreed in both orders</td><td class="size">562</td><td class="sym">my computation over the judgments jsonl, key <code>verdict_rule</code></td></tr>
+<tr><td>Pairs decided by third vote</td><td class="size">105</td><td class="sym">my computation, same key</td></tr>
+<tr><td>Pairs left as ties</td><td class="size">13</td><td class="sym">my computation, key <code>verdict</code></td></tr>
+<tr><td>Calls that returned tie</td><td class="size">30 of 1 439</td><td class="sym">my computation, judgement key <code>winner_listed</code></td></tr>
+<tr><td>Ledger lines with parse_fail</td><td class="size">2</td><td class="sym">my computation, ledger key <code>parse</code></td></tr>
+<tr><td>Median prompt tokens per ledger call</td><td class="size">12 725</td><td class="sym">my computation, ledger key <code>prompt_tokens</code></td></tr>
+</tbody>
+</table>
+<p class="note flag">The cap breach is an operational accident, not a protocol cost: the JSON states at line 411 that a first judge process was believed dead, a second was started, and both double-judged 321 pairs. The judgments file keeps the first record per pair, so its 1 439 kept calls are below the ledger's 2 146 lines. The JSON also mentions &quot;4 pre-fix smoke calls&quot; while the ledger holds 2 <code>parse_fail</code> lines; the two counts measure different things, and the record does not reconcile them.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>6 quotes: ledger lines and pair records, truncated at 400 characters</summary><div class="dbody">
+<blockquote>{"model": "openrouter/deepseek/deepseek-v4.1-flash", "winner_listed": "tie", "confidence": 0.0, "reason": "&lt;unparseable model output: 'We need compare candidates. Need decide better deliverables. Need inspect evidence. We have task: train synthetic feasib'&gt;", "prompt_tokens": 6621, "completion_tokens": 600, "litellm_response_cost": 0.0027063, "cost_usd": 0.000962, "latency_s": 4.59, "parse": "parse_fail", "call_id": 1, "group": "chemistry_iterative_v4_flash__tox21_synthetic_feasibility_scscore_model_synthetic_feasibility_modeling", "task": "tox21_synthetic_feasibility_scscore_model_synthetic_feasibility_modeling", "pair": "bb5078ca|c167c378", "order": "bb5078ca-first", "third_vote": false, "first_listed": "bb5078ca", "n_images_attached": 0}</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl line 1, quoted whole (750 characters); line 1 of the ledger, call_id 1; the reply text stops mid-sentence, the failure mode the protocol block describes at line 11</p>
+
+<blockquote>{"model": "openrouter/deepseek/deepseek-v4.1-flash", "winner_listed": "a", "confidence": 0.75, "reason": "Both produce the required .npy and a single final script, but A includes richer metadata, explicit tuning, and a more complete pipeline; B's script preview is truncated and relies on extra probe files.", "prompt_tokens": 6595, "completion_tokens": 60, "litellm_response_cost": 0.00102525, "cost_usd": 0.000689, "latency_s": 1.3, "parse": "ok", "call_id": 5, "group": "chemistry_iterative_v4_fla&hellip;</blockquote>
+<p class="sub">same file line 5, truncated at 400 characters; a normal text-judge call</p>
+
+<blockquote>{"group": "chemistry_iterative_v4_flash__llm_response_error_drugex_vis", "campaign": "chemistry_iterative_v4_flash", "task": "llm_response_error_drugex_vis", "i": "4aedf0aa", "j": "1d104ce6", "model": "openrouter/moonshotai/kimi-k3", "image_pair": true, "calls": [{"call_id": 12, "order": "4aedf0aa-first", "first_listed": "4aedf0aa", "winner_listed": "a", "winner_ij": "4aedf0aa", "confidence": 0.7, "reason": "Both pro&hellip;</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl line 2, truncated at 400 characters; an image-bearing pair judged by kimi-k3</p>
+
+<blockquote>{"group": "chemistry_iterative_v4_flash__llm_response_error_charge_density_difference", "campaign": "chemistry_iterative_v4_flash", "task": "llm_response_error_charge_density_difference", "i": "994f13ba", "j": "437bea8b", "model": "openrouter/moonshotai/kimi-k3", "image_pair": true, "calls": [{"call_id": 173, "order": "994f13ba-first", "first_listed": "994f13ba", "winner_listed": "tie", "winner_ij": "tie", "confidenc&hellip;</blockquote>
+<p class="sub">same file line 77, truncated at 400 characters; one of the 13 pairs recorded as a tie</p>
+
+<blockquote>"overhead_cause": "accident: the first judge process (nohup) was believed dead and a second was started; both ran concurrently 2026-09-23 ~21:00, double-judging 321 pairs before both completed. Ledger records every call; duplicate pair records were deduplicated (first kept) before analysis. The 667-pair protocol itself cost the projected amount and stays under cap."</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.json line 411, <code>cost.overhead_cause</code></p>
+
+<blockquote>"reasoning": "disabled on both judges (extra_body reasoning.enabled=false) &mdash; they are reasoners by default and would exhaust max_tokens before JSON"</blockquote>
+<p class="sub">same file line 11, <code>protocol.reasoning</code></p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e15_bt_pilot.py</code> (498 lines), <code class="path">experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl</code> (667 records), <code class="path">experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl</code> (2 146 lines), <code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.json</code>, <code class="path">experiments_verifiers/results/E14_bt_population.json</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>, <code class="path">docs/visual_clone/_reference.html</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> (never opened, per instruction). The two ledgers were loaded as JSON but not quoted in full - only the lines shown above. <code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md</code> is quoted on <a href="exp_e15_bt_eval.html">exp_e15_bt_eval.html</a>, which owns the evaluation readouts. <code class="path">experiments_verifiers/results/E15_bt_gradients/</code> is written by the evaluation script, not this one, and is not quoted here. No snapshot file contents were opened. The 19 per-group entries of <code class="path">E14_bt_population.json</code> (13 460 lines) were read at the totals, protocol and pricing keys only.</p>
+<p>Volatility: experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

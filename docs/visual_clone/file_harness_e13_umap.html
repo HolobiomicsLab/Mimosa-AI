@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e13_umap.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > experiments_verifiers/harness > e13_umap.py">
+<div class="wrap">
+
+<h1 class="hud">e13_umap.py</h1>
+<p class="intro">Arm-a figure script of E13: it re-projects the cached claim embeddings into 2-D with UMAP and colors each claim by its learned L3 weight w(c)=beta&#183;phi(c). It runs offline, after <a href="file_harness_e13_l3_extreme.html">e13_l3_extreme.py</a> stage <code>a</code>, with the <code>umap-learn</code> overlay. Zero API calls; it writes one PNG and one statistics block into the shared E13 results JSON.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Master diagram &mdash; what the file does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 330" role="img" aria-label="e13_umap.py pipeline: inputs, main, refit, projection, panels, coherence, outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="bin" href="../../experiments_verifiers/harness/e13_common.py">
+    <title>Cached inputs loaded through e13_common</title>
+    <rect x="14" y="120" width="150" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="89" y="146" text-anchor="middle">frozen caches</text>
+    <text class="box-sub" x="89" y="162" text-anchor="middle">e5 npz + claims jsonl</text>
+  </a>
+
+  <a class="box" id="bmain" href="#reads">
+    <title>main() at line 25 is the only function in the file</title>
+    <rect x="200" y="124" width="118" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="259" y="148" text-anchor="middle">main()</text>
+    <text class="box-sub" x="259" y="164" text-anchor="middle">only entry point</text>
+  </a>
+
+  <a class="box" id="bfit" href="#reads">
+    <title>Full-data logistic refit gives the weight vector w</title>
+    <rect x="352" y="26" width="176" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="440" y="50" text-anchor="middle">L3 refit</text>
+    <text class="box-sub" x="440" y="66" text-anchor="middle">LogisticRegression C=0.1 &#183; w = E@coef</text>
+  </a>
+
+  <a class="box" id="bumap" href="#reads">
+    <title>umap.UMAP fit_transform on the 2,480 claim embeddings</title>
+    <rect x="352" y="132" width="176" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="440" y="156" text-anchor="middle">UMAP projection</text>
+    <text class="box-sub" x="440" y="172" text-anchor="middle">cosine &#183; n_neighbors=30 &#183; seed 13</text>
+  </a>
+
+  <a class="box" id="bp1" href="#reads">
+    <title>Left panel: manifold colored by w, top and bottom 25 claims labelled</title>
+    <rect x="560" y="14" width="156" height="60" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="638" y="38" text-anchor="middle">panel 1</text>
+    <text class="box-sub" x="638" y="54" text-anchor="middle">color = w(c) &#183; label 25+25</text>
+  </a>
+
+  <a class="box" id="bp2" href="#reads">
+    <title>Right panel: same manifold colored by the number of tasks using the claim</title>
+    <rect x="560" y="94" width="156" height="60" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="638" y="118" text-anchor="middle">panel 2</text>
+    <text class="box-sub" x="638" y="134" text-anchor="middle">color = log1p(n_tasks)</text>
+  </a>
+
+  <a class="box" id="bnn" href="#reads">
+    <title>NearestNeighbors coherence test in 2-D and in the original 384-d space</title>
+    <rect x="560" y="180" width="156" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="638" y="204" text-anchor="middle">coherence test</text>
+    <text class="box-sub" x="638" y="220" text-anchor="middle">10-NN means &#183; 2-D vs 384-d</text>
+  </a>
+
+  <g class="box" id="bout">
+    <title>Outputs: one PNG figure and a stats block in the E13 results JSON</title>
+    <rect x="760" y="70" width="128" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="824" y="98" text-anchor="middle">writes</text>
+    <text class="box-sub" x="824" y="116" text-anchor="middle">E13_umap_claims</text>
+    <text class="box-sub" x="824" y="132" text-anchor="middle">_2026-09-23.png</text>
+    <text class="box-sub" x="824" y="156" text-anchor="middle">results JSON</text>
+    <text class="box-sub" x="824" y="172" text-anchor="middle">arms.a_geometry</text>
+    <text class="box-sub" x="824" y="188" text-anchor="middle">.umap stats</text>
+  </g>
+
+  <path class="edge" data-from="bin" data-to="bmain" d="M164,152 H200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="182" y="144" text-anchor="middle">load_e5()</text>
+
+  <path class="edge" data-from="bmain" data-to="bfit" d="M300,132 L352,70" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="318" y="94" text-anchor="middle">fit(X, y)</text>
+
+  <path class="edge" data-from="bmain" data-to="bumap" d="M318,156 H352" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="335" y="148" text-anchor="middle">E matrix</text>
+
+  <path class="edge dashed-edge" data-from="bfit" data-to="bp1" d="M528,58 L560,50" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="544" y="46" text-anchor="middle">w values</text>
+
+  <path class="edge" data-from="bumap" data-to="bp1" d="M528,152 L560,60" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="536" y="104" text-anchor="middle">P</text>
+
+  <path class="edge" data-from="bumap" data-to="bp2" d="M528,164 L560,132" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="548" y="140" text-anchor="middle">scatter()</text>
+
+  <path class="edge" data-from="bumap" data-to="bnn" d="M528,176 L560,204" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="204" text-anchor="middle">kneighbors()</text>
+
+  <path class="edge dashed-edge" data-from="bp1" data-to="bout" d="M716,44 L760,100" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="742" y="62" text-anchor="middle">savefig()</text>
+
+  <path class="edge dashed-edge" data-from="bnn" data-to="bout" d="M716,214 L760,180" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="740" y="212" text-anchor="middle">save_results()</text>
+
+  <text class="box-sub" x="14" y="286">solid = call &#183; dashed = reads/writes &#183; boxes: file (rect) / function (pill) &#183; 8 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; one function drives five steps: load, refit, project, plot twice, quantify. Every step name is a real call made inside <code>main()</code> (<a href="../../experiments_verifiers/harness/e13_umap.py">e13_umap.py</a> lines 25&ndash;85).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Data flow &mdash; what goes in, what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 250" role="img" aria-label="e13_umap.py data flow between files and results JSON">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="din">
+    <title>Read-only caches: embeddings npz plus the claims jsonl</title>
+    <rect x="14" y="80" width="196" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="104" text-anchor="middle">results/_cache_e5</text>
+    <text class="box-sub" x="112" y="120" text-anchor="middle">_embeddings.npz</text>
+    <text class="box-sub" x="112" y="140" text-anchor="middle">data/verifier_claims.jsonl</text>
+  </g>
+
+  <a class="box" id="dmain" href="#reads">
+    <title>main() reads both through e13_common helpers</title>
+    <rect x="258" y="92" width="150" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="333" y="116" text-anchor="middle">main()</text>
+    <text class="box-sub" x="333" y="132" text-anchor="middle">load_e5 / load_emb / l3_X</text>
+  </a>
+
+  <a class="box" id="dstats" href="#reads">
+    <title>Returned value: the two Pearson r numbers</title>
+    <rect x="456" y="30" width="196" height="82" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="554" y="54" text-anchor="middle">stats dict</text>
+    <text class="box-sub" x="554" y="72" text-anchor="middle">r(w, 10-NN mean w) 2-D</text>
+    <text class="box-sub" x="554" y="88" text-anchor="middle">r(w, 10-NN mean w) 384-d</text>
+    <text class="box-sub" x="554" y="104" text-anchor="middle">printed, then merged</text>
+  </a>
+
+  <g class="box" id="dout">
+    <title>Two writes: the figure and the results JSON key</title>
+    <rect x="700" y="60" width="186" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="793" y="84" text-anchor="middle">K.UMAP_PNG</text>
+    <text class="box-sub" x="793" y="100" text-anchor="middle">E13_umap_claims_2026-09-23.png</text>
+    <text class="box-sub" x="793" y="124" text-anchor="middle">results JSON</text>
+    <text class="box-sub" x="793" y="140" text-anchor="middle">arms.a_geometry</text>
+    <text class="box-sub" x="793" y="156" text-anchor="middle">.manifold_quantification.umap</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="din" data-to="dmain" d="M210,120 H258" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="234" y="112" text-anchor="middle">reads once</text>
+
+  <path class="edge" data-from="dmain" data-to="dstats" d="M408,110 L456,80" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="424" y="88" text-anchor="middle">corrcoef()</text>
+
+  <path class="edge dashed-edge" data-from="dstats" data-to="dout" d="M652,80 L700,92" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="676" y="76" text-anchor="middle">setdefault()</text>
+
+  <path class="edge dashed-edge" data-from="dmain" data-to="dout" d="M408,142 C560,200 640,180 700,150" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="540" y="196" text-anchor="middle">savefig(dpi=170) + save_results()</text>
+
+  <text class="box-sub" x="14" y="214">dashed = reads/writes &#183; solid = call &#183; config fields read: none (paths come from <tspan font-style="italic">e13_common</tspan> constants)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the script is a leaf consumer: it reads two frozen caches and appends one stats block plus one PNG. Path constants live in <a href="../../experiments_verifiers/harness/e13_common.py">e13_common.py</a> (lines 22&ndash;25).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control flow &mdash; two loops and one clipping rule</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 250" role="img" aria-label="e13_umap.py loops and clipping rule">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="c1" href="#reads">
+    <title>Weight vector from the full-data refit</title>
+    <rect x="20" y="96" width="150" height="54" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="95" y="120" text-anchor="middle">w = E @ coef[0]</text>
+    <text class="box-sub" x="95" y="136" text-anchor="middle">w is clipped by quantile</text>
+  </a>
+
+  <a class="box" id="c2" href="#reads">
+    <title>Color scale uses the 98th percentile of |w|</title>
+    <rect x="212" y="30" width="182" height="60" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="303" y="54" text-anchor="middle">vmin / vmax rule</text>
+    <text class="box-sub" x="303" y="70" text-anchor="middle">quantile(|w|, 0.98)</text>
+  </a>
+
+  <a class="box" id="c3" href="#reads">
+    <title>Two loops annotate the 25 highest and 25 lowest weights</title>
+    <rect x="212" y="140" width="182" height="66" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="303" y="164" text-anchor="middle">label loops</text>
+    <text class="box-sub" x="303" y="180" text-anchor="middle">argsort(-w)[:25] dark red</text>
+    <text class="box-sub" x="303" y="196" text-anchor="middle">argsort(w)[:25] navy</text>
+  </a>
+
+  <a class="box" id="c4" href="#reads">
+    <title>Coherence loop runs twice: 2-D euclidean, 384-d cosine</title>
+    <rect x="440" y="86" width="196" height="72" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="538" y="110" text-anchor="middle">coherence, 2 passes</text>
+    <text class="box-sub" x="538" y="126" text-anchor="middle">n_neighbors=11, drop self</text>
+    <text class="box-sub" x="538" y="142" text-anchor="middle">euclidean then cosine</text>
+  </a>
+
+  <g class="box" id="c5">
+    <title>Both r values land in the printed stats dict</title>
+    <rect x="690" y="90" width="196" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="788" y="114" text-anchor="middle">stats</text>
+    <text class="box-sub" x="788" y="130" text-anchor="middle">2 keys, 1 line of JSON</text>
+  </g>
+
+  <path class="edge" data-from="c1" data-to="c2" d="M170,110 L212,66" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="186" y="84" text-anchor="middle">|w|</text>
+
+  <path class="edge" data-from="c1" data-to="c3" d="M170,128 L212,166" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="186" y="156" text-anchor="middle">top/bottom</text>
+
+  <path class="edge" data-from="c1" data-to="c4" d="M170,132 C300,120 360,110 440,112" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="112" text-anchor="middle">w re-used</text>
+
+  <path class="edge dashed-edge" data-from="c4" data-to="c5" d="M636,122 H690" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="663" y="114" text-anchor="middle">dict keys</text>
+
+  <text class="box-sub" x="20" y="232">No retries, no error branch: an unreadable PNG header would only affect other files; here every path is assumed present.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the only decisions are the color clip (line 43) and which 25 claims to label (lines 47&ndash;52); the same nearest-neighbour test is run twice (lines 71&ndash;80).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="reads">What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym">reads</td><td class="sym">verifier_claims.jsonl</td><td>via <code>K.load_e5()</code></td><td>607 examples, SR label, claim names</td><td class="size">28</td></tr>
+<tr><td class="sym">reads</td><td class="sym">_cache_e5_embeddings.npz</td><td>via <code>K.load_emb()</code></td><td>2,480 claim embeddings, names array</td><td class="size">29</td></tr>
+<tr><td class="sym">reads</td><td class="sym">embz["name_desc_emb"]</td><td>in-memory npz array</td><td>UMAP input matrix E</td><td class="size">33</td></tr>
+<tr><td class="sym">reads</td><td class="sym">E13_l3_extreme_2026-09-23.json</td><td><code>K.load_results()</code></td><td>existing results dict to extend</td><td class="size">81</td></tr>
+<tr><td class="sym">writes</td><td class="sym">E13_umap_claims_2026-09-23.png</td><td><code>K.UMAP_PNG</code></td><td>two-panel figure at 170 dpi</td><td class="size">65</td></tr>
+<tr><td class="sym">writes</td><td class="sym">stats block</td><td>key <code>arms.a_geometry.manifold_quantification.umap</code></td><td>two Pearson r values</td><td class="size">82</td></tr>
+<tr><td class="sym">writes</td><td class="sym">runtimes.umap</td><td>same JSON</td><td>literal <code>"see harness/e13_umap.py"</code></td><td class="size">83</td></tr>
+<tr><td class="sym">reads</td><td class="sym">config fields</td><td>none</td><td>no project config is touched</td><td class="size">&ndash;</td></tr>
+</tbody>
+</table>
+
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e13_umap.py">experiments_verifiers/harness/e13_umap.py</a></h4>
+<p class="role">Draws and quantifies the claim manifold for E13 arm a as an offline companion to the other arm-a arms.</p>
+<p class="meta">89 lines &#183; classes: none &#183; functions: main &#183; imports e13_common</p>
+<details><summary>full symbol inventory</summary><div class="dbody">
+<pre>main()                                # lines 25-85: load, refit, project, plot, quantify</pre>
+<p>No classes and no methods. The module body holds the <code>umap</code> import (line 26, inside <code>main</code>), a <code>sys.path</code> insert (line 21) and <code>import e13_common as K</code> (line 22). Matplotlib is forced to the <code>Agg</code> backend at line 16.</p>
+<p>Owned constants: none. Every path comes from <code>e13_common</code>: <code>UMAP_PNG</code> (line 24 there), <code>load_results</code> / <code>save_results</code> (lines 239&ndash;251 there).</p>
+</div></details>
+
+<details><summary>numbers this run produced (read from the results JSON)</summary><div class="dbody">
+<blockquote>{"pearson_r_w_vs_10nn_mean_w_umap2d": 0.8921591176095137, "pearson_r_w_vs_10nn_mean_w_384d": 0.9492367795624028}</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E13_l3_extreme_2026-09-23.json</code>, key <code>arms.a_geometry.manifold_quantification.umap</code></p>
+<p>The same JSON records <code>runtimes.umap = "see harness/e13_umap.py"</code>: the stage does not time itself.</p>
+</div></details>
+
+<p class="note">The docstring says 2,480 cached claim embeddings (line 1). The script never checks that count; it uses whatever the npz holds.</p>
+<p class="note say">The 2-D picture is presentation only. The quantitative test of the same arm is the paired piecewise-vs-global AUC in <a href="file_harness_e13_l3_extreme.html">e13_l3_extreme.py</a> stage <code>a</code>, which states that in its own gaps list (lines 235&ndash;236 there).</p>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">importers</td><td>no importer found</td><td><code>grep -rn "import e13_umap"</code> over the repo returns nothing</td></tr>
+<tr><td class="sym">run command</td><td>hand-run with an overlay</td><td><code>uv run --with umap-learn python experiments_verifiers/harness/e13_umap.py</code> (docstring lines 3&ndash;4)</td></tr>
+<tr><td class="sym">upstream writer</td><td><code>e13_common.UMAP_PNG</code></td><td>the figure name is declared in <a href="../../experiments_verifiers/harness/e13_common.py">e13_common.py</a> line 24</td></tr>
+<tr><td class="sym">downstream reader</td><td><code>K.UMAP_PNG.name</code></td><td>recorded as <code>umap_png</code> by <a href="file_harness_e13_l3_extreme.html">e13_l3_extreme.py</a> line 232</td></tr>
+<tr><td class="sym">tests</td><td>none</td><td><code>grep -rn "e13_umap" tests/</code> returns nothing</td></tr>
+</tbody>
+</table>
+<p class="note">This digest is one of five in the harness batch: <a href="file_harness_e13_l3_extreme.html">e13_l3_extreme</a>, <a href="file_harness_e14_bt_enabler.html">e14_bt_enabler</a>, <a href="file_harness_e15_bt_pilot.html">e15_bt_pilot</a>, <a href="file_harness_e15_bt_eval.html">e15_bt_eval</a>. Experiment-level pages: <a href="exp_e13_umap.html">exp_e13_umap</a>, the <a href="exp_index.html">experiment index</a> and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e13_umap.py</code> (89 lines, every line), <code class="path">experiments_verifiers/harness/e13_common.py</code> (constants and result IO only), <code class="path">experiments_verifiers/harness/e13_l3_extreme.py</code> (stage <code>a</code> and the report artifact list), <code class="path">experiments_verifiers/results/E13_l3_extreme_2026-09-23.json</code> (<code>arms.a_geometry.manifold_quantification.umap</code> and <code>runtimes</code> keys), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> (never opened), the PNG file itself (not rendered or measured for this page), the 2,480-row embedding npz contents (only its shape is described, as the docstring states it), and the UMAP library source (external package, not read). Greps for importers and tests were run over the working copy only.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

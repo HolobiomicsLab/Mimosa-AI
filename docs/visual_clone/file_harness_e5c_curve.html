@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5c_curve.py - file digest - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e5c_curve.py">
+<div class="wrap">
+
+<h1 class="hud">e5c_curve.py</h1>
+<p class="intro">This script measures how few tasks the E5 rung L3 still generalizes from: task-level random splits at nine training fractions F from 0.10 to 0.90, 40 seeds each. It reuses the <a href="file_harness_e5b_splits.html">e5b_splits.py</a> helpers for the splits, the C grid and the paired statistics, then derives a minimum viable F, a saturation point and a log2 reconciliation. It writes a JSON, a Markdown digest and an SVG plus a PNG plot; run it with <code>uv run python experiments_verifiers/harness/e5c_curve.py</code> (L12).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 380" role="img" aria-label="e5c_curve.py master diagram: inputs, main, fraction loop, fraction block, derived rules, plot, digest, outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="b1">
+    <title>frozen population read through e5b_splits.load_all called at L238</title>
+    <rect x="16" y="40" width="180" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="106" y="66" text-anchor="middle">frozen inputs</text>
+    <text class="box-sub" x="106" y="82" text-anchor="middle">claims jsonl + npz</text>
+    <text class="box-sub" x="106" y="96" text-anchor="middle">136 tasks</text>
+  </g>
+
+  <a class="box" id="b2" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>main L236 calls load_all, loops the fractions and writes everything</title>
+    <rect x="266" y="40" width="190" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="361" y="66" text-anchor="middle">main</text>
+    <text class="box-sub" x="361" y="82" text-anchor="middle">L236</text>
+    <text class="box-sub" x="361" y="96" text-anchor="middle">B.load_all() L238</text>
+  </a>
+
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>run_fraction L53 loops the seeds and calls the e5b helpers</title>
+    <rect x="526" y="40" width="180" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="616" y="66" text-anchor="middle">run_fraction</text>
+    <text class="box-sub" x="616" y="82" text-anchor="middle">L53 &#183; one F, 40 seeds</text>
+    <text class="box-sub" x="616" y="96" text-anchor="middle">group_split L61</text>
+  </a>
+
+  <a class="box" id="b4" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>fraction_block L84 summarizes one fraction and picks the best baseline per seed</title>
+    <rect x="766" y="40" width="200" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="866" y="66" text-anchor="middle">fraction_block</text>
+    <text class="box-sub" x="866" y="82" text-anchor="middle">L84 &#183; best baseline L88</text>
+    <text class="box-sub" x="866" y="96" text-anchor="middle">gain L92</text>
+  </a>
+
+  <a class="box" id="b6" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>the F=0.5 ablation inside main L259-L278 compares fixed C with inner-CV C</title>
+    <rect x="216" y="170" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="316" y="196" text-anchor="middle">F=0.5 ablation</text>
+    <text class="box-sub" x="316" y="212" text-anchor="middle">L259 &#183; fixed vs inner-CV</text>
+    <text class="box-sub" x="316" y="226" text-anchor="middle">B.fit_eval L264-L266</text>
+  </a>
+
+  <a class="box" id="b5" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>the three derived rules applied to the nine blocks</title>
+    <rect x="490" y="170" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590" y="190" text-anchor="middle">derived rules</text>
+    <text class="box-sub" x="590" y="204" text-anchor="middle">min_viable_f L113</text>
+    <text class="box-sub" x="590" y="218" text-anchor="middle">saturation_f L128</text>
+    <text class="box-sub" x="590" y="232" text-anchor="middle">log2_reconciliation L137</text>
+  </a>
+
+  <a class="box" id="b7" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>make_plot L163 draws two panels and saves SVG and PNG</title>
+    <rect x="766" y="170" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="866" y="196" text-anchor="middle">make_plot</text>
+    <text class="box-sub" x="866" y="212" text-anchor="middle">L163 &#183; Agg backend L27</text>
+    <text class="box-sub" x="866" y="226" text-anchor="middle">savefig L231-L232</text>
+  </a>
+
+  <a class="box" id="b8" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>write_md L343 renders the markdown digest</title>
+    <rect x="490" y="300" width="200" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="590" y="326" text-anchor="middle">write_md</text>
+    <text class="box-sub" x="590" y="342" text-anchor="middle">L343</text>
+    <text class="box-sub" x="590" y="356" text-anchor="middle">four tables</text>
+  </a>
+
+  <g class="box" id="b9">
+    <title>four files written into experiments_verifiers/results/</title>
+    <rect x="766" y="300" width="200" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="866" y="322" text-anchor="middle">results/</text>
+    <text class="box-sub" x="866" y="338" text-anchor="middle">E5c_data_efficiency_&lt;date&gt;</text>
+    <text class="box-sub" x="866" y="352" text-anchor="middle">.json, .md, .svg, .png</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b2" d="M196,72 H266" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="231" y="34" text-anchor="middle">load_all</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M456,72 H526" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="491" y="34" text-anchor="middle">per fraction</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M706,72 H766" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="736" y="34" text-anchor="middle">per-seed AUCs</text>
+  <path class="edge" data-from="b2" data-to="b6" d="M361,104 V140 H316 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="352" y="134" text-anchor="end">ablation run</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M866,104 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="876" y="142" text-anchor="start">nine blocks</text>
+  <path class="edge" data-from="b5" data-to="b7" d="M690,205 H766" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="728" y="197" text-anchor="middle">plot data</text>
+  <path class="edge" data-from="b7" data-to="b9" d="M866,240 V300" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="876" y="276" text-anchor="start">svg + png</text>
+  <path class="edge" data-from="b5" data-to="b8" d="M590,240 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="276" text-anchor="start">out dict</text>
+  <path class="edge dashed-edge" data-from="b8" data-to="b9" d="M690,332 H766" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="728" y="324" text-anchor="middle">writes .md</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. Cyan = work inside <code>e5c_curve.py</code>, dashed grey = a file outside it. Solid = call, dashed = read/write. <code>main</code> (L236) loops <code>FRACTIONS</code> (L247), calling <code>run_fraction</code> (L248) and <code>fraction_block</code> (L249); it then runs the F=0.5 ablation (L259&ndash;278), the three derived rules (L280&ndash;282), writes the JSON itself (L335), calls <code>make_plot</code> (L337) and then <code>write_md</code> (L339). The plot writes the SVG and the PNG (L231&ndash;232); the JSON write has no box of its own and is named in this caption.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in and data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 300" role="img" aria-label="e5c_curve.py data flow: read files, constants, the out dict and four written files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="e1">
+    <title>read through e5b_splits.load_all, which calls e5_common.load_examples</title>
+    <rect x="20" y="30" width="240" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140" y="54" text-anchor="middle">verifier_claims.jsonl</text>
+    <text class="box-sub" x="140" y="70" text-anchor="middle">experiments_verifiers/data/</text>
+    <text class="box-sub" x="140" y="84" text-anchor="middle">SR, VER, claims</text>
+  </g>
+
+  <g class="box" id="e2">
+    <title>read through e5b_splits.load_all L47</title>
+    <rect x="20" y="120" width="240" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140" y="144" text-anchor="middle">_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="140" y="160" text-anchor="middle">experiments_verifiers/results/</text>
+    <text class="box-sub" x="140" y="174" text-anchor="middle">name_desc_emb</text>
+  </g>
+
+  <g class="box" id="e3">
+    <title>module constants L41-L50 set the grid, seeds and the E5 reference numbers</title>
+    <rect x="20" y="210" width="240" height="60" rx="2" fill="rgba(230,251,255,0.06)" stroke="#E6FBFF"/>
+    <text class="box-label" x="140" y="232" text-anchor="middle">module constants</text>
+    <text class="box-sub" x="140" y="248" text-anchor="middle">FRACTIONS L41, SEEDS L42</text>
+    <text class="box-sub" x="140" y="262" text-anchor="middle">LOTO_AUC_E5 L44, LOG2_FIT L45</text>
+  </g>
+
+  <a class="box" id="e4" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>main L236 builds the out dict and returns it at L340</title>
+    <rect x="380" y="100" width="180" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470" y="130" text-anchor="middle">main L236</text>
+    <text class="box-sub" x="470" y="146" text-anchor="middle">fractions, ablation,</text>
+    <text class="box-sub" x="470" y="160" text-anchor="middle">derivations, gaps</text>
+  </a>
+
+  <g class="box" id="e5">
+    <title>JSON written at L335 by main</title>
+    <rect x="670" y="30" width="230" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="785" y="52" text-anchor="middle">E5c_data_efficiency_&lt;date&gt;.json</text>
+    <text class="box-sub" x="785" y="68" text-anchor="middle">every block + gaps + runtime</text>
+  </g>
+
+  <g class="box" id="e6">
+    <title>plots saved at L231-L232 by make_plot</title>
+    <rect x="670" y="110" width="230" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="785" y="132" text-anchor="middle">E5c_data_efficiency.svg / .png</text>
+    <text class="box-sub" x="785" y="148" text-anchor="middle">two panels, fonts as paths L165</text>
+  </g>
+
+  <g class="box" id="e7">
+    <title>Markdown written at L422 by write_md</title>
+    <rect x="670" y="190" width="230" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="785" y="212" text-anchor="middle">E5c_data_efficiency_&lt;date&gt;.md</text>
+    <text class="box-sub" x="785" y="228" text-anchor="middle">per-fraction and paired tables</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="e1" data-to="e4" d="M260,60 H330 V120 H380" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="268" y="54" text-anchor="start">reads labels</text>
+  <path class="edge dashed-edge" data-from="e2" data-to="e4" d="M260,150 H380" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="320" y="142" text-anchor="middle">reads vectors</text>
+  <path class="edge" data-from="e3" data-to="e4" d="M260,240 H470 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="356" y="232" text-anchor="middle">fine grid</text>
+  <path class="edge dashed-edge" data-from="e4" data-to="e5" d="M560,120 H620 V58 H670" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="610" y="40" text-anchor="middle">writes json</text>
+  <path class="edge dashed-edge" data-from="e4" data-to="e6" d="M560,138 H670" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="615" y="130" text-anchor="middle">make_plot()</text>
+  <path class="edge dashed-edge" data-from="e4" data-to="e7" d="M560,160 H620 V218 H670" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="610" y="256" text-anchor="middle">returns out</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>7 boxes</code>. Two read files, three write targets plus the Markdown, and one returned dict (L340). The script reads no config field and no environment variable; <code>LOG2_FIT</code> (L45) and <code>LOTO_AUC_E5</code> (L44) are E5 reference numbers copied into the file, and the docstring labels them as such.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the fraction loop and the three decision rules</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 350" role="img" aria-label="e5c_curve.py control: per-fraction seed loop with skip tests, and the minimum viable F and saturation rules">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="f1">
+    <title>run_fraction L60 loops the 40 seeds of one fraction</title>
+    <rect x="20" y="30" width="240" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="140" y="54" text-anchor="middle">for seed in seeds</text>
+    <text class="box-sub" x="140" y="70" text-anchor="middle">SEEDS L42, 40 values</text>
+  </g>
+
+  <g class="box" id="f2">
+    <title>run_fraction L62 and L65 skip seeds with a single-class side</title>
+    <polygon points="420,20 560,58 420,96 280,58" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="400" y="54" text-anchor="middle">single-class side?</text>
+    <text class="box-sub" x="400" y="70" text-anchor="middle">L62 train / L65 test</text>
+  </g>
+
+  <g class="box" id="f3">
+    <title>run_fraction L68 and L69 select C then fit and score</title>
+    <rect x="640" y="30" width="280" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780" y="54" text-anchor="middle">select C, fit, score</text>
+    <text class="box-sub" x="780" y="70" text-anchor="middle">B.select_C_inner L68 &#183; B.fit_eval L69</text>
+  </g>
+
+  <g class="box" id="f4">
+    <title>skipped seeds are recorded in the block, not silently dropped</title>
+    <rect x="20" y="130" width="240" height="56" rx="2" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="140" y="154" text-anchor="middle">seed skipped</text>
+    <text class="box-sub" x="140" y="170" text-anchor="middle">skipped_seeds L63 / L66 / L71</text>
+  </g>
+
+  <g class="box" id="f5">
+    <title>min_viable_f L113 walks blocks ascending and needs three conditions</title>
+    <polygon points="330,240 570,285 330,330 90,285" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="276" text-anchor="middle">win-rate 0.60, dAUC&gt;0, p&lt;0.05</text>
+    <text class="box-sub" x="330" y="292" text-anchor="middle">for every baseline, else next F</text>
+  </g>
+
+  <g class="box" id="f6">
+    <title>saturation_f L132 compares each mean with the F=0.9 mean</title>
+    <polygon points="800,240 940,285 800,330 660,285" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="800" y="276" text-anchor="middle">within 0.01 of F=0.9?</text>
+    <text class="box-sub" x="800" y="292" text-anchor="middle">saturation_f L128</text>
+  </g>
+
+  <path class="edge" data-from="f1" data-to="f2" d="M260,58 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="270" y="12" text-anchor="middle">split</text>
+  <path class="edge" data-from="f2" data-to="f3" d="M560,58 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="590" y="22" text-anchor="middle">no</text>
+  <path class="edge" data-from="f2" data-to="f4" d="M350,96 V130" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="358" y="118" text-anchor="start">yes</text>
+  <path class="edge" data-from="f4" data-to="f5" d="M140,186 V285 H90" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="150" y="212" text-anchor="start">all nine blocks</text>
+  <path class="edge" data-from="f3" data-to="f6" d="M780,86 V240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="790" y="150" text-anchor="start">mean per F</text>
+  <path class="edge" data-from="f5" data-to="f6" d="M570,285 H660" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="615" y="277" text-anchor="middle">blocks</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>6 boxes</code>. Each seed is skipped when the train side (L62) or the test side (L65) holds one class, or when the AUC comes back <code>nan</code> (L70); the seed number is written into <code>rec["skipped_seeds"]</code> (L59) instead of being lost. <code>min_viable_f</code> (L113) returns the first block, in ascending F order, where the paired win-rate against every baseline is at least 0.60, the mean dAUC is above 0, and the t-test p is below 0.05 (L119&ndash;120). <code>saturation_f</code> (L128) returns the first F whose L3 mean is within 0.01 of the F=0.9 mean (L132).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>file read</td><td class="sym">verifier_claims.jsonl</td><td>via <code>B.load_all</code> L238 (e5_common.py L34&ndash;35)</td><td>SR, VER, claims</td></tr>
+<tr><td>file read</td><td class="sym">_cache_e5_embeddings.npz</td><td>via <code>B.load_all</code> L238 (e5b_splits.py L47)</td><td>name+desc vectors</td></tr>
+<tr><td>module</td><td class="sym">e5_common as C</td><td>import L32</td><td>_auc L80</td></tr>
+<tr><td>module</td><td class="sym">e5b_splits as B</td><td>import L33</td><td>load_all, group_split, select_C_inner, fit_eval, summarize, paired_stats, C_FIXED</td></tr>
+<tr><td>constant</td><td class="sym">FRACTIONS, SEEDS</td><td>L41&ndash;42</td><td>nine fractions, 40 seeds</td></tr>
+<tr><td>constant</td><td class="sym">LOTO_AUC_E5 0.753, LOG2_FIT</td><td>L44&ndash;45</td><td>plot marker, log2 comparison</td></tr>
+<tr><td>constant</td><td class="sym">N_SEEDS_ABLATION 10</td><td>L43</td><td>F=0.5 ablation seeds</td></tr>
+<tr><td>return</td><td class="sym">out dict</td><td>returned at L340</td><td>fractions, ablations, derivations, gaps</td></tr>
+<tr><td>file write</td><td class="sym">E5c_data_efficiency_&lt;date&gt;.json</td><td>path L36, write L335</td><td>full result block</td></tr>
+<tr><td>file write</td><td class="sym">E5c_data_efficiency_&lt;date&gt;.md</td><td>path L37, write L422</td><td>report tables</td></tr>
+<tr><td>file write</td><td class="sym">E5c_data_efficiency.svg and .png</td><td>paths L38&ndash;39, writes L231&ndash;232</td><td>two-panel curve figure</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: <code>n_tasks_total = 136</code> at L138 is a local literal used only inside <code>log2_reconciliation</code>, while the population box (L241) counts tasks from the data. The two agree on the 2026-09-21 freeze, but only the counted value follows the data.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File card</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e5c_curve.py">experiments_verifiers/harness/e5c_curve.py</a></h4>
+<p class="role">Sweeps nine training fractions, summarizes L3 against three paired baselines, and derives minimum viable F and saturation.</p>
+<p class="meta">427 lines &#183; 8 functions &#183; imports e5b_splits L33 and e5_common L32 &#183; writes JSON, MD, SVG, PNG</p>
+<details><summary>key signatures and constants</summary><div class="dbody">
+<pre>run_fraction(X, y, yver, tid, uni, v0, F, seeds) -&gt; dict     # L53
+fraction_block(rec) -&gt; dict                                  # L84
+min_viable_f(blocks) -&gt; dict | None                          # L113
+saturation_f(blocks) -&gt; (dict | None, float)                 # L128
+log2_reconciliation(blocks) -&gt; dict                          # L137
+make_plot(blocks, mv_blk, sat_blk, sat_ref, pop) -&gt; None     # L163
+main() -&gt; dict                                               # L236
+write_md(out) -&gt; None                                        # L343</pre>
+<p>Constants: <code>FRACTIONS</code> nine values (L41), <code>SEEDS = list(range(40))</code> (L42), <code>N_SEEDS_ABLATION = 10</code> (L43), <code>LOTO_AUC_E5 = 0.753</code> (L44), <code>LOG2_FIT = {"intercept": 0.526, "slope_per_log2": 0.042}</code> (L45).</p>
+</div></details>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>every function, module constant and the entry point (8 functions, 13 constants)</summary><div class="dbody">
+<pre>run_fraction(X, y, yver, tid, uni, v0, F, seeds)
+  L53  one fraction, one seed loop
+
+fraction_block(rec)
+  L84  summarizes one fraction, picks best baseline
+
+min_viable_f(blocks)
+  L113  first F that beats every baseline
+
+saturation_f(blocks)
+  L128  first F within 0.01 of F=0.9
+
+log2_reconciliation(blocks)
+  L137  measured means against E5's log2 fit
+
+make_plot(blocks, mv_blk, sat_blk, sat_ref, pop)
+  L163  two-panel figure, saves SVG and PNG
+
+main()
+  L236  sweeps fractions, derives rules, writes
+
+write_md(out)
+  L343  renders the markdown digest</pre>
+<p>Module level, no class in the file:</p>
+<pre>EV, TODAY, OUT_JSON, OUT_MD, OUT_SVG, OUT_PNG      # L30, L35-L39
+FRACTIONS, SEEDS, N_SEEDS_ABLATION                 # L41-L43
+LOTO_AUC_E5, LOG2_FIT                              # L44-L45
+BASELINE_COLORS, BASELINE_LABELS                   # L46-L50
+matplotlib.use("Agg")                              # L27
+if __name__ == "__main__": main()                  # L426-L427</pre>
+<p>Zero classes, zero methods, zero CLI flags. The plot backend is set to <code>Agg</code> (L27) before <code>pyplot</code> is imported (L28).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>Where</th><th>What it uses</th></tr></thead>
+<tbody>
+<tr><td class="sym">run directly</td><td><code>uv run python experiments_verifiers/harness/e5c_curve.py</code> (L12)</td><td>executes <code>main</code> at L426&ndash;427</td></tr>
+<tr><td class="sym">importers</td><td>grep of .py files for <code>e5c_curve</code>: no hit outside this file</td><td>no importer found</td></tr>
+<tr><td class="sym">tests/</td><td>grep of tests/ for <code>e5c</code>: no hit</td><td>no test found</td></tr>
+<tr><td class="sym">this file imports</td><td>e5b_splits L33, e5_common L32</td><td>shared splits, fitting and statistics</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the docstring says the F=0.10 side holds about 14 training tasks (L323), and the code records <code>n_train_tasks_mean</code> per fraction (L96) rather than asserting a size. The reported gap is about the C selection at tiny F, not about the split code.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e5c_curve.py</code> (427 lines, read in full), <code class="path">experiments_verifiers/harness/e5b_splits.py</code> L1&ndash;140 (the helpers this file reuses), <code class="path">experiments_verifiers/harness/e5_common.py</code> L1&ndash;45 and L128, <code class="path">tests/</code> and the .py tree (grep for the module name: no hit), <code class="path">docs/visual_clone/_reference.html</code> and <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p>Related pages: <a href="file_index.html">file_index.html</a> (hub), <a href="exp_e5c_curve.html">exp_e5c_curve.html</a>, <a href="file_harness_e5b_splits.html">e5b_splits.py</a> (reused here), <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/results/E5c_data_efficiency_2026-09-21.json</code>, <code>.md</code>, <code>.svg</code> and <code>.png</code> (results of one run, not the file); <code class="path">experiments_verifiers/REPORT_experiments.html</code> (a report). No file outside <code class="path">docs/visual_clone/</code> was modified.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

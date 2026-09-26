@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Entry point and configuration - Mimosa-AI</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > entry &amp; config > main.py + config.py">
+<div class="wrap">
+
+<h1 class="hud">Entry point and configuration</h1>
+<p class="intro">The shell calls <code>main.py::cli_main</code>, which parses 37 flags and dispatches to one of eight modes. <code>config.py::Config</code> holds every default, then reads a JSON file and applies CLI overrides. This page covers the six files of the entry and config area.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 - mode dispatch: argv to the code that runs</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="argv flows through cli_main and main into one of eight modes">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwI" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#E6FBFF"/>
+    </marker>
+    <marker id="arwS" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="b1" href="#c-main">
+    <title>The process flags, from the shell or from mimosa</title>
+    <rect x="24" y="44" width="210" height="46" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="129" y="63" text-anchor="middle">argv</text>
+    <text class="box-sub" x="129" y="79" text-anchor="middle">shell or mimosa flags</text>
+  </a>
+
+  <a class="box" id="b2" href="#c-main">
+    <title>Console-script entry point declared in pyproject.toml</title>
+    <rect x="24" y="134" width="210" height="46" rx="20" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="129" y="153" text-anchor="middle">cli_main()</text>
+    <text class="box-sub" x="129" y="169" text-anchor="middle">calls asyncio.run(main())</text>
+  </a>
+
+  <a class="box" id="b3" href="#c-main">
+    <title>Parses args, loads config, runs the environment precheck</title>
+    <rect x="24" y="224" width="210" height="46" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="129" y="243" text-anchor="middle">main()</text>
+    <text class="box-sub" x="129" y="259" text-anchor="middle">parse, load, precheck</text>
+  </a>
+
+  <a class="box" id="b4" href="#modes">
+    <title>The if / elif chain that picks one mode</title>
+    <rect x="24" y="340" width="210" height="46" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="129" y="359" text-anchor="middle">mode dispatch</text>
+    <text class="box-sub" x="129" y="375" text-anchor="middle">if / elif chain</text>
+  </a>
+
+  <a class="box" id="r1" href="area_cli.html">
+    <title>Interactive evaluation launcher, returns before config overrides</title>
+    <rect x="560" y="16" width="310" height="48" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="580" y="36">--evaluation_cli</text>
+    <text class="box-sub" x="580" y="52">EvaluationCLI.run()</text>
+  </a>
+
+  <a class="box" id="r2" href="area_cli.html">
+    <title>Interactive RAG chat over one run memory directory</title>
+    <rect x="560" y="78" width="310" height="48" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="580" y="98">--memory_cli</text>
+    <text class="box-sub" x="580" y="114">MemoryChatCLI.run()</text>
+  </a>
+
+  <a class="box" id="r3" href="area_cli.html">
+    <title>Zero-argument wizard when no mode flag is given</title>
+    <rect x="560" y="140" width="310" height="48" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="580" y="160">no mode flag</text>
+    <text class="box-sub" x="580" y="176">OnboardCLI.run()</text>
+  </a>
+
+  <a class="box" id="r4" href="area_extensibility.html">
+    <title>No-LLM manual shell: the human picks every tool call</title>
+    <rect x="560" y="202" width="310" height="48" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="580" y="222">--manual</text>
+    <text class="box-sub" x="580" y="238">HumanMode.shellLoop()</text>
+  </a>
+
+  <a class="box" id="r5" href="flow_sab_batch.html">
+    <title>Batch CSV evaluation, sequential for --papers and concurrent for ScienceAgentBench</title>
+    <rect x="560" y="264" width="310" height="48" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="580" y="284">--papers / --science_agent_bench</text>
+    <text class="box-sub" x="580" y="300">CsvEvaluationMode.start_evaluation()</text>
+  </a>
+
+  <a class="box" id="r6" href="flow_task_run.html">
+    <title>Single task through the engine, or a goal through the planner</title>
+    <rect x="560" y="322" width="310" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="580" y="342">--task / --goal / --scenario</text>
+    <text class="box-sub" x="580" y="357">EvolutionEngine.start_workflow_evolution()</text>
+    <text class="box-sub" x="580" y="371">Planner.start_planner() for --goal</text>
+  </a>
+
+  <a class="box" id="r7" href="area_benchmark_evaluation.html">
+    <title>Scores generated workflows without a task capsule</title>
+    <rect x="560" y="392" width="310" height="48" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="580" y="412">--workflow_eval_mode</text>
+    <text class="box-sub" x="580" y="428">WorkflowEval.run_workflow_eval_loop()</text>
+  </a>
+
+  <path class="edge" data-from="b1" data-to="b2" d="M129,90 V134" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwI)"/>
+  <text class="edge-label" x="137" y="116">argv</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M129,180 V224" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwI)"/>
+  <text class="edge-label" x="137" y="206">calls main()</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M129,270 V340" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwI)"/>
+  <text class="edge-label" x="137" y="308">flags + config</text>
+
+  <path class="edge" data-from="b4" data-to="r1" d="M234,363 H400 V40 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="b4" data-to="r2" d="M400,102 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="b4" data-to="r3" d="M400,164 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="b4" data-to="r4" d="M400,226 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwS)"/>
+  <path class="edge" data-from="b4" data-to="r5" d="M400,288 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwS)"/>
+  <path class="edge" data-from="b4" data-to="r6" d="M400,351 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="b4" data-to="r7" d="M400,363 V416 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwS)"/>
+
+  <text class="edge-label" x="406" y="34">--evaluation_cli</text>
+  <text class="edge-label" x="406" y="96">--memory_cli</text>
+  <text class="edge-label" x="406" y="158">no mode flag</text>
+  <text class="edge-label" x="406" y="220">--manual</text>
+  <text class="edge-label" x="406" y="282">batch CSV</text>
+  <text class="edge-label" x="406" y="345">task, goal, scenario</text>
+  <text class="edge-label" x="406" y="410">--workflow_eval_mode</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - <code>main.py::cli_main</code> to <code>main.py::main</code> to the eight mode branches (three return before the dispatch chain). Solid = call; ice white = entry/config, cyan = <code>sources/core</code>, steel = other areas.</p>
+
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../main.py">main.py</a></td><td>Parses flags and dispatches to one mode.</td><td class="size">423</td><td class="sym">cli_main, main, apply_config_overrides</td></tr>
+<tr><td class="sym"><a href="../../config.py">config.py</a></td><td>Holds every default field and loads JSON.</td><td class="size">722</td><td class="sym">Config, AddressMCP</td></tr>
+<tr><td class="sym"><a href="../../config_default.json">config_default.json</a></td><td>Template config to copy and edit.</td><td class="size">111</td><td class="sym">56 top-level keys</td></tr>
+<tr><td class="sym"><a href="../../auto-install.sh">auto-install.sh</a></td><td>Installs deps, starts Toolomics and Perspicacite.</td><td class="size">411</td><td class="sym">6 numbered steps</td></tr>
+<tr><td class="sym"><a href="../../cleanup.sh">cleanup.sh</a></td><td>Empties <code>tmp/</code> and <code>sources/workflows</code>.</td><td class="size">32</td><td class="sym">clean_directory</td></tr>
+<tr><td class="sym"><a href="../../workflow_evolution_anim.py">workflow_evolution_anim.py</a></td><td>Pygame replay of the evolution tree and memory.</td><td class="size">1852</td><td class="sym">App, load_all, main</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Mode table - flag, code entered, note</h2>
+<table id="modes">
+<thead><tr><th>Flag</th><th>Enters</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td class="sym">--task &lt;str or path&gt;</td><td class="sym">EvolutionEngine.start_workflow_evolution</td><td>A path input is read as the goal text.</td></tr>
+<tr><td class="sym">--goal &lt;str or path&gt;</td><td class="sym">Planner.start_planner</td><td>Plans, then transfers the capsule.</td></tr>
+<tr><td class="sym">--scenario &lt;path&gt;</td><td class="sym">ScenarioLoader.load_scenario</td><td>Copies the scenario goal into <code>args.task</code>.</td></tr>
+<tr><td class="sym">--learn</td><td class="sym">same branch, <code>enable_evolution=True</code></td><td>Stops at <code>learned_score_threshold</code>, default 0.9.</td></tr>
+<tr><td class="sym">--single_agent</td><td class="sym">single-agent factory</td><td>Benchmark baseline, no workflow synthesis.</td></tr>
+<tr><td class="sym">--manual</td><td class="sym">HumanMode.shellLoop</td><td>No LLM; an API key is still required.</td></tr>
+<tr><td class="sym">--papers &lt;csv&gt;</td><td class="sym">CsvEvaluationMode.start_evaluation</td><td><code>dataset_type="default"</code>, sequential rows.</td></tr>
+<tr><td class="sym">--science_agent_bench</td><td class="sym">CsvEvaluationMode.start_evaluation</td><td>Fixed CSV, <code>concurrent=True</code>; worker count from config.</td></tr>
+<tr><td class="sym">--workflow_eval_mode</td><td class="sym">WorkflowEval.run_workflow_eval_loop</td><td>Scores generated workflows only.</td></tr>
+<tr><td class="sym">--evaluation_cli</td><td class="sym">EvaluationCLI.run</td><td>Returns before config overrides are applied.</td></tr>
+<tr><td class="sym">--memory_cli</td><td class="sym">MemoryChatCLI.run</td><td>Returns before config overrides are applied.</td></tr>
+<tr><td class="sym">no mode flag</td><td class="sym">OnboardCLI.run</td><td>Zero-argument setup wizard.</td></tr>
+<tr><td class="sym">--config &lt;path&gt;</td><td class="sym">Config.load</td><td>Installed runs also load the user config file.</td></tr>
+</tbody>
+</table>
+
+<p class="note">Amber note: <code>--evaluation_cli</code>, <code>--memory_cli</code> and the no-flag wizard return before <code>apply_config_overrides</code>, so flags such as <code>--runner_default_timeout</code> do nothing there.</p>
+<p class="note flag">Red note: <code class="path">docs/reference/cli.md</code> lists 35 of the 37 flags; <code>--hybrid_verifier_reward</code> and <code>--planner_human_approve</code> are missing (checked with grep at this commit).</p>
+
+<details><summary>the other flags: behaviour, logging, batch</summary><div class="dbody">
+<p><code>--csv_runs_limit</code> (int, default 200), <code>--disable_judge</code>, <code>--debug</code>, <code>--verbose</code>, <code>--memory_uuid</code>, <code>--max_evolve_iterations</code> (writes <code>config.max_learning_evolve_iterations</code>).</p>
+<p>19 further flags come from <code>main.py::add_config_arguments</code> and are applied by <code>main.py::apply_config_overrides</code>: <code>--workflow_dir</code>, <code>--schema_code_path</code>, <code>--smolagent_factory_code_path</code>, <code>--prompt_workflow_creator</code>, <code>--runner_default_python_version</code>, <code>--runner_default_timeout</code>, <code>--runner_default_max_memory_mb</code>, <code>--runner_default_max_cpu_percent</code>, <code>--runner_temp_dir</code>, <code>--pushover_token</code>, <code>--pushover_user</code>, <code>--verifier_kind</code>, <code>--hybrid_verifier_num_claims</code>, <code>--hybrid_verifier_refinement_rounds</code>, <code>--hybrid_verifier_scorer_timeout_s</code>, <code>--hybrid_verifier_digest_max_files</code>, <code>--hybrid_verifier_pairwise_mode</code>, <code>--hybrid_verifier_reward</code>, <code>--planner_human_approve</code>.</p>
+<p>Before the dispatch chain <code>main.py::main</code> also calls <code>apply_config_overrides</code>, <code>validate_environment</code>, <code>Config.create_paths</code>, <code>Config.validate_paths</code> and builds <code>WorkspaceManager</code>. Every argument-driven mode, <code>--manual</code> included, therefore needs one API key from <code>validate_environment</code>.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 - config plumbing in six steps</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 660 470" role="img" aria-label="Config defaults, JSON file, loader, CLI overrides, path checks, ready config">
+  <defs>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow2" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="c1" href="#c-config">
+    <title>Config.__init__ assigns every default field</title>
+    <rect x="30" y="16" width="250" height="54" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="155" y="38" text-anchor="middle">Config.__init__</text>
+    <text class="box-sub" x="155" y="55" text-anchor="middle">defaults in config.py</text>
+  </a>
+
+  <a class="box" id="c2" href="#config-default">
+    <title>JSON template; also the --config path and the installed user config</title>
+    <rect x="30" y="92" width="250" height="54" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="155" y="114" text-anchor="middle">config_default.json</text>
+    <text class="box-sub" x="155" y="131" text-anchor="middle">56 keys, read by --config</text>
+  </a>
+
+  <a class="box" id="c3" href="#c-config">
+    <title>Config.load reads the file, from_json copies each key</title>
+    <rect x="30" y="168" width="250" height="54" rx="20" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="155" y="190" text-anchor="middle">Config.load()</text>
+    <text class="box-sub" x="155" y="207" text-anchor="middle">calls from_json()</text>
+  </a>
+
+  <a class="box" id="c4" href="#plumbing">
+    <title>CLI overrides win over the loaded file</title>
+    <rect x="30" y="244" width="250" height="54" rx="20" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="155" y="266" text-anchor="middle">apply_config_overrides()</text>
+    <text class="box-sub" x="155" y="283" text-anchor="middle">flags from add_config_arguments()</text>
+  </a>
+
+  <a class="box" id="c5" href="#c-config">
+    <title>Creates directories, then asserts the required paths exist</title>
+    <rect x="30" y="320" width="250" height="54" rx="20" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="155" y="342" text-anchor="middle">create_paths / validate_paths</text>
+    <text class="box-sub" x="155" y="359" text-anchor="middle">asserts files exist</text>
+  </a>
+
+  <a class="box" id="c6" href="overview.html">
+    <title>The mode then reads config fields it needs</title>
+    <rect x="30" y="396" width="250" height="54" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="155" y="418" text-anchor="middle">Config ready</text>
+    <text class="box-sub" x="155" y="435" text-anchor="middle">modes read the fields</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="c1" data-to="c2" d="M155,70 V92" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="168" y="85">dump() writes</text>
+  <path class="edge" data-from="c2" data-to="c3" d="M155,146 V168" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="168" y="161">load() reads</text>
+  <path class="edge" data-from="c3" data-to="c4" d="M155,222 V244" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="168" y="237">field values</text>
+  <path class="edge" data-from="c4" data-to="c5" d="M155,298 V320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="168" y="313">overrides win</text>
+  <path class="edge" data-from="c5" data-to="c6" d="M155,374 V396" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="168" y="389">paths checked</text>
+
+  <text class="box-sub" x="300" y="40">also: paths.user_config_file() on installed runs</text>
+  <text class="box-sub" x="300" y="118">jsonify() writes 57 top-level keys</text>
+  <text class="box-sub" x="300" y="196">_reanchor_relative_paths() fixes legacy paths</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - the order that decides final field values. Arrows: <code>config.py::Config.dump</code> writes the JSON skeleton, <code>config.py::Config.load</code> reads it back.</p>
+
+<p class="note flag">Red note: <code>config_default.json</code> sets <code>judge_model</code> and <code>vision_judge_model</code>, but <code>config.py::Config.from_json</code> reads neither key, so editing them in a JSON config has no effect.</p>
+
+<details id="plumbing"><summary>config defaults versus the JSON template (my computation)</summary><div class="dbody">
+<p>4 of the 56 JSON keys hold a different value from the <code>config.py</code> default: <code>smolagent_model_id</code> (<code>deepseek-v4-flash-0731</code> vs <code>deepseek-v3.2</code>), <code>learned_score_threshold</code> (0.9 vs 0.92), <code>max_concurrent_eval_tasks</code> (1 vs 2), <code>crossover_rate</code> (0.4 vs 0.25).</p>
+<p>1 key <code>Config.jsonify</code> writes is absent from the template file: <code>capsule_namer_model</code>.</p>
+<p>2 fields set in <code>Config.__init__</code> are absent from <code>jsonify</code> and <code>from_json</code>, so a JSON file cannot set them: <code>literrature_grounding</code> (this spelling) and <code>orchestrator_choose_model</code>. <code class="path">tests/config_roundtrip_test.py</code> records both in <code>KNOWN_GAPS</code> (issue #182).</p>
+<p><code>Config.jsonify</code> emits 57 top-level keys; <code>config_default.json</code> has 56.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File cards</h2>
+
+<div class="card ice" id="c-main">
+<h4><a href="../../main.py">main.py</a></h4>
+<p class="role">Parses 37 flags, validates the environment, and dispatches to one mode. Also declares the console script target.</p>
+<p class="meta">423 lines &#183; console script <code>mimosa = main:cli_main</code> &#183; reads: <code>config.py::Config</code>, <code class="path">sources/utils/paths.py</code></p>
+<details><summary>functions and the dispatch order</summary><div class="dbody">
+<pre>cli_main() -&gt; None
+main() -&gt; None
+validate_environment() -&gt; None
+add_config_arguments(parser, config) -&gt; None
+apply_config_overrides(args, config) -&gt; None
+load_goal_from_file_or_string(goal_input) -&gt; str
+manual_mode(args, config) -&gt; None
+papers_mode(args, config) -&gt; None
+science_bench_papers_mode(args, config) -&gt; None
+workflow_generation_evals(args, config) -&gt; None
+normal_execution_mode(args, config) -&gt; None
+setup_signal_handlers() -&gt; None</pre>
+<p>Order inside <code>main.py::main</code>: <code>dotenv.load_dotenv</code> at import, then <code>argparse</code>, config load (<code>--config</code>, else the installed user config), logging, <code>ensure_environment(auto_install=True)</code>, the three early-return branches, <code>apply_config_overrides</code>, <code>validate_environment</code>, path checks, <code>WorkspaceManager</code>, then the dispatch chain.</p>
+<p><code>main.py::main</code> raises <code>ValueError("No goal provided. Use --task, --goal to start.")</code> when <code>normal_execution_mode</code> gets no task, goal or scenario.</p>
+</div></details>
+</div>
+
+<div class="card ice" id="c-config">
+<h4><a href="../../config.py">config.py</a></h4>
+<p class="role">Owns every default field, loads and dumps JSON, checks paths, and resolves per-model OpenRouter routing.</p>
+<p class="meta">722 lines &#183; classes: <code>Config</code>, <code>AddressMCP</code> &#183; reads: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/pricing.py</code></p>
+<details><summary>methods, fields and path checks</summary><div class="dbody">
+<pre>AddressMCP.__post_init__() -&gt; None
+Config.openrouter_provider_for(model_id) -&gt; list[str] | None
+Config.openrouter_quantizations_for(model_id) -&gt; list[str] | None
+Config.model_pricing -&gt; dict (property)
+Config.refresh_pricing() -&gt; None
+Config.create_paths() -&gt; None
+Config.validate_paths() -&gt; None
+Config.jsonify() -&gt; dict[str, Any]
+Config.from_json(data) -&gt; None
+Config._reanchor_relative_paths() -&gt; None
+Config.dump(filepath) -&gt; None
+Config.load(filepath) -&gt; None</pre>
+<p><code>Config.load</code> raises <code>FileNotFoundError</code> when the file is missing. <code>Config.validate_paths</code> asserts that <code>workflow_dir</code>, <code>schema_code_path</code>, <code>smolagent_factory_code_path</code>, <code>prompt_workflow_creator</code>, <code>prompt_planner</code> and <code>workspace_dir</code> exist; <code>create_paths</code> creates <code>workflow_dir</code>, <code>memory_dir</code> and <code>runner_temp_dir</code>.</p>
+<p><code>AddressMCP.__post_init__</code> rejects empty IPs and a port outside 0-65535, and fails if <code>port_min &gt; port_max</code>.</p>
+<p>Mutable state lives under <code>paths.py</code> defaults: <code>sources/workflows</code>, <code>sources/memory</code>, <code>runs_capsule/</code>, <code>tmp/</code> in a checkout, XDG dirs in an installed run.</p>
+</div></details>
+</div>
+
+<div class="card ice" id="config-default">
+<h4><a href="../../config_default.json">config_default.json</a></h4>
+<p class="role">Template config: 56 top-level keys, dumped by running <code>python config.py</code>. Copy it, edit it, pass it with <code>--config</code>.</p>
+<p class="meta">111 lines &#183; keys: 56 &#183; read by: <code>config.py::Config.from_json</code></p>
+<details><summary>important fields: field | default in config.py | used by</summary><div class="dbody">
+<table>
+<thead><tr><th>Field</th><th>Default in config.py</th><th>Used by</th></tr></thead>
+<tbody>
+<tr><td class="sym">workspace_dir</td><td class="sym">Toolomics/workspace path</td><td class="sym">sources/utils/workspace_management.py</td></tr>
+<tr><td class="sym">discovery_addresses</td><td class="sym">0.0.0.0, ports 5000-5200</td><td class="sym">sources/core/tools_manager.py</td></tr>
+<tr><td class="sym">planner_llm_model</td><td class="sym">openrouter/z-ai/glm-5.3</td><td class="sym">sources/core/planner.py</td></tr>
+<tr><td class="sym">workflow_llm_model</td><td class="sym">openrouter/z-ai/glm-5.3</td><td class="sym">sources/core/workflow_factory.py</td></tr>
+<tr><td class="sym">smolagent_model_id</td><td class="sym">openrouter/deepseek/deepseek-v4-flash-0731</td><td class="sym">sources/core/workflow_factory.py</td></tr>
+<tr><td class="sym">judge_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">sources/evaluators/base.py</td></tr>
+<tr><td class="sym">capsule_namer_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">sources/utils/transfer_toolomics.py</td></tr>
+<tr><td class="sym">vision_judge_model</td><td class="sym">openrouter/moonshotai/kimi-k3</td><td class="sym">sources/evaluators/verifier_per_claim.py</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="sym">hybrid</td><td class="sym">sources/evaluators/evaluator.py</td></tr>
+<tr><td class="sym">hybrid_verifier_num_claims</td><td class="sym">10 claims</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
+<tr><td class="sym">hybrid_verifier_refinement_rounds</td><td class="sym">2</td><td class="sym">hybrid_verifier/layers.py</td></tr>
+<tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="sym">60 s</td><td class="sym">hybrid_verifier/layers.py</td></tr>
+<tr><td class="sym">hybrid_verifier_pairwise_mode</td><td class="sym">temporal</td><td class="sym">hybrid_verifier/aggregation.py</td></tr>
+<tr><td class="sym">hybrid_verifier_reward</td><td class="sym">win_rate</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
+<tr><td class="sym">hybrid_verifier_digest_max_files</td><td class="sym">8 files</td><td class="sym">hybrid_verifier/digest.py</td></tr>
+<tr><td class="sym">engine_name</td><td class="sym">litellm</td><td class="sym">sources/core/workflow_factory.py</td></tr>
+<tr><td class="sym">reasoning_effort</td><td class="sym">medium</td><td class="sym">sources/core/llm_provider.py</td></tr>
+<tr><td class="sym">max_tokens</td><td class="sym">16 384 tokens</td><td class="sym">sources/core/llm_provider.py</td></tr>
+<tr><td class="sym">save_logprobs</td><td class="sym">true</td><td class="sym">sources/core/workflow_factory.py</td></tr>
+<tr><td class="sym">learned_score_threshold</td><td class="sym">0.9</td><td class="sym">sources/core/evolution_engine.py</td></tr>
+<tr><td class="sym">max_learning_evolve_iterations</td><td class="sym">16 generations</td><td class="sym">sources/core/evolution_engine.py</td></tr>
+<tr><td class="sym">selection_strategy</td><td class="sym">qd</td><td class="sym">sources/core/evolution_engine.py</td></tr>
+<tr><td class="sym">population_size</td><td class="sym">16</td><td class="sym">sources/core/selection.py</td></tr>
+<tr><td class="sym">novelty_weight</td><td class="sym">0.25</td><td class="sym">sources/core/selection.py</td></tr>
+<tr><td class="sym">novelty_k_neighbours</td><td class="sym">k = 16</td><td class="sym">sources/core/selection.py</td></tr>
+<tr><td class="sym">crossover_rate</td><td class="sym">0.4</td><td class="sym">sources/core/workflow_selection.py</td></tr>
+<tr><td class="sym">admit_threshold</td><td class="sym">0.3</td><td class="sym">sources/core/selection.py</td></tr>
+<tr><td class="sym">min_improvement_threshold</td><td class="sym">0.01</td><td class="sym">sources/core/selection.py</td></tr>
+<tr><td class="sym">length_penalty_lambda</td><td class="sym">0.05</td><td class="sym">sources/core/selection.py</td></tr>
+<tr><td class="sym">initial_population</td><td class="sym">2 workflows</td><td class="sym">sources/core/evolution_engine.py</td></tr>
+<tr><td class="sym">max_concurrent_eval_tasks</td><td class="sym">1</td><td class="sym">main.py::science_bench_papers_mode</td></tr>
+<tr><td class="sym">evaluate_snapshot_ablations</td><td class="sym">true</td><td class="sym">sources/benchmark_evaluation/csv_mode.py</td></tr>
+<tr><td class="sym">export_astra</td><td class="sym">false</td><td class="sym">sources/transparency/astra_exporter.py</td></tr>
+<tr><td class="sym">planner_human_approve</td><td class="sym">false</td><td class="sym">main.py::main</td></tr>
+<tr><td class="sym">runner_default_python_version</td><td class="sym">3.12</td><td class="sym">sources/core/orchestrator.py</td></tr>
+<tr><td class="sym">runner_default_timeout</td><td class="sym">10 800 s</td><td class="sym">sources/core/orchestrator.py</td></tr>
+<tr><td class="sym">runner_default_max_memory_mb</td><td class="sym">10 000 MB</td><td class="sym">sources/core/orchestrator.py</td></tr>
+<tr><td class="sym">runner_default_max_cpu_percent</td><td class="sym">100 %</td><td class="sym">sources/core/orchestrator.py</td></tr>
+<tr><td class="sym">runner_requirements</td><td class="sym">14 pinned packages</td><td class="sym">sources/core/orchestrator.py</td></tr>
+<tr><td class="sym">agent_execution_timeout</td><td class="sym">18 000 s</td><td class="sym">sources/modules/smolagent_factory.py</td></tr>
+<tr><td class="sym">workflow_dir / memory_dir</td><td class="sym">checkout or XDG paths</td><td class="sym">sources/core/*, sources/utils/paths.py</td></tr>
+<tr><td class="sym">runs_capsule_dir / runner_temp_dir</td><td class="sym">checkout or XDG paths</td><td class="sym">sources/benchmark_evaluation/csv_mode.py</td></tr>
+<tr><td class="sym">pushover_token / pushover_user</td><td class="sym">from environment</td><td class="sym">sources/utils/notify.py</td></tr>
+<tr><td class="sym">literrature_grounding</td><td class="sym">true</td><td class="sym">sources/core/orchestrator.py, not persisted</td></tr>
+<tr><td class="sym">orchestrator_choose_model</td><td class="sym">false</td><td class="sym">sources/core/orchestrator.py, not persisted</td></tr>
+</tbody>
+</table>
+<p>Defaults quoted from <code>config.py::Config.__init__</code> at this commit. <code>runner_requirements</code> is a 14-entry list; it excludes scientific packages, which the agents install themselves.</p>
+</div></details>
+</div>
+
+<div class="card ice">
+<h4><a href="../../auto-install.sh">auto-install.sh</a></h4>
+<p class="role">One-shot installer and launcher: checks tools, starts Toolomics and Perspicacite, then opens the Observatory.</p>
+<p class="meta">411 lines &#183; 6 steps &#183; flags: <code>--yes</code>, <code>--cli</code>/<code>--no-cli</code>, <code>--no-webui</code>, <code>--skip-toolomics</code>, <code>--skip-perspicacite</code>, <code>--no-open</code></p>
+</div>
+
+<div class="card ice">
+<h4><a href="../../cleanup.sh">cleanup.sh</a></h4>
+<p class="role">Deletes the contents of <code>tmp/</code> and <code class="path">sources/workflows/</code> while keeping the directories. Run it before a benchmark sweep.</p>
+<p class="meta">32 lines &#183; arrays: <code>DIRS</code> &#183; functions: <code>clean_directory</code> &#183; uses <code>find "&lt;dir&gt;" -mindepth 1 -delete</code></p>
+</div>
+
+<div class="card steel">
+<h4><a href="../../workflow_evolution_anim.py">workflow_evolution_anim.py</a></h4>
+<p class="role">Pygame viewer of the evolution tree: plays one generation's memory trace while showing the lineage tree, the workflow PNG and the rubric timeline.</p>
+<p class="meta">1852 lines &#183; reads <code>lineage_&lt;uuid&gt;.json</code>, <code>workflow_&lt;uuid&gt;.png</code>, <code>stage*/</code> memory JSON &#183; run with <code>uv run workflow_evolution_anim.py</code></p>
+<details><summary>modes, inputs and keys</summary><div class="dbody">
+<pre>load_all(workflows_dir: Path, memory_dir: Path) -&gt; list[Workflow]
+load_memory_files(memory_dir: Path) -&gt; dict[str, list[dict]]
+_parse_evaluation(...) ; _load_workflow(wf_dir, memory_root) -&gt; Workflow | None
+App.run() ; App.record(path, fps, hold_seconds)</pre>
+<p>Flags: <code>--workflows-dir</code> (default <code>sources/workflows</code>), <code>--memory-dir</code> (default <code>sources/memory</code>), <code>--width</code> 1600, <code>--height</code> 1000, <code>--record &lt;mp4&gt;</code>, <code>--speed</code> 2.0 steps/s, <code>--fps</code> 30, <code>--hold-seconds</code> 1.0. It exits when no <code>lineage_&lt;uuid&gt;.json</code> exists under the workflows dir.</p>
+<p>Keys: SPACE, arrows, B (best generation), [ / ], H, Esc or Q. <code>--record</code> renders headless via <code>SDL_VIDEODRIVER=dummy</code> and needs ffmpeg. <code>pygame</code> and <code>pillow</code> are declared dependencies in <code>pyproject.toml</code>.</p>
+</div></details>
+</div>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">main.py</code> (423 lines), <code class="path">config.py</code> (722 lines), <code class="path">config_default.json</code> (111 lines), <code class="path">auto-install.sh</code> (411 lines), <code class="path">cleanup.sh</code> (32 lines), <code class="path">workflow_evolution_anim.py</code> (1852 lines), <code class="path">pyproject.toml</code>, <code class="path">docs/reference/cli.md</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/cli/__init__.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">tests/config_roundtrip_test.py</code>. Greps for mode, symbol and config-field names used the same files plus <code class="path">sources/core/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/benchmark_evaluation/</code> and <code class="path">sources/utils/</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/ensure_env.py</code>, <code class="path">sources/utils/precheck.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">sources/cli/pretty_print.py</code>, <code class="path">sources/cli/onboard_cli.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/cli/memory_chat_cli.py</code> - read for the call targets only, their own pages are <code>area_utils.html</code> and <code>area_cli.html</code>. Skipped <code>sources/core/*</code>, <code>sources/benchmark_evaluation/*</code>, <code>sources/evaluators/*</code>, <code>sources/extensibility/*</code>, <code>sources/transparency/*</code>, <code>sources/modules/*</code> - named as targets only. Skipped as Tier D: <code>docs/*</code> (except <code class="path">docs/reference/cli.md</code>), <code>webui/</code>, <code>datasets/</code>, <code>tests/</code> (except the round-trip test), <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code>, <code>audits/</code>, <code>CLA/</code>, <code>.venv/</code>, lock files, images and videos.</p>
+<p>The working tree had uncommitted changes when this page was built (<code>git status --porcelain</code> lists modified <code>main.py</code>, <code>config.py</code> and <code class="path">docs/reference/cli.md</code>, among others). All counts, defaults and line numbers are from that working tree. <code class="path">docs/getting-started/configuration.md</code> and <code class="path">docs/reference/configuration.md</code> were not opened, so their field lists are not checked here.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

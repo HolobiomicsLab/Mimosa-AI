@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5_md.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; experiments_verifiers/harness &gt; e5_md.py">
+<div class="wrap">
+
+<h1 class="hud">e5_md.py</h1>
+<p class="intro">This 140-line script renders the markdown summary of an E5 run from its results JSON: it picks the JSON file, reads it, and appends one section after another into a line buffer that becomes the <code>.md</code> file. It runs by hand, <code>uv run python experiments_verifiers/harness/e5_md.py [results_json]</code> (docstring L3); no other Python file imports it. Every number it prints is copied from the JSON, not recomputed (L27).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the script does: pick the JSON, append sections, write the markdown</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 400" role="img" aria-label="e5_md.py flow from argv or newest results JSON through section appends to the markdown file">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="rArg">
+    <title>Optional CLI argument and the fallback glob of results files</title>
+    <rect x="20" y="50" width="185" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="76" text-anchor="middle">sys.argv[1] (optional)</text>
+    <text class="box-sub" x="112" y="94" text-anchor="middle">else glob E5_learned_importance_*</text>
+    <text class="box-sub" x="112" y="112" text-anchor="middle">newest last &#183; L12</text>
+  </g>
+
+  <a class="box" id="rSrc" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>src: Path from argv or the sorted glob; EV is the experiment root</title>
+    <rect x="235" y="50" width="185" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="327" y="76" text-anchor="middle">src</text>
+    <text class="box-sub" x="327" y="94" text-anchor="middle">Path object &#183; L12</text>
+    <text class="box-sub" x="327" y="112" text-anchor="middle">parents[1] = EV &#183; L11</text>
+  </a>
+
+  <g class="box" id="rLoad">
+    <title>The whole payload is parsed once</title>
+    <rect x="450" y="50" width="185" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="542" y="76" text-anchor="middle">json.loads(src.read_text())</text>
+    <text class="box-sub" x="542" y="94" text-anchor="middle">d, the results dict</text>
+    <text class="box-sub" x="542" y="112" text-anchor="middle">L13</text>
+  </g>
+
+  <g class="box" id="rHelp">
+    <title>Two formatting helpers used by every section</title>
+    <rect x="450" y="180" width="185" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="542" y="206" text-anchor="middle">fmt</text>
+    <text class="box-sub" x="542" y="224" text-anchor="middle">3 decimals for floats &#183; L19</text>
+    <text class="box-sub" x="542" y="242" text-anchor="middle">KEEP, 9 metric keys &#183; L15</text>
+  </g>
+
+  <a class="box" id="rSecA" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>Sections: title, run date, question, provenance, classifier</title>
+    <rect x="665" y="30" width="165" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="747" y="58" text-anchor="middle">first sections</text>
+    <text class="box-sub" x="747" y="76" text-anchor="middle">question, provenance</text>
+    <text class="box-sub" x="747" y="94" text-anchor="middle">source classifier</text>
+    <text class="box-sub" x="747" y="110" text-anchor="middle">L25&#8211;L51</text>
+  </a>
+
+  <a class="box" id="rSecB" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>Ladder table, bootstrap CIs, success gate, learning curves, gate verdict</title>
+    <rect x="665" y="140" width="165" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="747" y="168" text-anchor="middle">result sections</text>
+    <text class="box-sub" x="747" y="186" text-anchor="middle">metrics, CI, gate</text>
+    <text class="box-sub" x="747" y="204" text-anchor="middle">curves, verdict</text>
+    <text class="box-sub" x="747" y="220" text-anchor="middle">L53&#8211;L88</text>
+  </a>
+
+  <a class="box" id="rSecC" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>Paired tests, permutation tests, weight tables, gaps, runtime</title>
+    <rect x="665" y="250" width="165" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="747" y="278" text-anchor="middle">last sections</text>
+    <text class="box-sub" x="747" y="296" text-anchor="middle">paired and permutation</text>
+    <text class="box-sub" x="747" y="314" text-anchor="middle">weights, gaps, runtime</text>
+    <text class="box-sub" x="747" y="330" text-anchor="middle">L90&#8211;L137</text>
+  </a>
+
+  <g class="box" id="rBuf">
+    <title>Append-only line buffer</title>
+    <rect x="450" y="290" width="185" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="542" y="314" text-anchor="middle">lines, A = lines.append</text>
+    <text class="box-sub" x="542" y="332" text-anchor="middle">one entry per markdown line</text>
+    <text class="box-sub" x="542" y="348" text-anchor="middle">L23 L24</text>
+  </g>
+
+  <g class="box" id="rOut">
+    <title>Final write of the joined buffer</title>
+    <rect x="235" y="180" width="185" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="327" y="206" text-anchor="middle">E5_learned_importance_DATE.md</text>
+    <text class="box-sub" x="327" y="224" text-anchor="middle">src.stem + ".md" &#183; L138</text>
+    <text class="box-sub" x="327" y="242" text-anchor="middle">write_text once &#183; L139</text>
+  </g>
+
+  <g class="box" id="rPrint">
+    <title>One confirmation line on stdout</title>
+    <rect x="20" y="180" width="185" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="112" y="206" text-anchor="middle">print("wrote", out)</text>
+    <text class="box-sub" x="112" y="224" text-anchor="middle">stdout &#183; L140</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="rArg" data-to="rSrc" d="M205,88 H235" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="220" y="80" text-anchor="middle">arg or glob</text>
+  <path class="edge" data-from="rSrc" data-to="rLoad" d="M420,88 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="435" y="80" text-anchor="middle">read_text</text>
+  <path class="edge" data-from="rLoad" data-to="rSecA" d="M635,88 C650,88 655,70 665,70" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="650" y="66" text-anchor="middle">d</text>
+  <path class="edge" data-from="rLoad" data-to="rSecB" d="M635,100 C650,120 655,170 665,180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="rLoad" data-to="rSecC" d="M600,126 V250 H665" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="610" y="200" text-anchor="start">d</text>
+  <path class="edge" data-from="rHelp" data-to="rSecB" d="M635,218 H665" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="648" y="210" text-anchor="middle">fmt</text>
+  <path class="edge" data-from="rSecA" data-to="rBuf" d="M747,116 C747,290 660,320 635,323" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="rSecC" data-to="rBuf" d="M747,336 C740,360 660,340 635,326" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="356" text-anchor="middle">A(line)</text>
+  <path class="edge" data-from="rBuf" data-to="rOut" d="M450,323 C420,310 380,270 355,256" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="410" y="300" text-anchor="middle">join with newlines</text>
+  <path class="edge" data-from="rOut" data-to="rPrint" d="M235,218 H205" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="210" text-anchor="middle">then print</text>
+
+  <text class="box-sub" x="20" y="380">solid = call  |  dashed = reads/writes  |  10 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. The script is module-level code plus one function: <code>fmt</code> (L19) is the only <code>def</code> in the file. Section groups are shown together because they all follow the same pattern &mdash; read a key of <code>d</code>, format it, append lines.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in, data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 300" role="img" aria-label="e5_md.py data flow: one JSON read, one markdown write, one printed line">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="sR1">
+    <title>argv[1] when given</title>
+    <rect x="20" y="40" width="220" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130" y="66" text-anchor="middle">sys.argv[1]</text>
+    <text class="box-sub" x="130" y="84" text-anchor="middle">explicit results JSON path</text>
+    <text class="box-sub" x="130" y="100" text-anchor="middle">L12</text>
+  </g>
+  <g class="box" id="sR2">
+    <title>Fallback: newest E5 results JSON by name order</title>
+    <rect x="20" y="130" width="220" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130" y="156" text-anchor="middle">results/E5_learned_importance_*.json</text>
+    <text class="box-sub" x="130" y="174" text-anchor="middle">sorted()[-1] = newest, L12</text>
+    <text class="box-sub" x="130" y="192" text-anchor="middle">read with read_text L13</text>
+  </g>
+
+  <a class="box" id="sStep" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>Module-level statements L11 to L140</title>
+    <rect x="300" y="90" width="200" height="120" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400" y="118" text-anchor="middle">e5_md.py statements</text>
+    <text class="box-sub" x="400" y="138" text-anchor="middle">json.loads L13</text>
+    <text class="box-sub" x="400" y="156" text-anchor="middle">A(...) per line L24&#8211;L137</text>
+    <text class="box-sub" x="400" y="174" text-anchor="middle">join and write L139</text>
+    <text class="box-sub" x="400" y="192" text-anchor="middle">no config field read</text>
+  </a>
+
+  <g class="box" id="sW1">
+    <title>Markdown summary next to the JSON</title>
+    <rect x="560" y="30" width="230" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="675" y="56" text-anchor="middle">results/E5_learned_importance_DATE.md</text>
+    <text class="box-sub" x="675" y="74" text-anchor="middle">same stem as the JSON &#183; L138</text>
+    <text class="box-sub" x="675" y="92" text-anchor="middle">overwritten on every run</text>
+  </g>
+  <g class="box" id="sW2">
+    <title>One stdout line with the output path</title>
+    <rect x="560" y="150" width="230" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="675" y="176" text-anchor="middle">stdout</text>
+    <text class="box-sub" x="675" y="194" text-anchor="middle">print("wrote", out) &#183; L140</text>
+  </g>
+  <g class="box" id="sCons">
+    <title>The markdown is the human-facing record of the run</title>
+    <rect x="830" y="90" width="170" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="915" y="126" text-anchor="middle">reader</text>
+    <text class="box-sub" x="915" y="146" text-anchor="middle">the operator and the</text>
+    <text class="box-sub" x="915" y="164" text-anchor="middle">experiment reports</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="sR1" data-to="sStep" d="M240,73 C270,73 280,110 300,120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="sR2" data-to="sStep" d="M240,168 H300" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="270" y="160" text-anchor="middle">text</text>
+  <path class="edge" data-from="sStep" data-to="sW1" d="M500,120 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="530" y="112" text-anchor="middle">write_text</text>
+  <path class="edge" data-from="sStep" data-to="sW2" d="M500,186 C525,186 535,180 560,180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="530" y="178" text-anchor="middle">print</text>
+  <path class="edge dashed-edge" data-from="sW1" data-to="sCons" d="M790,73 C810,73 815,120 830,130" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="810" y="100" text-anchor="middle">read later</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; one read, one write, one printed line. The script reads no config field and takes no state key: every path is derived from <code>__file__</code> (<code>EV</code> L11) or from the argument at L12.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the four decisions the renderer makes</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 400" role="img" aria-label="e5_md.py decision rules: source choice, float formatting, gate rows, paired-test rows, missing keys">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="tEntry" href="../../experiments_verifiers/harness/e5_md.py">
+    <title>Module starts, L11</title>
+    <rect x="30" y="26" width="960" height="44" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="46" text-anchor="middle">script starts: resolve src, then parse it</text>
+    <text class="box-sub" x="510" y="62" text-anchor="middle">no argument parsing, no flag, no default file name</text>
+  </a>
+
+  <g class="box" id="t1">
+    <title>Source choice, L12</title>
+    <rect x="30" y="110" width="280" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="134" text-anchor="middle">len(sys.argv) &gt; 1 ?</text>
+    <text class="box-sub" x="170" y="152" text-anchor="middle">yes &#8594; Path(sys.argv[1])</text>
+    <text class="box-sub" x="170" y="168" text-anchor="middle">no &#8594; newest glob match</text>
+  </g>
+  <g class="box" id="t2">
+    <title>Number formatting, L19</title>
+    <rect x="330" y="110" width="280" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="470" y="134" text-anchor="middle">isinstance(v, float) ?</text>
+    <text class="box-sub" x="470" y="152" text-anchor="middle">yes &#8594; f"{v:.3f}"</text>
+    <text class="box-sub" x="470" y="168" text-anchor="middle">no &#8594; str(v), ints stay plain</text>
+  </g>
+  <g class="box" id="t3">
+    <title>Gate rows, L84 to L86</title>
+    <rect x="630" y="110" width="280" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="134" text-anchor="middle">dict value with "pass" key ?</text>
+    <text class="box-sub" x="770" y="152" text-anchor="middle">yes &#8594; PASS / FAIL line</text>
+    <text class="box-sub" x="770" y="168" text-anchor="middle">no &#8594; line skipped</text>
+  </g>
+
+  <g class="box" id="t4">
+    <title>Paired-test rows, L95</title>
+    <rect x="30" y="220" width="280" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="244" text-anchor="middle">dict value with "mean" key ?</text>
+    <text class="box-sub" x="170" y="262" text-anchor="middle">yes &#8594; mean, ci95, p_le0 row</text>
+    <text class="box-sub" x="170" y="278" text-anchor="middle">no &#8594; no row printed</text>
+  </g>
+  <g class="box" id="t5">
+    <title>Metric cells, L58</title>
+    <rect x="330" y="220" width="280" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="470" y="244" text-anchor="middle">m.get(x) is None ?</text>
+    <text class="box-sub" x="470" y="262" text-anchor="middle">yes &#8594; the text "None" in the cell</text>
+    <text class="box-sub" x="470" y="278" text-anchor="middle">no &#8594; fmt(value)</text>
+  </g>
+  <g class="box" id="t6">
+    <title>Missing top-level keys, L27 to L137</title>
+    <rect x="630" y="220" width="280" height="70" rx="2" fill="none" stroke="#5E8CA3"/>
+    <text class="box-label" x="770" y="244" text-anchor="middle">d["date"] etc. present ?</text>
+    <text class="box-sub" x="770" y="262" text-anchor="middle">no &#8594; KeyError, no fallback</text>
+    <text class="box-sub" x="770" y="278" text-anchor="middle">only d.get("gate", {}) L70</text>
+  </g>
+
+  <g class="box" id="tOut">
+    <title>The buffer is joined once</title>
+    <rect x="230" y="320" width="560" height="60" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="344" text-anchor="middle">"\n".join(lines) + "\n"</text>
+    <text class="box-sub" x="510" y="364" text-anchor="middle">written in one call, L139</text>
+  </g>
+
+  <path class="edge" data-from="tEntry" data-to="t1" d="M400,70 C300,90 240,100 170,110" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="tEntry" data-to="t3" d="M700,70 C740,90 760,100 770,110" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t1" data-to="t2" d="M310,145 H330" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="320" y="137" text-anchor="middle">then</text>
+  <path class="edge" data-from="t2" data-to="t3" d="M610,145 H630" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t4" data-to="t5" d="M310,255 H330" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t5" data-to="t6" d="M610,255 H630" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t5" data-to="tOut" d="M470,290 V320" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t6" data-to="tOut" d="M770,290 C770,310 700,335 690,340" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="312" text-anchor="start">rows</text>
+  <text class="box-sub" x="30" y="395">no loop with a stop test, no retry: every loop here walks a dict or list once and appends</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the renderer never recomputes a statistic; it formats stored values. The one hard failure mode is a missing top-level key, which raises <code>KeyError</code>; only the <code>gate</code> block is read with a fallback (L70).</p>
+
+<p class="note">Amber: the fallback source is <code>sorted(glob(...))[-1]</code> (L12), a name-order maximum, so a hand-typed date earlier than the newest file still wins only when passed as an argument. The run date on L27 is copied from the JSON, not from the file name.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">sys.argv[1]</td><td>CLI argument</td><td>explicit results JSON path</td><td class="size">L12</td></tr>
+<tr><td>reads</td><td class="sym">E5_learned_importance_*.json</td><td>glob in <code class="path">experiments_verifiers/results/</code></td><td>fallback source, newest name</td><td class="size">L12</td></tr>
+<tr><td>reads</td><td class="sym">d["date"], src.name</td><td>results JSON key</td><td>run-date line</td><td class="size">L27</td></tr>
+<tr><td>reads</td><td class="sym">d["provenance"]</td><td>results JSON key</td><td>cache count, join counts, coverage</td><td class="size">L38&#8211;L46</td></tr>
+<tr><td>reads</td><td class="sym">d["source_classifier"]</td><td>results JSON key</td><td>accuracy versus prior</td><td class="size">L48&#8211;L51</td></tr>
+<tr><td>reads</td><td class="sym">d["metrics"]</td><td>results JSON key</td><td>ladder table, keeps 9 keys</td><td class="size">L15 L57</td></tr>
+<tr><td>reads</td><td class="sym">d["auc_bootstrap_ci"]</td><td>results JSON key</td><td>auc mean and 95% bounds</td><td class="size">L65 L66</td></tr>
+<tr><td>reads</td><td class="sym">d.get("gate", {})</td><td>results JSON key, with default</td><td>gate lines and verdict</td><td class="size">L70 L84 L88</td></tr>
+<tr><td>reads</td><td class="sym">d["learning_curves"]</td><td>results JSON key</td><td>mean AUC per training fraction</td><td class="size">L77&#8211;L79</td></tr>
+<tr><td>reads</td><td class="sym">d["paired_tests"]</td><td>results JSON key</td><td>mean dAUC, CI, P(d&lt;=0)</td><td class="size">L94&#8211;L96</td></tr>
+<tr><td>reads</td><td class="sym">d["permutation_tests"]</td><td>results JSON key</td><td>observed versus null AUC, p</td><td class="size">L100&#8211;L102</td></tr>
+<tr><td>reads</td><td class="sym">d["weights_analysis"]</td><td>results JSON key</td><td>Spearman, per-source, top 30</td><td class="size">L104&#8211;L130</td></tr>
+<tr><td>reads</td><td class="sym">d["gaps"], d["runtime_s"]</td><td>results JSON keys</td><td>gaps list and runtime line</td><td class="size">L134 L137</td></tr>
+<tr><td>reads</td><td class="sym">config field</td><td>none</td><td>no config import in this file</td><td class="size">L7&#8211;L9</td></tr>
+<tr><td>returns</td><td class="sym">nothing</td><td>module level, no function returns</td><td>the file is the output</td><td class="size">&#8212;</td></tr>
+<tr><td>writes</td><td class="sym">E5_learned_importance_&lt;stem&gt;.md</td><td>file, <code class="path">experiments_verifiers/results/</code></td><td>the rendered summary</td><td class="size">L138 L139</td></tr>
+<tr><td>writes</td><td class="sym">stdout</td><td>console</td><td>confirmation of the output path</td><td class="size">L140</td></tr>
+</tbody>
+</table>
+<p class="sub">The <code>KEEP</code> list at L15&ndash;L16 fixes the nine metric columns: <code>n</code>, <code>n_pos</code>, <code>auc_sr</code>, <code>auc_ver</code>, <code>tau_all</code>, <code>tau_top_quartile</code>, <code>within_task_ranking_accuracy</code>, <code>n_contrast_pairs</code>, <code>n_contrast_ties</code>; the pair and tie counts are re-printed as one <code>(pairs / ties)</code> cell at L57&ndash;L58.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>1 function, no class &mdash; plus the module-level names</summary><div class="dbody">
+<pre>fmt(v) -&gt; str                                L19   three decimals for floats</pre>
+<p>No class, no method, no lambda, no decorator, no <code>main()</code>, no <code>if __name__</code> guard. Module-level bindings in file order: <code>json</code> L7, <code>sys</code> L8, <code>Path</code> L9, <code>EV</code> L11, <code>src</code> L12, <code>d</code> L13, <code>KEEP</code> L15, <code>fmt</code> L19, <code>lines</code> L23, <code>A</code> L24, then <code>p</code>, <code>sc</code>, <code>gate</code>, <code>g</code>, <code>wa</code>, <code>out</code> as section locals L38&ndash;L138.</p>
+<p>Sections written, in order: title L25; run date and source file L27; <code>## Question</code> L29&ndash;L34; <code>## Provenance recovery</code> L36&ndash;L51; <code>## Ladder results</code> L53&ndash;L66; <code>## Success gate</code> L68&ndash;L73; <code>## Learning curves</code> L75&ndash;L79; <code>## Gate verdict</code> L81&ndash;L88; paired bootstrap table L90&ndash;L96; <code>## Permutation tests</code> L98&ndash;L102; <code>## Learned weights vs self-reported importance</code> L104&ndash;L130; <code>## Gaps and honesty</code> L132&ndash;L135; runtime line L137. The verdict word comes from <code>g['verdict']</code> and is wrapped in bold at L88.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<p>No importer found: a grep of the whole repository for <code>e5_md</code> and <code>import e5_md</code> returns only this file. It is a last-step script, run after <a href="file_harness_e5_run.html">e5_run.py</a> wrote the JSON.</p>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_harness_e5_run.html">e5_run.py</a></td><td>Writes <code>E5_learned_importance_&lt;date&gt;.json</code>, the input this script formats</td><td class="size">L28 L518</td></tr>
+<tr><td class="sym"><a href="exp_e5_md.html">exp_e5_md.html</a></td><td>Experiment page that documents this renderer</td><td class="size">page scope</td></tr>
+<tr><td class="sym"><code class="path">experiments_verifiers/README.md</code></td><td>Lists the renderer among the E5 scripts</td><td class="size">script list</td></tr>
+</tbody>
+</table>
+<p>Tests: <code>unknown</code> &mdash; a grep of <code class="path">tests/</code> for <code>e5_md</code> returns no file. The suite does not render markdown.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e5_md.html">exp_e5_md.html</a>, <a href="file_harness_e5_run.html">e5_run.py</a> (writes the JSON) and <a href="file_harness_e5_common.html">e5_common.py</a> (computes the numbers the JSON holds).</p><p>Sources read: <code class="path">experiments_verifiers/harness/e5_md.py</code> (140 lines, whole file), <code class="path">experiments_verifiers/harness/e5_run.py</code> (the key names its payload writes, L493&ndash;L517), <code class="path">experiments_verifiers/README.md</code> (script list), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> and repo <code class="path">.env</code> (never opened, secrets); <code class="path">experiments_verifiers/results/E5_learned_importance_*.json</code> and the rendered <code class="path">.md</code> bodies (recorded numbers, owned by the experiment pages; this page describes the renderer, and the keys are cited from the code); the other 47 <code class="path">experiments_verifiers/harness/*.py</code> scripts (grep shows no import of this file); <code class="path">__pycache__</code>; no pytest run and no script executed, as instructed.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

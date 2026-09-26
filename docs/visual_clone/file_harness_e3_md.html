@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e3_md.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e3_md.py">
+<div class="wrap">
+<h1 class="hud">e3_md.py</h1>
+<p class="intro">This is the renderer for the E3 markdown summary: it reads one dated results JSON and appends seven sections, including a success-gate verdict. It runs by hand, once, after a report stage; the input name is pinned by <code>DATE</code> L12. All numbers it prints are recomputed from the JSON, not measured here.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; seven markdown sections from one results JSON</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 330" role="img" aria-label="e3_md.py: main reads the E3 results JSON and appends seven markdown sections, then writes one md file">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="mIn">
+    <rect x="20" y="25" width="300" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="170" y="49" text-anchor="middle">results/E3_designA_20260921.json</text>
+    <text class="box-sub" x="170" y="64" text-anchor="middle">json.loads L24</text>
+    <text class="box-sub" x="170" y="79" text-anchor="middle">ABSENT on disk at this commit</text>
+  </g>
+  <g class="box" id="mMain">
+    <rect x="360" y="25" width="220" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470" y="56" text-anchor="middle">main L23</text>
+    <text class="box-sub" x="470" y="72" text-anchor="middle">builds one list of lines</text>
+  </g>
+  <g class="box" id="mFmt">
+    <rect x="620" y="25" width="180" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="710" y="56" text-anchor="middle">fmt L15</text>
+    <text class="box-sub" x="710" y="72" text-anchor="middle">None becomes an em dash L17</text>
+  </g>
+  <g class="box" id="mOut">
+    <rect x="840" y="25" width="260" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="970" y="49" text-anchor="middle">results/E3_designA_20260921.md</text>
+    <text class="box-sub" x="970" y="64" text-anchor="middle">write_text L124</text>
+    <text class="box-sub" x="970" y="79" text-anchor="middle">ABSENT on disk</text>
+  </g>
+  <g class="box" id="mDesign">
+    <rect x="20" y="140" width="180" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="110" y="168" text-anchor="middle">Design L30</text>
+    <text class="box-sub" x="110" y="184" text-anchor="middle">design and models L31</text>
+  </g>
+  <g class="box" id="mMetrics">
+    <rect x="220" y="140" width="180" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="310" y="168" text-anchor="middle">Metrics table L40</text>
+    <text class="box-sub" x="310" y="184" text-anchor="middle">one row per variant L44</text>
+  </g>
+  <g class="box" id="mSab">
+    <rect x="420" y="140" width="160" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="500" y="168" text-anchor="middle">Sabotage L61</text>
+    <text class="box-sub" x="500" y="184" text-anchor="middle">two blocks L64 L71</text>
+  </g>
+  <g class="box" id="mDis">
+    <rect x="600" y="140" width="170" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="168" text-anchor="middle">Disagreement L79</text>
+    <text class="box-sub" x="685" y="184" text-anchor="middle">four lines L82</text>
+  </g>
+  <g class="box" id="mCost">
+    <rect x="790" y="140" width="150" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="865" y="168" text-anchor="middle">LLM cost L89</text>
+    <text class="box-sub" x="865" y="184" text-anchor="middle">per model L95</text>
+  </g>
+  <g class="box" id="mSamp">
+    <rect x="960" y="140" width="140" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1030" y="168" text-anchor="middle">Sampling frame L101</text>
+    <text class="box-sub" x="1030" y="184" text-anchor="middle">frame text L103</text>
+  </g>
+  <g class="box" id="mGate">
+    <rect x="20" y="240" width="320" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="180" y="261" text-anchor="middle">Verdict vs success gate L108</text>
+    <text class="box-sub" x="180" y="276" text-anchor="middle">three thresholds L111 to L115</text>
+    <text class="box-sub" x="180" y="291" text-anchor="middle">overall line L121</text>
+  </g>
+  <path class="edge dashed-edge" data-from="mIn" data-to="mMain" d="M320,60 H360" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="340" y="52" text-anchor="middle">reads L24</text>
+  <path class="edge" data-from="mMain" data-to="mFmt" d="M580,60 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="52" text-anchor="middle">fmt used here</text>
+  <path class="edge dashed-edge" data-from="mMain" data-to="mOut" d="M580,85 C700,95 820,90 840,70" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="700" y="98" text-anchor="middle">write_text L124</text>
+  <path class="edge" data-from="mMain" data-to="mDesign" d="M400,95 C330,115 250,122 110,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="230" y="120" text-anchor="middle">L31</text>
+  <path class="edge" data-from="mMain" data-to="mMetrics" d="M430,95 C400,115 360,126 310,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="370" y="132" text-anchor="middle">L44</text>
+  <path class="edge" data-from="mMain" data-to="mSab" d="M470,95 C480,115 490,126 500,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="495" y="126" text-anchor="middle">L62</text>
+  <path class="edge" data-from="mMain" data-to="mDis" d="M510,95 C560,115 640,126 685,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="124" text-anchor="middle">L80</text>
+  <path class="edge" data-from="mMain" data-to="mCost" d="M540,95 C640,115 800,126 865,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="810" y="124" text-anchor="middle">L90</text>
+  <path class="edge" data-from="mMain" data-to="mSamp" d="M570,95 C700,115 950,126 1030,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="960" y="124" text-anchor="middle">L102</text>
+  <path class="edge" data-from="mMain" data-to="mGate" d="M380,95 V232 H170 V240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="190" y="232" text-anchor="middle">L109</text>
+  <path class="edge" data-from="mMetrics" data-to="mFmt" d="M400,172 C500,172 700,152 700,95" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="620" y="166" text-anchor="middle">fmt L47</text>
+
+  <text class="box-sub" x="20" y="324">solid = call  |  dashed = reads / writes  |  11 boxes. Every section is one L.append group; the file is written once at the end.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; order of work in <code>main</code> L23&#8211;L125: read the JSON, append the Design, Metrics, Sabotage, Disagreement, Cost, Sampling-frame and Verdict blocks, then one write L124.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: one JSON in, one markdown file out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 280" role="img" aria-label="e3_md.py data flow: the dated E3 results JSON is read and one markdown file is written">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="n1">
+    <rect x="20" y="30" width="300" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="170" y="56" text-anchor="middle">results/E3_designA_20260921.json</text>
+    <text class="box-sub" x="170" y="71" text-anchor="middle">the file named by DATE L12</text>
+    <text class="box-sub" x="170" y="86" text-anchor="middle">not on disk now</text>
+  </g>
+  <g class="box" id="n2">
+    <rect x="20" y="160" width="300" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="170" y="186" text-anchor="middle">results/E3_designA-pilot_20260921.json</text>
+    <text class="box-sub" x="170" y="201" text-anchor="middle">same schema, present on disk</text>
+    <text class="box-sub" x="170" y="216" text-anchor="middle">n_scored 20</text>
+  </g>
+  <g class="box" id="nMid">
+    <rect x="360" y="60" width="300" height="120" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="94" text-anchor="middle">main L23</text>
+    <text class="box-sub" x="510" y="109" text-anchor="middle">reads res keys: date, n_scored,</text>
+    <text class="box-sub" x="510" y="124" text-anchor="middle">design, models.glm, models.dsk,</text>
+    <text class="box-sub" x="510" y="139" text-anchor="middle">metrics, sabotage, usage_and_cost,</text>
+    <text class="box-sub" x="510" y="154" text-anchor="middle">disagreement_analysis, sampling_frame</text>
+  </g>
+  <g class="box" id="n4">
+    <rect x="700" y="30" width="320" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="860" y="56" text-anchor="middle">results/E3_designA_20260921.md</text>
+    <text class="box-sub" x="860" y="71" text-anchor="middle">write_text L124</text>
+    <text class="box-sub" x="860" y="86" text-anchor="middle">not on disk now</text>
+  </g>
+  <g class="box" id="n5">
+    <rect x="700" y="160" width="320" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="860" y="194" text-anchor="middle">stdout</text>
+    <text class="box-sub" x="860" y="208" text-anchor="middle">wrote plus the path L125</text>
+  </g>
+  <path class="edge dashed-edge" data-from="n1" data-to="nMid" d="M320,67 H360" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="340" y="59" text-anchor="middle">L24</text>
+  <path class="edge dashed-edge" data-from="n2" data-to="nMid" d="M320,197 C340,197 345,150 370,180" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="180" y="140" text-anchor="middle">same schema</text>
+  <path class="edge dashed-edge" data-from="nMid" data-to="n4" d="M660,80 C680,80 690,70 700,67" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="100" text-anchor="middle">md text L124</text>
+  <path class="edge dashed-edge" data-from="nMid" data-to="n5" d="M660,160 C680,170 690,190 700,197" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="190" text-anchor="middle">print L125</text>
+
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; config fields read: none. The only paths used come from <code>C.RESULTS</code> L24 and L123. No state key is touched. The pilot JSON is shown because it is the same schema and is present on disk; the script itself never opens it.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; logic: optional sections and the three-part gate</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 340" role="img" aria-label="e3_md.py logic: three optional sections guarded by key presence, and a three-test success gate">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <defs>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+  </defs>
+  <g class="box" id="q1">
+    <rect x="20" y="36" width="260" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="62" text-anchor="middle">sabotage block present?</text>
+    <text class="box-sub" x="150" y="78" text-anchor="middle">L61 res.get</text>
+  </g>
+  <g class="box" id="q1a">
+    <rect x="320" y="30" width="240" height="54" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="440" y="54" text-anchor="middle">pilot_random10 block?</text>
+    <text class="box-sub" x="440" y="68" text-anchor="middle">L64</text>
+  </g>
+  <g class="box" id="q1b">
+    <rect x="320" y="94" width="240" height="54" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="440" y="118" text-anchor="middle">floor_aware_top10 block?</text>
+    <text class="box-sub" x="440" y="132" text-anchor="middle">L71</text>
+  </g>
+  <g class="box" id="q2">
+    <rect x="20" y="180" width="260" height="60" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="150" y="206" text-anchor="middle">disagreement_analysis present?</text>
+    <text class="box-sub" x="150" y="222" text-anchor="middle">L79</text>
+  </g>
+  <g class="box" id="q3">
+    <rect x="20" y="260" width="260" height="60" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="150" y="286" text-anchor="middle">usage_and_cost present?</text>
+    <text class="box-sub" x="150" y="302" text-anchor="middle">L89</text>
+  </g>
+  <g class="box" id="q4">
+    <rect x="620" y="36" width="240" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="740" y="62" text-anchor="middle">auc delta >= 0.10?</text>
+    <text class="box-sub" x="740" y="78" text-anchor="middle">L111</text>
+  </g>
+  <g class="box" id="q5">
+    <rect x="620" y="116" width="240" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="740" y="142" text-anchor="middle">within-task >= 0.70?</text>
+    <text class="box-sub" x="740" y="158" text-anchor="middle">L112</text>
+  </g>
+  <g class="box" id="q6">
+    <rect x="620" y="196" width="240" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="740" y="222" text-anchor="middle">floor-aware pass >= 9/10?</text>
+    <text class="box-sub" x="740" y="238" text-anchor="middle">L115</text>
+  </g>
+  <g class="box" id="q7">
+    <rect x="900" y="116" width="200" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1000" y="142" text-anchor="middle">overall line</text>
+    <text class="box-sub" x="1000" y="158" text-anchor="middle">all three L121</text>
+  </g>
+  <path class="edge" data-from="q1" data-to="q1a" d="M280,66 H320" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="300" y="58" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q1" data-to="q1b" d="M280,80 V94 H320" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="300" y="90" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q2" data-to="q3" d="M150,240 V260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="230" y="254" text-anchor="start">ran in order</text>
+  <path class="edge" data-from="q4" data-to="q7" d="M860,66 C890,80 890,100 900,120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="880" y="96" text-anchor="start">test 1</text>
+  <path class="edge" data-from="q5" data-to="q7" d="M860,146 H900" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="880" y="138" text-anchor="middle">test 2</text>
+  <path class="edge" data-from="q6" data-to="q7" d="M860,226 C890,212 890,180 900,172" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="880" y="206" text-anchor="start">test 3</text>
+
+  <text class="box-sub" x="20" y="26">lane 1: optional blocks L61 to L99</text>
+  <text class="box-sub" x="620" y="26">lane 2: success gate L108 to L121</text>
+  <text class="box-sub" x="20" y="334">A missing key only removes that block; the markdown is still written. The overall line prints PASS only when all three tests pass L121.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the sabotage block needs both sub-blocks L64 and L71 to print anything; the gate thresholds (0.10, 0.70, 9 of 10) are hard-coded here and appear nowhere in <a href="file_harness_e3_run.html">e3_run.py</a>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">E3_designA_20260921.json</td><td>file, <code>experiments_verifiers/results/</code></td><td>the whole report: metrics, sabotage, cost, frame</td><td class="size">L24</td></tr>
+<tr><td>reads</td><td class="sym">res["date"], res["n_scored"]</td><td>keys of that JSON</td><td>the build line</td><td class="size">L27&#8211;L28</td></tr>
+<tr><td>reads</td><td class="sym">res["design"], res["models"]</td><td>keys, <code>glm</code> and <code>dsk</code></td><td>the Design section, naming both families</td><td class="size">L31&#8211;L33</td></tr>
+<tr><td>reads</td><td class="sym">res["metrics"]</td><td>key, one entry per variant</td><td>the metrics table and the baseline delta lines</td><td class="size">L44&#8211;L58</td></tr>
+<tr><td>reads</td><td class="sym">res["sabotage"]</td><td>key, optional</td><td><code>pilot_random10</code> L64 and <code>floor_aware_top10</code> L71 blocks</td><td class="size">L61&#8211;L77</td></tr>
+<tr><td>reads</td><td class="sym">res["disagreement_analysis"]</td><td>key, optional</td><td>four disagreement lines</td><td class="size">L79&#8211;L87</td></tr>
+<tr><td>reads</td><td class="sym">res["usage_and_cost"]</td><td>key, optional</td><td>the per-model cost table</td><td class="size">L89&#8211;L99</td></tr>
+<tr><td>reads</td><td class="sym">res["sampling_frame"]</td><td>key, required</td><td>population, pilot, full and seed lines</td><td class="size">L101&#8211;L106</td></tr>
+<tr><td>writes</td><td class="sym">E3_designA_20260921.md</td><td><code>experiments_verifiers/results/</code></td><td>the whole markdown summary, one write</td><td class="size">L123&#8211;L124</td></tr>
+<tr><td>writes</td><td class="sym">stdout</td><td>console</td><td>the word <code>wrote</code> plus the path</td><td class="size">L125</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no Config object, no env var</td><td><code>DATE = "20260921"</code> L12 pins the input name</td><td class="size">L12</td></tr>
+<tr><td>state</td><td class="sym">none</td><td>no state key read</td><td>the script is a pure renderer</td><td class="size">L24 L123</td></tr>
+</tbody>
+</table>
+<p class="note flag">Mismatch 1: the pinned input is missing. <code class="path">results/E3_designA_20260921.json</code> is absent on disk at this commit, so the script stops at <code>read_text</code> L24. Present are <code class="path">E3_designA-pilot_20260921.json</code> and <code class="path">E3_designA-salvaged_20260921.json</code>, and <code>DATE</code> L12 points at neither.</p>
+<p class="note flag">Mismatch 2: the schema read here is the elder one. Sections read <code>res["models"]["glm"]</code> and <code>res["models"]["dsk"]</code> L32&#8211;L33, and the sabotage keys <code>pilot_random10</code> and <code>floor_aware_top10</code> L64 and L71. The compliant full report of <a href="file_harness_e3_run2.html">e3_run2.py</a> writes <code>models.judgeA_qwen</code> and <code>models.judgeB_dsk</code> instead, and a flat <code>sabotage</code> block without those two sub-keys.</p>
+<p class="note">Observed on the pilot file: its <code>sabotage</code> key is <code>null</code> (my read of <code class="path">results/E3_designA-pilot_20260921.json</code>), so the Sabotage section would be skipped and the gate would print <code>FAIL</code> for the sabotage test L115.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>2 functions, no class &mdash; signatures and roles</summary><div class="dbody">
+<pre>fmt(v, nd=3)                                                        L15   None to em dash, float to nd places
+main() -&gt; None                                                      L23   read the JSON, build lines, write the md</pre>
+<p>Module constants: <code>HERE</code> L8, <code>DATE = "20260921"</code> L12. Imports: <code>json</code>, <code>sys</code>, <code>Path</code> L4&#8211;L6; <code>e3_common as C</code> L10 after a <code>sys.path</code> insert L9.</p>
+<p>Inside <code>main</code>: a list <code>L</code> L25 collects every line; section appends at L26, L27, L30, L40, L53, L61, L79, L89, L101 and L108; <code>fmt</code> is called from L47, L48, L49, L50, L82&#8211;L87 and L116&#8211;L119. Guard: <code>if __name__ == "__main__": main()</code> L128&#8211;L129, so importing the file runs nothing.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym">nothing</td><td>no importer found</td><td class="sym">grep over the repo finds only its own docstring</td></tr>
+<tr><td class="sym">its own import</td><td><code>import e3_common as C</code> L10</td><td class="sym">RESULTS L24 and L123 only</td></tr>
+<tr><td class="sym">command line</td><td><code>python experiments_verifiers/harness/e3_md.py</code></td><td class="sym">main through the guard L128&#8211;L129</td></tr>
+<tr><td class="sym">tests/</td><td>no test found</td><td class="sym">grep of <code>tests/</code> for <code>e3_md</code> returns nothing</td></tr>
+<tr><td class="sym"><a href="exp_e3_md.html">exp_e3_md.html</a></td><td>the experiment page for the E3 markdown</td><td class="sym">its scope covers the same JSON</td></tr>
+</tbody>
+</table>
+<p>The runner that produced the JSON this script renders is <a href="file_harness_e3_run.html">e3_run.py</a> (<code>report</code> and <code>report-pilot</code> stages L441&#8211;L478). The pilot markdown on disk matches the pilot JSON, so this script is the writer for that pair; no other writer for a <code>.md</code> under <code>results/</code> mentions E3 (grep).</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e3_md.html">exp_e3_md.html</a>, <a href="file_harness_e3_run.html">e3_run.py</a>, <a href="file_harness_e3_run2.html">e3_run2.py</a>, <a href="file_harness_e3_common.html">e3_common.py</a>, <a href="exp_index.html">exp_index.html</a>, <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e3_md.py</code> (129 lines, whole file), key names of <code class="path">results/E3_designA-pilot_20260921.json</code> and the directory listing of <code class="path">results/</code>, section write sites in <code class="path">harness/e3_run.py</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>, plus greps over the repo and <code class="path">tests/</code>.</p>
+<p class="skips">Skipped, with reason: <code class="path">results/E3_designA_20260921.json</code> and <code class="path">results/E3_designA_20260921.md</code> (absent from disk, so nothing to read); recorded metric values (the E3 experiment page owns the numbers); <code class="path">results/E3_designA-salvaged_20260921.json</code> (no writer for that name exists in the package and it falls outside this file's pinned name); <code class="path">results/E3_llm_cache.json</code> contents (a cache that holds model output); the env files (never opened, secrets); compiled <code class="path">__pycache__</code>. Nothing was executed; no pytest ran.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

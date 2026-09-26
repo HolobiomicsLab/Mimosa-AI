@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e3_md - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e3_md">
+<div class="wrap">
+
+<h1 class="hud">e3_md &mdash; the E3 markdown summary writer</h1>
+<p class="intro">E3 asked whether two LLM families, each writing its own binary checklist, rank benchmark artifacts better than the recorded verifier reward. <code>e3_md.py</code> turns one E3 results JSON into the human-readable markdown summary with a three-part success gate. It reads <code>results/E3_designA_20260921.json</code> and writes <code>results/E3_designA_20260921.md</code>; neither file exists on disk.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="e3_md design: input json, stages, output markdown">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="b1">
+    <title>Input the writer needs; the report stage that would write it never ran</title>
+    <rect x="16" y="40" width="210" height="56" rx="2" fill="none" stroke="#FF4D6A" stroke-dasharray="5 4"/>
+    <text class="box-label" x="121" y="62" text-anchor="middle">E3_designA_20260921.json</text>
+    <text class="box-sub" x="121" y="80" text-anchor="middle">absent on disk</text>
+  </g>
+
+  <g class="box" id="b2">
+    <title>Results directory constant taken from e3_common</title>
+    <rect x="16" y="150" width="210" height="52" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="121" y="172" text-anchor="middle">e3_common::RESULTS</text>
+    <text class="box-sub" x="121" y="190" text-anchor="middle">imported as C at L10</text>
+  </g>
+
+  <g class="box" id="b3">
+    <title>main reads the json once and appends every markdown line</title>
+    <rect x="280" y="90" width="190" height="64" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="114" text-anchor="middle">main()</text>
+    <text class="box-sub" x="375" y="132" text-anchor="middle">json.loads then appends</text>
+  </g>
+
+  <g class="box" id="b4">
+    <title>fmt turns missing values into an em dash and rounds floats</title>
+    <rect x="520" y="40" width="180" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="610" y="62" text-anchor="middle">fmt()</text>
+    <text class="box-sub" x="610" y="80" text-anchor="middle">3 decimals, None = dash</text>
+  </g>
+
+  <g class="box" id="b5">
+    <title>Markdown sections: design, metrics table, sabotage, disagreement, cost, frame</title>
+    <rect x="520" y="150" width="180" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="610" y="172" text-anchor="middle">section writers</text>
+    <text class="box-sub" x="610" y="190" text-anchor="middle">6 sections, L30&ndash;106</text>
+  </g>
+
+  <g class="box" id="b6">
+    <title>Three gate checks and one overall verdict line</title>
+    <rect x="760" y="90" width="170" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="845" y="112" text-anchor="middle">gate verdict</text>
+    <text class="box-sub" x="845" y="130" text-anchor="middle">3 checks, L108&ndash;121</text>
+  </g>
+
+  <g class="box" id="b7">
+    <title>Output file the writer would create; never created</title>
+    <rect x="760" y="200" width="170" height="52" rx="2" fill="none" stroke="#FF4D6A" stroke-dasharray="5 4"/>
+    <text class="box-label" x="845" y="222" text-anchor="middle">E3_designA_20260921.md</text>
+    <text class="box-sub" x="845" y="240" text-anchor="middle">absent on disk</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b3" d="M226,68 L280,116" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="230" y="86" text-anchor="start">read fails</text>
+
+  <path class="edge dashed-edge" data-from="b2" data-to="b3" d="M226,176 L280,146" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="228" y="214" text-anchor="start">results path</text>
+
+  <path class="edge" data-from="b3" data-to="b4" d="M470,116 L520,74" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="474" y="94" text-anchor="start">numbers</text>
+
+  <path class="edge" data-from="b3" data-to="b5" d="M470,138 L520,174" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="474" y="170" text-anchor="start">sections</text>
+
+  <path class="edge" data-from="b4" data-to="b5" d="M610,92 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="618" y="124" text-anchor="start">formats</text>
+
+  <path class="edge" data-from="b5" data-to="b6" d="M700,178 L760,146" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="702" y="204" text-anchor="start">gate text</text>
+
+  <path class="edge dashed-edge" data-from="b6" data-to="b7" d="M845,146 V200" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="853" y="176" text-anchor="start">write_text</text>
+
+  <text class="box-sub" x="16" y="286">7 boxes &#183; red dashed = absent</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 7 boxes. The script has exactly two functions: <code>main()</code> L23 and <code>fmt()</code> L15; everything between L30 and L121 appends strings inside <code>main()</code>. The gate checks read <code>metrics["ensemble-mean"]</code> (L109) and <code>sabotage["floor_aware_top10"]</code> (L114).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/e3_md.py">experiments_verifiers/harness/e3_md.py</a></h4>
+<p class="role">Formats one E3 results JSON into a markdown summary: design, metrics table, sabotage control, disagreement, cost, sampling frame, then a success gate.</p>
+<p class="meta">129 lines &#183; entry point <code>main()</code> L23, run as <code>python e3_md.py</code> &#183; no CLI arguments, no classes &#183; writes to <code>C.RESULTS</code></p>
+<details><summary>sections, gate rules, input keys</summary><div class="dbody">
+<pre>python experiments_verifiers/harness/e3_md.py        # no argv, no argparse
+fmt(v, nd=3) -&gt; str                                  # L15
+main() -&gt; None                                       # L23</pre>
+<p>Markdown sections, in order: title (L26), design (L30), checklist protocol bullets (L34&ndash;38), metrics table (L40&ndash;53), sabotage control (L61&ndash;77), disagreement analysis (L79&ndash;87), LLM cost table (L89&ndash;99), sampling frame (L101&ndash;106), verdict (L108&ndash;121).</p>
+<p>Gate rules (L110&ndash;121): <code>auc_sr</code> of <code>ensemble-mean</code> must beat the baseline by at least <code>0.10</code>; <code>within_task_tie_credit</code> must reach <code>0.70</code>; sabotage must reach <code>9/10</code> on <code>sabotage.floor_aware_top10.pass_mean</code>. Anything else prints <code>CONDITIONAL/FAIL</code>.</p>
+<p>Input keys it expects: <code>date</code>, <code>n_scored</code>, <code>design</code>, <code>models.glm</code> and <code>models.dsk</code> (L32&ndash;33), <code>metrics</code>, <code>sabotage</code>, <code>disagreement_analysis</code>, <code>usage_and_cost</code>, <code>sampling_frame</code>. That is the shape <a href="exp_e3_run.html">e3_run.py</a> writes (<code>build_report</code> L350). The compliant rerun in <a href="exp_e3_run2.html">e3_run2.py</a> names its models <code>judgeA_qwen</code> and <code>judgeB_dsk</code>, so <code>models['glm']</code> at L32 would raise <code>KeyError</code> on that file.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>E3 report JSON (<code>main</code> L24)</td><td>nothing</td><td class="sym">experiments_verifiers/results/E3_designA_20260921.json &mdash; absent</td></tr>
+<tr><td>Results directory (<code>e3_common::RESULTS</code> L17, import L10)</td><td>nothing</td><td class="sym">experiments_verifiers/results/</td></tr>
+<tr><td>nothing</td><td>markdown summary (<code>out</code> L123, L124)</td><td class="sym">experiments_verifiers/results/E3_designA_20260921.md &mdash; absent</td></tr>
+<tr><td>nothing</td><td>one line to stdout (<code>print</code> L125)</td><td class="sym">console: <code>wrote &lt;path&gt;</code></td></tr>
+</tbody>
+</table>
+<p class="sub">Citation form: <code>path::Symbol</code>. Line numbers are <code>e3_md.py</code>. The read at L24 has no <code>try</code> block, so the script fails with <code>FileNotFoundError</code> when the JSON is missing (no <code>try</code> or <code>except</code> in the file).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; no numbers to chart</h2>
+
+<p>This experiment has no usable numbers, because both the file it reads and the file it writes are missing. The script does not run to completion: <code>main()</code> calls <code>(C.RESULTS / f"E3_designA_{DATE}.json").read_text()</code> at L24 with no error handling, so the missing input raises <code>FileNotFoundError</code> before any markdown line is built. Only the four results files of the E3 pilot, salvage and compliant state exist, and none of them has the key shape the writer expects for a full report.</p>
+
+<table>
+<thead><tr><th>Metric the writer would print</th><th class="size">Value</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>auc_sr delta against the baseline</td><td class="size">unknown</td><td class="sym">e3_md.py L109&ndash;110; input json absent</td></tr>
+<tr><td>within_task_tie_credit</td><td class="size">unknown</td><td class="sym">e3_md.py L112, L118; input json absent</td></tr>
+<tr><td>Sabotage pass count</td><td class="size">unknown</td><td class="sym">e3_md.py L114&ndash;115; input json absent</td></tr>
+<tr><td>Overall gate verdict</td><td class="size">unknown</td><td class="sym">e3_md.py L121; never computed</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>File the page checked</th><th class="size">State</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td class="sym">results/E3_designA_20260921.json</td><td class="size">MISSING</td><td>the writer's only input; would be written by <code>e3_run.py</code> stage <code>report</code> (L473)</td></tr>
+<tr><td class="sym">results/E3_designA_20260921.md</td><td class="size">MISSING</td><td>the writer's output</td></tr>
+<tr><td class="sym">results/E3_designA-pilot_20260921.json</td><td class="size">present</td><td>pilot only, n=20; has no <code>sabotage.floor_aware_top10</code> key</td></tr>
+<tr><td class="sym">results/E3_designA-salvaged_20260921.json</td><td class="size">present</td><td>orchestrator summary; keys differ (flat <code>metrics.glm_solo</code> and so on)</td></tr>
+<tr><td class="sym">results/E3_designA_full_state.json</td><td class="size">present</td><td>raw state of the compliant rerun; no report keys</td></tr>
+<tr><td class="sym">results/E3_designA_state.json</td><td class="size">present</td><td>raw state of the dead pilot run; no report keys</td></tr>
+<tr><td class="sym">results/E3_checklists_cache_20260921.json</td><td class="size">MISSING</td><td>output of <code>e3_run.py</code> stage <code>export-checklists</code>; never produced</td></tr>
+</tbody>
+</table>
+<p class="note say">One sentence of why it matters: the E3 markdown summary that the cycle convention in <code>EXPERIMENTS.md</code> &sect;2 asks for (one JSON + one MD per experiment) was never produced for E3; the salvaged JSON is the substitute.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>the writer's input and output lines, plus the E3 verdict (5 quotes)</summary><div class="dbody">
+<blockquote>    res = json.loads((C.RESULTS / f"E3_designA_{DATE}.json").read_text())</blockquote>
+<p>Path: <code class="path">experiments_verifiers/harness/e3_md.py</code> &mdash; line 24, inside <code>main()</code>. This is the missing input.</p>
+<blockquote>    out = C.RESULTS / f"E3_designA_{DATE}.md"
+    out.write_text("\n".join(L))
+    print("wrote", out)</blockquote>
+<p>Path: <code class="path">experiments_verifiers/harness/e3_md.py</code> &mdash; lines 123&ndash;125. <code>DATE = "20260921"</code> is set at L12.</p>
+<blockquote>    sab_ok = False
+    if sab and "floor_aware_top10" in sab:
+        sab_ok = sab["floor_aware_top10"]["pass_mean"] &gt;= 9</blockquote>
+<p>Path: <code class="path">experiments_verifiers/harness/e3_md.py</code> &mdash; lines 113&ndash;115. Only the nested sabotage shape of <code>e3_run.build_report()</code> satisfies this test.</p>
+<blockquote>"status": "SALVAGED \u2014 agent terminated before final report; metrics computed by orchestrator from E3_designA_state.json",</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-salvaged_20260921.json</code> &mdash; line 5, key <code>status</code>. The only E3 summary that exists.</p>
+<blockquote>"verdict": "INCONCLUSIVE in current form: ensemble scores (min 0.681, mean 0.671, uwo 0.668) sit in the pilot's range and do not clearly beat the cheap baselines (E1 uniform 0.648, E5-L3 0.753). Sabotage-proof. Completion requires: balanced population (~50 neg), the two cheap flash models, cache reuse (265 cached LLM calls make re-scoring free)."</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-salvaged_20260921.json</code> &mdash; line 70, quoted in full. Note the recorded sabotage verdict (<code>"verdict": "PASS"</code>, <code>"passed": 10</code>, L24&ndash;26 of the same file) disagrees with the ten recorded rows, as <a href="exp_e3_run.html">exp_e3_run.html</a> shows.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e3_md.py</code> (all 129 lines), <code class="path">experiments_verifiers/harness/e3_common.py</code> (<code>RESULTS</code> L17), <code class="path">experiments_verifiers/harness/e3_run.py</code> (<code>build_report</code> L350, report write L473), <code class="path">experiments_verifiers/harness/e3_run2.py</code> (model keys and report write L475), <code class="path">experiments_verifiers/results/</code> (directory listing, checked file by file), <code class="path">results/E3_designA-salvaged_20260921.json</code> (lines 5, 24&ndash;26, 70), <code class="path">results/E3_designA-pilot_20260921.json</code> (keys only), <code class="path">experiments_verifiers/README.md</code> (E3 row: SPOCK, "died mid-run and was salvaged"), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (&sect;2 rule 9: one JSON + one MD per experiment), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <a href="exp_e3_run.html">exp_e3_run.html</a>, <a href="exp_e3_run2.html">exp_e3_run2.html</a>, <a href="exp_e3_common.html">exp_e3_common.html</a>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; secrets, never opened. <code class="path">experiments_verifiers/scorers/llm_judge_ensemble.py</code> &mdash; the judge is not this script's dependency. <code class="path">results/E3_designA_state.json</code> and <code class="path">results/E3_designA_full_state.json</code> &mdash; only their key shape was inspected, to confirm they hold no report keys. <code class="path">experiments_verifiers/REPORT_experiments.html</code> &mdash; a folder-level report, not an E3 artifact, and no E3 markdown exists to render. No experiment, application or pytest run, by the build rules: the writer was not executed, because running it is outside the build rules and its input is absent.</p>
+<p>experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

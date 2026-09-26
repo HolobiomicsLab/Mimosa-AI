@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/evaluators/base.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<!-- file_eval_base.html - file digest: sources/evaluators/base.py.
+     Sources and skip decisions: see the footer. Read-only page, nothing outside docs/visual_clone/ touched. -->
+<body data-crumb="File digests > sources/evaluators > base.py">
+<div class="wrap">
+
+<h1 class="hud">base.py</h1>
+<p class="intro">This file holds <code>BaseEvaluator</code>, the shared parent of every evaluator: it validates the config, builds the judge <code>LLMConfig</code>, reads one workflow folder and calls the judge model. It also holds <code>extract_json_payload</code> and the five evaluator exception classes. It runs when an evaluator subclass is built and whenever that subclass reads a run or asks the judge for JSON.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Main diagram - config in, judge text out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 430" role="img" aria-label="BaseEvaluator: construction, folder reads, judge calls, payload parsing and score writing">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="b1">
+    <title>Input: a Config instance and one workflow uuid. Lines 96-107.</title>
+    <rect x="20" y="40" width="180" height="84" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="70" text-anchor="middle">Config + uuid</text>
+    <text class="box-sub" x="110" y="90" text-anchor="middle">config: Config</text>
+    <text class="box-sub" x="110" y="106" text-anchor="middle">uuid: str</text>
+  </g>
+
+  <a class="box" id="b2" href="../../sources/evaluators/base.py">
+    <title>BaseEvaluator.__init__ (line 96): validates four config attributes, resolves the judge model, builds LLMConfig, creates both directories.</title>
+    <rect x="260" y="36" width="210" height="92" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="365" y="62" text-anchor="middle">__init__ 96</text>
+    <text class="box-sub" x="365" y="80" text-anchor="middle">checks 4 config fields</text>
+    <text class="box-sub" x="365" y="96" text-anchor="middle">splits judge_model</text>
+    <text class="box-sub" x="365" y="112" text-anchor="middle">builds LLMConfig 128</text>
+  </a>
+
+  <g class="box" id="b9">
+    <title>Entry points for subclasses: generic.py, scenario.py, verifier.py and hybrid_verifier/evaluator.py call these three helpers.</title>
+    <rect x="20" y="196" width="180" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="222" text-anchor="middle">subclass callers</text>
+    <text class="box-sub" x="110" y="242" text-anchor="middle">generic.py 348/464</text>
+    <text class="box-sub" x="110" y="258" text-anchor="middle">scenario.py 176/432</text>
+    <text class="box-sub" x="110" y="274" text-anchor="middle">verifier.py 300/332</text>
+    <text class="box-sub" x="110" y="290" text-anchor="middle">hybrid evaluator.py 518</text>
+  </g>
+
+  <a class="box" id="b3" href="../../sources/core/workflow_info.py">
+    <title>workflow_execution_text (line 189) calls _load_workflow_data (line 147); both return WorkflowInfo data.</title>
+    <rect x="260" y="212" width="210" height="92" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="365" y="238" text-anchor="middle">folder reads</text>
+    <text class="box-sub" x="365" y="256" text-anchor="middle">_load_workflow_data 147</text>
+    <text class="box-sub" x="365" y="272" text-anchor="middle">workflow_execution_text 189</text>
+    <text class="box-sub" x="365" y="288" text-anchor="middle">returns text + success flag</text>
+  </a>
+
+  <a class="box" id="b6" href="../../sources/evaluators/base.py">
+    <title>_call_judge_for_json (line 332) is the retry wrapper: it calls _call_judge and parses the reply.</title>
+    <rect x="520" y="212" width="190" height="92" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="615" y="238" text-anchor="middle">JSON retry 332</text>
+    <text class="box-sub" x="615" y="256" text-anchor="middle">attempt 1, then _retry 354</text>
+    <text class="box-sub" x="615" y="272" text-anchor="middle">returns (data, None)</text>
+    <text class="box-sub" x="615" y="288" text-anchor="middle">or (None, error) 380</text>
+  </a>
+
+  <a class="box" id="b4" href="../../sources/evaluators/base.py">
+    <title>_call_judge (line 311) builds one LLMProvider per call with the fixed judge system prompt (line 288).</title>
+    <rect x="760" y="212" width="190" height="92" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="855" y="238" text-anchor="middle">judge call 311</text>
+    <text class="box-sub" x="855" y="256" text-anchor="middle">_get_judge_system_prompt 288</text>
+    <text class="box-sub" x="855" y="272" text-anchor="middle">LLMProvider(...) 324</text>
+    <text class="box-sub" x="855" y="288" text-anchor="middle">returns raw text 330</text>
+  </a>
+
+  <a class="box" id="b5" href="../../sources/evaluators/base.py">
+    <title>extract_json_payload (line 21) strips fences and returns the first balanced JSON block.</title>
+    <rect x="760" y="36" width="190" height="92" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="855" y="62" text-anchor="middle">extract_json_payload 21</text>
+    <text class="box-sub" x="855" y="80" text-anchor="middle">strips ```json fences 34</text>
+    <text class="box-sub" x="855" y="96" text-anchor="middle">brace depth scan 44-61</text>
+    <text class="box-sub" x="855" y="112" text-anchor="middle">returns "" when none 62</text>
+  </a>
+
+  <a class="box" id="b7" href="../../sources/evaluators/base.py">
+    <title>_save_results (line 227) merges the score dict into state_result.json under evaluation[eval_type].</title>
+    <rect x="520" y="36" width="190" height="92" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="615" y="62" text-anchor="middle">_save_results 227</text>
+    <text class="box-sub" x="615" y="80" text-anchor="middle">reads old state 253</text>
+    <text class="box-sub" x="615" y="96" text-anchor="middle">sets evaluation block 272</text>
+    <text class="box-sub" x="615" y="112" text-anchor="middle">json.dump 277</text>
+  </a>
+
+  <g class="box" id="b8">
+    <title>Written artefact: workflow_dir/&lt;uuid&gt;/state_result.json, key evaluation.&lt;eval_type&gt;.</title>
+    <rect x="990" y="196" width="170" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1075" y="240" text-anchor="middle">state_result.json</text>
+    <text class="box-sub" x="1075" y="262" text-anchor="middle">evaluation.generic</text>
+    <text class="box-sub" x="1075" y="278" text-anchor="middle">evaluation.scenario</text>
+    <text class="box-sub" x="1075" y="294" text-anchor="middle">evaluation.verifier</text>
+  </g>
+
+  <g class="box" id="b10">
+    <title>The five exception classes defined at lines 64-86.</title>
+    <rect x="260" y="336" width="470" height="70" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="280" y="362">exception classes</text>
+    <text class="box-sub" x="280" y="382">EvaluatorError 64 / WorkflowDataError 69 / ScenarioError 74 / LLMEvaluationError 79 / ScoreExtractionError 84</text>
+  </g>
+
+  <path class="edge" data-from="b1" data-to="b2" d="M200,82 H260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="230" y="74" text-anchor="middle">builds</text>
+  <path class="edge" data-from="b9" data-to="b3" d="M200,246 H260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="230" y="238" text-anchor="middle">reads run</text>
+  <path class="edge" data-from="b9" data-to="b6" d="M110,196 V176 H615 V212" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="615" y="170" text-anchor="middle">judge for JSON</text>
+  <path class="edge" data-from="b9" data-to="b7" d="M110,196 V20 H615 V36" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="14" text-anchor="middle">saves scores</text>
+  <path class="edge dashed-edge" data-from="b2" data-to="b3" d="M365,128 V212" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="432" y="176" text-anchor="middle">self.workflow_dir</text>
+  <path class="edge" data-from="b6" data-to="b4" d="M710,258 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="735" y="250" text-anchor="middle">calls</text>
+  <path class="edge" data-from="b4" data-to="b6" d="M760,280 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="735" y="272" text-anchor="middle">raw reply</text>
+  <path class="edge" data-from="b6" data-to="b5" d="M615,212 V150 H820 V128" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="715" y="168" text-anchor="middle">extracts JSON</text>
+  <path class="edge dashed-edge" data-from="b7" data-to="b8" d="M710,82 H1075 V196" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="900" y="74" text-anchor="middle">writes json</text>
+  <path class="edge" data-from="b10" data-to="b2" d="M365,336 V128" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="330" text-anchor="middle">raises</text>
+  <path class="edge" data-from="b10" data-to="b3" d="M300,336 V304" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="272" y="326" text-anchor="middle">raises</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - the whole file. Entry points are the three helpers the subclasses call: <code>workflow_execution_text()</code> (<code class="path">sources/evaluators/base.py:189</code>), <code>_call_judge_for_json()</code> (<code class="path">:332</code>) and <code>_save_results()</code> (<code class="path">:227</code>). Solid arrows are direct calls (<code class="path">:363</code>, <code class="path">:356</code>), dashed arrows are attribute or file reads and writes (<code class="path">:248</code>, <code class="path">:276-277</code>).</p>
+<p class="note say">One file, two jobs: it is the parent class for the four evaluators and a small library of helpers (<code>extract_json_payload</code>, the exceptions) imported directly by other modules.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Data flow - what goes in, what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 420" role="img" aria-label="Data flow of base.py: config fields, folder files, memory cache, returned values and the written state file">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="d1">
+    <title>Config fields read in __init__: memory_dir (109), workflow_dir (111), model_pricing (113), reasoning_effort (115), judge_model (125), max_tokens (133), the two OpenRouter lookups (134-135).</title>
+    <rect x="20" y="30" width="290" height="150" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="165" y="54" text-anchor="middle">config fields read</text>
+    <text class="box-sub" x="165" y="76" text-anchor="middle">memory_dir 109, workflow_dir 111</text>
+    <text class="box-sub" x="165" y="94" text-anchor="middle">model_pricing 113, reasoning_effort 115</text>
+    <text class="box-sub" x="165" y="112" text-anchor="middle">judge_model 125, max_tokens 133</text>
+    <text class="box-sub" x="165" y="130" text-anchor="middle">openrouter_provider_for 134</text>
+    <text class="box-sub" x="165" y="148" text-anchor="middle">openrouter_quantizations_for 135</text>
+    <text class="box-sub" x="165" y="168" text-anchor="middle">temperature is hardcoded 0.2 (131)</text>
+  </g>
+
+  <g class="box" id="d2">
+    <title>Files read through WorkflowInfo: state_result.json and the genotype in workflow_dir/&lt;uuid&gt;/ (lines 162-182, 205-212).</title>
+    <rect x="20" y="230" width="290" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="165" y="254" text-anchor="middle">files read</text>
+    <text class="box-sub" x="165" y="276" text-anchor="middle">workflow_dir/&lt;uuid&gt;/ (162)</text>
+    <text class="box-sub" x="165" y="294" text-anchor="middle">state_result.json via WorkflowInfo 172</text>
+    <text class="box-sub" x="165" y="312" text-anchor="middle">genotype file via workflow_info.code 206</text>
+    <text class="box-sub" x="165" y="330" text-anchor="middle">state_result.json for scoring 249</text>
+    <text class="box-sub" x="165" y="348" text-anchor="middle">goal and answers keys 207, 212</text>
+    <text class="box-sub" x="165" y="368" text-anchor="middle">config_default.json: not read here</text>
+  </g>
+
+  <g class="box" id="d3">
+    <title>The constructed evaluator holds the paths, the judge config and a logger (lines 118-140).</title>
+    <rect x="350" y="30" width="270" height="120" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="485" y="56" text-anchor="middle">BaseEvaluator instance</text>
+    <text class="box-sub" x="485" y="76" text-anchor="middle">self.memory_dir, self.workflow_dir</text>
+    <text class="box-sub" x="485" y="94" text-anchor="middle">self.llm_config, self.judge_model</text>
+    <text class="box-sub" x="485" y="112" text-anchor="middle">mkdir both dirs 122-123</text>
+    <text class="box-sub" x="485" y="132" text-anchor="middle">self.logger 140</text>
+  </g>
+
+  <g class="box" id="d4">
+    <title>Memory writes: memory_dir/&lt;uuid&gt; is created per judge call (line 322-323) and LLMProvider caches each reply under it (line 324-329).</title>
+    <rect x="350" y="230" width="270" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="485" y="254" text-anchor="middle">memory written</text>
+    <text class="box-sub" x="485" y="276" text-anchor="middle">memory_dir/&lt;uuid&gt;/ 322</text>
+    <text class="box-sub" x="485" y="294" text-anchor="middle">mkdir(parents=True) 323</text>
+    <text class="box-sub" x="485" y="312" text-anchor="middle">LLMProvider(agent_name, memory_path) 324</text>
+    <text class="box-sub" x="485" y="330" text-anchor="middle">cache file name = agent_name</text>
+    <text class="box-sub" x="485" y="348" text-anchor="middle">retry call uses "&lt;agent&gt;_retry" 354</text>
+    <text class="box-sub" x="485" y="368" text-anchor="middle">no other file is written here</text>
+  </g>
+
+  <g class="box" id="d5">
+    <title>Returned values: WorkflowInfo, the (execution_text, success) tuple, raw judge text and the (parsed, error) tuple.</title>
+    <rect x="660" y="30" width="320" height="150" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="820" y="54" text-anchor="middle">values out</text>
+    <text class="box-sub" x="820" y="76" text-anchor="middle">_load_workflow_data -&gt; WorkflowInfo 147</text>
+    <text class="box-sub" x="820" y="94" text-anchor="middle">workflow_execution_text -&gt; (str, bool) 189</text>
+    <text class="box-sub" x="820" y="112" text-anchor="middle">_call_judge -&gt; raw str 311</text>
+    <text class="box-sub" x="820" y="130" text-anchor="middle">_call_judge_for_json -&gt; (Any, str | None) 332</text>
+    <text class="box-sub" x="820" y="148" text-anchor="middle">extract_json_payload -&gt; str 21</text>
+    <text class="box-sub" x="820" y="168" text-anchor="middle">_save_results -&gt; None 227</text>
+  </g>
+
+  <g class="box" id="d6">
+    <title>The only file written by this module: workflow_dir/&lt;uuid&gt;/state_result.json, key evaluation[eval_type] (lines 248-277).</title>
+    <rect x="660" y="230" width="320" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="820" y="254" text-anchor="middle">file written</text>
+    <text class="box-sub" x="820" y="276" text-anchor="middle">workflow_dir/&lt;uuid&gt;/state_result.json 249</text>
+    <text class="box-sub" x="820" y="294" text-anchor="middle">creates the folder if missing 275</text>
+    <text class="box-sub" x="820" y="312" text-anchor="middle">state["evaluation"][eval_type] = scores 272</text>
+    <text class="box-sub" x="820" y="330" text-anchor="middle">json.dump(..., indent=2) 277</text>
+    <text class="box-sub" x="820" y="348" text-anchor="middle">old state merged, not replaced 253-263</text>
+    <text class="box-sub" x="820" y="368" text-anchor="middle">eval_type is the caller's string 244</text>
+  </g>
+
+  <path class="edge" data-from="d1" data-to="d3" d="M310,105 H350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="97" text-anchor="middle">reads</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d3" d="M310,270 H330 V150 H350" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="330" y="216" text-anchor="middle">WorkflowInfo</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="d4" d="M485,150 V230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="540" y="196" text-anchor="middle">per judge call</text>
+  <path class="edge" data-from="d3" data-to="d5" d="M620,90 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="82" text-anchor="middle">returns</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="d6" d="M560,150 V200 H820 V230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="196" text-anchor="middle">json.dump</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - inputs, files and returned values. The module reads two config-controlled paths and one run folder, writes one state file and one memory folder per uuid, and returns the values listed in the middle-right box.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic - config gate and the JSON retry</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 430" role="img" aria-label="Decision tree: config validation in __init__ and the one-retry loop in _call_judge_for_json">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="20" y="18">lane A - BaseEvaluator.__init__ (lines 96-145)</text>
+  <g class="box" id="c1">
+    <title>Four hasattr checks: memory_dir, workflow_dir, model_pricing, reasoning_effort (lines 109-116).</title>
+    <rect x="20" y="34" width="180" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="110" y="60" text-anchor="middle">config fields present?</text>
+    <text class="box-sub" x="110" y="78" text-anchor="middle">lines 109-116</text>
+  </g>
+  <g class="box" id="c2">
+    <title>Missing field raises EvaluatorError with the field name in the message.</title>
+    <rect x="250" y="34" width="200" height="70" rx="6" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="350" y="60" text-anchor="middle">no: raise EvaluatorError</text>
+    <text class="box-sub" x="350" y="78" text-anchor="middle">lines 110, 112, 114, 116</text>
+  </g>
+  <g class="box" id="c3">
+    <title>Yes: both directories are created with mkdir(parents=True, exist_ok=True) (lines 122-123).</title>
+    <rect x="500" y="34" width="200" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="600" y="60" text-anchor="middle">mkdir memory, workflow</text>
+    <text class="box-sub" x="600" y="78" text-anchor="middle">lines 122-123</text>
+  </g>
+  <g class="box" id="c4">
+    <title>judge_model is split on the first slash: provider/model, else provider openai (line 127).</title>
+    <rect x="750" y="34" width="200" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="850" y="60" text-anchor="middle">split judge_model 127</text>
+    <text class="box-sub" x="850" y="78" text-anchor="middle">no slash: openai</text>
+  </g>
+  <g class="box" id="c5">
+    <title>LLMConfig.from_dict with temperature 0.2; any exception becomes EvaluatorError (lines 128-138).</title>
+    <rect x="990" y="34" width="170" height="70" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1075" y="60" text-anchor="middle">build LLMConfig</text>
+    <text class="box-sub" x="1075" y="78" text-anchor="middle">failure: raise 138</text>
+  </g>
+
+  <text class="box-sub" x="20" y="150">lane B - _call_judge_for_json (lines 332-380): one retry, and no retry when the call itself raised</text>
+  <g class="box" id="r1">
+    <title>Loop over (1, 2); the agent name gets the _retry suffix on the second attempt (lines 353-354).</title>
+    <rect x="20" y="166" width="170" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="105" y="192" text-anchor="middle">attempt in (1, 2)</text>
+    <text class="box-sub" x="105" y="210" text-anchor="middle">line 353</text>
+  </g>
+  <g class="box" id="r2">
+    <title>_call_judge is called with the current prompt (line 356).</title>
+    <rect x="230" y="166" width="160" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="310" y="192" text-anchor="middle">_call_judge()</text>
+    <text class="box-sub" x="310" y="210" text-anchor="middle">line 356</text>
+  </g>
+  <g class="box" id="r3">
+    <title>The call raised: return immediately with (None, error text); no second attempt (lines 357-361).</title>
+    <rect x="430" y="166" width="210" height="70" rx="6" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="535" y="192" text-anchor="middle">exception?</text>
+    <text class="box-sub" x="535" y="210" text-anchor="middle">yes: return (None, err) 361</text>
+  </g>
+  <g class="box" id="r4">
+    <title>extract_json_payload then json.loads; an empty payload or a decode error sets last_err (lines 363-370).</title>
+    <rect x="680" y="166" width="200" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="780" y="192" text-anchor="middle">payload parses?</text>
+    <text class="box-sub" x="780" y="210" text-anchor="middle">yes: return (data, None) 366</text>
+  </g>
+  <g class="box" id="r5">
+    <title>Second attempt only; the prompt gains the failure note plus _JSON_RETRY_FEEDBACK (lines 372-379).</title>
+    <rect x="920" y="166" width="240" height="70" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="1040" y="192" text-anchor="middle">retry once with feedback</text>
+    <text class="box-sub" x="1040" y="210" text-anchor="middle">lines 376-379</text>
+  </g>
+  <g class="box" id="r6">
+    <title>Terminal failure after attempt 2 returns the last error string (line 380).</title>
+    <rect x="680" y="290" width="480" height="70" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="920" y="316" text-anchor="middle">return (None, last_err) 380</text>
+    <text class="box-sub" x="920" y="334" text-anchor="middle">callers never wrap the call in try/except (339-341)</text>
+  </g>
+  <g class="box" id="r7">
+    <title>_JSON_RETRY_FEEDBACK is the constant retry instruction (lines 306-309).</title>
+    <rect x="20" y="290" width="330" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="185" y="316" text-anchor="middle">_JSON_RETRY_FEEDBACK 306</text>
+    <text class="box-sub" x="185" y="334" text-anchor="middle">"Reply with ONLY the JSON object"</text>
+  </g>
+
+  <path class="edge" data-from="c1" data-to="c2" d="M200,69 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="61" text-anchor="middle">no</text>
+  <path class="edge" data-from="c1" data-to="c3" d="M200,95 H225 V69" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c3" data-to="c4" d="M700,69 H750" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="725" y="61" text-anchor="middle">then</text>
+  <path class="edge" data-from="c4" data-to="c5" d="M950,69 H990" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="970" y="61" text-anchor="middle">then</text>
+  <path class="edge" data-from="r1" data-to="r2" d="M190,201 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="210" y="193" text-anchor="middle">calls</text>
+  <path class="edge" data-from="r2" data-to="r3" d="M390,201 H430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="410" y="193" text-anchor="middle">raised?</text>
+  <path class="edge" data-from="r3" data-to="r4" d="M640,201 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="660" y="193" text-anchor="middle">no</text>
+  <path class="edge" data-from="r4" data-to="r5" d="M880,201 H920" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="900" y="193" text-anchor="middle">no</text>
+  <path class="edge" data-from="r5" data-to="r6" d="M1040,236 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1100" y="266" text-anchor="middle">attempt 2 fails</text>
+  <path class="edge dashed-edge" data-from="r7" data-to="r5" d="M350,325 H400 V250 H1000 V236" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="500" y="266" text-anchor="middle">fills retry prompt</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - the two decision rules in the file. Lane A is the constructor gate (<code class="path">sources/evaluators/base.py:109-138</code>); lane B is the retry loop with its stop tests (<code class="path">:353-361</code>, <code class="path">:366</code>, <code class="path">:380</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>config field</td><td class="sym">memory_dir</td><td class="sym">config.memory_dir (line 109, 118)</td><td>root of per-uuid judge memory folders.</td></tr>
+<tr><td>config field</td><td class="sym">workflow_dir</td><td class="sym">config.workflow_dir (line 111, 119)</td><td>root of per-uuid workflow folders.</td></tr>
+<tr><td>config field</td><td class="sym">model_pricing</td><td class="sym">config.model_pricing (line 113, 120)</td><td>stored on the instance; not used in this file.</td></tr>
+<tr><td>config field</td><td class="sym">reasoning_effort</td><td class="sym">config.reasoning_effort (line 115, 132)</td><td>forwarded into the judge LLMConfig.</td></tr>
+<tr><td>config field</td><td class="sym">judge_model</td><td class="sym">config.judge_model (line 125)</td><td>provider and model for every judge call.</td></tr>
+<tr><td>config field</td><td class="sym">max_tokens</td><td class="sym">getattr(config, "max_tokens", 8192) (line 133)</td><td>judge response cap; the 8192 default is dead.</td></tr>
+<tr><td>config field</td><td class="sym">openrouter_provider_for, openrouter_quantizations_for</td><td class="sym">lines 134-135</td><td>routing hints for OpenRouter models.</td></tr>
+<tr><td>state key</td><td class="sym">goal, answers, code</td><td class="sym">WorkflowInfo reads (lines 206-212)</td><td>text of the run: goal plus final answers.</td></tr>
+<tr><td>state key</td><td class="sym">evaluation.&lt;eval_type&gt;</td><td class="sym">state_result.json (line 272)</td><td>written: the score dict of one evaluator.</td></tr>
+<tr><td>file read</td><td class="sym">&lt;workflow_dir&gt;/&lt;uuid&gt;/state_result.json</td><td class="sym">via WorkflowInfo (lines 171-173, 249-258)</td><td>goal, answers and the previous state.</td></tr>
+<tr><td>file read</td><td class="sym">&lt;workflow_dir&gt;/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py</td><td class="sym">workflow_info.code (line 206)</td><td>genotype source inside the execution text.</td></tr>
+<tr><td>file write</td><td class="sym">&lt;workflow_dir&gt;/&lt;uuid&gt;/state_result.json</td><td class="sym">open(..., "w") line 276</td><td>merged score dict, indent 2, UTF-8.</td></tr>
+<tr><td>file write</td><td class="sym">&lt;memory_dir&gt;/&lt;uuid&gt;/*.json</td><td class="sym">mkdir line 322-323, LLMProvider 324</td><td>judge call cache, one file per agent name.</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the third handler in <code>_save_results</code> catches <code>json.JSONEncodeError</code> (<code class="path">sources/evaluators/base.py:283</code>). The stdlib <code>json</code> module defines <code>JSONDecodeError</code> and no <code>JSONEncodeError</code>, so evaluating that clause raises <code>AttributeError</code> instead of converting the failure into <code>EvaluatorError</code>.</p>
+<p class="note">Amber: <code>workflow_execution_text</code> is annotated <code>-&gt; tuple[str, bool] | None</code> (line 189) but every path returns a tuple (lines 210, 216). Its success flag is a substring test, <code>success = not "[]" in res</code> (line 215), which is false for any answer list whose dump contains the two characters <code>[]</code>. The empty-run sentence at line 210 is the marker the legacy verifier matches on (<code class="path">sources/evaluators/verifier.py:57</code>, <code>_EMPTY_RUN_MARKER</code>, used at line 320).</p>
+<p class="note">Amber: <code>_load_workflow_data</code> returns a <code>WorkflowInfo</code> for a folder that does not exist (lines 164-165) and only raises <code>WorkflowDataError</code> when the path exists but is a file (lines 167-168). The <code>max_tokens</code> fallback 8192 (line 133) never applies because <code>Config</code> always sets <code>max_tokens</code>, default 16384 (<code class="path">config.py:163</code>). <code>datetime</code> is imported at line 8 and never used.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>1 function, 5 exception classes, 1 class, 7 methods, 1 class attribute: 15 symbols</summary><div class="dbody">
+<pre>extract_json_payload(text: str) -&gt; str                             line 21   first balanced JSON block
+EvaluatorError(Exception)                                         line 64   base error for evaluators
+WorkflowDataError(EvaluatorError)                                 line 69   run folder unreadable or invalid
+ScenarioError(EvaluatorError)                                     line 74   scenario rubric invalid
+LLMEvaluationError(EvaluatorError)                                line 79   judge evaluation failed
+ScoreExtractionError(EvaluatorError)                              line 84   score not extractable from text
+BaseEvaluator                                                     line 89   shared parent of every evaluator
+  _JSON_RETRY_FEEDBACK                              [class attr]  line 306  retry instruction string
+  __init__(self, config: "Config") -&gt; None                        line 96   validate config, build LLMConfig
+  _load_workflow_data(self, workflow_id: str) -&gt; WorkflowInfo     line 147  read one run folder
+  workflow_execution_text(self, uuid: str) -&gt; tuple[str, bool] | None  line 189  goal + answers as text
+  _save_results(self, scores: dict[str, float], uuid: str, eval_type: str) -&gt; None  line 227  write score block
+  _get_judge_system_prompt(self) -&gt; str                           line 288  fixed judge system prompt
+  _call_judge(self, uuid: str, agent_name: str, prompt: str) -&gt; str  line 311  one judge round trip
+  _call_judge_for_json(self, uuid: str, agent_name: str, prompt: str) -&gt; tuple[Any, str | None]  line 332  judge call + one retry</pre>
+<p>Module level: <code>if __name__ == "__main__":</code> at line 14 appends the repository root to <code>sys.path</code>; no other module-level statement runs. Imports: <code>json</code>, <code>logging</code>, <code>re</code>, <code>datetime</code> (unused), <code>Path</code>, <code>Any</code>, <code>sys</code>, <code>os</code> at lines 5-12, then <code>sources.core.llm_provider</code> (<code>LLMConfig</code>, <code>LLMProvider</code>) and <code>sources.core.workflow_info</code> (<code>WorkflowInfo</code>) at lines 17-18.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<h3>Importers in the repository</h3>
+<table>
+<thead><tr><th>Importer</th><th>What it takes</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_eval_generic.html">sources/evaluators/generic.py</a></td><td><code>from .base import *</code>: <code>BaseEvaluator</code>, the five exceptions</td><td class="sym">line 29</td></tr>
+<tr><td class="sym"><a href="area_evaluators_legacy.html">sources/evaluators/scenario.py</a></td><td><code>from .base import *</code>: parent class</td><td class="sym">line 21</td></tr>
+<tr><td class="sym"><a href="area_evaluators_legacy.html">sources/evaluators/verifier.py</a></td><td><code>BaseEvaluator</code>, <code>EvaluatorError</code>, <code>WorkflowDataError</code></td><td class="sym">lines 38-42</td></tr>
+<tr><td class="sym">sources/evaluators/verifier_claims.py</td><td><code>LLMEvaluationError</code>; calls <code>self._call_judge</code> and <code>self._call_judge_for_json</code></td><td class="sym">lines 27, 149, 303, 353</td></tr>
+<tr><td class="sym">sources/evaluators/verifier_per_claim.py</td><td><code>extract_json_payload</code> inside a function; calls <code>_call_judge_for_json</code></td><td class="sym">lines 778, 800, 840</td></tr>
+<tr><td class="sym"><a href="mod_evaluators_hybrid_verifier.html">sources/evaluators/hybrid_verifier/evaluator.py</a></td><td><code>BaseEvaluator</code>, <code>EvaluatorError</code>; calls <code>_load_workflow_data</code>, <code>_call_judge_for_json</code>, <code>_save_results</code></td><td class="sym">lines 50-53, 295, 518, 625</td></tr>
+<tr><td class="sym">sources/evaluators/hybrid_verifier/digest.py</td><td><code>extract_json_payload</code></td><td class="sym">lines 23, 88</td></tr>
+<tr><td class="sym">sources/evaluators/hybrid_verifier/layers.py</td><td><code>extract_json_payload</code></td><td class="sym">lines 22, 171</td></tr>
+<tr><td class="sym"><a href="file_eval_evaluator.html">sources/evaluators/evaluator.py</a></td><td><code>BaseEvaluator</code>, <code>EvaluatorError</code>, <code>WorkflowDataError</code>, re-exported</td><td class="sym">line 15</td></tr>
+<tr><td class="sym"><a href="exp_e19c_ratchet.html">experiments_verifiers/harness/e19c_ratchet.py</a></td><td><code>extract_json_payload</code>, used at line 337</td><td class="sym">line 51</td></tr>
+<tr><td class="sym"><a href="area_tests.html">tests/hybrid_verifier_test.py</a></td><td><code>extract_json_payload</code></td><td class="sym">line 37</td></tr>
+</tbody>
+</table>
+<h3>Tests that exercise it</h3>
+<ul>
+<li><code class="path">tests/hybrid_verifier_test.py:1024-1026</code> - <code>test_json_payload_extraction_tolerates_fences</code> asserts two <code>extract_json_payload</code> outputs. That is the only direct test of a function defined here.</li>
+<li><code class="path">tests/hybrid_verifier_test.py:159-174</code> - the helper builds <code>HybridVerifierEvaluator</code> with <code>__new__</code> "without <code>BaseEvaluator.__init__</code>", so the constructor is deliberately not run. Lines 439, 783 and 807 replace <code>_load_workflow_data</code> with a lambda.</li>
+<li><code class="path">tests/verifier_importance_test.py:32-42</code> - <code>_StubVerifier</code> subclasses <code>VerifierEvaluator</code> and skips <code>BaseEvaluator.__init__</code>, "so the suite runs without an OpenRouter pricing call" (lines 15-16). This is a test of the constructor's cost, not of its body.</li>
+<li><code class="path">tests/verifier_visual_test.py:313</code>, <code class="path">tests/verifier_result_focused_claims_test.py:95</code>, <code class="path">tests/verifier_importance_test.py:169</code> stub <code>_call_judge</code> / <code>_call_judge_for_json</code> on a fake verifier, so <code>_call_judge</code> itself is not run there.</li>
+<li>No test file imports <code>BaseEvaluator</code> directly, and no test calls <code>_save_results</code> or <code>workflow_execution_text</code>.</li>
+</ul>
+<p>Related pages: <a href="file_index.html">file_index.html</a>, <a href="area_evaluators.html">area_evaluators.html</a>, <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>, <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="file_eval_evaluator.html">file_eval_evaluator.html</a>, <a href="file_core_workflow_info.html">file_core_workflow_info.html</a>, <a href="file_core_llm_provider.html">file_core_llm_provider.html</a>, <a href="flow_verification.html">flow_verification.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/base.py</code> (380 lines, every def and class), <code class="path">config.py</code> (lines 65-76, 160-165, 222-223, 298-308), <code class="path">sources/core/workflow_info.py</code> (property list and lines 82-120, 173-200), <code class="path">sources/core/llm_provider.py</code> (class and signature lines 12-200, 253-330, 619), <code class="path">sources/evaluators/verifier.py</code> (lines 38-70, 300-332, 398, 579), <code class="path">sources/evaluators/scenario.py</code> (lines 18-40, 176, 432), <code class="path">sources/evaluators/generic.py</code> (lines 29, 348, 464), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (lines 50-53, 295, 518, 625), <code class="path">sources/evaluators/hybrid_verifier/digest.py</code> (lines 23, 88), <code class="path">sources/evaluators/hybrid_verifier/layers.py</code> (lines 22, 171), <code class="path">sources/evaluators/verifier_per_claim.py</code> (lines 778, 800), <code class="path">sources/evaluators/verifier_claims.py</code> (lines 27, 149, 303, 353), <code class="path">experiments_verifiers/harness/e19c_ratchet.py</code> (lines 45-56, 330-342), <code class="path">tests/hybrid_verifier_test.py</code> (lines 37, 150-175, 430-445, 780-812, 886-965, 1018-1030), <code class="path">tests/verifier_importance_test.py</code> (lines 10-45, 169-197), <code class="path">tests/verifier_visual_test.py</code> (lines 313, 329), <code class="path">tests/verifier_result_focused_claims_test.py</code> (lines 95, 108), <code class="path">config_default.json</code> (field keys), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code> and <code class="path">docs/visual_clone/_clone.js</code> for the page skeleton.</p>
+<p class="skips">Skipped: the bodies of the importing modules (their own digest pages own them); <code class="path">sources/evaluators/grounding.py</code> and <code class="path">sources/evaluators/hybrid_verifier/</code> internals (not called by this file); the <code>__main__</code> guard beyond its line number; runtime folders <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code> and <code>tmp/</code> (not read); <code class="path">.env</code>-style files (not opened). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

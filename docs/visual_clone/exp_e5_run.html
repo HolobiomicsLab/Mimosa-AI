@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5_run - E5 learned claim importance ladder - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e5_run">
+<div class="wrap">
+
+<h1 class="hud">e5_run &mdash; the learned-importance ladder</h1>
+<p class="intro">E5 asked whether claim weights learned from claims &times; outcomes can replace the LLM's self-reported 1&ndash;10 importance in the verifier reward. <code>e5_run.py</code> fits seven learned variants on four ladder levels (L0.5&ndash;L3), from a source-letter model up to MiniLM embeddings, scores them with task-level leave-one-task-out, and writes one JSON plus one MD. The recorded answer is a conditional pass: the top rung wins between tasks (auc_sr 0.753 against 0.640 for the recomputed reward) and ties it within tasks.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="e5_run inputs, stages and output files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text x="20" y="34" text-anchor="start" fill="#E6FBFF" font-size="11.5">hypothesis &mdash; learned weights rank tasks better than self-reported importance</text>
+  <text class="box-sub" x="20" y="50" text-anchor="start">same frozen claims, no live LLM call</text>
+
+  <a class="box" id="a1" href="../../experiments_verifiers/data/verifier_claims.jsonl">
+    <title>The frozen claim verdicts plus the embedding cache</title>
+    <rect x="20" y="70" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="94" text-anchor="middle">frozen claims + embeddings</text>
+    <text class="box-sub" x="155" y="110" text-anchor="middle">verifier_claims.jsonl &#183; npz cache</text>
+  </a>
+  <a class="box" id="b1" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>load_all collects examples, labels, provenance and embeddings</title>
+    <rect x="340" y="70" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="94" text-anchor="middle">load_all L42</text>
+    <text class="box-sub" x="460" y="110" text-anchor="middle">claims, labels, embeddings</text>
+  </a>
+  <g class="box" id="c1">
+    <title>Pool size of the frozen population</title>
+    <rect x="630" y="70" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="94" text-anchor="middle">607 rows, 136 tasks</text>
+    <text class="box-sub" x="755" y="110" text-anchor="middle">191 rows with SR true</text>
+  </g>
+
+  <g class="box" id="a2">
+    <title>Rubric provenance sources on disk</title>
+    <rect x="20" y="170" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="194" text-anchor="middle">rubric caches + goals</text>
+    <text class="box-sub" x="155" y="210" text-anchor="middle">rubric_cache_*.json &#183; ablations/*.json</text>
+  </g>
+  <a class="box" id="b2" href="exp_e5_common.html">
+    <title>The join and the fallback source classifier</title>
+    <rect x="340" y="170" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="194" text-anchor="middle">build_rubric_join L84</text>
+    <text class="box-sub" x="460" y="210" text-anchor="middle">join L84 &#183; classifier L99</text>
+  </a>
+  <g class="box" id="c2">
+    <title>Six source letters, direct where the join succeeded</title>
+    <rect x="630" y="170" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="194" text-anchor="middle">source labels per claim</text>
+    <text class="box-sub" x="755" y="210" text-anchor="middle">84.5% direct, 67.2% classifier</text>
+  </g>
+
+  <g class="box" id="a3">
+    <title>One held-out task per fit</title>
+    <rect x="20" y="270" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="294" text-anchor="middle">task-level LOTO folds</text>
+    <text class="box-sub" x="155" y="310" text-anchor="middle">one task out per fit, L217</text>
+  </g>
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>The three feature rungs of the ladder</title>
+    <rect x="340" y="270" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="294" text-anchor="middle">f_l1, f_l2, f_l3</text>
+    <text class="box-sub" x="460" y="310" text-anchor="middle">L173, L186, L204 &#183; groups, lexicon, MiniLM</text>
+  </a>
+  <a class="box" id="c3" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>loto_eval fits and scores each held-out task</title>
+    <rect x="630" y="270" width="250" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="755" y="294" text-anchor="middle">loto_eval L216</text>
+    <text class="box-sub" x="755" y="310" text-anchor="middle">pooled decision scores</text>
+  </a>
+
+  <g class="box" id="a4">
+    <title>Pooled scores with the benchmark labels</title>
+    <rect x="20" y="370" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="394" text-anchor="middle">pooled scores + labels</text>
+    <text class="box-sub" x="155" y="410" text-anchor="middle">from rows 1 and 3</text>
+  </g>
+  <a class="box" id="b4" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>main assembles metrics, CIs, curves, permutations and the gate</title>
+    <rect x="340" y="370" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="394" text-anchor="middle">main L346 &#183; metrics.py</text>
+    <text class="box-sub" x="460" y="410" text-anchor="middle">auc, CIs, curves, gate</text>
+  </a>
+  <a class="box" id="c4" href="../../experiments_verifiers/results/E5_learned_importance_2026-09-21.json">
+    <title>The two written result files</title>
+    <rect x="630" y="370" width="250" height="60" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="755" y="394" text-anchor="middle">E5 JSON + MD</text>
+    <text class="box-sub" x="755" y="410" text-anchor="middle">E5_learned_importance_&lt;date&gt;.*</text>
+  </a>
+
+  <path class="edge" data-from="a1" data-to="b1" d="M290,100 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="92" text-anchor="middle">reads</text>
+  <path class="edge" data-from="b1" data-to="c1" d="M580,100 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="92" text-anchor="middle">counts</text>
+
+  <path class="edge" data-from="a2" data-to="b2" d="M290,200 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="192" text-anchor="middle">goal hash</text>
+  <path class="edge" data-from="b2" data-to="c2" d="M580,200 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="192" text-anchor="middle">source letter</text>
+
+  <path class="edge" data-from="a3" data-to="b3" d="M290,300 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="292" text-anchor="middle">train rows</text>
+  <path class="edge" data-from="b3" data-to="c3" d="M580,300 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="292" text-anchor="middle">feature matrix</text>
+
+  <path class="edge" data-from="a4" data-to="b4" d="M290,400 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="392" text-anchor="middle">scores, labels</text>
+  <path class="edge" data-from="b4" data-to="c4" d="M580,400 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="392" text-anchor="middle">writes</text>
+
+  <text class="box-sub" x="20" y="454">hypothesis is the top text line, not a box &#183; steel = frozen data &#183; cyan pill = function &#183; 12 boxes, no crossing arrows</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>12 boxes</code>. The hypothesis line is quoted from <code class="path">results/E5_learned_importance_2026-09-21.md</code> L7. Clients of <code>loto_eval</code> are <code>main</code> (L346) and <code>permutation_test</code> (L292); <code>learning_curve</code> (L260) reuses the same feature functions on fraction splits.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e5_run.py">experiments_verifiers/harness/e5_run.py</a></h4>
+<p class="role">Fits the seven learned variants (L0.5&ndash;L3) under task-level leave-one-task-out, adds bootstrap CIs, learning curves, permutation tests and the learned-weight analysis, then writes the E5 JSON.</p>
+<p class="meta">524 lines &#183; 16 functions, no class &#183; entry point: <code>uv run python experiments_verifiers/harness/e5_run.py</code> (docstring L3) &#183; CLI arguments: none found, no <code>sys.argv</code> use</p>
+<details><summary>signatures, rungs and written keys</summary><div class="dbody">
+<pre>load_all() -&gt; tuple                                             # L42
+claim_x(c, embz, emb_idx) -&gt; np.ndarray                         # L68
+fit_source_classifier(exs, train_tasks, embz, emb_idx)          # L80
+classifier_cv_accuracy(exs, embz, emb_idx, n_folds=5)           # L99
+make_f_src(exs, embz, emb_idx, predicted_fill: bool)            # L132
+group_features(claims) -&gt; np.ndarray                            # L156
+build_lexicon(exs, min_df=15) -&gt; list[str]                      # L176
+make_f_l2(lex_index)                                            # L186
+make_f_l3(embz, emb_idx, key)                                   # L204
+loto_eval(exs, feats_fn, model_fn, inner_C=None, y=None)        # L216
+learning_curve(exs, feats_fn, model_fn, fracs=(0.25,0.5,0.75,1.0), n_rep=10)   # L260
+permutation_test(exs, feats_fn, model_fn, n_perm=200, seed=7)   # L292
+main()                                                          # L346</pre>
+<p>Rungs registered in <code>main</code>: <code>baseline_const_0.5</code>, <code>baseline_ver_bit</code>, <code>baseline_uniform_passrate</code>, <code>baseline_v0_recompute</code>, <code>baseline_manifest_reward</code>, <code>L0.5_source_direct</code>, <code>L0.5_source_pred</code>, <code>L1_group_logistic</code>, <code>L2_lexical_gbm</code>, <code>L2_lexical_logistic</code>, <code>L3_embed_name_logistic</code>, <code>L3_embed_name_desc_logistic</code>. Models: logistic (max_iter 3000, inner C sweep over 0.01/0.03/0.1/0.3/1.0/10.0) and <code>HistGradientBoostingClassifier</code> (max_depth 3, max_iter 150, learning_rate 0.06, random_state 0).</p>
+<p>JSON keys written (L493&ndash;L517): <code>data</code>, <code>provenance</code>, <code>source_classifier</code>, <code>metrics</code>, <code>auc_bootstrap_ci</code>, <code>learning_curves</code>, <code>permutation_tests</code>, <code>weights_analysis</code>, <code>per_example</code>, <code>gaps</code>, <code>runtime_s</code>, <code>gate</code>, <code>paired_tests</code>. <code>gate</code> and <code>paired_tests</code> sit after <code>runtime_s</code> in the file, so they were added later.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th>Cited at</th></tr></thead>
+<tbody>
+<tr><td>607 frozen claim evaluations</td><td>nothing</td><td class="sym">experiments_verifiers/data/verifier_claims.jsonl</td><td class="sym">load_all L43 via e5_common L34</td></tr>
+<tr><td>Rubric caches and goals</td><td>nothing</td><td class="sym">sources/workflows/*/_verifier_tmp/rubric_cache_*.json, ablations/*.json</td><td class="sym">load_all L44-L46 via e5_common L45, L55, L84</td></tr>
+<tr><td>Reward and VER/SR per generation</td><td>nothing</td><td class="sym">experiments_verifiers/manifest.json</td><td class="sym">load_all L47-L48</td></tr>
+<tr><td>MiniLM embeddings</td><td>nothing</td><td class="sym">experiments_verifiers/results/_cache_e5_embeddings.npz</td><td class="sym">load_all L56</td></tr>
+<tr><td>Nothing, it writes both result files</td><td>Payload with 13 keys, indent 1</td><td class="sym">experiments_verifiers/results/E5_learned_importance_&lt;date&gt;.json</td><td class="sym">OUT_JSON L28, write L518</td></tr>
+<tr><td>The JSON it just wrote</td><td>Markdown summary, 168 lines</td><td class="sym">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</td><td class="sym">written by <a href="exp_e5_md.html">e5_md.py</a> L139</td></tr>
+</tbody>
+</table>
+<p class="sub">No LLM client is imported by any of the four E5 scripts, so the run cost no API calls. <code>OUT_MD</code> is declared at L29 but <code>e5_run.py</code> never writes it; the markdown comes from <code>e5_md.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; auc_sr of every rung (task-level LOTO)</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="Bar chart of auc_sr for twelve baselines and rungs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="40" y="218.8" width="52" height="11.2" fill="rgba(0,229,255,0.13)" stroke="#00E5FF"/>
+  <text class="box-label" x="66" y="212.8" text-anchor="middle" style="font-size:9px">0.500</text>
+  <text class="box-sub" x="66" y="244.0" text-anchor="middle" style="font-size:8.5px">const 0.5</text>
+  <rect x="110" y="157.2" width="52" height="72.8" fill="rgba(0,229,255,0.13)" stroke="#00E5FF"/>
+  <text class="box-label" x="136" y="151.2" text-anchor="middle" style="font-size:9px">0.609</text>
+  <text class="box-sub" x="136" y="244.0" text-anchor="middle" style="font-size:8.5px">ver bit</text>
+  <rect x="180" y="135.3" width="52" height="94.7" fill="rgba(0,229,255,0.13)" stroke="#00E5FF"/>
+  <text class="box-label" x="206" y="129.3" text-anchor="middle" style="font-size:9px">0.648</text>
+  <text class="box-sub" x="206" y="244.0" text-anchor="middle" style="font-size:8.5px">uniform</text>
+  <rect x="250" y="140.1" width="52" height="89.9" fill="rgba(0,229,255,0.13)" stroke="#00E5FF"/>
+  <text class="box-label" x="276" y="134.1" text-anchor="middle" style="font-size:9px">0.640</text>
+  <text class="box-sub" x="276" y="244.0" text-anchor="middle" style="font-size:8.5px">v0 recompute</text>
+  <rect x="320" y="192.2" width="52" height="37.8" fill="rgba(0,229,255,0.13)" stroke="#00E5FF"/>
+  <text class="box-label" x="346" y="186.2" text-anchor="middle" style="font-size:9px">0.547</text>
+  <text class="box-sub" x="346" y="244.0" text-anchor="middle" style="font-size:8.5px">manifest</text>
+  <rect x="390" y="223.4" width="52" height="6.6" fill="rgba(0,229,255,0.13)" stroke="#00E5FF"/>
+  <text class="box-label" x="416" y="217.4" text-anchor="middle" style="font-size:9px">0.492</text>
+  <text class="box-sub" x="416" y="244.0" text-anchor="middle" style="font-size:8.5px">L0.5 direct</text>
+  <rect x="460" y="193.4" width="52" height="36.6" fill="rgba(0,229,255,0.13)" stroke="#00E5FF"/>
+  <text class="box-label" x="486" y="187.4" text-anchor="middle" style="font-size:9px">0.545</text>
+  <text class="box-sub" x="486" y="244.0" text-anchor="middle" style="font-size:8.5px">L0.5 pred</text>
+  <rect x="530" y="151.8" width="52" height="78.2" fill="rgba(0,229,255,0.13)" stroke="#00E5FF"/>
+  <text class="box-label" x="556" y="145.8" text-anchor="middle" style="font-size:9px">0.619</text>
+  <text class="box-sub" x="556" y="244.0" text-anchor="middle" style="font-size:8.5px">L1 group</text>
+  <rect x="600" y="99.5" width="52" height="130.5" fill="rgba(77,159,255,0.14)" stroke="#4D9FFF"/>
+  <text class="box-label" x="626" y="93.5" text-anchor="middle" style="font-size:9px">0.712</text>
+  <text class="box-sub" x="626" y="244.0" text-anchor="middle" style="font-size:8.5px">L2 gbm</text>
+  <rect x="670" y="85.2" width="52" height="144.8" fill="rgba(77,159,255,0.14)" stroke="#4D9FFF"/>
+  <text class="box-label" x="696" y="79.2" text-anchor="middle" style="font-size:9px">0.737</text>
+  <text class="box-sub" x="696" y="244.0" text-anchor="middle" style="font-size:8.5px">L2 log</text>
+  <rect x="740" y="105.2" width="52" height="124.8" fill="rgba(77,159,255,0.14)" stroke="#4D9FFF"/>
+  <text class="box-label" x="766" y="99.2" text-anchor="middle" style="font-size:9px">0.702</text>
+  <text class="box-sub" x="766" y="244.0" text-anchor="middle" style="font-size:8.5px">L3 name</text>
+  <rect x="810" y="76.4" width="52" height="153.6" fill="rgba(125,249,199,0.16)" stroke="#7DF9C7"/>
+  <text class="box-label" x="836" y="70.4" text-anchor="middle" style="font-size:9px">0.753</text>
+  <text class="box-sub" x="836" y="244.0" text-anchor="middle" style="font-size:8.5px">L3 name+desc</text>
+  <path d="M40,230 H860" fill="none" stroke="#1B4B6B" stroke-width="1.2"/>
+  <path d="M40,118.8 H860" fill="none" stroke="#0E2A3F" stroke-width="1" stroke-dasharray="4 4"/>
+  <path d="M40,61.3 H860" fill="none" stroke="#0E2A3F" stroke-width="1" stroke-dasharray="4 4"/>
+  <path d="M40,218.8 H860" fill="none" stroke="#FF4D6A" stroke-width="1" stroke-dasharray="3 4"/>
+  <text class="box-sub" x="34" y="234" text-anchor="end">0.48</text>
+  <text class="box-sub" x="34" y="122" text-anchor="end">0.64</text>
+  <text class="box-sub" x="34" y="64" text-anchor="end">0.80</text>
+  <text class="edge-label" x="866" y="222" text-anchor="end" style="fill:#FF4D6A">0.50 chance line</text>
+  <text class="box-sub" x="40" y="272">auc_sr values read from results/E5_learned_importance_2026-09-21.json; cyan = baseline, blue = L2/L3 fit, mint = best rung</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; all 12 values are the stored <code>metrics.&lt;name&gt;.auc_sr</code> numbers, labelled on the bars. The y axis starts at 0.48, not 0, so bar heights show the spread between 0.49 and 0.75 only. The <code>manifest</code> bar covers 159 rows; every other bar covers 607.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Examples pooled</td><td class="size">607 (191 with SR true)</td><td class="sym">E5_learned_importance_2026-09-21.json L7-L8</td></tr>
+<tr><td>Claim verdicts and tasks</td><td class="size">15 542 claims, 136 tasks, 32 contrast tasks</td><td class="sym">E5_learned_importance_2026-09-21.json L9-L12</td></tr>
+<tr><td>baseline_const_0.5 auc_sr</td><td class="size">0.500</td><td class="sym">E5_learned_importance_2026-09-21.json L95</td></tr>
+<tr><td>baseline_ver_bit auc_sr</td><td class="size">0.609 (223 of 293 pairs tie)</td><td class="sym">E5_learned_importance_2026-09-21.json L107, L114</td></tr>
+<tr><td>baseline_uniform_passrate auc_sr</td><td class="size">0.648</td><td class="sym">E5_learned_importance_2026-09-21.json L119</td></tr>
+<tr><td>baseline_v0_recompute auc_sr</td><td class="size">0.640</td><td class="sym">E5_learned_importance_2026-09-21.json L131</td></tr>
+<tr><td>baseline_manifest_reward auc_sr</td><td class="size">0.547 on 159 rows</td><td class="sym">E5_learned_importance_2026-09-21.json L143</td></tr>
+<tr><td>L0.5_source_direct auc_sr</td><td class="size">0.492, below the chance line</td><td class="sym">E5_learned_importance_2026-09-21.json L156</td></tr>
+<tr><td>L0.5_source_pred auc_sr</td><td class="size">0.545</td><td class="sym">E5_learned_importance_2026-09-21.json L168</td></tr>
+<tr><td>L1_group_logistic auc_sr</td><td class="size">0.619</td><td class="sym">E5_learned_importance_2026-09-21.json L180</td></tr>
+<tr><td>L2_lexical_gbm auc_sr</td><td class="size">0.712</td><td class="sym">E5_learned_importance_2026-09-21.json L192</td></tr>
+<tr><td>L2_lexical_logistic auc_sr</td><td class="size">0.737</td><td class="sym">E5_learned_importance_2026-09-21.json L204</td></tr>
+<tr><td>L3_embed_name_logistic auc_sr</td><td class="size">0.702</td><td class="sym">E5_learned_importance_2026-09-21.json L216</td></tr>
+<tr><td>L3_embed_name_desc_logistic auc_sr</td><td class="size">0.753 (best rung)</td><td class="sym">E5_learned_importance_2026-09-21.json L228</td></tr>
+<tr><td>L3 95% cluster-bootstrap CI</td><td class="size">0.754 mean, 0.661 to 0.839</td><td class="sym">E5_learned_importance_2026-09-21.json L269-L272</td></tr>
+<tr><td>L2 logistic 95% CI</td><td class="size">0.736 mean, 0.651 to 0.818</td><td class="sym">E5_learned_importance_2026-09-21.json L259-L262</td></tr>
+<tr><td>v0 recompute 95% CI</td><td class="size">0.639 mean, 0.567 to 0.702</td><td class="sym">E5_learned_importance_2026-09-21.json L239-L242</td></tr>
+<tr><td>Paired dAUC, L3 vs v0</td><td class="size">+0.114, CI 0.018 to 0.208, p 0.009</td><td class="sym">E5_learned_importance_2026-09-21.json L8659-L8665</td></tr>
+<tr><td>Paired dAUC, L1 vs v0</td><td class="size">-0.021, p 0.740</td><td class="sym">E5_learned_importance_2026-09-21.json L8675-L8681</td></tr>
+<tr><td>Permutation p, L1 and L3</td><td class="size">0.0050 each, 200 permutations</td><td class="sym">E5_learned_importance_2026-09-21.json L347, L354</td></tr>
+<tr><td>Gate verdict</td><td class="size">3 of 4 clauses pass, conditional pass</td><td class="sym">E5_learned_importance_2026-09-21.json L8650</td></tr>
+<tr><td>Failing clause</td><td class="size">within-task ranking 0.693 against a 0.70 bar</td><td class="sym">E5_learned_importance_2026-09-21.json L8644-L8648</td></tr>
+<tr><td>Runtime</td><td class="size">1083.1 s</td><td class="sym">E5_learned_importance_2026-09-21.json L8623</td></tr>
+</tbody>
+</table>
+<p class="sub">All values are stored in the JSON; nothing on this page is recomputed. The <code>n_contrast_ties</code> row is a count of equal-score pos/neg pairs on the 32 contrast tasks.</p>
+
+<details><summary>verbatim: the gate verdict, the paired test and the winning row</summary><div class="dbody">
+<blockquote>| L3_embed_name_desc_logistic | 607 | 191 | 0.753 | 0.617 | 0.333 | 0.204 | 0.693 | 293 | 4 | (293 / 4) |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> line 33 (ladder table row).</p>
+<blockquote>  "verdict": "3 of 4 clauses PASS (auc vs L0 and vs L1 with &gt;= +0.05, tau_top_quartile &gt; 0); the within-task &gt;= 70% clause FAILS narrowly for every rung (best 0.693 L3; the trivial uniform pass-rate baseline is 0.696 and nothing clears 70%). Overall: conditional pass &mdash; the learned importance function wins between-task ranking decisively (paired dAUC +0.114, p=0.009) but adds nothing to within-task ordering."</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.json</code> line 8650, key <code>gate.verdict</code>.</p>
+<blockquote>| L3 | +0.114 | [+0.018, +0.208] | 0.009 |
+| L2_gbm | +0.071 | [-0.026, +0.159] | 0.062 |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> lines 80&ndash;81 (paired task-cluster bootstrap dAUC against the v0 recompute, 2000 resamples). The L1 and L0.5 rows of the same table are in the metric table above.</p>
+<blockquote>its self-reported claim importances are noise (Spearman -0.12 vs learned), and learned claim-importance
+(L3 = MiniLM(claim name+desc) -&gt; logistic) helps BETWEEN tasks (AUC 0.753 vs 0.640) but ties the old
+reward WITHIN tasks.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/EXPERIMENTS.md</code> lines 11&ndash;13 (the research handoff summary of this run).</p>
+<blockquote>both measured capacity additions did worse: E1's fitted GBM &minus;0.061; E5's lexical GBM 0.712 vs logistic 0.737 [measured]</blockquote>
+<p>Path: <code class="path">experiments_verifiers/REPORT_e11_theory.html</code> line 76 (quotes this run's <code>L2_lexical_gbm</code> 0.712 and <code>L2_lexical_logistic</code> 0.737).</p>
+</div></details>
+
+<p class="note flag">Red: measured against the benchmark labels, the reward it replaced is not a ranking signal on the rows where it was recorded. <code>baseline_manifest_reward</code> stores auc_sr 0.547 on 159 rows (JSON L143), while <code>baseline_uniform_passrate</code> stores 0.648 on all 607 (L119). RECORDED VERDICTS ONLY.</p>
+<p class="note">Amber: the within-task clause fails for every rung, and the trivial uniform pass-rate baseline is the best within-task number at 0.696 (JSON L8645-L8647). Between-task ranking and within-task ranking do not move together here.</p>
+<p class="note">Amber: <code>permutation_tests._note</code> (JSON L358) states the observed AUCs there (L1 0.631, L3 0.665) use a fixed C=0.1 without the inner-C sweep, so they differ from the main table; only the p-value is meant to be read.</p>
+<p class="note">Amber: <code>load_all</code> L43 reads <code class="path">data/verifier_claims.jsonl</code>, so the 607 rows include the 42 rows that <code class="path">data/verifier_claims_sane.jsonl</code> nulls. The page quotes what the run used; see <a href="exp_e5_common.html">exp_e5_common.html</a> for the row counts.</p>
+<p class="note say">Why it matters: this run is the reproduction target other pages check against (README L133&ndash;134: E5 L3 auc 0.753), and it is the source of the claim-importance verdict used across the cycle-1 write-up.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Recorded gaps</h2>
+<details><summary>verbatim: three of the six gap lines the run wrote about itself</summary><div class="dbody">
+<blockquote>- verifier_claims.jsonl was parsed from evaluation.txt, which SKIPS error-status claims; V0 recompute drifts from the manifest reward (mean |diff| 0.044 over the 159 rows with a recorded reward; 17/159 exact) &mdash; all rung comparisons use LOTO scores computed identically, so this shifts the V0 baseline only
+- source_d exists only in v0-era rubrics (script-behaviour claims, 1353 claims); L0.5 therefore fits 6 source weights, not 5
+- 8 of 127 rubric keys could not be joined to any recorded goal (sample in provenance.unjoined_keys_sample); their claims rely on the classifier</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> lines 162&ndash;164, mirroring <code class="path">.json</code> key <code>gaps</code> at lines 8615&ndash;8622. The other three gap lines cover the sabotage control (not applicable), inherited SR label noise, and the task-count grouping difference.</p>
+<p>The task-count gap is worth reading whole: the JSON gap at L8621 says 136 tasks by <code>(campaign, task)</code> pairs against 124 by distinct task name, and notes that its own numbers are internally consistent.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e5_run.py</code> (whole file, 524 lines), <code class="path">e5_md.py</code>, <code class="path">e5_common.py</code>, <code class="path">e5_embed.py</code> (line counts and call sites); <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.json</code> (all metric, CI, curve, permutation, gate and gap keys cited by line) and <code class="path">.md</code> (whole file, 168 lines); <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (L11&ndash;13, L84), <code class="path">experiments_verifiers/README.md</code> (L26, L70, L86&ndash;89, L103, L127&ndash;134), <code class="path">experiments_verifiers/REPORT_e11_theory.html</code> (L73&ndash;76, L154&ndash;155); <code class="path">experiments_verifiers/data/verifier_claims.jsonl</code> and <code class="path">data/verifier_claims_sane.jsonl</code> (row counts, SR values). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; never opened, by the build rules. <code class="path">results/E5b_L3_splits_*</code> and <code class="path">results/E5c_data_efficiency_*</code> &mdash; separate experiments with their own pages (<a href="exp_e5b_splits.html">exp_e5b_splits.html</a>, <a href="exp_e5c_curve.html">exp_e5c_curve.html</a>) that re-run this learner on split and data-fraction grids. <code class="path">manifest.json</code> row contents &mdash; only the reward column is read by <code>load_all</code> L47&ndash;L48 and only its 159-row coverage is quoted here. <code class="path">REPORT_e10_weights_visualization.html</code> &mdash; 0 matches for <code>E5</code>; the E10 per-task weight line belongs to the E10/E12 pages, of which <a href="exp_e12_falsifier.html">exp_e12_falsifier.html</a> exists on disk at 2026-10-02. Links in this footer point at files present now; <code class="path">exp_metrics.html</code> is a peer page that was not on disk during this build, so it is named, not linked. No pytest run, no experiment run, no model fit, per the build rules.</p>
+<p>Absent at 2026-10-02: the JSON has no budget or cost key, although <code class="path">EXPERIMENTS.md</code> rule 8 asks for a declared cap and a per-call ledger. No LLM client is imported by the four E5 scripts, so the run cost 0 calls by construction. The <code class="path">per_example</code> array (L722&ndash;L8614) is summarised in the table, not quoted.</p>
+<p>The folder <code class="path">experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

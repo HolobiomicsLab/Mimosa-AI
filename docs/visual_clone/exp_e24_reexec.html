@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_reexec - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e24_reexec">
+<div class="wrap">
+
+<h1 class="hud">e24_reexec &mdash; clean-room re-execution</h1>
+<p class="intro">Do frozen workspaces still run when re-executed from a clean copy? The script copies each delivered workspace, strips generated outputs, re-runs the entry script in a pinned Python 3.10 sandbox and compares the new outputs to the frozen ones. It classifies every generation and appends resumable ledgers.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis to artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 520" role="img" aria-label="E24 re-execution design">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+<g class="box" id="bIomap"><rect x="20" y="40" width="170" height="54" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/><text class="box-label" x="105.0" y="65.0" text-anchor="middle">_e24_iomap.jsonl</text><text class="box-sub" x="105.0" y="80.0" text-anchor="middle">per-group I/O map</text></g>
+<g class="box" id="bSnap"><rect x="20" y="140" width="170" height="54" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/><text class="box-label" x="105.0" y="165.0" text-anchor="middle">148 snapshots</text><text class="box-sub" x="105.0" y="180.0" text-anchor="middle">workspace copies</text></g>
+<g class="box" id="bVenv"><rect x="20" y="240" width="170" height="54" rx="2" fill="none" stroke="#8FB8C9"/><text class="box-label" x="105.0" y="265.0" text-anchor="middle">_e24_venv</text><text class="box-sub" x="105.0" y="280.0" text-anchor="middle">pinned py3.10 sandbox</text></g>
+<g class="box" id="bMap"><rect x="250" y="40" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="340.0" y="65.0" text-anchor="middle">iomap_for / entry_for</text><text class="box-sub" x="340.0" y="80.0" text-anchor="middle">entry script</text></g>
+<g class="box" id="bStrip"><rect x="250" y="140" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="340.0" y="165.0" text-anchor="middle">strip_outputs</text><text class="box-sub" x="340.0" y="180.0" text-anchor="middle">remove frozen outputs</text></g>
+<g class="box" id="bExec"><rect x="250" y="240" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="340.0" y="265.0" text-anchor="middle">execute_gen</text><text class="box-sub" x="340.0" y="280.0" text-anchor="middle">run entry script</text></g>
+<g class="box" id="bClass"><rect x="250" y="340" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="340.0" y="365.0" text-anchor="middle">classify</text><text class="box-sub" x="340.0" y="380.0" text-anchor="middle">status per generation</text></g>
+<g class="box" id="bDet"><rect x="250" y="440" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="340.0" y="465.0" text-anchor="middle">det_stage</text><text class="box-sub" x="340.0" y="480.0" text-anchor="middle">re-run 10% sample</text></g>
+<g class="box" id="bLed"><rect x="490" y="340" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="580.0" y="365.0" text-anchor="middle">reexec ledger</text><text class="box-sub" x="580.0" y="380.0" text-anchor="middle">one row per gen</text></g>
+<g class="box" id="bDetLed"><rect x="490" y="440" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="580.0" y="465.0" text-anchor="middle">det ledger</text><text class="box-sub" x="580.0" y="480.0" text-anchor="middle">first vs second run</text></g>
+<g class="box" id="bRep"><rect x="740" y="390" width="150" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="815.0" y="415.0" text-anchor="middle">E24_reexec_holdout</text><text class="box-sub" x="815.0" y="430.0" text-anchor="middle">json + md</text></g>
+<path class="edge" d="M190,67 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="220" y="59" text-anchor="middle">iomap</text>
+<path class="edge" d="M340,94 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="330" y="120" text-anchor="end">entry script</text>
+<path class="edge" d="M190,167 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="220" y="159" text-anchor="middle">copy</text>
+<path class="edge" d="M190,267 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="220" y="259" text-anchor="middle">sandbox</text>
+<path class="edge" d="M340,194 V240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="330" y="220" text-anchor="end">stripped copy</text>
+<path class="edge" d="M340,294 V340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="332" y="320" text-anchor="end">regenerated outputs</text>
+<path class="edge" d="M430,367 H490" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="460" y="359" text-anchor="middle">status row</text>
+<path class="edge dashed-edge" d="M580,394 V420 H340 V440" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/><text class="edge-label" x="460" y="414" text-anchor="middle">reads rows</text>
+<path class="edge" d="M430,467 H490" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="460" y="459" text-anchor="middle">compare</text>
+<path class="edge" d="M670,360 L740,400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="704" y="368" text-anchor="middle">assembled</text>
+<path class="edge" d="M670,467 L740,430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="702" y="458" text-anchor="middle">det rows</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 11 boxes. Mint = experiment code, blue = inputs already on disk, steel dashed = the persistent sandbox venv. <code>execute_gen</code> (L291) is the core: it copies the snapshot out of <code class="path">snapshot_path</code>, strips frozen outputs, runs the mapped entry script with a 600 s cap and clean env, then calls <code>compare_file</code> (L188) and <code>classify</code> (L265). <code>run_stage</code> (L384) appends one ledger row; <code>det_stage</code> (L415) re-runs a 10% sample. Solid = call, dashed blue = reads rows.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e24_reexec.py">experiments_verifiers/harness/e24_reexec.py</a></h4>
+<p class="role">Re-executes every frozen generation in a pinned sandbox and diffs the outputs.</p>
+<p class="meta">473 lines &#183; entry point: <code>__main__</code> argparse (L464) &#183; CLI: <code>run</code> | <code>det</code>, <code>--pilot</code>, <code>--workers</code> (default <code>C.MAX_WORKERS</code> = 4)</p>
+<details><summary>functions, CLI, and the pre-registered classes</summary><div class="dbody">
+<pre>iomap_for(gid)                  L111  read the per-group I/O map
+entry_for(gen, m)               L116  resolve the mapped entry script
+strip_outputs(copy_root, m)     L146  delete generated outputs from the copy
+execute_gen(group, gen, ...)    L291  one clean-room execution
+compare_file(frozen, regen, m)  L188  csv / npy / png / blob comparison
+classify(files)                 L265  pre-registered status
+run_stage(pilot, workers)       L384  drive all generations, append ledger
+det_stage()                     L415  re-run 10% and compare outputs</pre>
+<p>CLI (L466&ndash;469): <code>cmd</code> in <code>{run, det}</code>, <code>--pilot</code> (5 declared groups), <code>--workers</code> (default 4). <code>PersistentSandbox</code> (L62) keeps the shared venv under <code class="path">results/_e24_venv/&lt;fingerprint&gt;/venv</code> and never deletes it.</p>
+<p>The registered statuses: <code>no_entry_script</code>, <code>crash</code> (exit != 0), <code>timeout</code> (wall &gt; 600 s), <code>clean_recover</code>, <code>divergent</code>. F4_strict counts crash + timeout + divergent; F4_broad adds no_entry_script. Numeric tolerance is <code>1e-4</code> relative or <code>1e-6</code> absolute.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>Reads</th><th>Writes</th><th>Path</th><th>Code</th></tr></thead>
+<tbody>
+<tr><td>per-group I/O map</td><td>entry script name</td><td class="sym"><code class="path">results/_e24_iomap_2026-09-24.jsonl</code></td><td class="sym">e24_reexec.py::iomap_for L111</td></tr>
+<tr><td>148 workspace snapshots</td><td>stripped temp copy</td><td class="sym"><code class="path">snapshot_path</code> per gen</td><td class="sym">e24_reexec.py::strip_outputs L146</td></tr>
+<tr><td>stripped copy</td><td>regenerated outputs</td><td class="sym">temp dir (removed after)</td><td class="sym">e24_reexec.py::execute_gen L291</td></tr>
+<tr><td>executed rows</td><td>reexec ledger</td><td class="sym"><code class="path">results/_e24_reexec_ledger_2026-09-24.jsonl</code></td><td class="sym">e24_reexec.py::run_stage L384</td></tr>
+<tr><td>determinism subsample</td><td>det ledger</td><td class="sym"><code class="path">results/_e24_reexec_det_2026-09-24.jsonl</code></td><td class="sym">e24_reexec.py::det_stage L415</td></tr>
+<tr><td>stdout and stderr</td><td>run logs</td><td class="sym"><code class="path">results/_e24_runlogs_2026-09-24/</code></td><td class="sym">e24_reexec.py::execute_gen L345</td></tr>
+</tbody>
+</table>
+
+<p class="note">Amber: the temp copy is deleted at the end of each execution, so the regenerated outputs exist only during the run; the ledger rows hold the comparison results, not the files.</p>
+<p class="note flag">Red: the results report (148 generations) and the live ledger disagree slightly. The ledger on disk holds 155 rows but 148 unique <code>(gid, uuid8)</code> keys; the extra rows are earlier pilot runs of the same keys, kept by the append-only design.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; re-execution status mix</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 380" role="img" aria-label="Re-execution status mix over 148 generations">
+<line x1="90" y1="320" x2="860" y2="320" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="323" text-anchor="end">0</text>
+<line x1="90" y1="255" x2="860" y2="255" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="258" text-anchor="end">25</text>
+<line x1="90" y1="190" x2="860" y2="190" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="193" text-anchor="end">50</text>
+<line x1="90" y1="125" x2="860" y2="125" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="128" text-anchor="end">75</text>
+<line x1="90" y1="60" x2="860" y2="60" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="63" text-anchor="end">100</text>
+<rect x="127" y="67.8" width="80" height="252.2" fill="none" stroke="#39FF88"/>
+<text class="box-label" x="167" y="62.8" text-anchor="middle">97</text>
+<text class="box-sub" x="167" y="338" text-anchor="middle">clean_recover</text>
+<rect x="281" y="249.8" width="80" height="70.2" fill="none" stroke="#FFB547"/>
+<text class="box-label" x="321" y="244.8" text-anchor="middle">27</text>
+<text class="box-sub" x="321" y="338" text-anchor="middle">divergent</text>
+<rect x="435" y="281.0" width="80" height="39.0" fill="none" stroke="#FF4D6A"/>
+<text class="box-label" x="475" y="276.0" text-anchor="middle">15</text>
+<text class="box-sub" x="475" y="338" text-anchor="middle">crash</text>
+<rect x="589" y="299.2" width="80" height="20.8" fill="none" stroke="#8FB8C9"/>
+<text class="box-label" x="629" y="294.2" text-anchor="middle">8</text>
+<text class="box-sub" x="629" y="338" text-anchor="middle">no_entry_script</text>
+<rect x="743" y="317.4" width="80" height="2.6" fill="none" stroke="#4D9FFF"/>
+<text class="box-label" x="783" y="312.4" text-anchor="middle">1</text>
+<text class="box-sub" x="783" y="338" text-anchor="middle">timeout</text>
+<text class="box-sub" x="90" y="360" text-anchor="start">counts of 148 generations | F4 strict 43 (29.0%) | source: E24_reexec_holdout md L7</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; bar chart of the status counts in <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> line 7 (also <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json</code> key <code>reexec_summary.status_counts</code>). Counts are printed above each bar over 148 generations.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>Generations re-executed</td><td>148</td><td class="sym">json reexec_summary.n_gens</td></tr>
+<tr><td>clean_recover</td><td>97</td><td class="sym">md L7</td></tr>
+<tr><td>divergent</td><td>27</td><td class="sym">md L7</td></tr>
+<tr><td>crash</td><td>15</td><td class="sym">md L7</td></tr>
+<tr><td>no_entry_script</td><td>8</td><td class="sym">md L7</td></tr>
+<tr><td>timeout</td><td>1</td><td class="sym">md L7</td></tr>
+<tr><td>F4 strict incidence</td><td>43 of 148 (29.0%)</td><td class="sym">md L7</td></tr>
+<tr><td>F4 broad incidence</td><td>51 of 148 (34.5%)</td><td class="sym">json reexec_summary.f4_broad</td></tr>
+<tr><td>Deterministic subsample</td><td>8 of 12 reproduced</td><td class="sym">md L7</td></tr>
+<tr><td>Det ledger rows</td><td>12</td><td class="sym">json coverage.det_rows</td></tr>
+<tr><td>Runtime median / max</td><td>12.2 s / 601.6 s</td><td class="sym">md L96</td></tr>
+<tr><td>Divergence taxonomy</td><td>25 frac_divergent, 1 dims, 1 missing</td><td class="sym">json reexec_summary.divergence_taxonomy</td></tr>
+</tbody>
+</table>
+
+<details><summary>verbatim result lines (6 quotes)</summary><div class="dbody">
+<blockquote>All numbers `my computation`. Same 19 groups / 148 generations as E15/E18/E19 (E14 arena). The verifier executes delivered scripts on temp copies (snapshots untouched, sha256-verified) and scores generalization on splits it owns, built ONLY from the workspaces' own input data &mdash; zero gold access.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> L3</p>
+<blockquote>**(1) F4 incidence (do frozen workspaces survive clean re-execution?): 29.0% strict** (43/148 crash/timeout/divergent; 51 incl. no-entry-script). Status mix: {'divergent': 27, 'clean_recover': 97, 'crash': 15, 'no_entry_script': 8, 'timeout': 1}. Determinism 8/12 sampled gens reproduce their own outputs bit-tolerantly.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> L7</p>
+<blockquote>- Compute: re-executions on temp copies (sha256-clean); runtime median 12.2s / max 601.6s per script.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> L96</p>
+<blockquote>- RUN RESUMPTION DISCLOSURE: the original agent died (credit/rate-limit) during final assembly; every phase (0-4) had already completed on disk in resumable ledgers; this assembly re-ran ONLY the offline evaluation stage (labels read once, as registered) &mdash; zero additional LLM calls, zero additional executions.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> L102</p>
+<blockquote>- One harness-fidelity fix during the pilot: pred_results/ is now pre-created (mirroring ExecutionSandbox.run_generated_code and the campaign's own re-grading); 3 pilot rows re-run, snapshots sha256-clean throughout.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> L103</p>
+<blockquote>- Determinism subsample n=12 (10%); the 4 non-deterministic gens are all 'divergent' (stochastic training without pinned seeds), so their frozen-vs-regenerated divergence is partly self-nondeterminism rather than environment drift.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> L107</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <a href="../../experiments_verifiers/harness/e24_reexec.py">experiments_verifiers/harness/e24_reexec.py</a>; <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code>, <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json</code>; <code class="path">results/_e24_reexec_ledger_2026-09-24.jsonl</code> (155 rows, 148 unique keys, from <code>wc -l</code> and <code>json.loads</code>); <code class="path">results/_e24_reexec_det_2026-09-24.jsonl</code> (12 rows); <code class="path">results/_e24_venv/</code> size only (<code>du -sh</code> = 2.8G; 77 245 files = <code>find . -type f -o -type l | wc -l</code>); <code class="path">experiments_verifiers/harness/e24_common.py</code> (constants, ledgers, <code>SCRIPT_TIMEOUT_S</code> L58); <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (constitution); <code class="path">experiments_verifiers/README.md</code> (E24 codename row L50); <code class="path">docs/visual_clone/_reference.html</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code>results/_e24_holdout_ledger_2026-09-24.jsonl</code>, <code>_e24_holdout_keys_2026-09-24.json</code>, <code>_e24_holdout_pilot_2026-09-24.jsonl</code>, <code>_e24_splits_2026-09-24/</code> (component 2, owned by <a href="exp_e24_holdout.html">exp_e24_holdout.html</a>); <code>results/_e24_iomap_2026-09-24.jsonl</code> (owned by <a href="exp_e24_iomap.html">exp_e24_iomap.html</a>); <code>results/_e24_runlogs_2026-09-24/</code> (per-run stdout/stderr, not a results file); the 148 frozen snapshots under <code>snapshot_path</code> (read-only evidence, too large to quote); <code>experiments_verifiers/.env</code> was never opened, by the build rules. EXPERIMENTS.md holds no E24 section; only its constitution was read. No experiment, no application and no pytest was run.</p>
+<p>Volatility: experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

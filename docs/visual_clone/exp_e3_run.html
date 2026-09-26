@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e3_run - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e3_run">
+<div class="wrap">
+
+<h1 class="hud">e3_run &mdash; Design A pilot: two judge families</h1>
+<p class="intro">E3 asked whether two LLM families from different labs, each writing and answering its own binary checklist, rank benchmark artifacts better than the recorded verifier reward. <code>e3_run.py</code> runs that design: it samples a 20-row pilot, scores both families, corrupts ten workspaces as a sabotage control, and writes the pilot metrics. It also holds the report code that later scripts reuse.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 400" role="img" aria-label="e3_run design: hypothesis, inputs, stages, artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bH">
+    <title>Hypothesis the pilot tested</title>
+    <rect x="20" y="20" width="180" height="48" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="40" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="110" y="56" text-anchor="middle">two families beat reward</text>
+  </g>
+
+  <g class="box" id="b1">
+    <title>Manifest rows and the goal text of each task note</title>
+    <rect x="20" y="100" width="180" height="52" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="110" y="122" text-anchor="middle">manifest.json + notes</text>
+    <text class="box-sub" x="110" y="140" text-anchor="middle">via e3_common L31</text>
+  </g>
+
+  <g class="box" id="b2">
+    <title>Frozen workspaces copied for the sabotage control</title>
+    <rect x="20" y="190" width="180" height="52" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="110" y="212" text-anchor="middle">snapshots/&lt;uuid_long&gt;</text>
+    <text class="box-sub" x="110" y="230" text-anchor="middle">copied, never mutated</text>
+  </g>
+
+  <g class="box" id="b3">
+    <title>build_frames samples the pilot and the full frame with a fixed seed</title>
+    <rect x="240" y="100" width="170" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="325" y="122" text-anchor="middle">build_frames()</text>
+    <text class="box-sub" x="325" y="140" text-anchor="middle">seed 20260921</text>
+  </g>
+
+  <g class="box" id="b4">
+    <title>run_instances scores both families on every row and saves state</title>
+    <rect x="440" y="100" width="170" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="525" y="122" text-anchor="middle">run_instances()</text>
+    <text class="box-sub" x="525" y="140" text-anchor="middle">chunks of 8</text>
+  </g>
+
+  <g class="box" id="b9">
+    <title>Resumable state and sabotage records</title>
+    <rect x="700" y="100" width="210" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="805" y="122" text-anchor="middle">E3_designA_state.json</text>
+    <text class="box-sub" x="805" y="140" text-anchor="middle">52 instances, 10 sabotage rows</text>
+  </g>
+
+  <g class="box" id="b5">
+    <title>corrupt_workspace writes a damaged copy of a workspace</title>
+    <rect x="240" y="190" width="170" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="325" y="212" text-anchor="middle">corrupt_workspace()</text>
+    <text class="box-sub" x="325" y="230" text-anchor="middle">5 modes</text>
+  </g>
+
+  <g class="box" id="b6">
+    <title>run_sabotage re-runs cached checklists on the damaged copies</title>
+    <rect x="440" y="190" width="170" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="525" y="212" text-anchor="middle">run_sabotage()</text>
+    <text class="box-sub" x="525" y="230" text-anchor="middle">exec step only</text>
+  </g>
+
+  <g class="box" id="b11">
+    <title>Ten damaged workspace copies on disk</title>
+    <rect x="700" y="200" width="210" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="805" y="222" text-anchor="middle">_e3_sabotage/</text>
+    <text class="box-sub" x="805" y="240" text-anchor="middle">10 copies, 123 MB</text>
+  </g>
+
+  <g class="box" id="b7">
+    <title>run_designb: dsk vetoes glm checks; no state key was ever written</title>
+    <rect x="20" y="290" width="180" height="52" rx="14" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="312" text-anchor="middle">run_designb()</text>
+    <text class="box-sub" x="110" y="330" text-anchor="middle">state key absent</text>
+  </g>
+
+  <g class="box" id="b8">
+    <title>build_report recomputes every metric through metrics_for()</title>
+    <rect x="440" y="290" width="170" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="525" y="312" text-anchor="middle">build_report()</text>
+    <text class="box-sub" x="525" y="330" text-anchor="middle">&#8594; metrics_for()</text>
+  </g>
+
+  <a class="box" id="b10" href="../../experiments_verifiers/results/E3_designA-pilot_20260921.json">
+    <title>Pilot metrics written by the report-pilot stage</title>
+    <rect x="700" y="290" width="210" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="805" y="312" text-anchor="middle">E3_designA-pilot_20260921</text>
+    <text class="box-sub" x="805" y="330" text-anchor="middle">.json &#183; n=20</text>
+  </a>
+
+  <path class="edge" data-from="bH" data-to="b3" d="M200,44 L240,110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="205" y="80" text-anchor="start">tests</text>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b3" d="M200,126 H240" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="220" y="118" text-anchor="middle">rows</text>
+
+  <path class="edge dashed-edge" data-from="b2" data-to="b3" d="M200,216 L240,130" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="204" y="178" text-anchor="start">snapshot flag</text>
+
+  <path class="edge dashed-edge" data-from="b2" data-to="b5" d="M200,216 H240" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="220" y="208" text-anchor="middle">reads</text>
+
+  <path class="edge" data-from="b3" data-to="b4" d="M410,126 H440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="425" y="118" text-anchor="middle">frame</text>
+
+  <path class="edge" data-from="b3" data-to="b7" d="M310,152 V270 H110 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="264" text-anchor="middle">full frame</text>
+
+  <path class="edge" data-from="b4" data-to="b9" d="M610,120 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="655" y="112" text-anchor="middle">saves</text>
+
+  <path class="edge dashed-edge" data-from="b4" data-to="b6" d="M525,152 V190" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="533" y="176" text-anchor="start">rows + state</text>
+
+  <path class="edge" data-from="b4" data-to="b8" d="M610,142 H665 V316 H610" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="668" y="286" text-anchor="start">state rows</text>
+
+  <path class="edge" data-from="b5" data-to="b6" d="M410,216 H440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="425" y="208" text-anchor="middle">copy</text>
+
+  <path class="edge dashed-edge" data-from="b6" data-to="b9" d="M610,206 L700,150" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="646" y="184" text-anchor="end">sabotage rows</text>
+
+  <path class="edge" data-from="b6" data-to="b11" d="M610,220 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="655" y="212" text-anchor="middle">writes copies</text>
+
+  <path class="edge" data-from="b8" data-to="b10" d="M610,316 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="655" y="308" text-anchor="middle">pilot json</text>
+
+  <text class="box-sub" x="20" y="390">12 boxes &#183; dashed outline = secondary</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 12 boxes. Stage names are the real functions: <code>build_frames()</code> L39, <code>run_instances()</code> L74, <code>corrupt_workspace()</code> L99, <code>run_sabotage()</code> L147, <code>run_designb()</code> L198, <code>build_report()</code> L350, <code>metrics_for()</code> L294 and <code>kendall_tau_top()</code> L278. The judge itself is <code>DesignAJudge</code> in <code>experiments_verifiers/scorers/llm_judge_ensemble.py</code>, imported at L27. <code>run_sabotage()</code> reuses the cached checklists, so it pays for the execution step only.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/e3_run.py">experiments_verifiers/harness/e3_run.py</a></h4>
+<p class="role">Samples E3 frames, scores both judge families on each row, corrupts ten workspaces as a sabotage control, and recomputes the pilot metrics.</p>
+<p class="meta">503 lines &#183; entry point <code>main(stage)</code> L424 &#183; 11 module functions, no classes &#183; judges <code>glm-5.3</code> + <code>deepseek-v4.1-flash</code> (<code>e3_common.MODELS</code> L144)</p>
+<details><summary>CLI, stages, means of the sabotage control</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e3_run.py &lt;stage&gt;
+
+argparse: one positional "stage", choices = pilot | sabotage | sabotage2 | full | designb
+           | report | report-pilot | export-checklists                        # L500-502</pre>
+<p>Stage dispatch (L431&ndash;441): <code>pilot</code> &rarr; <code>run_instances(pilot)</code>, <code>sabotage</code> &rarr; <code>run_sabotage(pilot)</code>, <code>sabotage2</code> &rarr; <code>run_sabotage(full, floor=0.4, tag="sabotage2")</code>, <code>full</code> &rarr; <code>run_instances(full)</code>, <code>designb</code> &rarr; <code>run_designb(full)</code>, <code>report</code> / <code>report-pilot</code> &rarr; <code>build_report()</code>, <code>export-checklists</code> &rarr; checklist dump.</p>
+<p><code>corrupt_workspace()</code> L99 copies the workspace first, then applies one of five modes in rotation (L164&ndash;168): <code>delete_pred_results</code>, <code>empty_goal_outputs</code>, <code>truncate_main</code> (largest file cut to 10 bytes), <code>header_only</code> (largest CSV keeps one line), <code>garbage</code> (up to 4 096 random bytes). If a mode finds no target it falls back to deleting <code>pred_results/</code>. Seeded by <code>SEED</code> L29, <code>SAB_SEED</code> in <a href="exp_e3_run2.html">e3_run2.py</a> L35.</p>
+<p>The docstring at L4&ndash;7 lists <code>pilot|sabotage|full|report</code> only; <code>sabotage2</code>, <code>designb</code> and <code>export-checklists</code> exist in the parser but not in that line (parser L500&ndash;502 is the fact).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Manifest rows, goals (<code>build_frames</code> L39)</td><td>nothing</td><td class="sym">experiments_verifiers/manifest.json + run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td></tr>
+<tr><td>Workspace listing and previews (<code>e3_common.build_evidence</code> L98)</td><td>nothing</td><td class="sym">workspace_artefacts/snapshots/&lt;uuid_long&gt;/</td></tr>
+<tr><td>Cached replies (<code>LLMClient.__init__</code> L169)</td><td>new cache entries (<code>client.save</code> L495)</td><td class="sym">experiments_verifiers/results/E3_llm_cache.json</td></tr>
+<tr><td>Resume state (<code>load_state</code> L62)</td><td>instance and sabotage records (<code>save_state</code> L68)</td><td class="sym">experiments_verifiers/results/E3_designA_state.json</td></tr>
+<tr><td>nothing</td><td>ten damaged workspace copies (<code>SAB_DIR</code> L33, L169)</td><td class="sym">experiments_verifiers/results/_e3_sabotage/&lt;uuid_long&gt;_&lt;mode&gt;/</td></tr>
+<tr><td>nothing</td><td>pilot or full metrics (<code>out_json</code> L473)</td><td class="sym">experiments_verifiers/results/E3_designA{suffix}_20260921.json</td></tr>
+<tr><td>API key (<code>C.load_dotenv</code> L425)</td><td>nothing</td><td class="sym">repo-root or experiments_verifiers/.env &mdash; skipped, never opened</td></tr>
+</tbody>
+</table>
+<p class="sub">Citation form: <code>path::Symbol</code>. Line numbers are <code>e3_run.py</code>. The report stage writes with suffix <code>-pilot</code> for <code>report-pilot</code> and no suffix for <code>report</code> (L472&ndash;474).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; pilot AUC per variant</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="pilot AUC against SR for each aggregation variant">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-label" x="20" y="26" text-anchor="start">pilot AUC vs SR (n=20)</text>
+
+  <path d="M50,140 H820" fill="none" stroke="#FFB547" stroke-width="1" stroke-dasharray="5 4"/>
+  <text class="box-sub" x="826" y="144" text-anchor="start">chance 0.5</text>
+
+  <rect x="50" y="104" width="60" height="136" rx="2" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7"/>
+  <text class="box-label" x="80" y="98" text-anchor="middle">0.68</text>
+  <text class="box-sub" x="80" y="256" text-anchor="middle">ens-mean</text>
+
+  <rect x="150" y="110" width="60" height="130" rx="2" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7"/>
+  <text class="box-label" x="180" y="104" text-anchor="middle">0.65</text>
+  <text class="box-sub" x="180" y="256" text-anchor="middle">ens-min</text>
+
+  <rect x="250" y="108" width="60" height="132" rx="2" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7"/>
+  <text class="box-label" x="280" y="102" text-anchor="middle">0.66</text>
+  <text class="box-sub" x="280" y="256" text-anchor="middle">ens-uwo</text>
+
+  <rect x="350" y="104" width="60" height="136" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+  <text class="box-label" x="380" y="98" text-anchor="middle">0.68</text>
+  <text class="box-sub" x="380" y="256" text-anchor="middle">glm-solo</text>
+
+  <rect x="450" y="116" width="60" height="124" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+  <text class="box-label" x="480" y="110" text-anchor="middle">0.62</text>
+  <text class="box-sub" x="480" y="256" text-anchor="middle">dsk-solo</text>
+
+  <rect x="550" y="154" width="60" height="86" rx="2" fill="rgba(255,77,106,0.10)" stroke="#FF4D6A"/>
+  <text class="box-label" x="580" y="148" text-anchor="middle">0.43</text>
+  <text class="box-sub" x="580" y="256" text-anchor="middle">reward</text>
+
+  <rect x="650" y="140" width="60" height="100" rx="2" fill="rgba(143,184,201,0.10)" stroke="#8FB8C9"/>
+  <text class="box-label" x="680" y="134" text-anchor="middle">0.50</text>
+  <text class="box-sub" x="680" y="256" text-anchor="middle">constant 0.5</text>
+
+  <rect x="750" y="140" width="60" height="100" rx="2" fill="rgba(143,184,201,0.10)" stroke="#8FB8C9"/>
+  <text class="box-label" x="780" y="134" text-anchor="middle">0.50</text>
+  <text class="box-sub" x="780" y="256" text-anchor="middle">VER-bit</text>
+
+  <text class="box-sub" x="50" y="286" text-anchor="start">bar height = AUC, 1.0 = 200 px</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; bar chart of every <code>auc_sr</code> in <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code>. Mint = ensemble aggregations, cyan = single family, red = the reward baseline, steel = trivial baselines. The reward baseline sits below chance here; the pilot is 20 rows and one contrast task, so the confidence intervals are wide.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Rows scored (pilot)</td><td class="size">20</td><td class="sym">pilot json L40, <code>n_scored</code></td></tr>
+<tr><td>auc_sr, ensemble-mean</td><td class="size">0.680</td><td class="sym">pilot json L45</td></tr>
+<tr><td>auc_sr 95% CI, ensemble-mean</td><td class="size">0.412&ndash;0.904</td><td class="sym">pilot json L46&ndash;49</td></tr>
+<tr><td>auc_sr, ensemble-min (WCO)</td><td class="size">0.650</td><td class="sym">pilot json L62</td></tr>
+<tr><td>auc_sr, ensemble-uwo</td><td class="size">0.660</td><td class="sym">pilot json L79</td></tr>
+<tr><td>auc_sr, glm-solo</td><td class="size">0.680</td><td class="sym">pilot json L96</td></tr>
+<tr><td>auc_sr, dsk-solo</td><td class="size">0.620</td><td class="sym">pilot json L113</td></tr>
+<tr><td>auc_sr, verifier reward (baseline)</td><td class="size">0.430</td><td class="sym">pilot json L130</td></tr>
+<tr><td>Kendall tau, reward baseline</td><td class="size">&minus;0.1087</td><td class="sym">pilot json L135</td></tr>
+<tr><td>Kendall tau, ensemble-mean</td><td class="size">0.2668</td><td class="sym">pilot json L50</td></tr>
+<tr><td>Contrast tasks in the pilot</td><td class="size">1</td><td class="sym">pilot json L53</td></tr>
+<tr><td>Within-task pairs</td><td class="size">2</td><td class="sym">pilot json L54 &mdash; underpowered</td></tr>
+<tr><td>Sabotage control</td><td class="size">null</td><td class="sym">pilot json L188 &mdash; no pilot sabotage</td></tr>
+<tr><td>LLM cost recorded in the pilot</td><td class="size">empty</td><td class="sym">pilot json L189, <code>usage_and_cost</code></td></tr>
+</tbody>
+</table>
+
+<h3>Sabotage control and the survived state (52 rows)</h3>
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Instances in the state file</td><td class="size">52</td><td class="sym">E3_designA_state.json, <code>instances</code> count &mdash; my computation</td></tr>
+<tr><td>Sabotaged rows recorded</td><td class="size">10</td><td class="sym">E3_designA_state.json L12913, <code>sabotage</code></td></tr>
+<tr><td>Rows whose ensemble-mean fell</td><td class="size">7 of 10</td><td class="sym">E3_designA_state.json L12913&ndash;13183 &mdash; my computation</td></tr>
+<tr><td>Rows with an unchanged mean</td><td class="size">3 of 10</td><td class="sym">modes <code>truncate_main</code> (2) and <code>garbage</code> (1)</td></tr>
+<tr><td>Sabotage verdict in salvaged json</td><td class="size">10 / 10 PASS</td><td class="sym">E3_designA-salvaged_20260921.json L24, L26</td></tr>
+<tr><td>auc_sr, mean over 52 rows</td><td class="size">0.671</td><td class="sym">salvaged json L46; reproduced by my computation</td></tr>
+<tr><td>auc_sr, min over 52 rows</td><td class="size">0.681</td><td class="sym">salvaged json L54; reproduced by my computation</td></tr>
+<tr><td>auc_sr, glm-solo over 52 rows</td><td class="size">0.652</td><td class="sym">salvaged json L30; reproduced by my computation</td></tr>
+<tr><td>within-task credit over 52 rows</td><td class="size">0.286</td><td class="sym">salvaged json L50, 7 pairs</td></tr>
+</tbody>
+</table>
+<p class="note flag">Mismatch: the salvaged file states the sabotage control passed 10 of 10 (<code>passed: 10</code>, L24&ndash;26), but the ten recorded rows hold only 7 rows where every aggregation is strictly lower than the original (my computation over <code>sabotage[*].lower</code>). Which rule the salvaged <code>passed</code> field used is unknown; the per-row booleans are the evidence.</p>
+<p class="note">Amber: the same 10 sabotage rows show two <code>truncate_main</code> picks and one <code>garbage</code> pick whose score did not move, because the original was already at the floor (<code>mean</code> 0.2125, 0.174, 0.125).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>pilot json and salvaged json, 8 lines</summary><div class="dbody">
+<blockquote>"n_scored": 20,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code> &mdash; line 40, key <code>n_scored</code>. The pilot frame is 10 SR-true + 10 SR-false (<code>sampling_frame.pilot</code>, L12).</p>
+<blockquote>"auc_sr": 0.68,
+ "auc_sr_ci95": [
+  0.412,
+  0.9041
+ ],
+ "tau_all": 0.2668,
+ "tau_top_quartile": 0.3381,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code> &mdash; lines 45&ndash;51, variant <code>ensemble-mean</code>.</p>
+<blockquote>"auc_sr": 0.43,
+ "auc_sr_ci95": [
+  0.1648,
+  0.6823
+ ],
+ "tau_all": -0.1087,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code> &mdash; lines 130&ndash;135, variant <code>verifier-reward (baseline)</code>.</p>
+<blockquote>"sabotage": null,
+ "usage_and_cost": {},</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code> &mdash; lines 188&ndash;189. The pilot ran no sabotage row and logged no cost.</p>
+<blockquote>"status": "SALVAGED \u2014 agent terminated before final report; metrics computed by orchestrator from E3_designA_state.json",</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-salvaged_20260921.json</code> &mdash; line 5, key <code>status</code>.</p>
+<blockquote>"passed": 10,
+ "total": 10,
+ "verdict": "PASS"</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-salvaged_20260921.json</code> &mdash; lines 24&ndash;26, key <code>sabotage</code>. See the amber flag above: the recorded rows show 7 of 10 falling.</p>
+<blockquote>"verdict": "INCONCLUSIVE in current form: ensemble scores (min 0.681, mean 0.671, uwo 0.668) sit in the pilot's range and do not clearly beat the cheap baselines (E1 uniform 0.648, E5-L3 0.753). Sabotage-proof."</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-salvaged_20260921.json</code> &mdash; line 70, truncated at 210 characters.</p>
+<blockquote>"MODEL CONSTRAINT VIOLATED: judge A was openrouter/z-ai/glm-5.3 (operator constraint was cheap flash-only: qwen3.7-flash + deepseek-v4.1-flash)."</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-salvaged_20260921.json</code> &mdash; line 10, key <code>caveats[2]</code>; the line continues, quoted here up to the first sentence. This caveat is why <a href="exp_e3_run2.html">e3_run2.py</a> exists.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e3_run.py</code> (all 503 lines), <code class="path">experiments_verifiers/harness/e3_common.py</code> (imported constants and helpers), <code class="path">experiments_verifiers/harness/e3_run2.py</code> (import sites, <code>SEED</code> family, budget gate), <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code> (all 491 lines), <code class="path">results/E3_designA-salvaged_20260921.json</code> (all 75 lines), <code class="path">results/E3_designA_state.json</code> (<code>instances</code> count; <code>sabotage</code> L12913&ndash;13183), <code class="path">experiments_verifiers/README.md</code> (E3 row: SPOCK, "died mid-run and was salvaged"), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (&sect;2 constitution, &sect;5 statistical norms: cluster bootstrap CIs, sabotage controls, "my computation" labels), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <code class="path">data_experiments.html</code> and <a href="exp_index.html">exp_index.html</a> for the experiment series. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; secrets, never opened. <code class="path">experiments_verifiers/scorers/llm_judge_ensemble.py</code> &mdash; read only for the imported names; its prompt text belongs to the e3_common and e3_run2 pages. <code class="path">experiments_verifiers/results/*</code> of other experiment ids (E1, E2, E4, E5, E8, E9, E16) &mdash; other pages own them. <code class="path">experiments_verifiers/results/E3_designA_20260921.json</code> &mdash; does not exist; the <code>report</code> stage that would write it never completed, so no full-frame metrics exist. <code class="path">experiments_verifiers/EXPERIMENTS.md</code> &mdash; has no per-experiment E3 section. <code class="path">workspace_artefacts/snapshots/*</code> and <code class="path">results/_e3_sabotage/*</code> &mdash; counted (10 copies, 123 MB) but not opened, because the sabotage comparison is already recorded in the state file. No experiment, application or pytest run, by the build rules.</p>
+<p>experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

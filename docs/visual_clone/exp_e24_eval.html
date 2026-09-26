@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_eval - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e24_eval">
+<div class="wrap">
+
+<h1 class="hud">e24_eval &mdash; Phase 3, confirmatory evaluation</h1>
+<p class="intro">Does an execution-grounded score rank generations better than artifact inspection? This script reads the E24 ledgers once, composes one score per generation, and runs the same pairs-correct and M2 readouts as E15, E18 and E19. It writes the results JSON and the results markdown.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram &mdash; inputs, readouts, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 560" role="img" aria-label="e24_eval inputs, stages and artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bQ">
+    <title>The confirmatory question of E24, tested once here</title>
+    <rect x="270" y="10" width="200" height="40" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="370" y="27" text-anchor="middle">Question: does execution rank?</text>
+    <text class="box-sub" x="370" y="42" text-anchor="middle">tested once, labels read here</text>
+  </g>
+
+  <a class="box" id="bLedgers" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>Reexec and holdout ledgers supply one row per generation</title>
+    <rect x="20" y="90" width="180" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="110" y="112" text-anchor="middle">reexec + holdout ledgers</text>
+    <text class="box-sub" x="110" y="128" text-anchor="middle">155 and 53 rows</text>
+  </a>
+
+  <a class="box" id="bGates" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>Gates JSON names the groups that admit component 2</title>
+    <rect x="20" y="175" width="180" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="110" y="197" text-anchor="middle">gates JSON</text>
+    <text class="box-sub" x="110" y="213" text-anchor="middle">5 admissible groups</text>
+  </a>
+
+  <a class="box" id="bE19" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>The cached E19 table supplies the e15, e18, e19 and uniform arms</title>
+    <rect x="20" y="260" width="180" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="110" y="282" text-anchor="middle">E19_hybrid_bt JSON</text>
+    <text class="box-sub" x="110" y="298" text-anchor="middle">e15, e18, e19 arms</text>
+  </a>
+
+  <a class="box" id="bLoad" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>e24_eval.load_tables L45 builds groups_data and gen_rows</title>
+    <rect x="250" y="90" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="112" text-anchor="middle">load_tables</text>
+    <text class="box-sub" x="350" y="128" text-anchor="middle">19 groups, 148 gen rows</text>
+  </a>
+
+  <a class="box" id="bPair" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>e24_eval.pairfn_e24 L105 and REEXEC_MAP L42 give one score per generation</title>
+    <rect x="250" y="185" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="207" text-anchor="middle">pairfn_e24 &middot; REEXEC_MAP</text>
+    <text class="box-sub" x="350" y="223" text-anchor="middle">holdout else reexec status</text>
+  </a>
+
+  <a class="box" id="bPC" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>main L153 calls E15E.pairs_correct and E15E.cluster_boot on 9 contrast groups</title>
+    <rect x="250" y="280" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="302" text-anchor="middle">pairs_correct &middot; cluster_boot</text>
+    <text class="box-sub" x="350" y="318" text-anchor="middle">147 contrast gen-pairs</text>
+  </a>
+
+  <a class="box" id="bM2" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>main L153 also runs the E9-style M2 replay with E15E.argmax_ship</title>
+    <rect x="250" y="375" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="397" text-anchor="middle">M2 replay</text>
+    <text class="box-sub" x="350" y="413" text-anchor="middle">argmax ship, read SR</text>
+  </a>
+
+  <a class="box" id="bEns" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>e24_eval.zscore_within L143 builds the zsum and UWO sensitivity arms</title>
+    <rect x="250" y="470" width="200" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="492" text-anchor="middle">zscore_within</text>
+    <text class="box-sub" x="350" y="508" text-anchor="middle">E24 + E19 z-sum, UWO</text>
+  </a>
+
+  <a class="box" id="bOut" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>E24_reexec_holdout JSON is the data of record</title>
+    <rect x="600" y="280" width="250" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="725" y="302" text-anchor="middle">E24_reexec_holdout.json</text>
+    <text class="box-sub" x="725" y="318" text-anchor="middle">readouts a-h, gaps, cost</text>
+  </a>
+
+  <a class="box" id="bMd" href="../../experiments_verifiers/harness/e24_eval.py">
+    <title>e24_eval._write_md L509 renders the results markdown</title>
+    <rect x="600" y="375" width="250" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="725" y="397" text-anchor="middle">E24_reexec_holdout.md</text>
+    <text class="box-sub" x="725" y="413" text-anchor="middle">TL;DR + tables</text>
+  </a>
+
+  <path class="edge" data-from="bQ" data-to="bLoad" d="M370,50 V90" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="378" y="74" text-anchor="start">tests</text>
+
+  <path class="edge dashed-edge" data-from="bLedgers" data-to="bLoad" d="M200,117 H250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="225" y="110" text-anchor="middle">per-gen rows</text>
+
+  <path class="edge dashed-edge" data-from="bGates" data-to="bPair" d="M200,202 H225 V212 H250" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="205" y="180" text-anchor="start">C2 group list</text>
+
+  <path class="edge dashed-edge" data-from="bE19" data-to="bPair" d="M200,287 H250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="225" y="280" text-anchor="middle">arm values</text>
+
+  <path class="edge" data-from="bLoad" data-to="bPair" d="M350,144 V185" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="358" y="168" text-anchor="start">groups_data</text>
+
+  <path class="edge" data-from="bPair" data-to="bPC" d="M350,239 V280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="358" y="264" text-anchor="start">one score each</text>
+
+  <path class="edge" data-from="bPC" data-to="bM2" d="M350,334 V375" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="358" y="358" text-anchor="start">+ ties broken</text>
+
+  <path class="edge" data-from="bM2" data-to="bEns" d="M350,429 V470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="358" y="454" text-anchor="start">z per group</text>
+
+  <path class="edge" data-from="bPC" data-to="bOut" d="M450,307 H600" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="525" y="300" text-anchor="middle">pooled, CI95</text>
+
+  <path class="edge" data-from="bEns" data-to="bMd" d="M450,497 H570 V402 H600" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="470" text-anchor="end">zsum, uwo</text>
+
+  <text class="box-sub" x="20" y="550">11 boxes | solid = call | dashed = reads/writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. The 147 contrast gen-pairs, the cluster bootstrap and the M2 replay come from <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code>; this script only supplies the E24 score and the runtime tie-break. Entry script <code class="path">experiments_verifiers/harness/e24_eval.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e24_eval.py">experiments_verifiers/harness/e24_eval.py</a></h4>
+<p class="role">Phase 3: composes one E24 score per generation, runs pairs-correct, M2 replay, independence, ensembles and cost readouts, and writes the results pair.</p>
+<p class="meta">634 lines &middot; 13 functions &middot; entry: <code>main()</code> (L153) &middot; CLI arguments: none</p>
+<details><summary>signatures, score composition, imports</summary><div class="dbody">
+<pre>load_tables() -&gt; tuple[list[dict], dict]      # L45   groups_data, gen_rows
+pairfn_e24(gd, a, b)                           # L105  holdout score, runtime tie-break
+mk_arm(name)                                   # L120
+sc_rew(gd, u)                                  # L126  recorded reward arm
+sc_uni(gd, u)                                  # L130  uniform arm
+pairfn(scorer)                                 # L134
+zscore_within(gd, name) -&gt; dict                # L143
+main()                                         # L153
+_fmt(x, nd=3)                                  # L505
+_write_md(out)                                 # L509</pre>
+<p>No argparse: the module is run with <code>uv run python experiments_verifiers/harness/e24_eval.py</code> (docstring usage line) and <code>if __name__ == "__main__": main()</code> (L633).</p>
+<p>Score composition (docstring L1&ndash;24, <code>REEXEC_MAP</code> L42): primary = holdout score where the group is admissible; fallback = <code>clean_recover 1.0</code>, <code>divergent 0.5</code>, everything else <code>0.0</code>. Equal scores fall back to the shorter Phase-1 runtime, then to 0.5 credit (<code>pairfn_e24</code> L105&ndash;118).</p>
+<p>Imports: <code>e15_bt_eval as E15E</code> (L36) for <code>pairs_correct</code>, <code>cluster_boot</code>, <code>paired_boot_diff</code>, <code>argmax_ship</code>; <code>e24_common as C</code> (L37). Duplicated files it reads: <code>E19_JSON</code> (L39), <code>DUEL_JSON</code> (L40).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th>Symbol</th></tr></thead>
+<tbody>
+<tr><td>Reexec + holdout ledgers</td><td>Per-generation scores</td><td class="sym">results/_e24_reexec_ledger_2026-09-24.jsonl</td><td class="sym">e24_eval.py::load_tables (L45)</td></tr>
+<tr><td>Gate table</td><td>Admissible group set</td><td class="sym">results/_e24_gates_2026-09-24.json</td><td class="sym">::load_tables (L45)</td></tr>
+<tr><td>E19 table (cached arms)</td><td>e15, e18, e19 values</td><td class="sym">results/E19_hybrid_bt_2026-09-23.json</td><td class="sym">::load_tables (L45)</td></tr>
+<tr><td>Determinism ledger</td><td><code>det</code> key per group</td><td class="sym">results/_e24_reexec_det_2026-09-24.jsonl</td><td class="sym">::load_tables (L45)</td></tr>
+<tr><td>Gradient duel JSON</td><td>Duel summary block</td><td class="sym">results/E24_gradient_duel_2026-09-24.json</td><td class="sym">::main (L153), <code>DUEL_JSON</code> L40</td></tr>
+<tr><td>All of the above</td><td>Readouts a&ndash;h, gaps, cost</td><td class="sym">results/E24_reexec_holdout_2026-09-24.json</td><td class="sym">::main (L153)</td></tr>
+<tr><td>The same dict</td><td>Results markdown</td><td class="sym">results/E24_reexec_holdout_2026-09-24.md</td><td class="sym">::_write_md (L509)</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the readouts need E19's cached table (<code>e19_tbl[gid][u]</code>, L51&ndash;52) and the E15 helper module; this page reads only that the code needs them, not their internals.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; within-task pairs-correct, pooled per arm</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 820 330" role="img" aria-label="Bar chart of pairs-correct pooled per arm">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <line x1="50" y1="260" x2="800" y2="260" stroke="#1B4B6B" stroke-width="1.25"/>
+  <line x1="50" y1="260" x2="50" y2="40" stroke="#1B4B6B" stroke-width="1.25"/>
+  <text class="box-sub" x="50" y="32" text-anchor="start">pooled pairs-correct (0 to 1)</text>
+  <text class="box-sub" x="10" y="265" text-anchor="start">0.0</text>
+
+  <rect x="60" y="134.1" width="70" height="125.9" fill="rgba(125,249,199,0.22)" stroke="#7DF9C7"/>
+  <text class="box-label" x="95" y="124" text-anchor="middle">0.6293</text>
+  <text class="box-sub" x="95" y="278" text-anchor="middle">E24</text>
+
+  <rect x="190" y="126.7" width="70" height="133.3" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="225" y="117" text-anchor="middle">0.6667</text>
+  <text class="box-sub" x="225" y="278" text-anchor="middle">E19</text>
+
+  <rect x="320" y="131.4" width="70" height="128.6" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="355" y="121" text-anchor="middle">0.6429</text>
+  <text class="box-sub" x="355" y="278" text-anchor="middle">E15</text>
+
+  <rect x="450" y="164.1" width="70" height="95.9" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="485" y="154" text-anchor="middle">0.4796</text>
+  <text class="box-sub" x="485" y="278" text-anchor="middle">E18</text>
+
+  <rect x="580" y="148.4" width="70" height="111.6" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="615" y="138" text-anchor="middle">0.5578</text>
+  <text class="box-sub" x="615" y="278" text-anchor="middle">reward</text>
+
+  <rect x="710" y="132.5" width="70" height="127.5" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="745" y="122" text-anchor="middle">0.6375</text>
+  <text class="box-sub" x="745" y="278" text-anchor="middle">uniform</text>
+
+  <text class="box-sub" x="60" y="312" text-anchor="start">bar height 200 px at 1.0; uniform has 80 pairs (E15 convention)</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; green bar = the E24 arm. Values from <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> lines 19&ndash;24; the same numbers are in the JSON under <code>readout_a_pairs_correct_contrast.arms</code> (first <code>pooled</code> at L2954).</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>E24 pooled pairs-correct</td><td class="size">0.6293, CI95 [0.5405, 0.7090]</td><td class="sym">E24_reexec_holdout_2026-09-24.md L19</td></tr>
+<tr><td>E19 pooled</td><td class="size">0.6667</td><td class="sym">same file L20</td></tr>
+<tr><td>E15 pooled</td><td class="size">0.6429</td><td class="sym">same file L21</td></tr>
+<tr><td>E18 pooled</td><td class="size">0.4796</td><td class="sym">same file L22</td></tr>
+<tr><td>recorded reward pooled</td><td class="size">0.5578</td><td class="sym">same file L23</td></tr>
+<tr><td>uniform pooled</td><td class="size">0.6375 (80 pairs)</td><td class="sym">same file L24</td></tr>
+<tr><td>E24 minus E18</td><td class="size">+0.1351 [+0.0778, +0.2065]</td><td class="sym">same file L29</td></tr>
+<tr><td>E24 minus E19</td><td class="size">-0.0468 [-0.1875, +0.1360]</td><td class="sym">same file L27</td></tr>
+<tr><td>pairs the holdout metric decided</td><td class="size">123 of 147</td><td class="sym">same file L33, key <code>holdout_decided</code></td></tr>
+<tr><td>pairs decided by runtime tie-break</td><td class="size">39 of 147</td><td class="sym">same file L33, key <code>runtime_tiebreak</code></td></tr>
+<tr><td>M2 SR shipped, E24</td><td class="size">9 of 19</td><td class="sym">same file L39</td></tr>
+<tr><td>M2 SR shipped, oracle</td><td class="size">12 of 19</td><td class="sym">same file L45</td></tr>
+<tr><td>independence vs E19 (mean rho)</td><td class="size">-0.013</td><td class="sym">same file L49</td></tr>
+<tr><td>F4 strict (crash, timeout, divergent)</td><td class="size">43 of 148 = 0.2905</td><td class="sym">E24_reexec_holdout_2026-09-24.json L2780&ndash;2781</td></tr>
+<tr><td>zsum sensitivity arm</td><td class="size">0.6497 [0.4262, 0.8563]</td><td class="sym">E24_reexec_holdout_2026-09-24.md L90</td></tr>
+<tr><td>UWO sensitivity arm</td><td class="size">0.5510 [0.3910, 0.7076]</td><td class="sym">same file L91</td></tr>
+<tr><td>E24 gradient relevance vs gold</td><td class="size">0.298 (lowest of five)</td><td class="sym">E24_gradient_duel_2026-09-24.md L7</td></tr>
+<tr><td>E24 gradient hallucination rate</td><td class="size">0.106 (lowest of five)</td><td class="sym">same file L7</td></tr>
+<tr><td>total LLM spend</td><td class="size">$0.2425 of $8.00 cap</td><td class="sym">E24_reexec_holdout_2026-09-24.md L95</td></tr>
+</tbody>
+</table>
+<p class="sub">Counted, not interpreted: the report states 9 contrast groups and calls every CI underpowered by construction (L100).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>four TL;DR answers and the pairs-correct table (click to expand; typographic dashes are written as "-")</summary><div class="dbody">
+<blockquote>**(1) F4 incidence (do frozen workspaces survive clean re-execution?): 29.0% strict** (43/148 crash/timeout/divergent; 51 incl. no-entry-script).</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code>, line 7.</p>
+<blockquote>**(2) Does verifier-owned generalization rank within-task better than artifact inspection? NO (underpowered to prove either way; point estimate BELOW both references).** ...</blockquote>
+<p>Path: same file, line 9 (opening of the line, <code>...</code> marks the numbers I left out).</p>
+<blockquote>**(3) Independent channel? YES - near-zero rank correlation with every artifact-inspection channel:** per-group Spearman vs E19 -0.013 (mean), vs E15 -0.102, vs reward 0.001.</blockquote>
+<p>Path: same file, line 11.</p>
+<blockquote>**(4) Does its measured-facts gradient judge best? Most FAITHFUL, least gold-relevant.** E24 relevance 0.298 - LOWEST of the five ... but hallucination 0.106 is the LOWEST by far</blockquote>
+<p>Path: same file, line 13 (<code>...</code> marks text I left out).</p>
+<blockquote>| e24 | 0.6293 | [0.5405,0.7090] | 147 | 0.265 |</blockquote>
+<p>Path: same file, line 19 (header row at L17).</p>
+<blockquote>Paired cluster-bootstrap diffs (95% CI): - e24_minus_e19: -0.0468 [-0.1875,+0.1360]</blockquote>
+<p>Path: same file, lines 26&ndash;27.</p>
+<blockquote>Pair decision composition: {'holdout_decided': 123, 'runtime_tiebreak': 39, 'reexec_decided': 24}</blockquote>
+<p>Path: same file, line 33.</p>
+<blockquote>- RUN RESUMPTION DISCLOSURE: the original agent died (credit/rate-limit) during final assembly; every phase (0-4) had already completed on disk in resumable ledgers; this assembly re-ran ONLY the offline evaluation stage</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code>, line 102.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_eval.py</code> (all 634 lines), <code class="path">experiments_verifiers/harness/e24_common.py</code> (constants and ledger paths), <code class="path">experiments_verifiers/results/E24_reexec_holdout_2026-09-24.md</code> (109 lines), <code class="path">results/E24_reexec_holdout_2026-09-24.json</code> (6 306 lines, keys quoted on this page), <code class="path">results/E24_gradient_duel_2026-09-24.md</code> (28 lines), <code class="path">results/E24_gradient_duel_2026-09-24.json</code> (keys <code>stats</code> and <code>sides</code> only), <code class="path">results/_e24_gates_2026-09-24.json</code>, <code class="path">results/_e24_holdout_ledger_2026-09-24.jsonl</code>, <code class="path">results/_e24_reexec_ledger_2026-09-24.jsonl</code>, <code class="path">results/_e24_reexec_det_2026-09-24.jsonl</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> and <code>.env</code> (never opened). Skipped <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> internals: this page cites the four functions <code>e24_eval.py</code> imports, and the helper belongs to the E15 pages. Skipped <code class="path">results/E24_bt_gradients/</code> (148 gradient text files, 592K) and <code class="path">results/E19_hybrid_bt_2026-09-23.json</code> (144 KB): both are read by the script, but their contents belong to <a href="exp_e24_gradient_duel.html">exp_e24_gradient_duel.html</a> and the E19 pages. Skipped <code class="path">results/_e24_venv/</code> (2.8 GB). Not run: the script (rule: cheap reads only).</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>__init__.py (sources/core) - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/core > __init__.py">
+<div class="wrap">
+
+<h1 class="hud">__init__.py</h1>
+<p class="intro">Package marker for <code class="path">sources/core/</code>: 14 <code>from .module import ...</code> statements (lines 9&ndash;34) publish 30 names, listed again in <code>__all__</code> (lines 36&ndash;77). The file holds no function and no class, so importing it loads the 14 submodules and binds their names. See <a href="area_sources_core.html">area_sources_core.html</a> for the folder.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what this file does: import in, 30 names out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 380" role="img" aria-label="sources/core/__init__.py re-export graph">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="i0">
+    <title>the caller statement that runs this file</title>
+    <rect x="20" y="156" width="140" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="90" y="180" text-anchor="middle">import sources.core</text>
+    <text class="box-sub" x="90" y="196" text-anchor="middle">Python runs __init__.py</text>
+  </g>
+
+  <a class="box" id="m1" href="../../sources/core/__init__.py">
+    <title>line 9 llm_provider and line 10 schema</title>
+    <rect x="200" y="16" width="230" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="315" y="40" text-anchor="middle">llm_provider + schema</text>
+    <text class="box-sub" x="315" y="58" text-anchor="middle">L9 LLMConfig, LLMProvider</text>
+    <text class="box-sub" x="315" y="74" text-anchor="middle">L10 Task, Plan, TaskStatus, 7 names</text>
+  </a>
+
+  <a class="box" id="m2" href="../../sources/core/__init__.py">
+    <title>lines 19-24 workflow info, orchestrator, planner, three factories</title>
+    <rect x="200" y="106" width="230" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="315" y="130" text-anchor="middle">orchestrator, factories</text>
+    <text class="box-sub" x="315" y="148" text-anchor="middle">L19-L21 WorkflowInfo + orchestrator</text>
+    <text class="box-sub" x="315" y="164" text-anchor="middle">L22-L24 Factory + 2 subclasses</text>
+  </a>
+
+  <a class="box" id="m3" href="../../sources/core/__init__.py">
+    <title>lines 25-28 runner, selection, tools</title>
+    <rect x="200" y="196" width="230" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="315" y="220" text-anchor="middle">runner, selection, tools</text>
+    <text class="box-sub" x="315" y="238" text-anchor="middle">L25-L26 runner, selector</text>
+    <text class="box-sub" x="315" y="254" text-anchor="middle">L27-L28 tools, selection</text>
+  </a>
+
+  <a class="box" id="m4" href="../../sources/core/__init__.py">
+    <title>lines 33-34 the two engines</title>
+    <rect x="200" y="286" width="230" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="315" y="310" text-anchor="middle">evolution + variation</text>
+    <text class="box-sub" x="315" y="328" text-anchor="middle">L33 EvolutionEngine</text>
+    <text class="box-sub" x="315" y="344" text-anchor="middle">L34 VariationEngine</text>
+  </a>
+
+  <a class="box" id="ns" href="../../sources/core/__init__.py">
+    <title>the module object with 30 bound attributes</title>
+    <rect x="500" y="150" width="180" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590" y="174" text-anchor="middle">sources.core</text>
+    <text class="box-sub" x="590" y="192" text-anchor="middle">module object</text>
+    <text class="box-sub" x="590" y="208" text-anchor="middle">30 bound attributes</text>
+  </a>
+
+  <a class="box" id="al" href="../../sources/core/__init__.py">
+    <title>__all__ assignment, lines 36-77</title>
+    <rect x="740" y="150" width="180" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="830" y="174" text-anchor="middle">__all__</text>
+    <text class="box-sub" x="830" y="192" text-anchor="middle">L36-L77, 30 strings</text>
+    <text class="box-sub" x="830" y="208" text-anchor="middle">same set as the imports</text>
+  </a>
+
+  <path class="edge" data-from="i0" data-to="m1" d="M160,184 L175,184 V51 H200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="184" y="120" text-anchor="start">executes</text>
+  <path class="edge dotted-edge" data-from="m1" data-to="ns" d="M430,51 H465 V185 H500" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge dotted-edge" data-from="m2" data-to="ns" d="M430,141 H465 V185 H500" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge dotted-edge" data-from="m3" data-to="ns" d="M430,231 H465 V185 H500" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge dotted-edge" data-from="m4" data-to="ns" d="M430,321 H465 V185 H500" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="452" y="132" text-anchor="middle">binds 4 groups</text>
+  <path class="edge" data-from="ns" data-to="al" d="M680,185 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="710" y="177" text-anchor="middle">names listed again</text>
+
+  <text class="box-sub" x="20" y="252">read order is top to bottom: L9, L10, L19, L20, L21, L22, L23, L24, L25, L26, L27, L28, L33, L34, then __all__ at L36.</text>
+  <text class="box-sub" x="20" y="272">0 functions, 0 classes in the file (ast.parse of the 77 lines).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>7 boxes</code>. Dotted arrows = import binding, solid = execution order. Names and line numbers are exact: <code>sources/core/__init__.py:9</code>, <code>:10</code>, <code>:19-24</code>, <code>:25-28</code>, <code>:33-34</code>, <code>:36-77</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: nothing read from disk, one module object out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="data flow of the package import">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="dIn">
+    <title>caller statement, argument of the import</title>
+    <rect x="20" y="60" width="200" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="84" text-anchor="middle">caller import line</text>
+    <text class="box-sub" x="120" y="102" text-anchor="middle">from sources.core import X</text>
+    <text class="box-sub" x="120" y="118" text-anchor="middle">or import sources.core</text>
+  </g>
+
+  <a class="box" id="dRun" href="../../sources/core/__init__.py">
+    <title>the file body runs once</title>
+    <rect x="270" y="60" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="84" text-anchor="middle">__init__.py body</text>
+    <text class="box-sub" x="370" y="102" text-anchor="middle">L9-L34 imports, L36-L77 assign</text>
+    <text class="box-sub" x="370" y="118" text-anchor="middle">cached in sys.modules after</text>
+  </a>
+
+  <g class="box" id="dOut">
+    <title>the returned value of the import</title>
+    <rect x="520" y="60" width="200" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="620" y="84" text-anchor="middle">module object</text>
+    <text class="box-sub" x="620" y="102" text-anchor="middle">sources.core</text>
+    <text class="box-sub" x="620" y="118" text-anchor="middle">30 names bound</text>
+  </g>
+
+  <g class="box" id="dDeps">
+    <title>side effect: the submodule import chain</title>
+    <rect x="520" y="200" width="200" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="620" y="224" text-anchor="middle">transitive imports</text>
+    <text class="box-sub" x="620" y="242" text-anchor="middle">litellm (llm_provider.py:10)</text>
+    <text class="box-sub" x="620" y="258" text-anchor="middle">numpy (genotype_embedding.py:31)</text>
+  </g>
+
+  <g class="box" id="dKeys">
+    <title>what the module itself never touches</title>
+    <rect x="770" y="60" width="150" height="70" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="845" y="86" text-anchor="middle">not touched</text>
+    <text class="box-sub" x="845" y="104" text-anchor="middle">no config field</text>
+    <text class="box-sub" x="845" y="120" text-anchor="middle">no file read or write</text>
+  </g>
+
+  <path class="edge" data-from="dIn" data-to="dRun" d="M220,95 H270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="245" y="87" text-anchor="middle">executes once</text>
+  <path class="edge" data-from="dRun" data-to="dOut" d="M470,95 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="495" y="87" text-anchor="middle">returns module</text>
+  <path class="edge dashed-edge" data-from="dRun" data-to="dDeps" d="M370,130 V235 H520" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="430" y="200" text-anchor="middle">loads submodules</text>
+  <path class="edge dashed-edge" data-from="dOut" data-to="dKeys" d="M720,95 H770" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="745" y="87" text-anchor="middle">no data</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>5 boxes</code>. Dashed = reads or writes. Config fields read: <b>none</b>. Files read or written: <b>none</b>. State keys: <b>none</b>. Returned value: the <code>sources.core</code> module object. The one dashed out-edge is the submodule chain that Python loads as a side effect of the L9&ndash;L34 statements.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control logic: one straight execution, all-or-nothing</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="import order and failure rule">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="g0">
+    <title>start of the import</title>
+    <rect x="20" y="110" width="150" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="95" y="134" text-anchor="middle">import starts</text>
+    <text class="box-sub" x="95" y="150" text-anchor="middle">14 statements in order</text>
+  </g>
+
+  <g class="box" id="g1">
+    <title>decision inside each submodule import</title>
+    <rect x="220" y="110" width="180" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="310" y="134" text-anchor="middle">submodule import raises?</text>
+    <text class="box-sub" x="310" y="150" text-anchor="middle">no try/except in this file</text>
+  </g>
+
+  <g class="box" id="g2">
+    <title>failure outcome</title>
+    <rect x="230" y="20" width="170" height="56" rx="2" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="315" y="44" text-anchor="middle">ImportError raised</text>
+    <text class="box-sub" x="315" y="60" text-anchor="middle">package import fails</text>
+  </g>
+
+  <g class="box" id="g3">
+    <title>success outcome</title>
+    <rect x="450" y="110" width="180" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="540" y="134" text-anchor="middle">package importable</text>
+    <text class="box-sub" x="540" y="150" text-anchor="middle">30 names available</text>
+  </g>
+
+  <g class="box" id="g4">
+    <title>workaround used by tests</title>
+    <rect x="450" y="230" width="460" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="680" y="254" text-anchor="middle">tests avoid the heavy chain</text>
+    <text class="box-sub" x="680" y="270" text-anchor="middle">loader and stub package used by tests</text>
+  </g>
+
+  <g class="box" id="g5">
+    <title>the names that a caller sees</title>
+    <rect x="680" y="110" width="230" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="134" text-anchor="middle">caller binds the names</text>
+    <text class="box-sub" x="795" y="150" text-anchor="middle">only one test does this</text>
+  </g>
+
+  <path class="edge" data-from="g0" data-to="g1" d="M170,138 H220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="195" y="130" text-anchor="middle">per line</text>
+  <path class="edge" data-from="g1" data-to="g2" d="M310,110 V76" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="320" y="98" text-anchor="start">yes</text>
+  <path class="edge" data-from="g1" data-to="g3" d="M400,138 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="425" y="130" text-anchor="middle">no</text>
+  <path class="edge" data-from="g3" data-to="g5" d="M630,138 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="655" y="130" text-anchor="middle">re-exports</text>
+  <path class="edge dashed-edge" data-from="g2" data-to="g4" d="M320,76 L150,258 H450" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="240" y="250" text-anchor="middle">avoided by tests</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>6 boxes</code>. The file has no <code>if</code>, no loop, no retry: 14 unconditional imports then one assignment. The only decision is implicit &mdash; if any submodule import raises, line execution stops and the package is not importable; the tests keep that chain out of their run (comments at <code>tests/selection_test.py:16-19</code>, <code>tests/lineage_goal_filter_test.py:19</code>, <code>tests/archive_projection_test.py:4</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">import</td><td class="sym">llm_provider</td><td class="sym">L9</td><td>re-export LLMConfig, LLMProvider</td></tr>
+<tr><td class="sym">import</td><td class="sym">schema</td><td class="sym">L10</td><td>re-export Task, Plan, PlanStep, TaskStatus, TaskComplexity, SelectionLog, IndividualRun</td></tr>
+<tr><td class="sym">import</td><td class="sym">workflow_info</td><td class="sym">L19</td><td>re-export WorkflowInfo</td></tr>
+<tr><td class="sym">import</td><td class="sym">orchestrator</td><td class="sym">L20</td><td>re-export WorkflowOrchestrator</td></tr>
+<tr><td class="sym">import</td><td class="sym">planner</td><td class="sym">L21</td><td>re-export Planner, PlanValidationError, DependencyError</td></tr>
+<tr><td class="sym">import</td><td class="sym">factory</td><td class="sym">L22</td><td>re-export Factory</td></tr>
+<tr><td class="sym">import</td><td class="sym">workflow_factory</td><td class="sym">L23</td><td>re-export WorkflowFactory</td></tr>
+<tr><td class="sym">import</td><td class="sym">single_agent_factory</td><td class="sym">L24</td><td>re-export SingleAgentFactory</td></tr>
+<tr><td class="sym">import</td><td class="sym">workflow_runner</td><td class="sym">L25</td><td>re-export WorkflowRunner, ExecutionStatus, ExecutionResult, RuntimeConfig</td></tr>
+<tr><td class="sym">import</td><td class="sym">workflow_selection</td><td class="sym">L26</td><td>re-export WorkflowSelector</td></tr>
+<tr><td class="sym">import</td><td class="sym">tools_manager</td><td class="sym">L27</td><td>re-export Tool, MCP, ToolManager</td></tr>
+<tr><td class="sym">import</td><td class="sym">selection</td><td class="sym">L28</td><td>re-export SelectionPressure, SelectionStrategy, PopulationMember</td></tr>
+<tr><td class="sym">import</td><td class="sym">evolution_engine</td><td class="sym">L33</td><td>re-export EvolutionEngine</td></tr>
+<tr><td class="sym">import</td><td class="sym">variation_engine</td><td class="sym">L34</td><td>re-export VariationEngine</td></tr>
+<tr><td class="sym">constant</td><td class="sym">__all__</td><td class="sym">L36-L77</td><td>30 strings, same set as the imports</td></tr>
+<tr><td class="sym">config field</td><td class="sym">none read</td><td class="sym">&mdash;</td><td>the file never touches <code>Config</code></td></tr>
+<tr><td class="sym">file read</td><td class="sym">none</td><td class="sym">&mdash;</td><td>no <code>open()</code> in the file</td></tr>
+<tr><td class="sym">file written</td><td class="sym">none</td><td class="sym">&mdash;</td><td>no write call in the file</td></tr>
+<tr><td class="sym">value returned</td><td class="sym">module sources.core</td><td class="sym">import machinery</td><td>the package object the caller gets</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: one statement gives the whole core surface, and the same statement loads <code>litellm</code> through <code class="path">sources/core/llm_provider.py:10</code> and <code>numpy</code> through the <code>selection</code> &rarr; <code>code_features</code> &rarr; <code>genotype_embedding</code> chain.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<p class="sub">No class, no function, no module-level constant besides <code>__all__</code>. Everything the file defines is an import binding.</p>
+<details><summary>all 14 import statements and the __all__ list, in file order</summary><div class="dbody">
+<pre>"""Core sub-package for Mimosa-AI. ..."""                        # L1-L7  - docstring names the five areas
+
+from .llm_provider import LLMConfig, LLMProvider                # L9     - LLM access
+from .schema import (TaskStatus, TaskComplexity, SelectionLog,  # L10-L18 - run and plan records
+    IndividualRun, PlanStep, Plan, Task)
+from .workflow_info import WorkflowInfo                         # L19    - per-run metadata
+from .orchestrator import WorkflowOrchestrator                  # L20    - run entry point
+from .planner import Planner, PlanValidationError, DependencyError  # L21 - goal decomposition
+from .factory import Factory                                    # L22    - factory base
+from .workflow_factory import WorkflowFactory                   # L23    - multi-agent factory
+from .single_agent_factory import SingleAgentFactory            # L24    - single-agent factory
+from .workflow_runner import (WorkflowRunner, ExecutionStatus,  # L25    - sandboxed execution
+    ExecutionResult, RuntimeConfig)
+from .workflow_selection import WorkflowSelector                # L26    - parent selection facade
+from .tools_manager import Tool, MCP, ToolManager               # L27    - MCP discovery
+from .selection import (SelectionPressure, SelectionStrategy,   # L28-L32 - archive admission
+    PopulationMember)
+from .evolution_engine import EvolutionEngine                   # L33    - QD evolution loop
+from .variation_engine import VariationEngine                   # L34    - prompts and mutation
+
+__all__ = [ ... 30 strings ... ]                                # L36-L77 - public name list
+
+# counts (my computation: ast.parse over the 77 lines)
+import statements: 14      names imported: 30      names in __all__: 30
+imported - __all__ = empty set     __all__ - imported = empty set     duplicates: none
+FunctionDef: 0     AsyncFunctionDef: 0     ClassDef: 0</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym">no production importer found</td><td>no production file imports a name from the package root</td><td class="sym">grep -rn "from sources.core import" . (2026-10-02)</td></tr>
+<tr><td class="sym"><a href="../../main.py">main.py</a></td><td>imports the submodules directly: EvolutionEngine, Planner</td><td class="sym">lines 35-36, instantiated at 222</td></tr>
+<tr><td class="sym"><a href="../../sources/core/planner.py">sources/core/planner.py</a></td><td><code>from .evolution_engine import EvolutionEngine</code>, does not pass through the package root</td><td class="sym">lines 31, 79</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/csv_mode.py">sources/benchmark_evaluation/csv_mode.py</a></td><td>submodule import of EvolutionEngine and Planner</td><td class="sym">lines 31-32, 162</td></tr>
+<tr><td class="sym"><a href="../../webui/backend/mimosa_bridge.py">webui/backend/mimosa_bridge.py</a></td><td>lazy submodule imports inside functions</td><td class="sym">lines 185, 191</td></tr>
+<tr><td class="sym"><a href="../../tests/astra_exporter_test.py">tests/astra_exporter_test.py</a></td><td>the only package-root import in the repo; tests the ASTRA gate</td><td class="sym">line 558 (after <code>importorskip("litellm")</code> at 557)</td></tr>
+<tr><td class="sym"><a href="../../tests/selection_test.py">tests/selection_test.py</a></td><td>loads submodules with <code>importlib</code> to keep this file out of the path</td><td class="sym">lines 16-29</td></tr>
+<tr><td class="sym"><a href="../../tests/lineage_goal_filter_test.py">tests/lineage_goal_filter_test.py</a></td><td>imports <code>lineage</code> directly for the same reason</td><td class="sym">line 19 (comment)</td></tr>
+<tr><td class="sym"><a href="../../tests/archive_projection_test.py">tests/archive_projection_test.py</a></td><td>imports the renderer directly</td><td class="sym">line 4 (comment)</td></tr>
+<tr><td class="sym"><a href="../../tests/planner_json_extraction_test.py">tests/planner_json_extraction_test.py</a></td><td>installs a stub <code>sources.core</code> package before loading <code>planner</code></td><td class="sym">lines 8, 54, 59, 106</td></tr>
+</tbody>
+</table>
+<p class="note flag">Stale artefact: <code class="path">sources/core/__init__.py:74</code> still carries the comment <code># Darwin / evolution engine</code>, but no Darwin name is imported any more; <code class="path">tests/evaluator_test.py:19-26</code> records that <code>sources.core.dgm</code> / <code>DarwinMachine</code> were removed and skips collection.</p>
+<p class="note">The file is 77 lines: 7 of docstring (L1-L7), 14 import statements (L9-L34) and a 42-line <code>__all__</code> list holding 30 names (L36-L77). Removing the re-exports would leave every production import working, because no production module uses them.</p>
+</div>
+
+<footer>
+<p>Sources: <a href="../../sources/core/__init__.py">sources/core/__init__.py</a> (all 77 lines, read line by line), <a href="../../main.py">main.py</a> (L35-36, 222), <a href="../../sources/core/llm_provider.py">sources/core/llm_provider.py</a> (L10 top-level <code>import litellm</code>), <a href="../../sources/core/genotype_embedding.py">sources/core/genotype_embedding.py</a> (L31 <code>import numpy</code>, L60 lazy sentence_transformers), <a href="../../config.py">config.py</a> (path fields only, not needed by this file). Counts are my computation with <code>ast.parse</code> and <code>grep -rn --include=*.py -E "from sources\.core import" .</code> (virtualenvs excluded).</p>
+<p class="skips">Skipped: <code>docs/</code> prose about the core package (not evidence about the file); <code>sources/workflows/</code>, <code>sources/memory/</code>, <code>tmp/</code>, <code>run_notes/</code>, <code>runs_capsule/</code> (runtime data); every <code>.venv/</code> and <code>site-packages</code> hit of <code>from .core import</code> (unrelated library code); the module bodies of the 14 imported submodules (they own their own digest pages in this set). Their import behaviour is reported only as the transitive dependency in Diagram 2. No pytest run and no application run, by the build rules. Diagram 3 states that the file has no branch; the "decision" drawn is Python's import-failure rule, not an <code>if</code> in this file.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e9_deployment.py - file digest - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e9_deployment.py">
+<div class="wrap">
+
+<h1 class="hud">e9_deployment.py</h1>
+<p class="intro">This script replays deployment on the sane data written by <a href="file_harness_e8_blast_radius.html">e8_blast_radius.py</a>: it trains the learned claim-importance scorers L3 and L3b on the other campaigns, scores the <code>asb_full_iterative_1</code> generations, ships the top-scoring generation per task and checks its recorded SR. It compares that against the recorded-reward policy P0, three claims baselines, and within-campaign leave-one-task-out. It writes one JSON and one Markdown file; run it with <code>uv run python experiments_verifiers/harness/e9_deployment.py</code> (L17).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 480" role="img" aria-label="e9_deployment.py master diagram: sane inputs, main, loaders, features, fitting, scorer set-up, replay, diagnostics, digest, outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="b1">
+    <title>three frozen inputs read at L48, L64 and L84</title>
+    <rect x="16" y="40" width="210" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="121" y="64" text-anchor="middle">sane inputs</text>
+    <text class="box-sub" x="121" y="80" text-anchor="middle">verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="121" y="96" text-anchor="middle">manifest_sane.json, npz cache</text>
+  </g>
+
+  <a class="box" id="b2" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>main L201 loads, fits, replays, diagnoses and writes</title>
+    <rect x="256" y="40" width="180" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="346" y="64" text-anchor="middle">main</text>
+    <text class="box-sub" x="346" y="80" text-anchor="middle">L201</text>
+    <text class="box-sub" x="346" y="96" text-anchor="middle">one run, eight scorers</text>
+  </a>
+
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>the three loaders plus the manifest row category</title>
+    <rect x="466" y="40" width="220" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="576" y="60" text-anchor="middle">load and index</text>
+    <text class="box-sub" x="576" y="76" text-anchor="middle">load_sane L46 &#183; manifest_index L63</text>
+    <text class="box-sub" x="576" y="92" text-anchor="middle">load_emb L83 &#183; mrow_cat L72</text>
+  </a>
+
+  <a class="box" id="b4" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>the two feature maps of the deployment experiment</title>
+    <rect x="716" y="40" width="230" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="831" y="60" text-anchor="middle">features</text>
+    <text class="box-sub" x="831" y="76" text-anchor="middle">l3_feats L90 &#183; 384 dims</text>
+    <text class="box-sub" x="831" y="92" text-anchor="middle">l3b_feats L98 &#183; 771 dims</text>
+  </a>
+
+  <a class="box" id="b5" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>select_C_inner L120 and fit_score L142 produce one score per generation</title>
+    <rect x="716" y="170" width="230" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="831" y="194" text-anchor="middle">fitting</text>
+    <text class="box-sub" x="831" y="212" text-anchor="middle">select_C_inner L120</text>
+    <text class="box-sub" x="831" y="228" text-anchor="middle">fit_score L142 &#183; zeros if one class</text>
+  </a>
+
+  <a class="box" id="b6" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>the scorer dictionary built inside main: cross-campaign, LOTO, baselines</title>
+    <rect x="466" y="170" width="220" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="576" y="194" text-anchor="middle">scorer set-up (in main)</text>
+    <text class="box-sub" x="576" y="212" text-anchor="middle">cross-campaign L250 &#183; LOTO L257</text>
+    <text class="box-sub" x="576" y="228" text-anchor="middle">baselines L271-L276</text>
+  </a>
+
+  <a class="box" id="b7" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>replay L159 ships one generation per task and counts the outcomes</title>
+    <rect x="196" y="170" width="240" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="316" y="194" text-anchor="middle">replay</text>
+    <text class="box-sub" x="316" y="212" text-anchor="middle">L159 &#183; argmax per task</text>
+    <text class="box-sub" x="316" y="228" text-anchor="middle">sr, ver, rank1, top3</text>
+  </a>
+
+  <a class="box" id="b8" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>the diagnostics computed after the replay: metrics, picked uuids, missed tasks</title>
+    <rect x="196" y="300" width="240" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="316" y="324" text-anchor="middle">diagnostics</text>
+    <text class="box-sub" x="316" y="342" text-anchor="middle">C.standard_metrics L343</text>
+    <text class="box-sub" x="316" y="358" text-anchor="middle">pick agreement L315 &#183; missed L346</text>
+  </a>
+
+  <a class="box" id="b9" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>write_md L455 renders the tables from the out dict</title>
+    <rect x="466" y="300" width="220" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="576" y="324" text-anchor="middle">write_md</text>
+    <text class="box-sub" x="576" y="342" text-anchor="middle">L455 &#183; nine scored rows</text>
+    <text class="box-sub" x="576" y="358" text-anchor="middle">gap-to-oracle list L526</text>
+  </a>
+
+  <g class="box" id="b10">
+    <title>JSON written at L448, Markdown at L553</title>
+    <rect x="716" y="300" width="230" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="831" y="324" text-anchor="middle">results/</text>
+    <text class="box-sub" x="831" y="342" text-anchor="middle">E9_l3_deployment_sane_&lt;date&gt;.json</text>
+    <text class="box-sub" x="831" y="358" text-anchor="middle">E9_l3_deployment_sane_&lt;date&gt;.md</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b2" d="M226,75 H256" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="241" y="32" text-anchor="middle">reads</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M436,75 H466" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="451" y="32" text-anchor="middle">loads</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M686,75 H716" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="701" y="32" text-anchor="middle">rows</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M831,110 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="841" y="142" text-anchor="start">feature fn</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M716,208 H686" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="701" y="200" text-anchor="middle">scores, C</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M466,208 H436" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="451" y="200" text-anchor="middle">score map</text>
+  <path class="edge" data-from="b7" data-to="b8" d="M316,246 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="326" y="278" text-anchor="start">per-task detail</text>
+  <path class="edge" data-from="b8" data-to="b9" d="M436,338 H466" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="451" y="330" text-anchor="middle">out dict</text>
+  <path class="edge dashed-edge" data-from="b9" data-to="b10" d="M686,338 H716" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="701" y="330" text-anchor="middle">writes .md</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. Cyan = work inside <code>e9_deployment.py</code>, dashed grey = a read path or a written file. Solid = call, dashed = read/write. <code>main</code> (L201) calls <code>load_sane</code> L203, <code>manifest_index</code> L204, <code>load_emb</code> L205, then <code>fit_score</code> from the two scorer loops (L251, L263), then <code>replay</code> three times (L284, L307), then its own diagnostics, then writes the JSON at L448 and calls <code>write_md</code> at L450. The two boxes labelled &ldquo;in main&rdquo; are the scorer dictionary and the diagnostic counts; they have no function of their own.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in and data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 320" role="img" aria-label="e9_deployment.py data flow: three sane inputs, constants, the out dict and two written files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="k1">
+    <title>rows with claims, read at L47-L48</title>
+    <rect x="16" y="24" width="260" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="146" y="46" text-anchor="middle">data/verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="146" y="62" text-anchor="middle">SR, VER, reward, claims, uuid</text>
+  </g>
+
+  <g class="box" id="k2">
+    <title>per-generation rows, read at L64</title>
+    <rect x="16" y="92" width="260" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="146" y="114" text-anchor="middle">data/manifest_sane.json</text>
+    <text class="box-sub" x="146" y="130" text-anchor="middle">carried, contaminated, recovered</text>
+  </g>
+
+  <g class="box" id="k3">
+    <title>claim embeddings, read at L84</title>
+    <rect x="16" y="160" width="260" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="146" y="182" text-anchor="middle">results/_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="146" y="198" text-anchor="middle">names, name_desc_emb</text>
+  </g>
+
+  <g class="box" id="k4">
+    <title>module constants L38-L40 fix the campaign and the score map</title>
+    <rect x="16" y="228" width="260" height="56" rx="2" fill="rgba(230,251,255,0.06)" stroke="#E6FBFF"/>
+    <text class="box-label" x="146" y="250" text-anchor="middle">module constants</text>
+    <text class="box-sub" x="146" y="266" text-anchor="middle">ASB L38, C_GRID L39, SCORE_MAP L40</text>
+  </g>
+
+  <a class="box" id="k5" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>main L201 returns the out dict at L452</title>
+    <rect x="360" y="110" width="180" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="140" text-anchor="middle">main L201</text>
+    <text class="box-sub" x="450" y="156" text-anchor="middle">population, strict_replay,</text>
+    <text class="box-sub" x="450" y="170" text-anchor="middle">diagnostics, gaps</text>
+  </a>
+
+  <g class="box" id="k6">
+    <title>written at L448 by main</title>
+    <rect x="650" y="60" width="254" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="777" y="84" text-anchor="middle">E9_l3_deployment_sane_&lt;date&gt;.json</text>
+    <text class="box-sub" x="777" y="100" text-anchor="middle">eight scorers + oracle, gaps</text>
+  </g>
+
+  <g class="box" id="k7">
+    <title>written at L553 by write_md</title>
+    <rect x="650" y="170" width="254" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="777" y="194" text-anchor="middle">E9_l3_deployment_sane_&lt;date&gt;.md</text>
+    <text class="box-sub" x="777" y="210" text-anchor="middle">selection table, misses, gaps</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="k1" data-to="k5" d="M276,52 H320 V125 H360" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="284" y="46" text-anchor="start">claims rows</text>
+  <path class="edge dashed-edge" data-from="k2" data-to="k5" d="M276,120 H360" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="318" y="112" text-anchor="middle">uuid_long</text>
+  <path class="edge dashed-edge" data-from="k3" data-to="k5" d="M276,188 H320 V155 H360" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="284" y="204" text-anchor="start">vectors</text>
+  <path class="edge" data-from="k4" data-to="k5" d="M276,256 H450 V190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="350" y="248" text-anchor="middle">ASB, C grid</text>
+  <path class="edge dashed-edge" data-from="k5" data-to="k6" d="M540,130 H600 V90 H650" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="598" y="72" text-anchor="middle">writes</text>
+  <path class="edge dashed-edge" data-from="k5" data-to="k7" d="M540,170 H600 V200 H650" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="598" y="232" text-anchor="middle">returns out</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>7 boxes</code>. Three read files, four module constants, one returned dict (L452) and two written files. <code>e5_common</code> is imported at L33 for <code>_auc</code>, <code>uniform_score</code>, <code>v0_reward</code> and <code>standard_metrics</code> (used at L274&ndash;276, L343). No config field and no environment variable is read.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the per-task ranking rule and its tie-break</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 400" role="img" aria-label="e9_deployment.py control: per-task ranking with a latest-first tie-break, the single-class guard, and the inclusive sensitivity run">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="m1">
+    <title>replay L164 walks the generations of one task</title>
+    <rect x="20" y="26" width="230" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="135" y="50" text-anchor="middle">candidates of one task</text>
+    <text class="box-sub" x="135" y="66" text-anchor="middle">cands_by_task L159</text>
+  </g>
+
+  <g class="box" id="m2">
+    <title>replay L168-L169 sorts twice: latest uuid_long, then score</title>
+    <rect x="310" y="26" width="280" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="46" text-anchor="middle">two-stage stable sort</text>
+    <text class="box-sub" x="450" y="64" text-anchor="middle">uuid_long desc L168, score desc L169</text>
+  </g>
+
+  <g class="box" id="m3">
+    <title>replay L170 ships ranked[0] and counts its SR</title>
+    <rect x="650" y="26" width="290" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="795" y="46" text-anchor="middle">winner = ranked[0]</text>
+    <text class="box-sub" x="795" y="64" text-anchor="middle">sr_shipped L174, ver_shipped L177</text>
+  </g>
+
+  <g class="box" id="m4">
+    <title>fit_score L147-L148 returns zeros when the train side holds one class</title>
+    <polygon points="330,120 570,166 330,212 90,166" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="330" y="156" text-anchor="middle">train side single-class?</text>
+    <text class="box-sub" x="330" y="172" text-anchor="middle">L147 &#183; returns zeros, C None</text>
+  </g>
+
+  <g class="box" id="m5">
+    <title>select_C_inner L130 skips folds with a single-class side</title>
+    <rect x="650" y="120" width="290" height="60" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="795" y="144" text-anchor="middle">fold skipped</text>
+    <text class="box-sub" x="795" y="162" text-anchor="middle">L130 &#183; fold_of = i % 4 L123</text>
+  </g>
+
+  <g class="box" id="m6">
+    <title>main L293-L310 adds the recovered rows to the reward and oracle runs only</title>
+    <polygon points="700,250 940,296 700,342 460,296" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700" y="288" text-anchor="middle">include recovered rows?</text>
+    <text class="box-sub" x="700" y="304" text-anchor="middle">reward P0 and oracle only, L293-L312</text>
+  </g>
+
+  <g class="box" id="m7">
+    <title>the strict universe stays at the claim-bearing generations</title>
+    <rect x="60" y="250" width="320" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="220" y="276" text-anchor="middle">strict replay</text>
+    <text class="box-sub" x="220" y="294" text-anchor="middle">strict_tasks L245 &#183; replay L284</text>
+    <text class="box-sub" x="220" y="310" text-anchor="middle">learned scorers cannot score recovered rows</text>
+    <text class="box-sub" x="220" y="326" text-anchor="middle">L293 note</text>
+  </g>
+
+  <path class="edge" data-from="m1" data-to="m2" d="M250,54 H310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="280" y="46" text-anchor="middle">scored</text>
+  <path class="edge" data-from="m2" data-to="m3" d="M590,54 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="620" y="46" text-anchor="middle">rank</text>
+  <path class="edge" data-from="m1" data-to="m4" d="M135,82 V240 H200 V200" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="146" y="112" text-anchor="start">fit on train</text>
+  <path class="edge" data-from="m4" data-to="m5" d="M570,166 H650" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="610" y="158" text-anchor="middle">yes</text>
+  <path class="edge" data-from="m5" data-to="m6" d="M795,180 V250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="805" y="216" text-anchor="start">sensitivity</text>
+  <path class="edge" data-from="m3" data-to="m7" d="M650,54 H630 V220 H220 V250" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="460" y="214" text-anchor="middle">eight scorers</text>
+  <path class="edge" data-from="m6" data-to="m7" d="M460,296 H380" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="420" y="288" text-anchor="middle">no</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>7 boxes</code>. The ranking rule is two sorts in a row: first by <code>order_key</code> = latest <code>uuid_long</code> (L168, defined L279), then by score (L169), so ties ship the latest generation. <code>fit_score</code> returns zeros when its train side holds one class (L147&ndash;148) and <code>select_C_inner</code> skips single-class folds (L130). The inclusive sensitivity (L293&ndash;312) adds the recovered rows but only reaches the reward baseline and the oracle, because recovered rows carry no claims.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>file read</td><td class="sym">data/verifier_claims_sane.jsonl</td><td>L47&ndash;48</td><td>claims, SR, VER, reward per generation</td></tr>
+<tr><td>file read</td><td class="sym">data/manifest_sane.json</td><td>L64</td><td>carried rows, uuid_long, recovered rows</td></tr>
+<tr><td>file read</td><td class="sym">results/_cache_e5_embeddings.npz</td><td>L84</td><td>claim name+desc vectors</td></tr>
+<tr><td>module</td><td class="sym">e5_common as C</td><td>import L33</td><td>_auc L134, uniform_score L274, v0_reward L276, standard_metrics L343</td></tr>
+<tr><td>constant</td><td class="sym">ASB</td><td>L38</td><td>the campaign under test</td></tr>
+<tr><td>constant</td><td class="sym">C_GRID, SCORE_MAP</td><td>L39&ndash;40</td><td>C values, status to score</td></tr>
+<tr><td>return</td><td class="sym">out dict</td><td>returned at L452</td><td>population, replays, diagnostics, gaps</td></tr>
+<tr><td>file write</td><td class="sym">E9_l3_deployment_sane_&lt;date&gt;.json</td><td>path L36, write L448</td><td>every scorer result</td></tr>
+<tr><td>file write</td><td class="sym">E9_l3_deployment_sane_&lt;date&gt;.md</td><td>path L37, write L553</td><td>selection table, misses, gaps</td></tr>
+<tr><td>dict key read</td><td class="sym">SR, VER, reward, claims, uuid</td><td>rows from L49&ndash;59</td><td>labels, features, ranking</td></tr>
+<tr><td>dict key read</td><td class="sym">recovered_from_log, note_contaminated</td><td>mrow_cat L73&ndash;77</td><td>row category carried or not</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: rows whose <code>SR</code> or <code>claims</code> is <code>None</code> are dropped at L52&ndash;54 and counted in <code>n_flagged</code>. That is the sane-data contract from E8, not a new filter.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File card</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e9_deployment.py">experiments_verifiers/harness/e9_deployment.py</a></h4>
+<p class="role">Trains L3 and L3b on the other campaigns, ships the top-scoring asb generation per task, and compares it with recorded reward.</p>
+<p class="meta">557 lines &#183; 11 functions &#183; imports e5_common L33 &#183; writes results/E9_l3_deployment_sane_&lt;date&gt;.json + .md</p>
+<details><summary>key signatures and constants</summary><div class="dbody">
+<pre>load_sane() -&gt; (list, int)                                   # L46
+manifest_index() -&gt; (dict, defaultdict)                      # L63
+mrow_cat(r) -&gt; str                                           # L72
+load_emb() -&gt; (dict, dict)                                   # L83
+l3_feats(e, embz, idx) -&gt; np.ndarray                         # L90
+l3b_feats(e, embz, idx) -&gt; np.ndarray                        # L98
+select_C_inner(X, y, groups, seed=0) -&gt; float                # L120
+fit_score(train, test, feat, seed=0) -&gt; (scores, C)          # L142
+replay(cands_by_task, scores, order_key) -&gt; (dict, dict)     # L159
+main() -&gt; dict                                               # L201
+write_md(out, details_all, strict_tasks, oracle_strict)      # L455</pre>
+<p>Constants: <code>ASB = "asb_full_iterative_1"</code> (L38), <code>C_GRID</code> (L39), <code>SCORE_MAP = {"pass": 1.0, "fail": 0.0, "unsure": 0.5}</code> (L40).</p>
+</div></details>
+</div>
+<p class="note say">Why it matters: <code>replay</code> (L159) is the part other scripts reuse, because it is the only place where the ship-one-generation rule and its tie-break are written down once.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>every function, module constant and the entry point (11 functions)</summary><div class="dbody">
+<pre>load_sane()
+  L46  sane jsonl into scored claim rows
+
+manifest_index()
+  L63  asb manifest rows keyed by task and uuid
+
+mrow_cat(r)
+  L72  row category: recovered, contaminated, carried
+
+load_emb()
+  L83  embedding cache and name index
+
+l3_feats(e, embz, idx)
+  L90  mean score-weighted name+desc vector
+
+l3b_feats(e, embz, idx)
+  L98  pass centroid, fail centroid, counts
+
+select_C_inner(X, y, groups, seed=0)
+  L120  task-grouped 4-fold CV picks C
+
+fit_score(train, test, feat, seed=0)
+  L142  fits logistic, scores the test rows
+
+replay(cands_by_task, scores, order_key)
+  L159  ships one generation per task
+
+main()
+  L201  loads, fits, replays, diagnoses, writes
+
+write_md(out, details_all, strict_tasks, oracle_strict)
+  L455  renders the markdown digest</pre>
+<p>Module level, no class in the file:</p>
+<pre>EV, TODAY, OUT_JSON, OUT_MD                    # L31, L35-L37
+ASB, C_GRID, SCORE_MAP                         # L38-L40
+if __name__ == "__main__": main()              # L556-L557</pre>
+<p>Zero classes, zero methods, zero CLI flags. The markdown table order is the local list at L457&ndash;458, so a new scorer showing up in <code>results</code> does not appear in the digest unless that list changes.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>Where</th><th>What it uses</th></tr></thead>
+<tbody>
+<tr><td class="sym">e12_falsifier.py</td><td>import L42 (<code>import e9_deployment as E9</code>)</td><td>ASB L47, load_sane L190, mrow_cat L199, replay L220 and L301</td></tr>
+<tr><td class="sym">e13_common.py</td><td>import L79 (inside a function)</td><td>l3b_feats L80</td></tr>
+<tr><td class="sym">e13_l3_extreme.py</td><td>import L1163 (inside a function)</td><td>manifest_index L1203, ASB L1204, mrow_cat L1209, replay L1218 and L1242</td></tr>
+<tr><td class="sym">upstream producer</td><td><a href="../../experiments_verifiers/harness/e8_blast_radius.py">e8_blast_radius.py</a> L495, L501</td><td>writes the two sane files this script reads</td></tr>
+<tr><td class="sym">tests/</td><td>grep of tests/ for <code>e9_deployment</code>: no hit</td><td>no test found</td></tr>
+<tr><td class="sym">run directly</td><td><code>uv run python experiments_verifiers/harness/e9_deployment.py</code> (L17)</td><td>executes <code>main</code> at L556&ndash;557</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: <code>write_md</code> (L455) prints only the eight names in <code>order</code> (L457&ndash;458) plus ORACLE, while the JSON keeps every key of <code>results</code> (L406). The digest and the JSON can disagree if a scorer name is added to one side only.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e9_deployment.py</code> (557 lines, read in full), <code class="path">experiments_verifiers/harness/e8_blast_radius.py</code> L495&ndash;519 (the writer of its inputs), <code class="path">experiments_verifiers/harness/e5_common.py</code> L128, L154, L211, L222 (the helpers it imports), import sites in <code class="path">e12_falsifier.py</code> L42, <code class="path">e13_common.py</code> L79, <code class="path">e13_l3_extreme.py</code> L1163, <code class="path">tests/</code> (grep: no hit), <code class="path">docs/visual_clone/_reference.html</code> and <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p>Related pages: <a href="file_index.html">file_index.html</a> (hub), <a href="exp_e9_deployment.html">exp_e9_deployment.html</a>, <a href="file_harness_e8_blast_radius.html">e8_blast_radius.py</a> (writes its input), <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/results/E9_l3_deployment_sane_2026-09-22.json</code> and <code>.md</code> (results of one run, not the file); <code class="path">experiments_verifiers/REPORT_excluded_task_bug_and_sane_replay.html</code> (a report). No file outside <code class="path">docs/visual_clone/</code> was modified.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

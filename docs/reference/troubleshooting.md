@@ -135,19 +135,24 @@ If you *did* set them, check Langfuse is actually running
 
 A few likely causes:
 
-- **Verifier hard fails.** If every generation has a refuted hard claim
-  (rated importance ≥ 8), `hard_fail_capped` flips `true` and
-  `overall_score` is capped at
-  `_HARD_FAIL_CAP` (currently `0.89`). QD selection ranks on this capped
-  score (`overall_score_uncapped` is still logged for analysis), so
-  capped runs stay below uncapped improvements. You may have a
-  structural mismatch between the task description and what the
-  workflow can actually verify against.
-- **Recurring failure code.** The `abstracted_prompt_gradient` is
-  prefixed with a short code name (e.g. `FALLBACK_ECFP_CLASSIFIER`).
-  If the same code recurs across generations, the loop is re-discovering
-  the same failure mode — inspect `evaluation.txt` for the per-claim
-  detail behind it.
+- **Script-stage failures dominate.** Under the hybrid temporal-ladder
+  verifier, a pair is decided at the earliest ladder stage where the
+  generations differ — a generation that keeps failing `script`-stage
+  claims (code missing/invalid, inputs not read) loses every pairwise
+  comparison regardless of its deliverables. Inspect
+  `evaluation.txt`'s stage headers: if the earliest failing stage never
+  changes across generations, the loop is re-discovering the same
+  structural failure — check the goal's named inputs against what the
+  workflow actually opens. *(Legacy runs, pre-2026-09-24: the
+  multi-source verifier capped `overall_score` at
+  `_HARD_FAIL_CAP = 0.89` whenever a claim rated importance ≥ 8 was
+  refuted — capped runs ranked below uncapped improvements for the same
+  reason: one refuted hard claim dominated the rest.)*
+- **Recurring failure code.** The `abstracted_textual_gradient` leads
+  with the elimination point (earliest stage/claim where this generation
+  lost). If the same claim/stage recurs across generations, the loop is
+  re-discovering the same failure mode — inspect `evaluation.txt` for
+  the per-claim detail behind it.
 - **Tool gap.** The agents may need a tool that Toolomics doesn't expose.
   Use `--manual` mode to confirm the tool you need is actually
   discoverable.

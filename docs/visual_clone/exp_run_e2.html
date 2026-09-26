@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>run_e2 - E2 static grounding - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; run_e2">
+<div class="wrap">
+
+<h1 class="hud">run_e2 &mdash; E2 static grounding</h1>
+<p class="intro">E2 asked whether grader-free deterministic checks alone can predict VER strongly and SR at least as well as the LLM-judged reward. <code class="path">run_e2.py</code> scores 135 frozen workspaces under two check sets and runs a sabotage control on copies. The extended check set reaches AUC_ver 0.792, below the 0.85 gate; the attributable-failure subset reaches 0.953.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 680" role="img" aria-label="E2 run_e2.py pipeline: inputs, stages, output">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="e2h">
+    <title>E2 hypothesis: fixed static checks gate VER without LLMs</title>
+    <rect x="330" y="20" width="240" height="46" rx="2" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="450" y="40" text-anchor="middle">Static checks gate VER</text>
+    <text class="box-sub" x="450" y="56" text-anchor="middle">gate: auc_ver 0.85</text>
+  </g>
+
+  <a class="box" id="e2i1" href="../../experiments_verifiers/manifest.json">
+    <title>Manifest rows with a snapshot and non-empty pred_results</title>
+    <rect x="20" y="100" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="124" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="145" y="140" text-anchor="middle">135 rows kept</text>
+  </a>
+
+  <a class="box" id="e2i2" href="../../experiments_verifiers/ablations">
+    <title>Ablation notes hold the task goal text</title>
+    <rect x="20" y="200" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="224" text-anchor="middle">ablations/*.json</text>
+    <text class="box-sub" x="145" y="240" text-anchor="middle">goal per campaign and task</text>
+  </a>
+
+  <a class="box" id="e2i3" href="../../experiments_verifiers/workspace_artefacts/snapshots">
+    <title>Frozen per-generation workspaces</title>
+    <rect x="20" y="300" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="324" text-anchor="middle">workspace_artefacts/snapshots</text>
+    <text class="box-sub" x="145" y="340" text-anchor="middle">read-only workspaces</text>
+  </a>
+
+  <a class="box" id="e2l" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>load_population filters rows and collects goals</title>
+    <rect x="330" y="100" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="124" text-anchor="middle">load_population()</text>
+    <text class="box-sub" x="450" y="140" text-anchor="middle">rows + goals</text>
+  </a>
+
+  <a class="box" id="e2s" href="../../experiments_verifiers/scorers/static_grounding.py">
+    <title>run_scorer calls the static scorer twice per row</title>
+    <rect x="330" y="200" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="224" text-anchor="middle">run_scorer()</text>
+    <text class="box-sub" x="450" y="240" text-anchor="middle">score_with_features + score</text>
+  </a>
+
+  <a class="box" id="e2k" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>sabotage copies workspaces and corrupts the declared output</title>
+    <rect x="330" y="300" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="324" text-anchor="middle">sabotage()</text>
+    <text class="box-sub" x="450" y="340" text-anchor="middle">temp copies, 10 rows</text>
+  </a>
+
+  <a class="box" id="e2m" href="../../experiments_verifiers/harness/metrics.py">
+    <title>metrics_block and check_stats compute §0 metrics</title>
+    <rect x="330" y="400" width="240" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="424" text-anchor="middle">metrics_block()</text>
+    <text class="box-sub" x="450" y="440" text-anchor="middle">check_stats, CIs, tau</text>
+  </a>
+
+  <a class="box" id="e2w" href="../../experiments_verifiers/harness/run_e2.py">
+    <title>main assembles the result dict and writes it</title>
+    <rect x="330" y="500" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="524" text-anchor="middle">main()</text>
+    <text class="box-sub" x="450" y="540" text-anchor="middle">writes JSON L362</text>
+  </a>
+
+  <g class="box" id="e2o">
+    <title>Result JSON for E2</title>
+    <rect x="330" y="580" width="300" height="56" rx="2" fill="rgba(94,140,163,0.12)" stroke="#5E8CA3"/>
+    <text class="box-label" x="480" y="604" text-anchor="middle">E2_static-grounding_20260921.json</text>
+    <text class="box-sub" x="480" y="620" text-anchor="middle">per-example scores, checks, evidence</text>
+  </g>
+
+  <path class="edge" data-from="e2h" data-to="e2l" d="M450,66 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="86" text-anchor="start">tests</text>
+
+  <path class="edge dashed-edge" data-from="e2i1" data-to="e2l" d="M270,128 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="120" text-anchor="middle">rows</text>
+  <path class="edge dashed-edge" data-from="e2i2" data-to="e2s" d="M270,228 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="220" text-anchor="middle">goals</text>
+  <path class="edge dashed-edge" data-from="e2i3" data-to="e2s" d="M270,328 H305 V240 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="286" y="348" text-anchor="middle">workspaces</text>
+
+  <path class="edge" data-from="e2l" data-to="e2s" d="M450,156 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="180" text-anchor="start">rows + goals</text>
+
+  <path class="edge" data-from="e2s" data-to="e2k" d="M450,256 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="280" text-anchor="start">original scores</text>
+
+  <path class="edge" data-from="e2s" data-to="e2m" d="M330,228 H310 V420 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="400" text-anchor="end">scores</text>
+  <path class="edge" data-from="e2k" data-to="e2m" d="M560,356 V400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="568" y="380" text-anchor="start">sabotage hits</text>
+
+  <path class="edge" data-from="e2m" data-to="e2w" d="M450,456 V500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="480" text-anchor="start">metrics</text>
+  <path class="edge" data-from="e2w" data-to="e2o" d="M480,556 V580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="488" y="572" text-anchor="start">writes</text>
+
+  <text class="box-sub" x="20" y="380" text-anchor="start">solid = call | dashed = reads | max 12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram &mdash; <code>10 boxes</code>; the other experiment pages are listed in <a href="exp_index.html">exp_index.html</a>. Violet = hypothesis, steel = frozen input, mint = function in this script, cyan = metric helper. Solid = call, dashed = reads. Reads come from <code class="path">manifest.json</code> (filter at L41), the ablation note goals (L47) and the snapshot dirs (L55); the scorer itself is <code class="path">scorers/static_grounding.py::score_with_features</code> (L719) and <code>::score</code> (L493). <code>sabotage</code> (L88) copies to a temp dir, corrupts the goal-declared output and re-scores; it removes the temp dir in a <code>finally</code> (L146).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/run_e2.py">experiments_verifiers/harness/run_e2.py</a></h4>
+<p class="role">Scores 135 snapshots under the strict6 and extended check sets, runs a sabotage control on copies, and writes one result JSON with metrics and CIs.</p>
+<p class="meta">398 lines (<code>wc -l</code>) &#183; entry point: <code>main()</code> L205, guard L397 &#183; CLI arguments: none found (no <code>argparse</code>; date fixed at L33)</p>
+<details><summary>entry point, fixed date, how to run</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/run_e2.py   # docstring L10, from repo root
+main() -> None                                          # L205, reads no argv
+DATE = "20260921"                                       # L33, hardcoded
+sabotage(all_rows, per, goals, variant, k=10, seed=13)  # L88</pre>
+<p><code>grep -n "sys.argv"</code> finds nothing in this file. The sabotage sample is seeded (<code>seed=13</code>, L88) and draws <code>k=10</code> rows whose declared output exists (L99&ndash;110).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>Citation</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Manifest rows with snapshots</td><td class="sym">run_e2.py::load_population L36&ndash;50</td><td>Result JSON, indent 1</td><td class="sym"><a href="../../experiments_verifiers/results/E2_static-grounding_20260921.json">results/E2_static-grounding_20260921.json</a></td></tr>
+<tr><td>Task goals from ablation notes</td><td class="sym">run_e2.py L47</td><td>Console digest</td><td class="sym">stdout L366&ndash;382; summary <a href="../../experiments_verifiers/results/E2_static-grounding_20260921.md">.md</a> has no writer</td></tr>
+<tr><td>Workspace files and scripts</td><td class="sym">static_grounding.py::score L493</td><td>Temp sabotage copies</td><td class="sym">tempfile <code>e2_sabotage_*</code>, L112, removed L146</td></tr>
+<tr><td>Declared output names from the goal</td><td class="sym">static_grounding.py::declared_outputs L89</td><td>&mdash;</td><td class="sym">&mdash;</td></tr>
+<tr><td>Metric helpers</td><td class="sym">harness/metrics.py::auc L23, task_cluster_bootstrap_ci L123</td><td>&mdash;</td><td class="sym">&mdash;</td></tr>
+</tbody>
+</table>
+<p class="note flag">The docstring says the run writes a <code>.md</code> (L10) and the folder holds <code class="path">results/E2_static-grounding_20260921.md</code>, but the script writes only the JSON (L362&ndash;363). <code>grep -r "E2_static-grounding"</code> finds no writer for the markdown; its author is <code>unknown</code>.</p>
+<p class="note">Amber: the strict6 design text is cited as <code>EXPERIMENTS_PLAN.md</code> E2 (<code>static_grounding.py</code> L502) and that file is <strong>gone</strong>; only the docstring summary of the six checks could be read.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; AUC_ver per variant, gate line at 0.85</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 860 300" role="img" aria-label="Bar chart of E2 AUC_ver per variant and baseline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <path d="M50,260 H800" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M50,81.5 H800" fill="none" stroke="#FFB547" stroke-width="1.25" stroke-dasharray="5 4"/>
+  <text class="box-sub" x="54" y="75" text-anchor="start">gate: auc_ver 0.85 (run_e2.py L343)</text>
+
+  <g><title>extended variant AUC_ver 0.7923, JSON L61</title>
+    <rect x="50" y="93.6" width="80" height="166.4" rx="2" fill="rgba(0,229,255,0.22)" stroke="#00E5FF"/>
+    <text class="box-sub" x="90" y="86" text-anchor="middle">0.7923</text>
+    <text class="box-sub" x="90" y="278" text-anchor="middle">extended</text>
+  </g>
+  <g><title>strict6 variant AUC_ver 0.5013, JSON L22</title>
+    <rect x="170" y="154.7" width="80" height="105.3" rx="2" fill="rgba(255,77,106,0.18)" stroke="#FF4D6A"/>
+    <text class="box-sub" x="210" y="147" text-anchor="middle">0.5013</text>
+    <text class="box-sub" x="210" y="278" text-anchor="middle">strict6</text>
+  </g>
+  <g><title>extended with pkl-lenient sensitivity AUC_ver 0.8280, JSON L291</title>
+    <rect x="290" y="86.1" width="80" height="173.9" rx="2" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+    <text class="box-sub" x="330" y="79" text-anchor="middle">0.8280</text>
+    <text class="box-sub" x="330" y="278" text-anchor="middle">pkl-lenient</text>
+  </g>
+  <g><title>extended on attributable failures AUC_ver 0.9529, JSON L284</title>
+    <rect x="410" y="59.9" width="80" height="200.1" rx="2" fill="rgba(57,255,136,0.22)" stroke="#39FF88"/>
+    <text class="box-sub" x="450" y="52" text-anchor="middle">0.9529</text>
+    <text class="box-sub" x="450" y="278" text-anchor="middle">attributable</text>
+    <text class="box-sub" x="450" y="290" text-anchor="middle">only, n=133</text>
+  </g>
+  <g><title>recorded reward AUC_ver 0.3660, JSON L246</title>
+    <rect x="530" y="183.1" width="80" height="76.9" rx="2" fill="rgba(94,140,163,0.18)" stroke="#5E8CA3"/>
+    <text class="box-sub" x="570" y="176" text-anchor="middle">0.3660</text>
+    <text class="box-sub" x="570" y="278" text-anchor="middle">reward</text>
+    <text class="box-sub" x="570" y="290" text-anchor="middle">baseline</text>
+  </g>
+  <g><title>constant 0.5 baseline</title>
+    <rect x="650" y="155" width="80" height="105" rx="2" fill="rgba(143,184,201,0.18)" stroke="#8FB8C9"/>
+    <text class="box-sub" x="690" y="148" text-anchor="middle">0.5000</text>
+    <text class="box-sub" x="690" y="278" text-anchor="middle">constant_0.5</text>
+  </g>
+</svg>
+</div>
+<p class="figcap">Chart &mdash; <code>auc_ver</code> per variant and baseline on the same 135 rows; exceptions are labelled in the bar name. Bar height is the value, printed above each bar. Cyan = extended check set, red = the first-pass strict6 set, green = the extended set measured only on the rows whose VER failure has a static cause, steel = the recorded reward and the constant. Values are cited in the table below; <code>constant_0.5</code> is 0.5000 by definition (run_e2.py L245).</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Rows scored</td><td>135</td><td class="sym">E2_static-grounding_20260921.json L57</td></tr>
+<tr><td>SR-true rows</td><td>50</td><td class="sym">E2_static-grounding_20260921.json L58</td></tr>
+<tr><td>VER-true rows</td><td>126</td><td class="sym">E2_static-grounding_20260921.json L59</td></tr>
+<tr><td>extended auc_ver</td><td>0.7923</td><td class="sym">E2_static-grounding_20260921.json L61</td></tr>
+<tr><td>extended auc_sr</td><td>0.5913</td><td class="sym">E2_static-grounding_20260921.json L60</td></tr>
+<tr><td>extended auc_sr CI95</td><td>0.4727 &ndash; 0.7135</td><td class="sym">E2_static-grounding_20260921.json L71&ndash;72</td></tr>
+<tr><td>strict6 auc_ver</td><td>0.5013</td><td class="sym">E2_static-grounding_20260921.json L22</td></tr>
+<tr><td>pkl-lenient auc_ver</td><td>0.8280</td><td class="sym">E2_static-grounding_20260921.json L291</td></tr>
+<tr><td>attributable-only auc_ver</td><td>0.9529 (n=133)</td><td class="sym">E2_static-grounding_20260921.json L284&ndash;285</td></tr>
+<tr><td>Reward baseline auc_ver</td><td>0.3660</td><td class="sym">E2_static-grounding_20260921.json L246</td></tr>
+<tr><td>Reward baseline auc_sr</td><td>0.4698</td><td class="sym">E2_static-grounding_20260921.json L245</td></tr>
+<tr><td>Paired delta auc_ver vs reward</td><td>+0.4406 [0.2650, 0.8129]</td><td class="sym">E2_static-grounding_20260921.json L86&ndash;90</td></tr>
+<tr><td>Sabotage control</td><td>10 of 10 corrupted rows scored lower</td><td class="sym">E2_static-grounding_20260921.json L95&ndash;97</td></tr>
+<tr><td>McNemar p vs reward split</td><td>0.1686</td><td class="sym">E2_static-grounding_20260921.json L265</td></tr>
+<tr><td>VER-false rows / caught statically</td><td>9 / 7</td><td class="sym">E2_static-grounding_20260921.json L268&ndash;269</td></tr>
+<tr><td>Within-task ranking (extended)</td><td>0.5265, tie rate 0.6106</td><td class="sym">E2_static-grounding_20260921.json L66, L69</td></tr>
+<tr><td>Gate as written</td><td>auc_ver &gt;= 0.85, auc_sr &gt;= 0.4698</td><td class="sym">E2_static-grounding_20260921.json L301&ndash;303</td></tr>
+</tbody>
+</table>
+
+<details><summary>verbatim evidence lines (result JSON and markdown)</summary><div class="dbody">
+<blockquote>  "auc_sr": 0.5912941176470589,
+  "auc_ver": 0.7923280423280424,
+  "tau_all": 0.15206991950799098,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.json</code> lines 60&ndash;62 (<code>variants.extended.metrics</code>).</p>
+
+<blockquote>    "n": 10,
+    "n_ok": 10,
+    "pass": true,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.json</code> lines 95&ndash;97 (<code>variants.extended.metrics.sabotage</code>).</p>
+
+<blockquote>    "auc_ver": 0.5013227513227513,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.json</code> line 22 (<code>variants.strict6.metrics</code>). First pass, before the hazard check existed.</p>
+
+<blockquote>   "n_ver_false": 9,
+   "n_caught_static": 7,</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.json</code> lines 268&ndash;269 (<code>ver_failure_attribution</code>).</p>
+
+<blockquote>   "auc_ver_attributable_only": 0.9529478458049887,
+   "n_attributable_only": 133</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.json</code> lines 284&ndash;285.</p>
+
+<blockquote>   "auc_ver": "&gt;= 0.85",
+   "auc_sr": "&gt;= baseline reward auc_sr on same rows",
+   "baseline_reward_auc_sr": 0.469764705882353</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.json</code> lines 301&ndash;303 (<code>success_gate</code>), quoted from the file; the &gt; signs are source text.</p>
+
+<blockquote>auc_ver = 0.5013 &mdash; gate failure. Failure analysis of the 9 VER-false rows showed</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.md</code> line 37 (the source line uses an em dash).</p>
+
+<blockquote>- **auc_ver: FAIL on the full population** &mdash; 0.792 &lt; 0.85 (CI 0.59&ndash;0.97).</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.md</code> line 67.</p>
+
+
+</div></details>
+
+<p class="note say">Why it matters: static checks separate VER from non-VER far better than the recorded reward, but the extended set saturates at 1.0 on 63 of 135 rows, so it cannot order the top of a ranking (<code class="path">E2_static-grounding_20260921.md</code> L75: 63/135 rows score exactly 1.0).</p>
+</div>
+
+<footer>
+<p>Related pages: <a href="exp_index.html">exp_index.html</a> lists every experiment page; <a href="data_experiments.html">data_experiments.html</a> covers the folder itself.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/run_e2.py</code> (398 lines), <code class="path">experiments_verifiers/scorers/static_grounding.py</code> (766 lines; <code>score</code> L493, <code>score_with_features</code> L719, <code>declared_outputs</code> L89, hazard rules L342&ndash;347), <code class="path">experiments_verifiers/harness/metrics.py</code> (177 lines), <code class="path">experiments_verifiers/results/E2_static-grounding_20260921.json</code> and <code class="path">.md</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>, <code class="path">experiments_verifiers/manifest.json</code> (keys and row filter only, 1 104 rows), <code class="path">experiments_verifiers/ablations/</code> (file count 462), <code class="path">experiments_verifiers/workspace_artefacts/snapshots/</code> (dir count 148 at 2026-10-02; README.md L93 says 199 frozen workspaces &mdash; my computation differs), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> (never opened, secrets); <code class="path">EXPERIMENTS_PLAN.md</code>, <code class="path">HANDOFF.md</code>, <code class="path">VERIFIER_ARCHITECTURE.md</code> (cited by README.md and by the code, absent from disk &mdash; not linked); <code class="path">scorers/llm_judge_ensemble.py</code> (E3, not imported by run_e2.py); every other <code class="path">results/*</code> file (other experiments); the 135 snapshot workspaces themselves (their content is in the JSON as per-example checks and evidence); <code class="path">data/*.jsonl</code> (E1/E5 population, not an E2 input); <code class="path">sources/**</code> (app code, untouched); <code class="path">datasets/**</code> (gold is evaluation-side only and E2 does not read it). Neither the experiment nor the sabotage control was re-run here; the sabotage figure is as recorded. No pytest.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_holdout.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e24_holdout.py">
+<div class="wrap">
+<h1 class="hud">e24_holdout.py</h1>
+<p class="intro">This file is E24 Phase 2: the verifier builds its own labeled evaluation from the workspace's own train data, with zero gold access. It cuts one fixed 80/20 split per admissible group (seed 20260924), rewrites the held-out 20% as the test file with labels stripped, re-executes the delivered script on that swapped copy, and scores the fresh predictions against the labels it kept. Two commands: <code>split</code> then <code>run</code> (<code>--pilot</code> redacts every metric value).</p>
+
+<div id="legend" data-auto></div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 — the job: split the workspace data, swap it in, re-execute, score</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 860 556" role="img" aria-label="e24_holdout.py: gates and iomap pick the groups, split_stage builds the swapped files, holdout_gen re-executes and score_predictions scores the predictions">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="iG">
+    <rect x="20" y="30" width="220" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130.0" y="50" text-anchor="middle">_e24_gates json</text>
+    <text class="box-sub" x="130.0" y="65" text-anchor="middle">admissible L179</text>
+  </g>
+  <g class="box" id="iM">
+    <rect x="20" y="110" width="220" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130.0" y="130" text-anchor="middle">_e24_iomap jsonl</text>
+    <text class="box-sub" x="130.0" y="145" text-anchor="middle">maps L181</text>
+  </g>
+  <g class="box" id="sRun">
+    <rect x="280" y="20" width="240" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400.0" y="40" text-anchor="middle">run_stage L386</text>
+    <text class="box-sub" x="400.0" y="55" text-anchor="middle">jobs for every gen L402</text>
+    <text class="box-sub" x="400.0" y="70" text-anchor="middle">pilot redacts L378</text>
+  </g>
+  <g class="box" id="sSplit">
+    <rect x="280" y="130" width="240" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400.0" y="150" text-anchor="middle">split_stage L176</text>
+    <text class="box-sub" x="400.0" y="165" text-anchor="middle">idempotent guard L187</text>
+  </g>
+  <g class="box" id="sBuild">
+    <rect x="280" y="240" width="240" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400.0" y="260" text-anchor="middle">builders L172</text>
+    <text class="box-sub" x="400.0" y="275" text-anchor="middle">csv L79, sdf L101, pkl L130</text>
+  </g>
+  <g class="box" id="sCache">
+    <rect x="580" y="120" width="240" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="700.0" y="140" text-anchor="middle">_e24_splits_2026-09-24/&lt;gid&gt;</text>
+    <text class="box-sub" x="700.0" y="155" text-anchor="middle">five group folders</text>
+  </g>
+  <g class="box" id="sKeys">
+    <rect x="580" y="230" width="240" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="700.0" y="250" text-anchor="middle">_e24_holdout_keys json</text>
+    <text class="box-sub" x="700.0" y="265" text-anchor="middle">seed, specs, groups L209</text>
+  </g>
+  <g class="box" id="sMut">
+    <rect x="580" y="340" width="240" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700.0" y="360" text-anchor="middle">make_mutate L220</text>
+    <text class="box-sub" x="700.0" y="375" text-anchor="middle">swaps train and test L228</text>
+  </g>
+  <g class="box" id="sGen">
+    <rect x="280" y="340" width="240" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400.0" y="360" text-anchor="middle">holdout_gen L366</text>
+    <text class="box-sub" x="400.0" y="375" text-anchor="middle">R.execute_gen L369</text>
+  </g>
+  <g class="box" id="sScore">
+    <rect x="280" y="450" width="240" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400.0" y="470" text-anchor="middle">score_predictions L248</text>
+    <text class="box-sub" x="400.0" y="485" text-anchor="middle">four metric branches L270</text>
+  </g>
+  <g class="box" id="sLed">
+    <rect x="580" y="450" width="240" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="700.0" y="470" text-anchor="middle">_e24_holdout_ledger jsonl</text>
+    <text class="box-sub" x="700.0" y="485" text-anchor="middle">append L418</text>
+  </g>
+  <path class="edge dashed-edge" data-from="iG" data-to="sSplit" d="M240,63 H260 V170 H280" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="250" y="80" text-anchor="end">admissible L179</text>
+  <path class="edge dashed-edge" data-from="iM" data-to="sSplit" d="M240,143 H280" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="250" y="196" text-anchor="end">maps L181</text>
+  <path class="edge" data-from="sSplit" data-to="sBuild" d="M400,210 V240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="410" y="230" text-anchor="start">carrier L189</text>
+  <path class="edge dashed-edge" data-from="sBuild" data-to="sCache" d="M520,280 H550 V160 H580" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="560" y="110" text-anchor="end">write splits L189</text>
+  <path class="edge dashed-edge" data-from="sSplit" data-to="sKeys" d="M520,170 H550 V270 H580" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="545" y="208" text-anchor="middle">payload L212</text>
+  <path class="edge dashed-edge" data-from="sCache" data-to="sMut" d="M700,200 V340" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="710" y="290" text-anchor="start">source files L222</text>
+  <path class="edge" data-from="sRun" data-to="sGen" d="M340,100 V340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="245" y="236" text-anchor="end">jobs L408</text>
+  <path class="edge" data-from="sMut" data-to="sGen" d="M580,380 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="550" y="372" text-anchor="middle">mutate L369</text>
+  <path class="edge" data-from="sGen" data-to="sScore" d="M400,420 V450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="410" y="442" text-anchor="start">row L371</text>
+  <path class="edge dashed-edge" data-from="sScore" data-to="sLed" d="M520,490 H580" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="550" y="482" text-anchor="middle">append L418</text>
+  <path class="edge dashed-edge" data-from="sKeys" data-to="sScore" d="M580,270 H545 V470 H520" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="545" y="300" text-anchor="end">labels L252</text>
+  <text class="box-sub" x="20" y="546">solid = call  |  dashed = reads / writes  |  11 boxes. Two commands: split L432, run L435.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 — <code>split_stage</code> L176 and <code>run_stage</code> L386 are two separate commands; <code>holdout_gen</code> L366 is the only place that runs a delivered script, through <code>e24_reexec.execute_gen</code> L369 with the mutate hook.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 — data flow: gates, maps, frozen train file and swapped splits in; four kinds of output out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1110 460" role="img" aria-label="e24_holdout.py data flow: the gates file, the I/O maps, the frozen train file and the swapped splits go in; split files, the keys file, the ledger and returned dicts come out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="f1">
+    <rect x="20" y="30" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="50" text-anchor="middle">_e24_gates json L178</text>
+    <text class="box-sub" x="140.0" y="65" text-anchor="middle">admissible gids</text>
+  </g>
+  <g class="box" id="f2">
+    <rect x="20" y="120" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="140" text-anchor="middle">_e24_iomap jsonl L181</text>
+    <text class="box-sub" x="140.0" y="155" text-anchor="middle">train, test, output paths</text>
+  </g>
+  <g class="box" id="f3">
+    <rect x="20" y="210" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="230" text-anchor="middle">frozen snapshot train file</text>
+    <text class="box-sub" x="140.0" y="245" text-anchor="middle">read by the builder L82</text>
+  </g>
+  <g class="box" id="f4">
+    <rect x="20" y="300" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="320" text-anchor="middle">_e24_splits swapped files</text>
+    <text class="box-sub" x="140.0" y="335" text-anchor="middle">copied in by mutate L228</text>
+  </g>
+  <g class="box" id="mid">
+    <rect x="330" y="120" width="300" height="140" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="480.0" y="144" text-anchor="middle">e24_holdout.py</text>
+    <text class="box-sub" x="480.0" y="159" text-anchor="middle">435 lines, no Config field</text>
+    <text class="box-sub" x="480.0" y="174" text-anchor="middle">held-out labels stay in keys.json</text>
+    <text class="box-sub" x="480.0" y="189" text-anchor="middle">snapshots guarded L423</text>
+  </g>
+  <g class="box" id="o1">
+    <rect x="700" y="20" width="380" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="890.0" y="40" text-anchor="middle">_e24_splits_2026-09-24/&lt;gid&gt;/</text>
+    <text class="box-sub" x="890.0" y="55" text-anchor="middle">train_swapped L87 · test_swapped L90</text>
+    <text class="box-sub" x="890.0" y="70" text-anchor="middle">_meta.json L195 · keys.json L194</text>
+  </g>
+  <g class="box" id="o2">
+    <rect x="700" y="130" width="380" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="890.0" y="150" text-anchor="middle">_e24_holdout_keys_2026-09-24.json</text>
+    <text class="box-sub" x="890.0" y="165" text-anchor="middle">seed, specs, per-group index L209</text>
+  </g>
+  <g class="box" id="o3">
+    <rect x="700" y="240" width="380" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="890.0" y="260" text-anchor="middle">_e24_holdout_ledger_2026-09-24.jsonl</text>
+    <text class="box-sub" x="890.0" y="275" text-anchor="middle">one row per generation L418</text>
+  </g>
+  <g class="box" id="o4">
+    <rect x="700" y="350" width="380" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="890.0" y="370" text-anchor="middle">returned values</text>
+    <text class="box-sub" x="890.0" y="385" text-anchor="middle">payload dict L214 · row dict L374</text>
+    <text class="box-sub" x="890.0" y="400" text-anchor="middle">split meta dict L91</text>
+  </g>
+  <path class="edge dashed-edge" data-from="f1" data-to="mid" d="M260,65 H295 V140 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="326" y="64" text-anchor="end">admissible L179</text>
+  <path class="edge dashed-edge" data-from="f2" data-to="mid" d="M260,155 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="326" y="186" text-anchor="end">paths L181</text>
+  <path class="edge dashed-edge" data-from="f3" data-to="mid" d="M260,245 H305 V200 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="307" y="196" text-anchor="end">read L82</text>
+  <path class="edge dashed-edge" data-from="f4" data-to="mid" d="M260,335 H310 V230 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="312" y="226" text-anchor="end">copy L228</text>
+  <path class="edge dashed-edge" data-from="mid" data-to="o1" d="M630,140 H665 V60 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="668" y="132" text-anchor="end">write L87</text>
+  <path class="edge dashed-edge" data-from="mid" data-to="o2" d="M630,170 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="665" y="162" text-anchor="middle">write L212</text>
+  <path class="edge dashed-edge" data-from="mid" data-to="o3" d="M630,200 H665 V280 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="668" y="272" text-anchor="end">write L418</text>
+  <path class="edge dashed-edge" data-from="mid" data-to="o4" d="M630,230 H680 V390 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="682" y="382" text-anchor="end">return L374</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 — config fields read: none. Constants read: <code>E24_SEED</code> 20260924 L86, <code>HOLDOUT_FRAC</code> 0.20 L51, <code>MAX_WORKERS</code> 4 L430, <code>SPLIT_SPECS</code> L184. The regenerated workspace is deleted after scoring L373, so no prediction copy is kept.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 — logic: the metric dispatch and the failure rules of <code>score_predictions</code></h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 594" role="img" aria-label="e24_holdout.py logic: score_predictions rejects failed re-executions first, then dispatches on the pre-registered metric kind">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="q1">
+    <rect x="20" y="40" width="240" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140.0" y="60" text-anchor="middle">score_predictions L248</text>
+  </g>
+  <g class="box" id="q2">
+    <rect x="300" y="30" width="300" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450.0" y="50" text-anchor="middle">no_entry_script? L253</text>
+  </g>
+  <g class="box" id="q3">
+    <rect x="300" y="100" width="300" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450.0" y="120" text-anchor="middle">crash, timeout, harness? L256</text>
+  </g>
+  <g class="box" id="q4">
+    <rect x="300" y="170" width="300" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450.0" y="190" text-anchor="middle">output path mapped? L262</text>
+  </g>
+  <g class="box" id="q5">
+    <rect x="300" y="240" width="300" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450.0" y="260" text-anchor="middle">predictions on disk? L266</text>
+  </g>
+  <g class="box" id="r0">
+    <rect x="660" y="60" width="400" height="150" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="860.0" y="84" text-anchor="middle">score 0.0 with a reason</text>
+    <text class="box-sub" x="860.0" y="99" text-anchor="middle">L254 no entry script</text>
+    <text class="box-sub" x="860.0" y="114" text-anchor="middle">L257 crash tail · L263 no output map</text>
+    <text class="box-sub" x="860.0" y="129" text-anchor="middle">L267 predictions missing</text>
+  </g>
+  <g class="box" id="q6">
+    <rect x="300" y="340" width="340" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="360.0" text-anchor="middle">metric kind?</text>
+    <text class="box-sub" x="470.0" y="375.0" text-anchor="middle">L270, L303, L322, L343</text>
+  </g>
+  <g class="box" id="o1">
+    <rect x="700" y="320" width="360" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="880.0" y="340" text-anchor="middle">mean_roc_auc, mean AUC L301</text>
+  </g>
+  <g class="box" id="o2">
+    <rect x="700" y="385" width="360" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="880.0" y="405" text-anchor="middle">rmse, score is -RMSE L320</text>
+  </g>
+  <g class="box" id="o3">
+    <rect x="700" y="450" width="360" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="880.0" y="470" text-anchor="middle">accuracy, positional L335</text>
+  </g>
+  <g class="box" id="o4">
+    <rect x="700" y="515" width="360" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="880.0" y="535" text-anchor="middle">spearman rho, positional L357</text>
+  </g>
+  <g class="box" id="q7">
+    <rect x="300" y="440" width="340" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="460" text-anchor="middle">join or parse error? L359</text>
+  </g>
+  <path class="edge" data-from="q1" data-to="q2" d="M260,70 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="280" y="62" text-anchor="middle">row in</text>
+  <path class="edge" data-from="q2" data-to="r0" d="M600,50 H620 V90 H660" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="620" y="82" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q2" data-to="q3" d="M450,86 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="460" y="94" text-anchor="start">no</text>
+  <path class="edge" data-from="q3" data-to="r0" d="M600,128 H660" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="630" y="120" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q3" data-to="q4" d="M450,156 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="460" y="164" text-anchor="start">no</text>
+  <path class="edge" data-from="q4" data-to="r0" d="M600,198 H630 V160 H660" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="630" y="192" text-anchor="middle">no</text>
+  <path class="edge" data-from="q4" data-to="q5" d="M450,226 V240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="460" y="234" text-anchor="start">yes</text>
+  <path class="edge" data-from="q5" data-to="r0" d="M600,268 H640 V210 H660" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="640" y="262" text-anchor="middle">no</text>
+  <path class="edge" data-from="q5" data-to="q6" d="M450,296 V340" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="460" y="320" text-anchor="start">yes</text>
+  <path class="edge" data-from="q6" data-to="o1" d="M640,358 H700" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="670" y="350" text-anchor="middle">auc</text>
+  <path class="edge" data-from="q6" data-to="o2" d="M640,372 H670 V413 H700" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="672" y="406" text-anchor="end">rmse</text>
+  <path class="edge" data-from="q6" data-to="o3" d="M640,384 H680 V478 H700" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="682" y="470" text-anchor="end">accuracy</text>
+  <path class="edge" data-from="q6" data-to="o4" d="M640,396 H690 V543 H700" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="692" y="536" text-anchor="end">spearman</text>
+  <path class="edge" data-from="q6" data-to="q7" d="M470,400 V440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="424" text-anchor="start">inner check</text>
+  <text class="box-sub" x="20" y="586">lane 1: the re-execution guard branch L253 to L268  |  lane 2: the metric dispatch. Inner failures keep score 0.0: unjoinable L274, L314, L327, L330, L347, metric_uncomputable L296, L351, L355, unparseable L360.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 — a failed re-execution never reaches a metric: status is tested first L253&#8211;L268. Positional joins (accuracy, spearman) compare lengths L335 and L348; the roc_auc and rmse branches join on an id column L276 and L306.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>config</td><td class="sym">nothing</td><td>no <code>Config</code> import L27&#8211;L37</td><td>seed and fraction come from <code>e24_common</code></td><td class="size">L85</td></tr>
+<tr><td>reads</td><td class="sym">_e24_gates_2026-09-24.json</td><td><code>C.GATES_JSON</code> L178 and L389</td><td>the admissible group list</td><td class="size">L179</td></tr>
+<tr><td>reads</td><td class="sym">_e24_iomap_2026-09-24.jsonl</td><td><code>C.IOMAP</code> L181 and L392</td><td>train, test and output paths per group</td><td class="size">L181</td></tr>
+<tr><td>reads</td><td class="sym">frozen snapshot train file</td><td><code>C.REPO / snapshot_path / rel</code> L81</td><td>source rows for the split, never modified</td><td class="size">L81</td></tr>
+<tr><td>reads</td><td class="sym">_e24_splits_2026-09-24/&lt;gid&gt;/_meta.json</td><td><code>_load_keys</code> L233</td><td>held-out labels and hold_ids at scoring time</td><td class="size">L234</td></tr>
+<tr><td>reads</td><td class="sym">swapped split files</td><td><code>SPLIT_CACHE</code> L222</td><td>copied over train and test in the temp workspace</td><td class="size">L228</td></tr>
+<tr><td>reads</td><td class="sym">_e24_holdout_ledger_2026-09-24.jsonl</td><td><code>C.HOLDOUT_LEDGER</code> L393</td><td><code>done_keys</code> so a run resumes</td><td class="size">L393</td></tr>
+<tr><td>writes</td><td class="sym">train_swapped and test_swapped</td><td><code>SPLIT_CACHE/&lt;gid&gt;</code>, L87, L90, L106, L118, L143</td><td>the swapped data given to the re-execution</td><td class="size">L87</td></tr>
+<tr><td>writes</td><td class="sym">keys.json and _meta.json</td><td>same folder, L194 and L195</td><td>labels, hold_ids, seeds, input fingerprints</td><td class="size">L194</td></tr>
+<tr><td>writes</td><td class="sym">_e24_holdout_keys_2026-09-24.json</td><td><code>C.HOLDOUT_KEYS</code> L212</td><td>seed, per-group specs and split index</td><td class="size">L212</td></tr>
+<tr><td>writes</td><td class="sym">_e24_holdout_ledger_2026-09-24.jsonl</td><td><code>C.HOLDOUT_LEDGER</code>, append L418</td><td>one row per generation: status, metric, score</td><td class="size">L418</td></tr>
+<tr><td>state</td><td class="sym">C.GUARD</td><td>baseline L388, check after the run L423</td><td>fails if any snapshot changed</td><td class="size">L388</td></tr>
+</tbody>
+</table>
+<p class="note">Recorded on disk, my computation: <code class="path">results/_e24_splits_2026-09-24/</code> holds five group folders and <code class="path">results/_e24_holdout_keys_2026-09-24.json</code> lists five groups; the holdout ledger has 53 rows — 31 <code>scored</code>, 18 <code>crash</code>, 3 <code>no_entry_script</code>, 1 <code>timeout</code>; the gates file admits 5 of 19 groups.</p><p class="note flag">The pilot gate in <code class="path">results/_e24_pilot_2026-09-24.json</code> records 3 of 5 pilot groups computable and the verdict <code>PROCEED</code>; the full run later scored rows in 5 of 5 admissible groups. Two scorer bugs fixed after that gate are declared in the report (key <code>gaps</code>, third item). My computation from the two files.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>13 top-level callables and 1 nested function &#8212; signatures and roles</summary><div class="dbody">
+<pre>_stratified_idx(n, strata, seed) -&gt; np.ndarray                                L45   held-out index set, stratified if asked
+_input_fingerprint(group, rel) -&gt; dict[str, str]                               L62   sha256 per generation of one input file
+_canonical_gen(group) -&gt; dict                                                  L72   most complete workspace, structural choice
+build_split_csv(group, m, spec, out) -&gt; dict                                   L79   pandas split, labels echoed back
+build_split_sdf(group, m, spec, out) -&gt; dict                                   L101  RDKit split, label props stripped
+build_split_pkl(group, m, spec, out) -&gt; dict                                   L130  sandbox helper for pickled mols
+split_stage() -&gt; dict                                                          L176  build and persist one split per group
+make_mutate(gid, m)                                                            L220  closure that swaps the data files
+  mutate(copy_root, _m) -&gt; None                                                L225  copyfile train and test
+_load_keys(gid) -&gt; dict                                                        L233  the group _meta.json
+_resolve_output(run_row, out_path) -&gt; Path | None                              L237  regenerated output, rglob fallback
+score_predictions(gid, m, run_row) -&gt; dict                                     L248  score predictions vs held-out labels
+holdout_gen(group, gen, maps, redact: bool) -&gt; dict                            L366  re-execute one generation, then score
+run_stage(pilot: bool, workers: int) -&gt; None                                   L386  parallel holdout run, ledger append</pre>
+<p><code>BUILDERS</code> L173 maps the three carrier names to the three builders; the pkl branch writes its own helper script L138&#8211;L164 and runs it in the
+persistent sandbox L166. <code>SPLIT_CACHE</code> L39 is <code>results/_e24_splits_2026-09-24</code>.</p>
+<p>Imports: <code>argparse</code>, <code>hashlib</code>, <code>json</code>, <code>shutil</code>, <code>sys</code>, <code>Path</code> L23&#8211;L28; <code>numpy</code> L30,
+<code>pandas</code> L31, <code>scipy.stats.spearmanr</code> L32; <code>e24_common as C</code> L36; <code>e24_reexec as R</code> L37 for
+<code>execute_gen</code> L369, <code>PersistentSandbox</code> L166 and <code>run_env</code> L167. <code>rdkit</code> and <code>deepchem</code> are imported inside the builders L102 and L140.</p>
+<p>Command line L427&#8211;L435: <code>split</code> calls <code>split_stage</code> L433, <code>run</code> calls <code>run_stage</code> L435; <code>--pilot</code> L429 sets the
+redaction flag, <code>--workers</code> L430 defaults to <code>C.MAX_WORKERS</code> 4.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_common.py">harness/e24_common.py</a></td><td class="sym">imported as <code>C</code> L36</td><td class="sym">SPLIT_SPECS L184 · E24_SEED L85 · HOLDOUT_FRAC L50 · MAX_WORKERS L430</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_reexec.py">harness/e24_reexec.py</a></td><td class="sym">imported as <code>R</code> L37</td><td class="sym">execute_gen L369 · PersistentSandbox L166 · run_env L167</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_iomap.py">harness/e24_iomap.py</a></td><td class="sym">reads its ledger, no import</td><td class="sym"><code>HOLDOUT_LEDGER</code> L324, redacted pilot rows only</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_eval.py">harness/e24_eval.py</a></td><td class="sym">reads its ledger, no import</td><td class="sym"><code>HOLDOUT_LEDGER</code> L52 for the holdout score L66</td></tr>
+<tr><td class="sym">command line</td><td class="sym"><code>split</code> L432 then <code>run --pilot</code> L435</td><td class="sym">split_stage L176 · run_stage L386</td></tr>
+<tr><td class="sym">tests/</td><td class="sym">no test found</td><td class="sym">grep of <code>tests/</code> for <code>e24</code> returns nothing</td></tr>
+</tbody>
+</table>
+<p>The experiment page is <a href="exp_e24_holdout.html">exp_e24_holdout.html</a>; the phase it reuses is described in <a href="file_harness_e24_reexec.html">file_harness_e24_reexec.html</a> and its consumers in <a href="file_harness_e24_eval.html">file_harness_e24_eval.html</a>.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e24_holdout.html">exp_e24_holdout.html</a>, <a href="exp_index.html">exp_index.html</a>, <a href="file_harness_e24_reexec.html">file_harness_e24_reexec.html</a>, <a href="file_harness_e24_eval.html">file_harness_e24_eval.html</a>, <a href="file_index.html">file digest index</a></p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_holdout.py</code> (435 lines, whole file); row and status counts of <code class="path">results/_e24_holdout_ledger_2026-09-24.jsonl</code> and <code class="path">results/_e24_holdout_pilot_2026-09-24.jsonl</code> (json.loads, counts only); the group index of <code class="path">results/_e24_holdout_keys_2026-09-24.json</code> and the directory listing of <code class="path">results/_e24_splits_2026-09-24/</code>; <code class="path">results/_e24_gates_2026-09-24.json</code> (admissible count); call sites in <code class="path">e24_iomap.py</code> and <code class="path">e24_eval.py</code> by grep; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p class="skips">Skipped, with reason: <code>.env</code> and <code>experiments_verifiers/.env</code> (never opened); the bodies of <code class="path">e24_reexec.py</code> and <code class="path">e18_scripted_bt.py</code> (other pages; only the called symbols are cited); the split files themselves and the held-out label values (they are the evaluation key, not the file digest subject); the 148 frozen snapshots; <code class="path">results/_e24_venv/</code> (2.8 GB); <code class="path">results/E24_reexec_holdout_2026-09-24.json</code> (the Phase-3 report). No split was rebuilt, no script ran, no pytest ran.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

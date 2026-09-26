@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e18_gradient_duel.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e18_gradient_duel.py">
+<div class="wrap">
+
+<h1 class="hud">e18_gradient_duel.py</h1>
+<p class="intro">This script runs the three-way feedback duel: one identical E16 judge prompt is applied to each generation with the E18 scripted gradient, the E15 preference gradient and the verifier gradient, then the three readings are compared pairwise. It runs as <code>uv run python experiments_verifiers/harness/e18_gradient_duel.py</code> and writes <code class="path">results/E18_gradient_duel_2026-09-23.json</code> plus a markdown copy. The E18 side makes new calls; the E15 side and the verifier side are cache hits (docstring L28&#8211;L34).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does: one prompt, three gradient texts, three deltas</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 430" role="img" aria-label="e18_gradient_duel.py: the E16 population json joins to the E18 and E15 gradient directories, each generation is judged three ways, then paired statistics and one verdict are written">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="i1">
+    <title>The three inputs: population items plus two gradient directories</title>
+    <rect x="20" y="140" width="240" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140" y="166" text-anchor="middle">inputs</text>
+    <text class="box-sub" x="140" y="188" text-anchor="middle">_e16_population.json L43</text>
+    <text class="box-sub" x="140" y="206" text-anchor="middle">results/E18_bt_gradients/ L35</text>
+    <text class="box-sub" x="140" y="224" text-anchor="middle">results/E15_bt_gradients/ L34</text>
+    <text class="box-sub" x="140" y="242" text-anchor="middle">&lt;campaign&gt;__&lt;task&gt;/&lt;uuid&gt;.txt L46 L50</text>
+    <text class="box-sub" x="140" y="260" text-anchor="middle">verifier gradient in the item L72</text>
+  </g>
+
+  <a class="box" id="b1" href="../../experiments_verifiers/harness/e18_gradient_duel.py">
+    <title>build_triples keeps only generations that have all three gradients</title>
+    <rect x="290" y="150" width="200" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="176" text-anchor="middle">build_triples L41</text>
+    <text class="box-sub" x="390" y="196" text-anchor="middle">key (campaign, task, uuid8) L52</text>
+    <text class="box-sub" x="390" y="214" text-anchor="middle">campaign suffix fallback L54</text>
+    <text class="box-sub" x="390" y="232" text-anchor="middle">drops two counters L58 L62</text>
+    <text class="box-sub" x="390" y="250" text-anchor="middle">triples L64</text>
+  </a>
+
+  <a class="box" id="b2" href="../../experiments_verifiers/harness/e18_gradient_duel.py">
+    <title>one(k) judges the same item three times</title>
+    <rect x="530" y="140" width="220" height="130" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="640" y="166" text-anchor="middle">one(k) L89</text>
+    <text class="box-sub" x="640" y="186" text-anchor="middle">reads both txt files L91 L92</text>
+    <text class="box-sub" x="640" y="204" text-anchor="middle">E18 text, role judge_e18 L93</text>
+    <text class="box-sub" x="640" y="222" text-anchor="middle">E15 text, role judge_bt L94</text>
+    <text class="box-sub" x="640" y="240" text-anchor="middle">E16.judge_item, cached L95</text>
+    <text class="box-sub" x="640" y="258" text-anchor="middle">10 workers L97</text>
+  </a>
+
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e18_gradient_duel.py">
+    <title>judge_with_text swaps only the gradient block of the E16 prompt</title>
+    <rect x="790" y="140" width="200" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="890" y="166" text-anchor="middle">judge_with_text L69</text>
+    <text class="box-sub" x="890" y="186" text-anchor="middle">E16.judge_messages L71</text>
+    <text class="box-sub" x="890" y="204" text-anchor="middle">replace one block L72</text>
+    <text class="box-sub" x="890" y="222" text-anchor="middle">E16._llm L73, role arg</text>
+  </a>
+
+  <a class="box" id="b4" href="../../experiments_verifiers/harness/e18_gradient_duel.py">
+    <title>paired compares any two of the three sides per item</title>
+    <rect x="290" y="300" width="200" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="326" text-anchor="middle">paired L109</text>
+    <text class="box-sub" x="390" y="346" text-anchor="middle">999 bootstraps L109</text>
+    <text class="box-sub" x="390" y="364" text-anchor="middle">cluster (campaign, task)</text>
+    <text class="box-sub" x="390" y="382" text-anchor="middle">x_higher, y_higher, ties</text>
+  </a>
+
+  <a class="box" id="b5" href="../../experiments_verifiers/harness/e18_gradient_duel.py">
+    <title>six comparisons over three axes</title>
+    <rect x="530" y="300" width="220" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="640" y="326" text-anchor="middle">stats L137</text>
+    <text class="box-sub" x="640" y="346" text-anchor="middle">e18 - ver, e18 - e15, e15 - ver</text>
+    <text class="box-sub" x="640" y="364" text-anchor="middle">gold_relevance, alignment, halluc</text>
+    <text class="box-sub" x="640" y="382" text-anchor="middle">per-side means L141&#8211;L146</text>
+  </a>
+
+  <a class="box" id="b6" href="../../experiments_verifiers/harness/e18_gradient_duel.py">
+    <title>the verdict branches on the two CIs</title>
+    <rect x="790" y="300" width="200" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="890" y="326" text-anchor="middle">verdict L191</text>
+    <text class="box-sub" x="890" y="346" text-anchor="middle">beat both CIs L196</text>
+    <text class="box-sub" x="890" y="364" text-anchor="middle">directionally yes L199</text>
+    <text class="box-sub" x="890" y="382" text-anchor="middle">mixed L202, no L206</text>
+  </a>
+
+  <g class="box" id="o1">
+    <title>The written outputs</title>
+    <rect x="1030" y="140" width="150" height="130" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1105" y="166" text-anchor="middle">writes</text>
+    <text class="box-sub" x="1105" y="188" text-anchor="middle">E18_gradient_</text>
+    <text class="box-sub" x="1105" y="206" text-anchor="middle">duel_2026-09-23</text>
+    <text class="box-sub" x="1105" y="224" text-anchor="middle">.json L211</text>
+    <text class="box-sub" x="1105" y="242" text-anchor="middle">same stem .md L281</text>
+    <text class="box-sub" x="1105" y="260" text-anchor="middle">answer printed L213</text>
+  </g>
+
+  <text class="box-sub" x="20" y="20" text-anchor="start">entry: main L81 &#183; no argparse &#183; E16 loaded as the instrument L31</text>
+
+  <path class="edge dashed-edge" data-from="i1" data-to="b1" d="M260,205 H290" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="275" y="197" text-anchor="middle">join</text>
+  <path class="edge" data-from="b1" data-to="b2" d="M490,205 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="197" text-anchor="middle">triples L83</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M750,205 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="770" y="197" text-anchor="middle">3 calls</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M890,230 C890,270 500,270 420,300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="280" text-anchor="middle">judgments L100</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M490,350 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="342" text-anchor="middle">deltas</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M750,350 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="770" y="342" text-anchor="middle">CIs L191</text>
+  <path class="edge dashed-edge" data-from="b6" data-to="o1" d="M990,350 C1020,350 1030,280 1060,270" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="1000" y="326" text-anchor="middle">json L211</text>
+  <path class="edge dashed-edge" data-from="b5" data-to="o1" d="M750,320 C880,300 1000,300 1105,270" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arwE)"/>
+
+  <text class="box-sub" x="20" y="416" text-anchor="start">solid = call &#183; dashed = reads/writes &#183; 8 boxes &#183; only the E18 side spends new calls; the other two sides are cache hits</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 8 boxes. <code>judge_with_text</code> receives the role name as an argument (L69, L73), so the E18 text is judged under <code>judge_e18</code> and the E15 text under <code>judge_bt</code> (L93&#8211;L94); the verifier side re-uses the E16 cache (L95).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: two gradient directories in, one json and one md out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 340" role="img" aria-label="data flow of e18_gradient_duel.py: no CLI argument, three read sources, one stats object, two written files and a printed verdict">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="g1">
+    <title>No CLI arguments; only the imported settings</title>
+    <rect x="20" y="30" width="250" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="56" text-anchor="middle">no CLI arguments</text>
+    <text class="box-sub" x="145" y="78" text-anchor="middle">main takes no arguments L81</text>
+    <text class="box-sub" x="145" y="96" text-anchor="middle">model from E16.MODEL L168</text>
+    <text class="box-sub" x="145" y="114" text-anchor="middle">env loaded by E16._load_env L82</text>
+    <text class="box-sub" x="145" y="132" text-anchor="middle">config.py: no field read</text>
+  </g>
+
+  <g class="box" id="g2">
+    <title>Everything read from disk</title>
+    <rect x="20" y="170" width="250" height="140" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="196" text-anchor="middle">reads</text>
+    <text class="box-sub" x="145" y="218" text-anchor="middle">results/_e16_population.json L43</text>
+    <text class="box-sub" x="145" y="236" text-anchor="middle">results/E18_bt_gradients/ L46</text>
+    <text class="box-sub" x="145" y="254" text-anchor="middle">results/E15_bt_gradients/ L60</text>
+    <text class="box-sub" x="145" y="272" text-anchor="middle">both txt bodies L91 L92</text>
+    <text class="box-sub" x="145" y="290" text-anchor="middle">results/_e16_judge_cache.jsonl L159</text>
+  </g>
+
+  <a class="box" id="g3" href="../../experiments_verifiers/harness/e18_gradient_duel.py">
+    <title>rows carry all three judgments plus the label fields</title>
+    <rect x="330" y="40" width="250" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="455" y="66" text-anchor="middle">rows L100</text>
+    <text class="box-sub" x="455" y="86" text-anchor="middle">e18, e15, ver per generation L104&#8211;L106</text>
+    <text class="box-sub" x="455" y="104" text-anchor="middle">SR and reward carried along L105</text>
+  </a>
+
+  <a class="box" id="g4" href="../../experiments_verifiers/harness/e18_gradient_duel.py">
+    <title>the stats object and the verdict sentence</title>
+    <rect x="330" y="160" width="250" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="455" y="186" text-anchor="middle">out object L167</text>
+    <text class="box-sub" x="455" y="206" text-anchor="middle">stats L181, calls L183&#8211;L189</text>
+    <text class="box-sub" x="455" y="224" text-anchor="middle">verdict answer L208</text>
+  </a>
+
+  <g class="box" id="g5">
+    <title>The written and printed outputs</title>
+    <rect x="650" y="40" width="330" height="140" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7" stroke-dasharray="5 4"/>
+    <text class="box-label" x="815" y="66" text-anchor="middle">writes and prints</text>
+    <text class="box-sub" x="815" y="88" text-anchor="middle">results/E18_gradient_duel_2026-09-23.json L211</text>
+    <text class="box-sub" x="815" y="106" text-anchor="middle">results/E18_gradient_duel_2026-09-23.md L281</text>
+    <text class="box-sub" x="815" y="124" text-anchor="middle">printed verdict answer L213</text>
+    <text class="box-sub" x="815" y="142" text-anchor="middle">printed new-call counts L214</text>
+    <text class="box-sub" x="815" y="160" text-anchor="middle">printed new cost L215</text>
+  </g>
+
+  <g class="box" id="g6">
+    <title>nothing is returned</title>
+    <rect x="650" y="210" width="330" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="815" y="236" text-anchor="middle">returns None</text>
+    <text class="box-sub" x="815" y="256" text-anchor="middle">main has no return; __main__ guard L284</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="g1" data-to="g3" d="M270,85 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="300" y="77" text-anchor="middle">settings L168</text>
+  <path class="edge dashed-edge" data-from="g2" data-to="g3" d="M270,240 C300,240 300,110 330,104" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="296" y="160" text-anchor="start">triples L83</text>
+  <path class="edge" data-from="g3" data-to="g4" d="M455,130 V160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="465" y="150" text-anchor="start">rows L100</text>
+  <path class="edge dashed-edge" data-from="g4" data-to="g5" d="M580,200 C615,200 620,150 650,120" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="176" text-anchor="start">json + md</text>
+  <path class="edge" data-from="g4" data-to="g6" d="M580,230 H650" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="615" y="222" text-anchor="middle">end of main</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the run needs no arguments: both directories and the population file have fixed paths built from <code>EV</code> (L29). The cost block at L155&#8211;L165 counts new calls per side and reads the shared cache for the reported total; the <code>E18_bt_cost_ledger</code> exists check at L157 is an empty branch and is not used.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the logic: the triple join, then the four-way verdict</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 340" role="img" aria-label="logic of e18_gradient_duel.py: how a triple is accepted, and the four verdict branches on the two confidence intervals">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="20" y="20" text-anchor="start">1. accept one generation only when all three gradients exist (build_triples L52&#8211;L63)</text>
+  <g class="box" id="j1">
+    <title>one E18 gradient file</title>
+    <rect x="20" y="40" width="200" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="64" text-anchor="middle">E18 &lt;uuid&gt;.txt L50</text>
+    <text class="box-sub" x="120" y="84" text-anchor="middle">uuid8 = stem[-8:] L51</text>
+  </g>
+  <g class="box" id="j2">
+    <title>population key lookup</title>
+    <rect x="270" y="40" width="230" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="385" y="64" text-anchor="middle">key found? L52</text>
+    <text class="box-sub" x="385" y="84" text-anchor="middle">else campaign suffix search L54</text>
+  </g>
+  <g class="box" id="j3">
+    <title>the E15 file must exist under the same directory name</title>
+    <rect x="560" y="40" width="250" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="64" text-anchor="middle">E15 file exists? L61</text>
+    <text class="box-sub" x="685" y="84" text-anchor="middle">same stem, other directory L60</text>
+  </g>
+  <g class="box" id="j4">
+    <title>keep the triple</title>
+    <rect x="560" y="150" width="250" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="685" y="174" text-anchor="middle">triple kept L64</text>
+    <text class="box-sub" x="685" y="194" text-anchor="middle">item, e15_path, e18_path</text>
+  </g>
+  <g class="box" id="j5">
+    <title>the two counted drops</title>
+    <rect x="270" y="150" width="250" height="60" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="395" y="174" text-anchor="middle">drops L58, L62</text>
+    <text class="box-sub" x="395" y="194" text-anchor="middle">no join, or no E15 gradient</text>
+  </g>
+  <path class="edge" data-from="j1" data-to="j2" d="M220,70 H270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="j2" data-to="j3" d="M500,70 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="530" y="60" text-anchor="middle">item</text>
+  <path class="edge" data-from="j2" data-to="j5" d="M385,100 V150" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="395" y="128" text-anchor="start">no candidate</text>
+  <path class="edge" data-from="j3" data-to="j4" d="M685,100 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="695" y="128" text-anchor="start">yes</text>
+  <path class="edge" data-from="j3" data-to="j5" d="M560,80 C520,100 470,120 450,150" fill="none" stroke="#FF4D6A" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="500" y="112" text-anchor="middle">no</text>
+
+  <line x1="20" y1="228" x2="1180" y2="228" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="20" y="248" text-anchor="start">2. verdict on the two E18 deltas (main L191&#8211;L210)</text>
+  <g class="box" id="v1">
+    <title>the two relevance deltas of the E18 side</title>
+    <rect x="20" y="262" width="230" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="286" text-anchor="middle">rel18v, rel18x15 L191</text>
+    <text class="box-sub" x="135" y="306" text-anchor="middle">both intervals exist</text>
+  </g>
+  <g class="box" id="v2">
+    <title>both lower bounds above zero</title>
+    <rect x="300" y="262" width="230" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="415" y="286" text-anchor="middle">both CIs exclude 0? L196</text>
+    <text class="box-sub" x="415" y="306" text-anchor="middle">beat_ver and beat_e15 L194</text>
+  </g>
+  <g class="box" id="v3">
+    <title>the strongest verdict</title>
+    <rect x="580" y="180" width="290" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="725" y="204" text-anchor="middle">YES, beats both channels L197</text>
+    <text class="box-sub" x="725" y="224" text-anchor="middle">verdict answer</text>
+  </g>
+  <g class="box" id="v4">
+    <title>both means positive but an interval spans zero</title>
+    <rect x="580" y="40" width="290" height="60" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="725" y="64" text-anchor="middle">DIRECTIONALLY YES L199</text>
+    <text class="box-sub" x="725" y="84" text-anchor="middle">verdict answer, underpowered label</text>
+  </g>
+  <g class="box" id="v5">
+    <title>exactly one side is beaten</title>
+    <rect x="580" y="262" width="290" height="60" rx="2" fill="none" stroke="#FFB547"/>
+    <text class="box-label" x="725" y="286" text-anchor="middle">MIXED L202</text>
+    <text class="box-sub" x="725" y="306" text-anchor="middle">names the beaten channel</text>
+  </g>
+  <g class="box" id="v6">
+    <title>no side beaten</title>
+    <rect x="930" y="150" width="250" height="60" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="1055" y="174" text-anchor="middle">NO L206</text>
+    <text class="box-sub" x="1055" y="194" text-anchor="middle">verdict answer, points at deltas</text>
+  </g>
+  <path class="edge" data-from="v1" data-to="v2" d="M250,292 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="v2" data-to="v3" d="M530,282 C555,270 555,220 580,212" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="556" y="250" text-anchor="middle">yes</text>
+  <path class="edge" data-from="v2" data-to="v4" d="M530,272 C550,240 550,150 580,90" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="552" y="140" text-anchor="middle">no, both means positive</text>
+  <path class="edge" data-from="v2" data-to="v5" d="M530,300 C550,300 555,292 580,292" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="556" y="316" text-anchor="middle">one side</text>
+  <path class="edge" data-from="v5" data-to="v6" d="M870,292 C910,292 920,200 930,184" fill="none" stroke="#FF4D6A" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="912" y="262" text-anchor="middle">none</text>
+  <text class="box-sub" x="20" y="336" text-anchor="start">11 boxes &#183; red = dropped input or the negative verdict; amber = an answer with a wide interval</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; 11 boxes. The join needs the E18 file, a population key and the E15 file of the same name; the verdict reads <code>rel18v["ci95"][0]</code> and <code>rel18x15["ci95"][0]</code> for the strict answer and falls back to the sign of the two means (L194&#8211;L207).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">_e16_population.json</td><td><code class="path">results/</code>, via <code>E16.POP_JSON</code></td><td>the judged item: goal, artifact state, labels</td><td class="size">L43</td></tr>
+<tr><td>reads</td><td class="sym">E18_bt_gradients/&lt;campaign&gt;__&lt;task&gt;/</td><td><code class="path">results/</code></td><td>the E18 scripted gradient of the generation</td><td class="size">L35 L46 L50</td></tr>
+<tr><td>reads</td><td class="sym">E15_bt_gradients/&lt;campaign&gt;__&lt;task&gt;/</td><td><code class="path">results/</code></td><td>the E15 preference gradient of the same name</td><td class="size">L34 L60 L61</td></tr>
+<tr><td>reads</td><td class="sym">both gradient bodies</td><td>the two txt files</td><td>the text swapped into the judge prompt</td><td class="size">L91 L92</td></tr>
+<tr><td>reads</td><td class="sym">verifier gradient text</td><td>inside the item, <code>E16.gradient_text</code></td><td>the block that is replaced</td><td class="size">L72</td></tr>
+<tr><td>reads</td><td class="sym">_e16_judge_cache.jsonl</td><td><code class="path">results/</code></td><td>cached judgments and the reported total cost</td><td class="size">L159 L160</td></tr>
+<tr><td>reads</td><td class="sym">repo .env</td><td>repo root and <code class="path">experiments_verifiers/.env</code></td><td>API key material, through <code>E16._load_env</code></td><td class="size">L82</td></tr>
+<tr><td>writes</td><td class="sym">E18_gradient_duel_2026-09-23.json</td><td><code class="path">results/</code></td><td>verdict, stats and all three judgments per pair</td><td class="size">L211</td></tr>
+<tr><td>writes</td><td class="sym">E18_gradient_duel_2026-09-23.md</td><td><code class="path">results/</code></td><td>the same numbers as markdown</td><td class="size">L281</td></tr>
+<tr><td>prints</td><td class="sym">answer, call counts, cost</td><td>console</td><td>population line, drops, verdict, spend</td><td class="size">L84 L213&#8211;L215</td></tr>
+<tr><td>returns</td><td class="sym">None</td><td><code>main</code></td><td>no return statement; guard at L284</td><td class="size">L81</td></tr>
+<tr><td>config</td><td class="sym">E16.MODEL only</td><td>constant of the imported file</td><td>the one model both judge roles use</td><td class="size">L168</td></tr>
+<tr><td>config</td><td class="sym">CAP_USD = 6.0</td><td>this file, L38</td><td>recorded as <code>within_cap</code> against new cost</td><td class="size">L188 L189</td></tr>
+<tr><td>state</td><td class="sym">none</td><td>no state key, no <code>config.py</code> field</td><td>all inputs are fixed result paths</td><td class="size">&#8212;</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: <code>within_cap</code> compares the new-call cost only (L164) against <code>CAP_USD = 6.0</code> (L189). The total across all three channels is reported separately as <code>cache_total_cost_usd_all_e16_e17_e18</code> (L187) and is not compared with any cap.</p>
+<p class="note flag">Red: the branch at L157&#8211;L158 checks the E18 cost ledger and then does nothing (<code>pass</code> with the comment that <code>E16._llm</code> logs into its own cache). A reader can take the ledger check for a control; it is dead code.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>5 top-level functions, 2 nested functions, 0 classes &mdash; signatures and roles</summary><div class="dbody">
+<pre>build_triples()                              L41    join three gradient texts per item
+judge_with_text(item, grad_text, role)       L69    judge with one swapped gradient text
+main()                                       L81    run three judges, compare, write
+_fmt(x, nd=3)                                L218   dash for None, else 3 decimals
+_write_md(out)                               L222   render the markdown report</pre>
+<p>Nested functions: <code>one(k)</code> L89 (inside <code>main</code>, the three judging calls) and <code>paired(side_x, side_y, field, boot=999, seed=0)</code> L109 (inside <code>main</code>).</p>
+<p>Module constants: <code>EV</code> L29, <code>TODAY</code> L33, <code>E15_DIR</code> L34, <code>E18_DIR</code> L35, <code>OUT_JSON</code> L36, <code>OUT_MD</code> L37, <code>CAP_USD</code> L38. Import: <code>sys.path.insert(0, str(EV / "harness"))</code> L30 then <code>import e16_gradient_audit as E16</code> L31.</p>
+<p>Comparison sets: <code>sides = [("e18", "ver"), ("e18", "e15"), ("e15", "ver")]</code> L135 and <code>axes = ["gold_relevance", "alignment_signed", "hallucination_flag"]</code> L136 give the six paired rows; <code>stats</code> keys are built as <code>f"{x}_minus_{y}"</code> L137. Per side the file stores the direction counter (L138&#8211;L140), the mean relevance (L141&#8211;L143) and the hallucination rate (L144&#8211;L146). SR-stratified deltas exist for the first two side pairs only (L147&#8211;L153). Bootstrap: <code>boot=999</code> (L109), percentiles 2.5 and 97.5, cluster key <code>f"{campaign}|{task}"</code>.</p>
+<p>Judge roles passed to <code>E16._llm</code>: <code>judge_e18</code> and <code>judge_bt</code> (L93, L94); the verifier side runs under the E16 default role through <code>E16.judge_item</code> (L95).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">no importer found</td><td>repo-wide grep finds only this file and its docstring</td><td class="sym">L17</td></tr>
+<tr><td class="sym">documented run</td><td><code>uv run python experiments_verifiers/harness/e18_gradient_duel.py</code></td><td class="sym">L17</td></tr>
+<tr><td class="sym">it imports</td><td><a href="file_harness_e16_gradient_audit.html">e16_gradient_audit.py</a> as <code>E16</code>: prompt, judge, cache, env</td><td class="sym">L31</td></tr>
+<tr><td class="sym">it consumes</td><td>gradient files written by <a href="file_harness_e18_bt_eval.html">e18_bt_eval.py</a> (<code>write_gradients</code>) and by the E15 harness</td><td class="sym">L34 L35</td></tr>
+<tr><td class="sym">predecessor page</td><td><a href="file_harness_e17_gradient_duel.html">e17_gradient_duel.py</a> ran the two-way duel; this file adds the third channel</td><td class="sym">L28&#8211;L34</td></tr>
+</tbody>
+</table>
+<p>Tests: no test found. A grep of <code class="path">tests/</code> for <code>e18_gradient</code>, <code>build_triples</code> and <code>judge_with_text</code> returns no file.</p>
+<p>Line count: 285 lines (<code>wc -l</code>).</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e18_gradient_duel.py</code> (285 lines, read in full: docstring, constants, all five top-level functions, both nested functions, the join, the cost block and the verdict branches), the E16 file for the imported symbols, repo-wide grep for <code>e18_gradient_duel</code>, grep of <code class="path">tests/</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> and the repo <code class="path">.env</code> (key material, never opened); <code class="path">results/E18_gradient_duel_2026-09-23.{json,md}</code>, <code class="path">results/_e16_population.json</code> and the gradient directories (read-only evidence, quoted on <a href="exp_e18_gradient_duel.html">exp_e18_gradient_duel.html</a>); <code class="path">results/_e16_judge_cache.jsonl</code> (shared cache, not opened); the E19/E24 duel files that repeat the pattern and the E18 producer file &mdash; their own pages. No script was run, no pytest, no application start.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Modules and prompts - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > modules and prompts">
+<div class="wrap">
+
+<h1 class="hud">Modules and prompts</h1>
+<p class="intro">Two Python templates and ten Markdown prompts are read from disk and spliced into every generated workflow script. The workflow factory reads them, the assembly step pastes them into one module, and the runner executes that module in a subprocess. No page describes the templates line by line.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 - how a template reaches a running workflow</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 250" role="img" aria-label="Template injection chain">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="t1" href="../../sources/modules/state_schema.py">
+    <title>State template, injected verbatim as state_code</title>
+    <rect x="16" y="20" width="200" height="42" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="116" y="39" text-anchor="middle">state_schema.py</text>
+    <text class="box-sub" x="116" y="55" text-anchor="middle">151 lines</text>
+  </a>
+
+  <a class="box" id="t2" href="../../sources/modules/smolagent_factory.py">
+    <title>Agent factory template, injected verbatim as smolagent_factory_code</title>
+    <rect x="16" y="72" width="200" height="42" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="116" y="91" text-anchor="middle">smolagent_factory.py</text>
+    <text class="box-sub" x="116" y="107" text-anchor="middle">501 lines</text>
+  </a>
+
+  <a class="box" id="t3" href="../../sources/prompts/workflow_v15.md">
+    <title>Workflow-creator prompt selected by config</title>
+    <rect x="16" y="124" width="200" height="42" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="116" y="143" text-anchor="middle">workflow_v15.md</text>
+    <text class="box-sub" x="116" y="159" text-anchor="middle">selected by config</text>
+  </a>
+
+  <a class="box" id="t4" href="../../sources/prompts/smolagent_sys_prompt.md">
+    <title>Per-agent system prompt, stored as SYSTEM_PROMPT</title>
+    <rect x="16" y="176" width="200" height="42" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="116" y="195" text-anchor="middle">smolagent_sys_prompt.md</text>
+    <text class="box-sub" x="116" y="211" text-anchor="middle">agent protocol</text>
+  </a>
+
+  <a class="box" id="f1" href="mod_core_runner.html">
+    <title>WorkflowFactory.assemble_workflow splices the four inputs into one script</title>
+    <rect x="330" y="88" width="290" height="54" rx="20" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="475" y="110" text-anchor="middle">WorkflowFactory.assemble_workflow</text>
+    <text class="box-sub" x="475" y="128" text-anchor="middle">f-string splices 4 code blocks</text>
+  </a>
+
+  <g class="box" id="g1">
+    <title>complete_code: the assembled runnable module</title>
+    <rect x="680" y="40" width="200" height="46" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="780" y="60" text-anchor="middle">generated workflow</text>
+    <text class="box-sub" x="780" y="76" text-anchor="middle">complete_code</text>
+  </g>
+
+  <a class="box" id="r1" href="mod_core_runner.html">
+    <title>WorkflowRunner.execute runs the assembled script in its own venv</title>
+    <rect x="680" y="140" width="200" height="46" rx="20" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="780" y="160" text-anchor="middle">WorkflowRunner.execute</text>
+    <text class="box-sub" x="780" y="176" text-anchor="middle">venv subprocess</text>
+  </a>
+
+  <path class="edge" data-from="t1" data-to="f1" d="M216,41 L330,100" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="273" y="62" text-anchor="middle">craft_workflow</text>
+  <path class="edge" data-from="t2" data-to="f1" d="M216,93 L330,108" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="273" y="88" text-anchor="middle">craft_workflow</text>
+  <path class="edge" data-from="t3" data-to="f1" d="M216,145 L330,124" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="273" y="130" text-anchor="middle">get_system_prompt</text>
+  <path class="edge" data-from="t4" data-to="f1" d="M216,197 L330,136" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="273" y="154" text-anchor="middle">load_single_agent_</text>
+  <text class="edge-label" x="273" y="166" text-anchor="middle">system_prompt</text>
+
+  <path class="edge" data-from="f1" data-to="g1" d="M620,115 L680,63" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="650" y="82" text-anchor="middle">returns complete_code</text>
+  <path class="edge" data-from="g1" data-to="r1" d="M780,86 L780,140" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="772" y="117" text-anchor="end">execute runs</text>
+
+  <text class="box-sub" x="16" y="242">solid = call | fan-in edges: read template, then splice | max 7 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - injection chain. <code>WorkflowFactory.get_system_prompt()</code> (<code>sources/core/workflow_factory.py:49</code>) reads <code>workflow_v15.md</code>; <code>Factory.load_single_agent_system_prompt()</code> (<code>sources/core/factory.py:99</code>) reads <code>smolagent_sys_prompt.md</code>; <code>WorkflowFactory.craft_workflow()</code> (<code>sources/core/workflow_factory.py:412</code>) reads both <code>sources/modules/*.py</code> files at lines 466-469 and passes them to <code>assemble_workflow()</code> (<code>sources/core/workflow_factory.py:283</code>); <code>WorkflowOrchestrator.workflow_sandbox_run()</code> (<code>sources/core/orchestrator.py:64</code>) hands the assembled code to <code>WorkflowRunner.execute()</code> (<code>sources/core/workflow_runner.py:310</code>).</p>
+
+<details><summary>the splice point, verbatim (workflow_factory.py lines 364-374)</summary><div class="dbody">
+<blockquote># Load tools
+&#123;tools_code&#125;
+
+# Load state schema
+&#123;state_code&#125;
+
+# Load smolagent factory
+&#123;smolagent_factory_code&#125;
+
+# Generated workflow
+&#123;workflow_genotype_code&#125;</blockquote>
+<p class="path">sources/core/workflow_factory.py</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 - state schema keys</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="WorkflowState key tree">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="st0" href="../../sources/modules/state_schema.py">
+    <title>WorkflowState TypedDict, the LangGraph shared state</title>
+    <rect x="14" y="124" width="176" height="52" rx="12" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="102" y="146" text-anchor="middle">WorkflowState</text>
+    <text class="box-sub" x="102" y="162" text-anchor="middle">TypedDict, line 95</text>
+  </a>
+  <path class="edge" data-from="st0" data-to="k0" d="M190,150 L300,16" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <path class="edge" data-from="st0" data-to="k1" d="M190,150 L300,42" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <path class="edge" data-from="st0" data-to="k2" d="M190,150 L300,68" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <path class="edge" data-from="st0" data-to="k3" d="M190,150 L300,94" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <path class="edge" data-from="st0" data-to="k4" d="M190,150 L300,120" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <path class="edge" data-from="st0" data-to="k5" d="M190,150 L300,146" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <path class="edge" data-from="st0" data-to="k6" d="M190,150 L300,172" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <path class="edge" data-from="st0" data-to="k7" d="M190,150 L300,198" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <path class="edge" data-from="st0" data-to="k8" d="M190,150 L300,224" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <rect x="300" y="4" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="20">workflow_uuid: str</text>
+  <rect x="300" y="30" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="46">model_id: str</text>
+  <rect x="300" y="56" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="72">goal: str</text>
+  <rect x="300" y="82" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="98">step_name: List[str]</text>
+  <rect x="300" y="108" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="124">task_prompt: List[str]</text>
+  <rect x="300" y="134" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="150">actions: List[Action]</text>
+  <text class="box-sub" x="850" y="150" text-anchor="end">Action = {tool: str}</text>
+  <rect x="300" y="160" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="176">observations: List[Observation]</text>
+  <text class="box-sub" x="850" y="176" text-anchor="end">Observation = {data: str}</text>
+  <rect x="300" y="186" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="202">answers: List[str]</text>
+  <rect x="300" y="212" width="560" height="24" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="310" y="228">success: List[bool]</text>
+  <text class="box-sub" x="14" y="288">rounded = class/TypedDict | rectangle = one state key | my reading of state_schema.py</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - the 9 keys of <code>WorkflowState</code> (<code>sources/modules/state_schema.py:95</code>) plus the nested <code>Action</code> and <code>Observation</code> TypedDicts (lines 89 and 92). <code>master_router</code> (line 109) and <code>debate_router</code> (line 142) read <code>answers</code>; the module also sets <code>MAX_CONSECUTIVE_FALLBACKS = 3</code> and <code>MAX_CONSECUTIVE_RETRY = 5</code>. The factory builds the initial state from <code>WorkflowState.__annotations__</code> (<code>sources/core/workflow_factory.py:336</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The two module templates</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/modules/state_schema.py">state_schema.py</a></td><td>Injects the shared state, the two routers, and the <code>Answer</code> parser.</td><td class="size">151</td><td class="sym">WorkflowState, Answer, master_router, debate_router</td></tr>
+<tr><td class="sym"><a href="../../sources/modules/smolagent_factory.py">smolagent_factory.py</a></td><td>Injects the agent factory and the graph-node wrapper.</td><td class="size">501</td><td class="sym">SmolAgentFactory, WorkflowNodeFactory.create_agent_node</td></tr>
+</tbody>
+</table>
+
+<div class="grid2">
+<div class="card steel">
+<h4><a href="../../sources/modules/state_schema.py">sources/modules/state_schema.py</a></h4>
+<p class="role">Defines <code>WorkflowState</code>, the <code>Answer</code> model that parses agent JSON, and two routing functions. The factory injects it verbatim as <code>state_code</code>.</p>
+<p class="meta">151 lines &#183; not imported at runtime &#183; read by <code>WorkflowFactory.craft_workflow</code> (workflow_factory.py:466)</p>
+<details><summary>symbols and constants</summary><div class="dbody">
+<pre>class Answer(BaseModel): status, message, retry_advice, error
+class Action(TypedDict): tool: str
+class Observation(TypedDict): data: str
+class WorkflowState(TypedDict): 9 keys
+MAX_CONSECUTIVE_FALLBACKS = 3
+MAX_CONSECUTIVE_RETRY = 5
+def master_router(state) -&gt; str
+def debate_router(state) -&gt; str</pre>
+<p><code>Answer.validate</code> repairs malformed JSON and falls back to <code>Answer.from_raw</code>. <code>master_router</code> reads the last 5 <code>step_name</code> entries to bound retry loops.</p>
+</div></details>
+</div>
+
+<div class="card steel">
+<h4><a href="../../sources/modules/smolagent_factory.py">sources/modules/smolagent_factory.py</a></h4>
+<p class="role">Wraps a SmolAgents <code>CodeAgent</code> with memory caching, logprobs, and a graph-node factory. The factory injects it verbatim as <code>smolagent_factory_code</code>.</p>
+<p class="meta">501 lines &#183; read by <code>WorkflowFactory.craft_workflow</code> (workflow_factory.py:468) &#183; imports <code>MODEL_ID</code>, <code>MEMORY_PATH</code>, <code>SYSTEM_PROMPT</code> globals</p>
+<details><summary>symbols</summary><div class="dbody">
+<pre>TOP_LOGPROBS = 5
+def logprobs_kwargs_for(model_id) -&gt; dict
+class SmolAgentFactory:
+    __init__(name, instruct_prompt, tools, model, temperature, max_steps=128)
+    override_system_prompt(sys_prompt)
+    get_engine()
+    build_workflow_step_prompt(state)
+    load_agent_memory(workflow_uuid, instructions)
+    run_cached(state, instructions) -&gt; dict
+    run(state) -&gt; dict
+class WorkflowNodeFactory:
+    create_agent_node(agent_factory) -&gt; Callable[[WorkflowState], dict]</pre>
+<p><code>CodeAgent(...)</code> at line 145 carries an <code>additional_authorized_imports</code> allow-list (line 155 onward); the comment there limits action-as-code to basic libraries.</p>
+</div></details>
+</div>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The ten prompt files</h2>
+<table>
+<thead><tr><th>Name</th><th class="size">Lines</th><th>Used by</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/prompts/planner_paperbench_codedev.md">planner_paperbench_codedev.md</a></td><td class="size">95</td><td>no code reference found (unknown)</td><td>Planner prompt for paperbench code-dev tasks.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/planner_reproduction.md">planner_reproduction.md</a></td><td class="size">122</td><td><code>config.prompt_planner</code>; <code>Planner._read_prompt</code></td><td>Planner prompt for paper reproduction plans.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/smolagent_sys_prompt.md">smolagent_sys_prompt.md</a></td><td class="size">407</td><td><code>config.prompt_smolagent</code>; <code>Factory.load_single_agent_system_prompt</code></td><td>System prompt for the code-action agent.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/workflow_v8.md">workflow_v8.md</a></td><td class="size">297</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Polymorphic architect; 49 headings, pattern catalogue.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/workflow_v9.md">workflow_v9.md</a></td><td class="size">429</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Longest file; adds custom routers and deliberation.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/workflow_v10.md">workflow_v10.md</a></td><td class="size">183</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Shortest workflow prompt; kept for diffing.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/workflow_v11.md">workflow_v11.md</a></td><td class="size">227</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Adds router reference and debate protocol.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/workflow_v12_model_select.md">workflow_v12_model_select.md</a></td><td class="size">258</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Adds a model-choice section for agents.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/workflow_v13_model_select.md">workflow_v13_model_select.md</a></td><td class="size">241</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Revisions of the model-choice variant.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/workflow_v15.md">workflow_v15.md</a></td><td class="size">333</td><td><code>config.prompt_workflow_creator</code> (default)</td><td>Flexible-routing variant; lets the LLM write routers.</td></tr>
+</tbody>
+</table>
+
+<h3>File size of each prompt</h3>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 250" role="img" aria-label="Prompt file size bar chart">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="60" y="141.7" width="56" height="63.3" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="88.0" y="137.7" text-anchor="middle">6.1k</text>
+  <text class="box-sub" x="88.0" y="218" text-anchor="middle">planner_pb</text>
+  <rect x="142" y="124.8" width="56" height="80.2" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="170.0" y="120.8" text-anchor="middle">7.7k</text>
+  <text class="box-sub" x="170.0" y="218" text-anchor="middle">planner_rep</text>
+  <rect x="224" y="40.0" width="56" height="165.0" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="252.0" y="36.0" text-anchor="middle">15.9k</text>
+  <text class="box-sub" x="252.0" y="218" text-anchor="middle">smol_sys</text>
+  <rect x="306" y="140.2" width="56" height="64.8" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="334.0" y="136.2" text-anchor="middle">6.2k</text>
+  <text class="box-sub" x="334.0" y="218" text-anchor="middle">v10</text>
+  <rect x="388" y="88.8" width="56" height="116.2" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="416.0" y="84.8" text-anchor="middle">11.2k</text>
+  <text class="box-sub" x="416.0" y="218" text-anchor="middle">v11</text>
+  <rect x="470" y="80.4" width="56" height="124.6" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="498.0" y="76.4" text-anchor="middle">12.0k</text>
+  <text class="box-sub" x="498.0" y="218" text-anchor="middle">v12_model_select</text>
+  <rect x="552" y="87.7" width="56" height="117.3" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="580.0" y="83.7" text-anchor="middle">11.3k</text>
+  <text class="box-sub" x="580.0" y="218" text-anchor="middle">v13_model_select</text>
+  <rect x="634" y="67.6" width="56" height="137.4" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="662.0" y="63.599999999999994" text-anchor="middle">13.2k</text>
+  <text class="box-sub" x="662.0" y="218" text-anchor="middle">v15</text>
+  <rect x="716" y="100.4" width="56" height="104.6" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="744.0" y="96.4" text-anchor="middle">10.1k</text>
+  <text class="box-sub" x="744.0" y="218" text-anchor="middle">v8</text>
+  <rect x="798" y="52.30000000000001" width="56" height="152.7" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="826.0" y="48.30000000000001" text-anchor="middle">14.7k</text>
+  <text class="box-sub" x="826.0" y="218" text-anchor="middle">v9</text>
+  <line x1="40" y1="205" x2="880" y2="205" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="40" y="238">bytes, one bar per prompt file (my computation) | max = 15889 bytes = smolagent_sys_prompt.md</text>
+</svg>
+</div>
+<p class="figcap">Bar chart - the ten prompts range from <code>6.1 kB</code> (<code>workflow_v10.md</code>) to <code>15.9 kB</code> (<code>smolagent_sys_prompt.md</code>). Numbers are my computation from <code>os.path.getsize</code>.</p>
+
+<h3>Pattern of the prompt files</h3>
+<p>All ten are plain Markdown: no YAML front matter, first line is a single <code>#</code> title, then <code>##</code> sections. Length runs from 95 to 429 lines. Heading count ranges from 7 to 65.</p>
+
+<div class="grid3">
+<div class="card steel">
+<h4><a href="../../sources/prompts/workflow_v15.md">workflow_v15.md</a></h4>
+<p class="role">Starts with execution context and router reference, then a section that lets the LLM design its own routers with a stated contract.</p>
+<p class="meta">333 lines &#183; 21 headings &#183; <code>git log</code>: added by commit <code>80b386e</code> "feat: new v15 prompt + sandbox fix"</p>
+</div>
+<div class="card steel">
+<h4><a href="../../sources/prompts/workflow_v9.md">workflow_v9.md</a></h4>
+<p class="role">Oldest style: architecture principles first, then a long catalogue of workflow patterns for scientific computing.</p>
+<p class="meta">429 lines &#183; 65 headings &#183; largest heading count of the set</p>
+</div>
+<div class="card steel">
+<h4><a href="../../sources/prompts/smolagent_sys_prompt.md">smolagent_sys_prompt.md</a></h4>
+<p class="role">Tells one agent how to work: tool use versus Python, execution boundaries, output format, core patterns.</p>
+<p class="meta">407 lines &#183; 24 headings &#183; loaded as <code>SYSTEM_PROMPT</code>, then applied by <code>SmolAgentFactory.override_system_prompt</code></p>
+</div>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Which workflow_v* prompt does the code select?</h2>
+<p>Newest file: <code>workflow_v15.md</code>, modified 2026-09-21 (<code>os.path.getmtime</code>, my computation). Selected prompt: <code>workflow_v15.md</code>, set in <code>config.py</code> and mirrored in <code>config_default.json</code>.</p>
+<details><summary>grep evidence (grep -rn 'workflow_v' --include=*.py --include=*.json)</summary><div class="dbody">
+<pre>config.py:207:            "sources/prompts/workflow_v15.md"
+config_default.json:60:  "prompt_workflow_creator": "sources/prompts/workflow_v15.md",
+tests/paths_test.py:78:            "prompt_planner": "sources/prompts/workflow_v10.md",
+.git HEAD (7e8463b) config.py:153: workflow_v15.md</pre>
+<p>Only <code>workflow_v15.md</code> is named as a default. No .py or .json file outside <code>config.py</code>, <code>config_default.json</code> and <code class="path">tests/paths_test.py</code> names any <code>workflow_v*.md</code> file. CLI override: <code>--prompt_workflow_creator</code> (<code>main.py:68</code>, applied at <code>main.py:113</code>).</p>
+</div></details>
+<p class="note say">A prompt that is not selected is never read: <code>WorkflowFactory.get_system_prompt()</code> opens exactly one path, <code>config.prompt_workflow_creator</code>.</p>
+<p class="note">No <code>workflow_v14.md</code> exists; the set jumps from <code>workflow_v13_model_select.md</code> to <code>workflow_v15.md</code>. Whether a v14 was ever written is unknown.</p>
+<p class="note flag"><code>docs/DEVELOPER_GUIDE.md:160</code> and <code>docs/reference/configuration.md:37</code> both name <code>workflow_v11.md</code> as the current default; the code default is <code>workflow_v15.md</code> (<code>config.py:206-208</code>, <code>config_default.json:60</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Related pages</h2>
+<div class="grid3">
+<div class="card l2"><h4><a href="mod_core_runner.html">mod_core_runner.html</a></h4><p class="role">Carries the file cards for <code>WorkflowFactory</code> and <code>WorkflowRunner</code>.</p><p class="meta">page</p></div>
+<div class="card l2"><h4><a href="mod_core_planner.html">mod_core_planner.html</a></h4><p class="role">Shows <code>Planner._read_prompt</code>, which opens <code>prompt_planner</code>.</p><p class="meta">page</p></div>
+<div class="card ice"><h4><a href="area_entry_config.html">area_entry_config.html</a></h4><p class="role">Holds the <code>config.py</code> and <code>config_default.json</code> fields that name the prompts.</p><p class="meta">page</p></div>
+</div>
+<div class="grid2">
+<div class="card l3"><h4><a href="flow_task_run.html">flow_task_run.html</a></h4><p class="role">Shows the same chain as a sequence: craft, assemble, execute, evaluate.</p><p class="meta">page</p></div>
+<div class="card l2"><h4><a href="overview.html">overview.html</a></h4><p class="role">Places the sandbox step in the 5-layer picture.</p><p class="meta">page</p></div>
+</div>
+</div>
+
+<footer>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>; <code class="path">docs/visual_clone/_clone.css</code>; <code class="path">docs/visual_clone/_clone.js</code>; <code class="path">sources/modules/state_schema.py</code>; <code class="path">sources/modules/smolagent_factory.py</code>; <code>sources/prompts/*.md</code> (10 files); <code class="path">sources/core/workflow_factory.py</code>; <code class="path">sources/core/factory.py</code>; <code class="path">sources/core/orchestrator.py</code>; <code class="path">sources/core/workflow_runner.py</code>; <code class="path">sources/core/planner.py</code>; <code class="path">sources/core/single_agent_factory.py</code>; <code>config.py</code>; <code>config_default.json</code>; <code>main.py</code>; <code class="path">tests/paths_test.py</code>; <code class="path">docs/DEVELOPER_GUIDE.md</code> (lines 155-168); <code class="path">docs/reference/configuration.md</code> (lines 33-40); <code class="path">docs/reference/file-layout.md</code> (lines 68-72).</p>
+<p class="skips">Skipped: <code class="path">sources/modules/__pycache__/</code> - bytecode cache. Skipped: line-by-line reading of the 10 prompt files - Tier C, sampled 3 (<code>planner_reproduction.md</code>, <code>smolagent_sys_prompt.md</code>, <code>workflow_v15.md</code>) and measured the rest by headings and size. Skipped: <code class="path">.venv/lib/python3.11/site-packages/config.py</code> - Tier D; noted only that its default is the older <code>workflow_v12_model_select.md</code>. Skipped: <code class="path">docs/site/</code>, <code>datasets/</code>, <code>webui/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code> - Tier D, out of scope. Skipped: the 8 older <code>workflow_v*.md</code> files beyond sampling - same pattern, differ by section count and size.</p>
+<p>The working tree had uncommitted changes when this page was built: <code>git status --porcelain</code> lists modified files (including <code>config.py</code>, <code>docs/</code>) and <code class="path">docs/visual_clone/</code> as untracked. The prompt defaults were checked against <code>git show HEAD:config.py</code> and match. <code class="path">sources/modules/</code> and <code class="path">sources/prompts/</code> were unmodified.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

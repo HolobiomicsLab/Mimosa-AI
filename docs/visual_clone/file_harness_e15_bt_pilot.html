@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e15_bt_pilot.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > experiments_verifiers/harness > e15_bt_pilot.py">
+<div class="wrap">
+
+<h1 class="hud">e15_bt_pilot.py</h1>
+<p class="intro">The live judging engine of the E15 preference pilot: it walks the pair plan written by <a href="file_harness_e14_bt_enabler.html">e14_bt_enabler.py</a> and asks two OpenRouter judges which of two workspaces delivered more. Every pair is judged in both listed orders, a disagreement triggers one third vote, and each call is appended to a cost ledger. It is resumable and stops when a cost cap is reached.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Master diagram &mdash; from the pair plan to two ledgers</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 460" role="img" aria-label="e15_bt_pilot.py pipeline: plan, dry run, judge queue, both-order calls, third vote, ledgers">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="bin" href="#reads">
+    <title>Plan, goals and snapshot file paths are all read from disk</title>
+    <rect x="10" y="16" width="166" height="92" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="93" y="38" text-anchor="middle">inputs</text>
+    <text class="box-sub" x="93" y="54" text-anchor="middle">results/E14_bt_population.json</text>
+    <text class="box-sub" x="93" y="70" text-anchor="middle">run_notes/&lt;camp&gt;/&lt;task&gt;.json</text>
+    <text class="box-sub" x="93" y="86" text-anchor="middle">snapshot artifact paths</text>
+    <text class="box-sub" x="93" y="100" text-anchor="middle">PNG bytes for image pairs</text>
+  </a>
+
+  <a class="box" id="bmain" href="#reads">
+    <title>main() dispatches the two subcommands</title>
+    <rect x="10" y="150" width="166" height="66" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="93" y="174" text-anchor="middle">main()</text>
+    <text class="box-sub" x="93" y="190" text-anchor="middle">argparse: dry | judge</text>
+    <text class="box-sub" x="93" y="206" text-anchor="middle">flags: workers, cost-cap, limit</text>
+  </a>
+
+  <a class="box" id="bdry" href="#reads">
+    <title>dry: validate the plan and print the shape of the work</title>
+    <rect x="212" y="10" width="220" height="66" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="322" y="34" text-anchor="middle">cmd_dry()</text>
+    <text class="box-sub" x="322" y="50" text-anchor="middle">load_plan asserts 19 groups / 667 pairs</text>
+    <text class="box-sub" x="322" y="66" text-anchor="middle">counts image vs text pairs</text>
+  </a>
+
+  <a class="box" id="bjudge" href="#reads">
+    <title>judge: build the queue, set pricing and the cap, run a thread pool</title>
+    <rect x="212" y="96" width="220" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="322" y="120" text-anchor="middle">cmd_judge()</text>
+    <text class="box-sub" x="322" y="136" text-anchor="middle">skip pairs in load_done_pairs()</text>
+    <text class="box-sub" x="322" y="152" text-anchor="middle">_spent = load_spent()</text>
+    <text class="box-sub" x="322" y="168" text-anchor="middle">ThreadPoolExecutor(workers=6)</text>
+  </a>
+
+  <a class="box" id="brp" href="#reads">
+    <title>run_pair builds the prompt and judges the first listed order</title>
+    <rect x="212" y="194" width="220" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="322" y="218" text-anchor="middle">run_pair()</text>
+    <text class="box-sub" x="322" y="234" text-anchor="middle">build() via E14.build_prompt</text>
+    <text class="box-sub" x="322" y="250" text-anchor="middle">one(i, j, "i-first")</text>
+    <text class="box-sub" x="322" y="266" text-anchor="middle">model: text or vision</text>
+  </a>
+
+  <a class="box" id="bone2" href="#reads">
+    <title>Second call swaps the listed order</title>
+    <rect x="212" y="292" width="220" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="322" y="316" text-anchor="middle">second call</text>
+    <text class="box-sub" x="322" y="332" text-anchor="middle">one(j, i, "j-first")</text>
+    <text class="box-sub" x="322" y="348" text-anchor="middle">verdicts normalized to i/j space</text>
+  </a>
+
+  <a class="box" id="bthird" href="#reads">
+    <title>Agreement decides; disagreement triggers one coin-ordered third vote</title>
+    <rect x="212" y="374" width="220" height="80" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="322" y="396" text-anchor="middle">verdict rule</text>
+    <text class="box-sub" x="322" y="412" text-anchor="middle">same verdict &#8594; both-orders-agree</text>
+    <text class="box-sub" x="322" y="428" text-anchor="middle">else stable_coin() &#8594; third vote</text>
+    <text class="box-sub" x="322" y="444" text-anchor="middle">majority, or tie if split</text>
+  </a>
+
+  <g class="box" id="bjudgecall">
+    <title>One judge call: retries, JSON-mode fallback, cost guard</title>
+    <rect x="470" y="96" width="196" height="96" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="568" y="120" text-anchor="middle">judge_call() / _call_llm()</text>
+    <text class="box-sub" x="568" y="136" text-anchor="middle">base64 images attached</text>
+    <text class="box-sub" x="568" y="152" text-anchor="middle">5 attempts with backoff</text>
+    <text class="box-sub" x="568" y="168" text-anchor="middle">cost cap check &#8594; StopRun</text>
+    <text class="box-sub" x="568" y="184" text-anchor="middle">parse_verdict on the text</text>
+  </g>
+
+  <g class="box" id="bout">
+    <title>Two append-only ledgers, both JSONL</title>
+    <rect x="700" y="120" width="190" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="795" y="144" text-anchor="middle">writes</text>
+    <text class="box-sub" x="795" y="166" text-anchor="middle">E15_bt_pilot_judgments</text>
+    <text class="box-sub" x="795" y="182" text-anchor="middle">_2026-09-23.jsonl (per pair)</text>
+    <text class="box-sub" x="795" y="204" text-anchor="middle">E15_bt_cost_ledger</text>
+    <text class="box-sub" x="795" y="220" text-anchor="middle">_2026-09-23.jsonl (per call)</text>
+    <text class="box-sub" x="795" y="244" text-anchor="middle">2 146 call records</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="bin" data-to="bmain" d="M93,108 V150" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="101" y="134" text-anchor="start">paths only</text>
+
+  <path class="edge" data-from="bmain" data-to="bdry" d="M176,166 L212,44" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="180" y="100" text-anchor="start">dry</text>
+  <path class="edge" data-from="bmain" data-to="bjudge" d="M176,182 L212,134" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="182" y="150" text-anchor="start">judge</text>
+  <path class="edge dashed-edge" data-from="bdry" data-to="bjudge" d="M432,44 C470,70 470,100 432,120" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="452" y="86" text-anchor="start">load_plan()</text>
+  <path class="edge" data-from="bjudge" data-to="brp" d="M322,172 V194" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="188" text-anchor="start">submit</text>
+  <path class="edge" data-from="brp" data-to="bone2" d="M322,270 V292" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="286" text-anchor="start">second order</text>
+  <path class="edge" data-from="bone2" data-to="bthird" d="M322,362 V374" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="372" text-anchor="start">compare</text>
+  <path class="edge" data-from="brp" data-to="bjudgecall" d="M432,230 L470,168" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="446" y="196" text-anchor="start">judge_call()</text>
+  <path class="edge" data-from="bthird" data-to="bjudgecall" d="M432,398 L470,190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="300" text-anchor="start">third vote</text>
+  <path class="edge dashed-edge" data-from="bjudgecall" data-to="bout" d="M666,144 H700" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="682" y="136" text-anchor="middle">append call</text>
+  <path class="edge dashed-edge" data-from="bthird" data-to="bout" d="M432,414 C560,420 640,300 700,250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="580" y="404" text-anchor="middle">append pair</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; two subcommands, one pair pipeline. Calls, order labels and the third-vote rule come from <a href="../../experiments_verifiers/harness/e15_bt_pilot.py">e15_bt_pilot.py</a> lines 267&ndash;356; the ledger appends are at lines 225 and 354.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Data flow &mdash; what goes in and what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 290" role="img" aria-label="e15_bt_pilot.py data flow: plan and goals in, judgments and cost ledgers out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="f1">
+    <title>Read-only inputs, all named by the plan</title>
+    <rect x="10" y="30" width="216" height="140" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="118" y="54" text-anchor="middle">reads</text>
+    <text class="box-sub" x="118" y="76" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="118" y="94" text-anchor="middle">groups[].design.judging_order</text>
+    <text class="box-sub" x="118" y="112" text-anchor="middle">gens[].snapshot_path artifacts</text>
+    <text class="box-sub" x="118" y="130" text-anchor="middle">run_notes/&lt;camp&gt;/&lt;task&gt;.json goal</text>
+    <text class="box-sub" x="118" y="148" text-anchor="middle">judgments ledger (resume)</text>
+    <text class="box-sub" x="118" y="164" text-anchor="middle">cost ledger (spent so far)</text>
+  </g>
+
+  <a class="box" id="f2" href="#reads">
+    <title>The per-call record returned by judge_call</title>
+    <rect x="270" y="40" width="200" height="118" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="64" text-anchor="middle">call record</text>
+    <text class="box-sub" x="370" y="82" text-anchor="middle">winner_listed, confidence, reason</text>
+    <text class="box-sub" x="370" y="100" text-anchor="middle">tokens, cost_usd, latency_s</text>
+    <text class="box-sub" x="370" y="118" text-anchor="middle">parse: ok or parse_fail</text>
+    <text class="box-sub" x="370" y="136" text-anchor="middle">plus meta: group, pair, order,</text>
+    <text class="box-sub" x="370" y="152" text-anchor="middle">third_vote, n_images_attached</text>
+  </a>
+
+  <a class="box" id="f3" href="#reads">
+    <title>The per-pair record, which carries the final verdict and its rule</title>
+    <rect x="520" y="30" width="190" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="615" y="54" text-anchor="middle">pair record</text>
+    <text class="box-sub" x="615" y="72" text-anchor="middle">verdict (i, j or tie)</text>
+    <text class="box-sub" x="615" y="90" text-anchor="middle">verdict_rule</text>
+    <text class="box-sub" x="615" y="108" text-anchor="middle">calls: list of call records</text>
+  </a>
+
+  <g class="box" id="f4">
+    <title>Nothing is returned to the shell; the two ledgers are the output</title>
+    <rect x="520" y="160" width="190" height="106" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="615" y="184" text-anchor="middle">writes</text>
+    <text class="box-sub" x="615" y="204" text-anchor="middle">E15_bt_pilot_judgments_2026-09-23.jsonl</text>
+    <text class="box-sub" x="615" y="222" text-anchor="middle">667 records (one per pair)</text>
+    <text class="box-sub" x="615" y="244" text-anchor="middle">E15_bt_cost_ledger_2026-09-23.jsonl</text>
+    <text class="box-sub" x="615" y="262" text-anchor="middle">2 146 records (one per call)</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="f1" data-to="f2" d="M226,100 H270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="248" y="92" text-anchor="middle">prompt built</text>
+  <path class="edge" data-from="f2" data-to="f3" d="M470,100 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="495" y="92" text-anchor="middle">normalize</text>
+  <path class="edge dashed-edge" data-from="f2" data-to="f4" d="M400,158 L520,200" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="440" y="196" text-anchor="middle">ledger.append</text>
+  <path class="edge dashed-edge" data-from="f3" data-to="f4" d="M615,130 V160" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="623" y="148" text-anchor="start">append</text>
+
+  <text class="box-sub" x="10" y="214">Cost guard: <tspan font-style="italic">_spent</tspan>, <tspan font-style="italic">COST_CAP_NOW</tspan> and <tspan font-style="italic">PRICING</tspan> are module globals created inside cmd_judge (lines 419&ndash;427), not at import time.</text>
+  <text class="box-sub" x="10" y="238">No project config field is read: the cap, worker count and models are constants or CLI flags (lines 46&ndash;51, 486&ndash;489).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the dry subcommand needs neither pricing nor the cap: it never calls the judge. The cap values exist only inside the <code>judge</code> path.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic &mdash; verdict rule, cost guard, retry path</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 400" role="img" aria-label="e15_bt_pilot.py verdict decision, cost cap and retry logic">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="h1" href="#reads">
+    <title>Two calls, one per listed order</title>
+    <rect x="10" y="30" width="170" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="95" y="54" text-anchor="middle">v1 and v2</text>
+    <text class="box-sub" x="95" y="70" text-anchor="middle">winner_ij per order</text>
+    <text class="box-sub" x="95" y="86" text-anchor="middle">equals i, j or tie</text>
+  </a>
+
+  <a class="box" id="h2" href="#reads">
+    <title>Agreement is accepted with no third call</title>
+    <rect x="220" y="16" width="180" height="66" rx="12" fill="rgba(57,255,136,0.08)" stroke="#39FF88"/>
+    <text class="box-label" x="310" y="40" text-anchor="middle">v1 == v2</text>
+    <text class="box-sub" x="310" y="56" text-anchor="middle">verdict = v1</text>
+    <text class="box-sub" x="310" y="72" text-anchor="middle">rule = both-orders-agree</text>
+  </a>
+
+  <a class="box" id="h3" href="#reads">
+    <title>Disagreement buys one third vote, order chosen by a hash coin</title>
+    <rect x="220" y="104" width="180" height="76" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="310" y="128" text-anchor="middle">v1 != v2</text>
+    <text class="box-sub" x="310" y="144" text-anchor="middle">stable_coin(group|i|j|third)</text>
+    <text class="box-sub" x="310" y="160" text-anchor="middle">judge the chosen order</text>
+    <text class="box-sub" x="310" y="176" text-anchor="middle">3 votes now</text>
+  </a>
+
+  <a class="box" id="h4" href="#reads">
+    <title>Majority takes the pair; a 2-1-0 style split stays a tie</title>
+    <rect x="220" y="202" width="180" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="310" y="226" text-anchor="middle">count votes</text>
+    <text class="box-sub" x="310" y="242" text-anchor="middle">one leader &#8594; majority rule</text>
+    <text class="box-sub" x="310" y="258" text-anchor="middle">two leaders &#8594; tie</text>
+    <text class="box-sub" x="310" y="274" text-anchor="middle">persistent-3-way-split</text>
+  </a>
+
+  <a class="box" id="h5" href="#reads">
+    <title>Cost guard runs before every attempt</title>
+    <rect x="470" y="16" width="196" height="76" rx="12" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="568" y="40" text-anchor="middle">spent &gt;= cost cap</text>
+    <text class="box-sub" x="568" y="56" text-anchor="middle">STOP flag set</text>
+    <text class="box-sub" x="568" y="72" text-anchor="middle">raise StopRun(reason)</text>
+    <text class="box-sub" x="568" y="88" text-anchor="middle">pending futures cancelled</text>
+  </a>
+
+  <a class="box" id="h6" href="#reads">
+    <title>Retry path: JSON mode dropped, then backoff, five attempts</title>
+    <rect x="470" y="112" width="196" height="104" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="568" y="136" text-anchor="middle">attempt loop</text>
+    <text class="box-sub" x="568" y="152" text-anchor="middle">response_format refused?</text>
+    <text class="box-sub" x="568" y="168" text-anchor="middle">drop it, retry at once</text>
+    <text class="box-sub" x="568" y="184" text-anchor="middle">else wait 4*2^n s, capped</text>
+    <text class="box-sub" x="568" y="200" text-anchor="middle">429 or rate: wait 15*(n+1) s</text>
+  </a>
+
+  <a class="box" id="h7" href="#reads">
+    <title>Unparseable text becomes a zero-confidence tie, flagged</title>
+    <rect x="470" y="236" width="196" height="76" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="568" y="260" text-anchor="middle">parse_verdict None</text>
+    <text class="box-sub" x="568" y="276" text-anchor="middle">winner tie, confidence 0.0</text>
+    <text class="box-sub" x="568" y="292" text-anchor="middle">parse = parse_fail</text>
+    <text class="box-sub" x="568" y="308" text-anchor="middle">the call is still billed</text>
+  </a>
+
+  <a class="box" id="h8" href="#reads">
+    <title>Resume rule: a pair already in the ledger is not judged again</title>
+    <rect x="700" y="112" width="190" height="104" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="795" y="136" text-anchor="middle">skip rule</text>
+    <text class="box-sub" x="795" y="152" text-anchor="middle">key = (group, i, j)</text>
+    <text class="box-sub" x="795" y="168" text-anchor="middle">in load_done_pairs()?</text>
+    <text class="box-sub" x="795" y="184" text-anchor="middle">yes &#8594; not queued</text>
+    <text class="box-sub" x="795" y="200" text-anchor="middle">_spent rebuilt from ledger</text>
+  </a>
+
+  <path class="edge" data-from="h1" data-to="h2" d="M180,52 L220,49" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="44" text-anchor="middle">equal</text>
+  <path class="edge" data-from="h1" data-to="h3" d="M180,72 L220,130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="192" y="106" text-anchor="start">differ</text>
+  <path class="edge" data-from="h3" data-to="h4" d="M310,180 V202" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="318" y="196" text-anchor="start">3 votes</text>
+  <path class="edge dashed-edge" data-from="h1" data-to="h5" d="M180,90 C300,120 360,60 470,44" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="330" y="86" text-anchor="middle">before each attempt</text>
+  <path class="edge" data-from="h5" data-to="h6" d="M568,92 V112" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="576" y="108" text-anchor="start">else try</text>
+  <path class="edge" data-from="h6" data-to="h7" d="M568,216 V236" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="576" y="232" text-anchor="start">text parsed</text>
+  <path class="edge dashed-edge" data-from="h8" data-to="h4" d="M700,140 C620,150 500,220 400,240" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="560" y="196" text-anchor="middle">queue built from ledger</text>
+
+  <text class="box-sub" x="10" y="332">Recorded for this run: 667 judged pairs, 148 gradient files downstream, 2 146 ledger lines; the cost ledger totals $44.8898, above the $40 hard cap.</text>
+  <text class="box-sub" x="10" y="356">The evaluation file names the cause of the overspend as two concurrent judge processes, with duplicate pair records deduplicated before analysis (write-up in E15_bt_pilot_2026-09-23.json, key <tspan font-style="italic">cost.overhead_cause</tspan>).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the verdict tree is lines 322&ndash;341; the cost guard is lines 163&ndash;168; the retry path is lines 177&ndash;189; the skip rule is lines 436&ndash;442.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="reads">What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym">reads</td><td class="sym">E14_bt_population.json</td><td><code>PLAN_PATH</code> (line 41)</td><td>groups, pair lists, gens, pricing block</td><td class="size">65</td></tr>
+<tr><td class="sym">reads</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td><td><code>RUN_NOTES</code> (line 44)</td><td>the task goal placed in the prompt</td><td class="size">92</td></tr>
+<tr><td class="sym">reads</td><td class="sym">snapshot artifacts</td><td>paths from the plan</td><td>previews, image lists and PNG bytes</td><td class="size">199</td></tr>
+<tr><td class="sym">reads</td><td class="sym">judgments ledger</td><td><code>JUDGMENTS</code> (line 42)</td><td>resume: which pairs are already done</td><td class="size">365</td></tr>
+<tr><td class="sym">reads</td><td class="sym">cost ledger</td><td><code>COST_LEDGER</code> (line 43)</td><td>resume: dollars already spent</td><td class="size">376</td></tr>
+<tr><td class="sym">writes</td><td class="sym">judgments JSONL</td><td><code>JUDGMENTS.open("a")</code></td><td>one record per judged pair</td><td class="size">354</td></tr>
+<tr><td class="sym">writes</td><td class="sym">cost ledger JSONL</td><td><code>COST_LEDGER.open("a")</code></td><td>one record per judge call</td><td class="size">225</td></tr>
+<tr><td class="sym">reads</td><td class="sym">config fields</td><td>none</td><td>no project config key is read</td><td class="size">&ndash;</td></tr>
+</tbody>
+</table>
+
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e15_bt_pilot.py">experiments_verifiers/harness/e15_bt_pilot.py</a></h4>
+<p class="role">Executes the E14 pair plan with two LLM judges, resolves both-order disagreements, and logs every call and pair.</p>
+<p class="meta">498 lines &#183; 20 functions, 3 classes &#183; imports litellm lazily &#183; imports e14_bt_enabler</p>
+<details><summary>full symbol inventory &mdash; every class, method and top-level function</summary><div class="dbody">
+<pre>load_plan() -> dict                                       # 64: read plan and assert its shape
+load_goals(plan) -> dict[tuple[str, str], str]            # 88: goal per (campaign, task)
+class StopRun(Exception)                                  # 99: hard stop or budget stop
+class PairDone(Exception)                                 # 103: defined, never raised
+parse_verdict(text) -> dict | None                        # 111: strip think blocks, repair to JSON
+_call_llm(model, messages, max_tokens) -> tuple[str, dict] # 147: litellm call, backoff, cost guard
+judge_call(prompt, model, images, meta) -> dict           # 193: one judge call plus ledger append
+png_dims(path)                                            # 236: PNG IHDR width and height
+gen_images(gen) -> list[Path]                             # 248: two largest PNGs of a generation
+stable_coin(key) -> str                                   # 263: sha256 based order coin
+run_pair(group, pair, goal, call_counter) -> dict         # 267: one pair, both orders, third vote
+  run_pair.build(first, second)                           # 274: nested; prompt and attachments
+  run_pair.build.fmt(pths) -> str                         # 282: nested; "name (WxH px)" list
+  run_pair.one(first, second, order_label, third) -> dict # 295: nested; one normalized call
+load_done_pairs() -> set[tuple]                           # 362: resume key set from the ledger
+load_spent() -> float                                     # 373: dollars from the cost ledger
+class Counter                                             # 382: thread-safe call-id counter
+  Counter.__init__(self, start=0)                         # 383
+  Counter.__iter__(self)                                  # 387
+  Counter.__next__(self)                                  # 390
+cmd_dry(args)                                             # 396: plan check and prompt sizes
+cmd_judge(args)                                           # 418: queue, thread pool, summaries
+main()                                                    # 481: argparse dispatch</pre>
+<p>Module constants: <code>TODAY</code> (40), <code>PLAN_PATH</code> / <code>JUDGMENTS</code> / <code>COST_LEDGER</code> / <code>RUN_NOTES</code> (41&ndash;44), <code>MODEL_TEXT</code> and <code>MODEL_VISION</code> (46&ndash;47), <code>DEFAULT_WORKERS</code>, <code>DEFAULT_COST_CAP</code>, <code>MAX_IMAGES_PER_GEN</code> (49&ndash;51), four threading locks (53&ndash;56), <code>STOP</code> (58), <code>IMAGE_MANIFEST_TAIL</code> (254).</p>
+<p><code>PairDone</code> (line 103) appears only in its own definition: <code>grep -n PairDone</code> finds line 103 alone. Module globals <code>_spent</code>, <code>COST_CAP_NOW</code> and <code>PRICING</code> are assigned inside <code>cmd_judge</code> (lines 419&ndash;427), so the dry path would fail on them if the judge code path ran.</p>
+</div></details>
+
+<details><summary>ledger counts read from the result files</summary><div class="dbody">
+<blockquote>"coverage": {"planned_pairs": 667, "judged_pairs": 667, "complete": true, "gradient_files": 148}</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.json</code>, key <code>coverage</code></p>
+<blockquote>"total_usd": 44.8898, "protocol_usd": 25.9875, "cap_usd": 40.0, "cap_breach": true</blockquote>
+<p class="sub">same file, key <code>cost</code>; the same JSON states the protocol budget holds and the overrun came from duplicate concurrent execution.</p>
+<p>File sizes on disk: <code class="path">E15_bt_pilot_judgments_2026-09-23.jsonl</code> = 667 lines, <code class="path">E15_bt_cost_ledger_2026-09-23.jsonl</code> = 2 146 lines (<code>wc -l</code>).</p>
+</div></details>
+
+<p class="note">The docstring states the gold-hygiene rule: prompts hold only the task goal plus inventories, previews and images; SR, VER and reward are never placed in a prompt (lines 8&ndash;9).</p>
+<p class="note flag">Reasoning is switched off for both judges with <code>extra_body</code> (line 156), and the docstring records why: as reasoners they would exhaust <code>max_tokens</code> before emitting JSON (lines 149&ndash;151). This is a deliberate deviation from the models' defaults.</p>
+<p class="note">The cost cap default is 34.0 dollars (line 50) although the hard cap is 40 (comment line 50, and <code>cap_usd</code> in the results). The recorded run still ended above 40.</p>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">importers</td><td>no importer found</td><td>no importer found; the file is a self-contained CLI</td></tr>
+<tr><td class="sym">imports</td><td><code>e14_bt_enabler as E14</code></td><td>line 38; used at lines 277 and 410 for <code>build_prompt</code></td></tr>
+<tr><td class="sym">run command</td><td><code>dry</code> then <code>judge</code></td><td>docstring lines 16&ndash;18: <code>... e15_bt_pilot.py dry</code>, then <code>judge [--workers 6] [--cost-cap 34]</code></td></tr>
+<tr><td class="sym">plan producer</td><td><code>results/E14_bt_population.json</code></td><td>written by <a href="file_harness_e14_bt_enabler.html">e14_bt_enabler.py</a> line 1227</td></tr>
+<tr><td class="sym">consumer</td><td>both ledgers are read by the evaluator</td><td><a href="file_harness_e15_bt_eval.html">e15_bt_eval.py</a> <code>load_all()</code> (lines 61&ndash;79 there)</td></tr>
+<tr><td class="sym">tests</td><td>none</td><td><code>grep -rn "e15_bt_pilot" tests/</code> returns nothing</td></tr>
+</tbody>
+</table>
+<p class="note">Related pages: <a href="exp_e15_bt_pilot.html">exp_e15_bt_pilot</a> (experiment view with ledger quotes), <a href="file_harness_e15_bt_eval.html">e15_bt_eval</a> (its evaluator), <a href="file_harness_e14_bt_enabler.html">e14_bt_enabler</a> (its plan producer), <a href="exp_index.html">exp_index</a>, and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e15_bt_pilot.py</code> (498 lines, read in full), <code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.json</code> (keys <code>coverage</code>, <code>cost</code>, <code>protocol</code>), <code class="path">experiments_verifiers/results/E14_bt_population.json</code> (totals only), ledger line counts from <code class="path">wc -l</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> (never opened), the body of the 667 pair records and the 2 146 cost records beyond the counts above, the quoted judge reasons (another page quotes them), the artifact files listed inside the plan, and the litellm library source. No judge call was made and no ledger was written by this page. Greps for importers and tests ran over the working copy only.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -46,11 +46,12 @@ You add new tools without touching Mimosa's core.
 
 <div class="feature-card" markdown>
 ### :material-magnify-scan: Verifier-driven evaluation
-A multi-source per-claim verifier writes **deterministic Python programs**
-that confirm what the agents claim, against five vantages (literature,
-user goal, math invariants, statistical fingerprint, visual correctness). Only a coarse *prompt gradient* — which does not
-leak the verified claims — is fed back to the mutator.
-</div>
+A hybrid temporal-ladder verifier extracts task-defining key claims
+(`script` → `log` → `result`) and grades every generation with cached
+**deterministic Python policy scorers**; the reward is a pairwise
+win-rate over the task's previous generations, decided at the earliest
+ladder stage where they differ. An elimination-point *textual gradient*
+is fed back to the mutator.
 
 <div class="feature-card" markdown>
 ### :material-archive: Full audit trail
@@ -100,8 +101,8 @@ The framework is organized into five layers:
 3. **Meta-orchestration** — synthesizes a task-specific multi-agent workflow and
    evolves it generation by generation.
 4. **Agent execution** — code-generating agents run subtasks in a sandbox.
-5. **Judge & evaluation** — multi-source per-claim verifier scores outputs and
-   drives the next mutation.
+5. **Judge & evaluation** — the hybrid temporal-ladder verifier scores
+   outputs and drives the next mutation.
 
 ![Mimosa architecture overview](images/mimosa_overall.jpg){ width="90%" }
 
@@ -128,7 +129,7 @@ A 5-minute quickstart from a fresh checkout to a finished workflow.
 
 <div class="feature-card" markdown>
 ### :material-graph: Understand the engine
-How workflow evolution, QD selection, and the multi-source verifier work.
+How workflow evolution, QD selection, and the hybrid verifier work.
 [Concepts →](concepts/index.md)
 </div>
 

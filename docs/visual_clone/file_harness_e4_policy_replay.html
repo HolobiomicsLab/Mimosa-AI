@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e4_policy_replay.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; experiments_verifiers/harness &gt; e4_policy_replay.py">
+<div class="wrap">
+
+<h1 class="hud">e4_policy_replay.py</h1>
+<p class="intro">This file simulates counterfactual selection policies over every graded task in the frozen ablation notes. It joins each task's uuid order, evolution rewards and ablation VER/SR grades by uuid suffix, then replays ten policies and counts the grader queries each one spends. It runs only as a script (<code>python e4_policy_replay.py [date]</code>, L483&ndash;L484); no other file imports it.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does: load notes, keep shippable gens, replay ten policies, write the record</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 400" role="img" aria-label="e4_policy_replay.py flow from ablation notes through loading, policies and stats to the result JSON">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="aIn">
+    <title>Frozen ablation note per task, read by load_task_sequences</title>
+    <rect x="20" y="60" width="170" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="88" text-anchor="middle">ablations/*.json</text>
+    <text class="box-sub" x="105" y="106" text-anchor="middle">462 note files &#183; L43&#8211;L47</text>
+  </g>
+
+  <g class="box" id="aMan">
+    <title>manifest.json, cross-check only (assert on the task set)</title>
+    <rect x="20" y="180" width="170" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="206" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="105" y="224" text-anchor="middle">cross-check only &#183; L231</text>
+  </g>
+
+  <a class="box" id="aLoad" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>load_task_sequences: join uuid suffix to ablation labels, L35</title>
+    <rect x="225" y="60" width="185" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="317" y="88" text-anchor="middle">load_task_sequences</text>
+    <text class="box-sub" x="317" y="106" text-anchor="middle">uuid suffix join &#183; L35</text>
+    <text class="box-sub" x="317" y="122" text-anchor="middle">reward, VER, SR, status</text>
+  </a>
+
+  <a class="box" id="aUni" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>replay_universe: keep tasks with one evaluated generation, L75</title>
+    <rect x="225" y="180" width="185" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="317" y="208" text-anchor="middle">replay_universe</text>
+    <text class="box-sub" x="317" y="226" text-anchor="middle">status == "evaluated" &#183; L79</text>
+    <text class="box-sub" x="317" y="242" text-anchor="middle">207 tasks</text>
+  </a>
+
+  <a class="box" id="aPol" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>run_policy: one branch per policy name, L118</title>
+    <rect x="450" y="60" width="195" height="86" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="547" y="88" text-anchor="middle">run_policy</text>
+    <text class="box-sub" x="547" y="106" text-anchor="middle">P0 P1 P1seq P2-k</text>
+    <text class="box-sub" x="547" y="122" text-anchor="middle">P4 P6 P6b PORACLE</text>
+  </a>
+
+  <a class="box" id="aPick" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>Pick helpers: ranked_desc, p0_pick, p4_pick, median_reward_gen, plateau_fires</title>
+    <rect x="450" y="180" width="195" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="547" y="208" text-anchor="middle">pick helpers</text>
+    <text class="box-sub" x="547" y="226" text-anchor="middle">ranked_desc &#183; p0_pick</text>
+    <text class="box-sub" x="547" y="242" text-anchor="middle">plateau_fires &#183; L87&#8211;L116</text>
+  </a>
+
+  <a class="box" id="aStat" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>Stats helpers: wilson, auc, kendall, sequential_topq</title>
+    <rect x="685" y="60" width="180" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="775" y="88" text-anchor="middle">stats helpers</text>
+    <text class="box-sub" x="775" y="106" text-anchor="middle">wilson &#183; auc &#183; kendall</text>
+    <text class="box-sub" x="775" y="122" text-anchor="middle">sequential_topq &#183; L183&#8211;L221</text>
+  </a>
+
+  <a class="box" id="aMain" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>main: replay all tasks, build the payload, print the digest, L226</title>
+    <rect x="685" y="180" width="180" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="775" y="208" text-anchor="middle">main</text>
+    <text class="box-sub" x="775" y="226" text-anchor="middle">per-campaign and pooled</text>
+    <text class="box-sub" x="775" y="242" text-anchor="middle">tables &#183; gate &#183; L226</text>
+  </a>
+
+  <g class="box" id="aOut">
+    <title>results/E4_policy_replay_&lt;DATE&gt;.json and the console table</title>
+    <rect x="895" y="80" width="105" height="166" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="947" y="150" text-anchor="middle">E4 record</text>
+    <text class="box-sub" x="947" y="168" text-anchor="middle">JSON L461</text>
+    <text class="box-sub" x="947" y="186" text-anchor="middle">stdout L466</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="aIn" data-to="aLoad" d="M190,95 H225" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="207" y="86" text-anchor="middle">json.load</text>
+  <path class="edge" data-from="aLoad" data-to="aUni" d="M317,146 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="166" text-anchor="start">tasks dict</text>
+  <path class="edge dashed-edge" data-from="aMan" data-to="aMain" d="M190,211 C300,211 300,300 700,300 V266" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="470" y="294" text-anchor="middle">assert task set equal</text>
+  <path class="edge" data-from="aUni" data-to="aPol" d="M410,223 C430,223 430,103 450,103" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="432" y="150" text-anchor="start">shippable</text>
+  <path class="edge" data-from="aPick" data-to="aPol" d="M547,180 V146" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="556" y="166" text-anchor="start">pick or None</text>
+  <path class="edge" data-from="aPol" data-to="aStat" d="M645,103 H685" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="665" y="122" text-anchor="middle">SR, queries</text>
+  <path class="edge" data-from="aStat" data-to="aMain" d="M775,146 V180" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="788" y="166" text-anchor="start">tau, CI, curve</text>
+  <path class="edge" data-from="aMain" data-to="aOut" d="M865,223 H947 V246" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="905" y="240" text-anchor="start">json.dump</text>
+
+  <text class="box-sub" x="20" y="370">solid = call  |  dashed = reads/writes  |  max 12 boxes per diagram</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. Mint = this file, steel dashed = frozen input on disk. <code>main</code> calls every other name; the two loaders run once, then <code>run_policy</code> runs ten times per task (the policy list is at L235). The pick helpers are called from inside <code>run_policy</code>, never the other way round.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in, data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 330" role="img" aria-label="e4_policy_replay.py data flow: frozen inputs, returned dict, written files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="dIn1">
+    <title>Frozen note copy per task: evolved_workflows_uuids, evolution_rewards, ablations[], goal</title>
+    <rect x="20" y="40" width="215" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="127" y="68" text-anchor="middle">ablations/&lt;campaign&gt;__&lt;task&gt;.json</text>
+    <text class="box-sub" x="127" y="86" text-anchor="middle">uuids, rewards, ablations[]</text>
+    <text class="box-sub" x="127" y="102" text-anchor="middle">read L47</text>
+  </g>
+
+  <g class="box" id="dIn2">
+    <title>Manifest rows, used for the equality assert only</title>
+    <rect x="20" y="140" width="215" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="127" y="168" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="127" y="186" text-anchor="middle">rows &#8594; (campaign, task)</text>
+    <text class="box-sub" x="127" y="202" text-anchor="middle">read L231</text>
+  </g>
+
+  <g class="box" id="dCfg">
+    <title>No Config object and no env var is read; only argv[1] gives the date</title>
+    <rect x="20" y="235" width="215" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="127" y="263" text-anchor="middle">sys.argv[1] (optional)</text>
+    <text class="box-sub" x="127" y="281" text-anchor="middle">date, default 20260921</text>
+    <text class="box-sub" x="127" y="297" text-anchor="middle">L27 &#183; no Config field</text>
+  </g>
+
+  <a class="box" id="dMain" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>main builds the result dict</title>
+    <rect x="330" y="120" width="200" height="96" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="430" y="150" text-anchor="middle">main</text>
+    <text class="box-sub" x="430" y="168" text-anchor="middle">universe &#183; policies</text>
+    <text class="box-sub" x="430" y="186" text-anchor="middle">per_campaign &#183; gate</text>
+    <text class="box-sub" x="430" y="204" text-anchor="middle">per_task_decisions &#183; L397</text>
+  </a>
+
+  <g class="box" id="dRet">
+    <title>Return value of main: the payload dict</title>
+    <rect x="620" y="30" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="720" y="58" text-anchor="middle">payload dict</text>
+    <text class="box-sub" x="720" y="76" text-anchor="middle">~30 keys, in memory only</text>
+    <text class="box-sub" x="720" y="92" text-anchor="middle">returned L520</text>
+  </g>
+
+  <g class="box" id="dW1">
+    <title>Written with json.dump(..., indent=1)</title>
+    <rect x="620" y="140" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="720" y="168" text-anchor="middle">results/E4_policy_replay_DATE.json</text>
+    <text class="box-sub" x="720" y="186" text-anchor="middle">written L462&#8211;L464</text>
+  </g>
+
+  <g class="box" id="dW2">
+    <title>Console digest: header row, one row per campaign, OVERALL row, gate, curve, tau, plateau</title>
+    <rect x="620" y="235" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="720" y="263" text-anchor="middle">stdout digest</text>
+    <text class="box-sub" x="720" y="281" text-anchor="middle">campaign table</text>
+    <text class="box-sub" x="720" y="297" text-anchor="middle">print L466&#8211;L480</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="dIn1" data-to="dMain" d="M235,80 C280,80 290,140 330,150" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="272" y="112" text-anchor="start">notes</text>
+  <path class="edge dashed-edge" data-from="dIn2" data-to="dMain" d="M235,175 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="282" y="166" text-anchor="middle">assert</text>
+  <path class="edge dashed-edge" data-from="dCfg" data-to="dW1" d="M235,270 C400,300 500,300 540,200 C560,175 585,175 620,175" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="430" y="300" text-anchor="middle">output file name</text>
+  <path class="edge" data-from="dMain" data-to="dRet" d="M530,140 C570,120 580,65 620,65" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="580" y="120" text-anchor="start">return</text>
+  <path class="edge" data-from="dMain" data-to="dW1" d="M530,168 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="575" y="160" text-anchor="middle">dump</text>
+  <path class="edge" data-from="dMain" data-to="dW2" d="M530,196 C560,220 580,255 620,265" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="240" text-anchor="start">print</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; dashed = reads and writes on disk, solid = calls inside the process. Nothing is read from <code>config.py</code>: the only external input besides the two JSON trees is <code>sys.argv[1]</code> (L27). Every count in the payload is labelled "my computation" (L399).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the decision rule inside run_policy</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 420" role="img" aria-label="run_policy: one box per policy branch with its real condition and pick rule">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="eEntry" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>run_policy(name, task) dispatches on the policy name, L118</title>
+    <rect x="20" y="26" width="980" height="48" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="48" text-anchor="middle">run_policy(name, task) &#183; L118 &#183; if / elif chain on the policy name</text>
+    <text class="box-sub" x="510" y="64" text-anchor="middle">no shippable gen &#8594; SR False, 0 queries (L121) &#183; unknown name raises ValueError (L180)</text>
+  </a>
+
+  <g class="box" id="e1">
+    <title>P0 and P4: reward max, tie by index direction</title>
+    <rect x="20" y="120" width="235" height="98" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="137" y="144" text-anchor="middle">name == "P0" / "P4"</text>
+    <text class="box-sub" x="137" y="162" text-anchor="middle">P0: max(reward, index) L125 L110</text>
+    <text class="box-sub" x="137" y="180" text-anchor="middle">P4: max(reward, -index) L128 L114</text>
+    <text class="box-sub" x="137" y="198" text-anchor="middle">0 queries &#183; current engine pick</text>
+  </g>
+
+  <g class="box" id="e2">
+    <title>P1: oracle VER labels, unbilled</title>
+    <rect x="270" y="120" width="235" height="98" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="387" y="144" text-anchor="middle">name == "P1"</text>
+    <text class="box-sub" x="387" y="162" text-anchor="middle">ver_ok = [g for g in sh if g["VER"]]</text>
+    <text class="box-sub" x="387" y="180" text-anchor="middle">none &#8594; p0_pick, SR False L133</text>
+    <text class="box-sub" x="387" y="198" text-anchor="middle">else max(reward, index) L136</text>
+  </g>
+
+  <g class="box" id="e3">
+    <title>P1seq: billed loop that stops at the first VER-true generation</title>
+    <rect x="520" y="120" width="235" height="98" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="637" y="144" text-anchor="middle">name == "P1seq"</text>
+    <text class="box-sub" x="637" y="162" text-anchor="middle">loop rk = ranked_desc(sh)</text>
+    <text class="box-sub" x="637" y="180" text-anchor="middle">stop test: g["VER"] true L140</text>
+    <text class="box-sub" x="637" y="198" text-anchor="middle">else ship rk[0], queries = len(rk) L143</text>
+  </g>
+
+  <g class="box" id="e4">
+    <title>P2-k: billed loop over the top-k by reward, stop at first SR-true</title>
+    <rect x="770" y="120" width="230" height="98" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="885" y="144" text-anchor="middle">name.startswith("P2")</text>
+    <text class="box-sub" x="885" y="162" text-anchor="middle">k = int(name.split("-")[1]) L145</text>
+    <text class="box-sub" x="885" y="180" text-anchor="middle">stop test: g["SR"] true L149</text>
+    <text class="box-sub" x="885" y="198" text-anchor="middle">else ship rk[0] L152</text>
+  </g>
+
+  <g class="box" id="e5">
+    <title>P6 and P6b: the plateau gate runs before any query</title>
+    <rect x="270" y="250" width="235" height="98" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="387" y="274" text-anchor="middle">name in "P6" / "P6b"</text>
+    <text class="box-sub" x="387" y="292" text-anchor="middle">plateau_fires L154 L164</text>
+    <text class="box-sub" x="387" y="310" text-anchor="middle">false &#8594; p0_pick, 0 queries</text>
+    <text class="box-sub" x="387" y="328" text-anchor="middle">true &#8594; 1 query, median gen L160</text>
+  </g>
+
+  <g class="box" id="e6">
+    <title>PORACLE: the upper bound, one row per task</title>
+    <rect x="520" y="250" width="235" height="98" rx="2" fill="none" stroke="#5E8CA3"/>
+    <text class="box-label" x="637" y="274" text-anchor="middle">name == "PORACLE"</text>
+    <text class="box-sub" x="637" y="292" text-anchor="middle">any(g["SR"] for g in sh) L176</text>
+    <text class="box-sub" x="637" y="310" text-anchor="middle">queries = rank of first SR-true L177</text>
+    <text class="box-sub" x="637" y="328" text-anchor="middle">pick_index None L178</text>
+  </g>
+
+  <g class="box" id="eOut">
+    <title>Every branch returns the same dict shape</title>
+    <rect x="770" y="250" width="230" height="98" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="885" y="278" text-anchor="middle">returns</text>
+    <text class="box-sub" x="885" y="296" text-anchor="middle">SR, queries, pick_index,</text>
+    <text class="box-sub" x="885" y="314" text-anchor="middle">pick_reward, detail</text>
+    <text class="box-sub" x="885" y="332" text-anchor="middle">L119 comment</text>
+  </g>
+
+  <path class="edge" data-from="eEntry" data-to="e1" d="M137,74 V120" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="eEntry" data-to="e2" d="M387,74 V120" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="eEntry" data-to="e3" d="M637,74 V120" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="eEntry" data-to="e4" d="M885,74 V120" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="eEntry" data-to="e5" d="M300,74 C300,180 340,240 387,250" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="eEntry" data-to="e6" d="M637,74 C637,180 637,230 637,250" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="645" y="230" text-anchor="start">elif</text>
+  <path class="edge" data-from="e1" data-to="eOut" d="M255,169 C600,169 800,220 885,250" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="e5" data-to="eOut" d="M505,299 H770" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="292" text-anchor="middle">verdict dict</text>
+
+  <text class="box-sub" x="20" y="386">8 boxes &#183; loops with a stop test = P1seq (VER) and P2-k (SR) &#183; retry path = none</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the whole file is a dispatch on the policy name plus two loops that stop at the first hit. <code>P6</code> and <code>P6b</code> add a gate before any query: when <code>plateau_fires</code> is false both fall back to <code>p0_pick</code> (L156, L166) and spend 0 queries.</p>
+
+<p class="note">Amber: <code>P1</code> reads the recorded <code>VER</code> label directly (L132), which the payload calls an oracle: a real VER check would itself cost a grader query, and <code>P1seq</code> is the billed variant (L138). The file states this at L408.</p>
+<p class="note flag">Red: <code>main</code> contains a dead placeholder line, <code>tr = [r for r, in zip(rs, strict=False) if False]</code> (L313), and <code>tr</code> is never used again; <code>thr</code> from L312 is the top-quartile threshold that is kept. Both sit between the tau table and the pooled tau.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">ablations/&lt;campaign&gt;__&lt;task&gt;.json</td><td>file, <code class="path">experiments_verifiers/ablations/</code></td><td>uuid order, rewards, ablation grades</td><td class="size">L43 L47</td></tr>
+<tr><td>reads</td><td class="sym">evolved_workflows_uuids</td><td>note key</td><td>chronological generation slots</td><td class="size">L48</td></tr>
+<tr><td>reads</td><td class="sym">evolution_rewards</td><td>note key</td><td>reward per slot, may be shorter</td><td class="size">L49 L60</td></tr>
+<tr><td>reads</td><td class="sym">ablations[]</td><td>note key</td><td>VER, SR, CBS, cost, status, source</td><td class="size">L51 L64</td></tr>
+<tr><td>reads</td><td class="sym">uuid suffix, last 8 hex</td><td>join key</td><td>matches note slot to grade row</td><td class="size">L54 L62</td></tr>
+<tr><td>reads</td><td class="sym">manifest.json</td><td>file, <code class="path">experiments_verifiers/manifest.json</code></td><td>cross-check only, never a filter</td><td class="size">L231&#8211;L233</td></tr>
+<tr><td>reads</td><td class="sym">sys.argv[1]</td><td>CLI argument</td><td>date in the output file name</td><td class="size">L27</td></tr>
+<tr><td>reads</td><td class="sym">config field</td><td>none</td><td>no Config import in this file</td><td class="size">L14&#8211;L22</td></tr>
+<tr><td>returns</td><td class="sym">result dict</td><td>return of <code>main</code></td><td>universe, policies, gate, decisions</td><td class="size">L397 L520</td></tr>
+<tr><td>writes</td><td class="sym">results/E4_policy_replay_&lt;DATE&gt;.json</td><td>file, <code>json.dump(indent=1)</code></td><td>the E4 record</td><td class="size">L461&#8211;L464</td></tr>
+<tr><td>writes</td><td class="sym">console digest</td><td>stdout</td><td>campaign table, gate, tau, plateau</td><td class="size">L466&#8211;L480</td></tr>
+<tr><td>imports</td><td class="sym">scipy.stats as sps</td><td>module scope</td><td><code>kendalltau</code> only</td><td class="size">L22 L220</td></tr>
+</tbody>
+</table>
+<p class="sub">The join ignores positional order on purpose: <code>load_task_sequences</code> matches by uuid suffix because <code>evolution_index</code> semantics differ across campaigns (docstring L37&ndash;L40). Slots whose uuid is the literal <code>generation_failed</code> are marked <code>failed_slot</code> (L59) and can never ship.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>13 top-level functions, no class &mdash; signatures, lines, roles</summary><div class="dbody">
+<pre>load_task_sequences()                                   L35   join notes into task dict
+replay_universe(tasks) -&gt; dict                           L75   tasks with a graded gen
+ranked_desc(shippable) -&gt; list                          L87   reward-descending order
+plateau_fires(shippable, var_eps=PLATEAU_VAR_EPS)
+    -&gt; tuple[bool, list | None]                         L92   last-3 reward variance test
+median_reward_gen(shippable)                            L104  lower-middle reward gen
+p0_pick(shippable)                                      L110  max reward, latest tie-break
+p4_pick(shippable)                                      L114  max reward, earliest tie-break
+run_policy(name, task) -&gt; dict                          L118  policy dispatch, query count
+sequential_topq(sh, q) -&gt; tuple[bool, int]              L183  top-q early-stop curve
+wilson(k, n, z=1.96)                                    L198  binomial 95% interval
+auc(scores, labels)                                     L208  rank AUC with half ties
+kendall(rewards, srs)                                   L217  tau plus p-value
+main()                                                  L226  replay, aggregate, write</pre>
+<p>Module constants: <code>BASE</code> L24, <code>ABL_DIR</code> L25, <code>RESULTS_DIR</code> L26, <code>DATE</code> L27, <code>PLATEAU_VAR_EPS = 1e-6</code> L29, <code>EVALUATED_MIN_REWARD = 1e-12</code> L30. Policy list built in <code>main</code>: <code>['P0','P1','P1seq','P2-1','P2-3','P2-5','P4','P6','P6b','PORACLE']</code> L235. Imports: <code>json</code>, <code>os</code>, <code>statistics</code>, <code>sys</code>, <code>from collections import Counter, defaultdict</code> L16&ndash;L20, <code>from scipy import stats as sps</code> L22. No class, no decorator, <code>main</code> is guarded by <code>if __name__ == '__main__'</code> L483.</p>
+<p>Payload keys worth naming: <code>universe.notes</code> (7 method notes) L403, <code>policies</code> (one string per policy) L412, <code>gate.rule</code> and <code>gate.caveat</code> L424&ndash;L426, <code>rank_of_first_sr_true.mcnemar_P0_vs_P2-3</code> L445, <code>plateau_diagnostics</code> L449, <code>run_1_bulk_plateau_check</code> L450, <code>per_task_decisions</code> L453.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym">experiments_verifiers/harness/e8_blast_radius.py</td><td>Mirrors the loader and the policy rules; no import statement</td><td class="size">L258 L321 L624</td></tr>
+<tr><td class="sym">experiments_verifiers/results/E4_summary.md</td><td>Report text that reports this script's numbers</td><td class="size">results folder</td></tr>
+<tr><td class="sym">experiments_verifiers/results/E8_blast_radius_20260922.json</td><td>Names this script as the method of record</td><td class="size">JSON note</td></tr>
+</tbody>
+</table>
+<p>No importer found: a repo-wide grep for <code>import e4_policy_replay</code> and <code>policy_replay</code> returns no Python file that imports it. The file runs as a script (<code>if __name__ == '__main__'</code> L483) and writes its own record. Its output page is <a href="exp_e4_policy_replay.html">exp_e4_policy_replay.html</a>.</p>
+<p>Tests: <code>unknown</code> &mdash; a grep of <code class="path">tests/</code> for <code>e4_policy_replay</code>, <code>policy_replay</code>, <code>plateau_fires</code> and <code>sequential_topq</code> returns no file. The suite is offline unit tests for the framework; this harness script is not exercised there.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e4_policy_replay.html">exp_e4_policy_replay.html</a>, <a href="data_experiments.html">data_experiments.html</a>, and the sibling digest pages <a href="file_harness_e5_common.html">e5_common.py</a> and <code>e8_blast_radius.py</code>.</p><p>Sources read: <code class="path">experiments_verifiers/harness/e4_policy_replay.py</code> (484 lines, whole file), <code class="path">experiments_verifiers/harness/e8_blast_radius.py</code> (grep hits only), <code class="path">experiments_verifiers/README.md</code> (codename table), <code class="path">experiments_verifiers/results/</code> (file listing), <code class="path">experiments_verifiers/ablations/</code> (462 files, counted), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>, repo-wide grep for importers and <code class="path">tests/</code> coverage.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> and repo <code class="path">.env</code> (never opened, secrets); <code class="path">experiments_verifiers/results/E4_policy_replay_20260921.json</code> and <code class="path">E4_summary.md</code> bodies (recorded numbers, not needed for the code description; the exp page carries them); the other 47 <code class="path">experiments_verifiers/harness/*.py</code> scripts (grep shows no import of this file); <code class="path">sources/**</code> (no importer); <code class="path">__pycache__</code>; no pytest run and no script executed, as instructed.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

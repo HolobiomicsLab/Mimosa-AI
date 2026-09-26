@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Package vetting and run transparency - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > security + transparency">
+<div class="wrap">
+
+<h1 class="hud">Package vetting and run transparency</h1>
+<p class="intro">Two small folders do Mimosa's paperwork. <code class="path">sources/security/check_package.py</code> checks installed package versions before a run, and <code class="path">sources/transparency/</code> turns a finished run's memory into ASTRA YAML, a <code>recipe.py</code>, and a decision list. This page maps both, and marks the one place where the docs disagree with the code.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>1 - Pre-flight package check</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 400" role="img" aria-label="Pinned requirements reach the runner; PackageCheck is never called">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1a" href="area_entry_config.html">
+    <title>Pinned runner package list</title>
+    <rect x="18" y="40" width="200" height="58" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="118" y="64" text-anchor="middle">runner_requirements</text>
+    <text class="box-sub" x="118" y="80" text-anchor="middle">config.py:242</text>
+  </a>
+
+  <a class="box" id="d1b" href="../../sources/core/orchestrator.py">
+    <title>Installs the pinned dependencies</title>
+    <rect x="288" y="40" width="240" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="408" y="64" text-anchor="middle">workflow_requirements_install</text>
+    <text class="box-sub" x="408" y="80" text-anchor="middle">WorkflowOrchestrator</text>
+  </a>
+
+  <a class="box" id="d1c" href="mod_core_runner.html">
+    <title>Sandbox dependency install</title>
+    <rect x="598" y="40" width="284" height="58" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="740" y="64" text-anchor="middle">install_dependencies</text>
+    <text class="box-sub" x="740" y="80" text-anchor="middle">WorkflowRunner, sandbox</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="d1a" data-to="d1b" d="M218,69 H288" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="253" y="61" text-anchor="middle">reads pins</text>
+  <path class="edge" data-from="d1b" data-to="d1c" d="M528,69 H598" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="563" y="61" text-anchor="middle">install deps</text>
+
+  <a class="box" id="d1d" href="../../main.py">
+    <title>Entry point, environment precheck phase</title>
+    <rect x="18" y="190" width="200" height="58" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="118" y="214" text-anchor="middle">main.py::main</text>
+    <text class="box-sub" x="118" y="230" text-anchor="middle">env precheck phase</text>
+  </a>
+
+  <a class="box" id="d1e" href="area_utils.html">
+    <title>Provider and environment probe</title>
+    <rect x="288" y="190" width="240" height="58" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="408" y="214" text-anchor="middle">PreCheck.run()</text>
+    <text class="box-sub" x="408" y="230" text-anchor="middle">probes providers</text>
+  </a>
+
+  <path class="edge" data-from="d1d" data-to="d1e" d="M218,219 H288" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="253" y="211" text-anchor="middle">calls</text>
+
+  <a class="box" id="d1f" href="../../sources/security/check_package.py">
+    <title>Version range check, currently empty</title>
+    <rect x="598" y="190" width="284" height="58" rx="6" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="740" y="214" text-anchor="middle">PackageCheck.run()</text>
+    <text class="box-sub" x="740" y="230" text-anchor="middle">allow &#183; exit 1 if unsafe</text>
+  </a>
+  <text class="edge-label" x="740" y="270" text-anchor="middle" fill="#FF4D6A">no caller in tree</text>
+
+  <text class="box-sub" x="18" y="330">solid = call  |  dashed = reads/writes  |  dotted = import only  |  max 12 boxes per diagram</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - <code>config.runner_requirements</code> reaches the sandbox through <code>sources/core/orchestrator.py::WorkflowOrchestrator.workflow_requirements_install</code>. <code class="path">sources/security/check_package.py</code> has no inbound arrow: nothing imports or calls <code>PackageCheck</code>.</p>
+
+<table>
+<thead><tr><th>Check</th><th>What it reads</th><th class="size">Lines</th><th>Who calls it</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/security/check_package.py">check_package.py</a></td><td>Own <code>safe_versions</code> dict, installed versions</td><td class="size">58</td><td class="sym">nobody (grep, 7e8463b)</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/precheck.py">precheck.py</a></td><td>API keys, provider probes</td><td class="size">477</td><td class="sym">main.py::main</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/ensure_env.py">ensure_env.py</a></td><td>Host Python 3.12, pip</td><td class="size">331</td><td class="sym">main.py::main</td></tr>
+</tbody>
+</table>
+<p class="sub">Full utils list: <a href="area_utils.html">area_utils.html</a> &#183; config fields: <a href="area_entry_config.html">area_entry_config.html</a> &#183; sandbox runner: <a href="mod_core_runner.html">mod_core_runner.html</a>.</p>
+
+<p class="note flag">Red note: <code>AGENTS.md</code> says <code>check_package.py</code> does "version blocklisting for known supply-chain CVEs, e.g. the litellm 1.82.8 <code>.pth</code> attack", but the working tree has the litellm entry commented out (<code>check_package.py:7</code>), so <code>safe_versions</code> is empty, <code>run()</code> loops over nothing, and no file calls <code>PackageCheck</code>.</p>
+<p class="note">Amber note: <code>main.py:328</code> labels the <code>setup_logging</code> call <code># security check</code>; no package check runs at that point.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>2 - Transparency outputs</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 620 360" role="img" aria-label="Best-run memory to ASTRA YAML, decisions, recipe">
+  <defs>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow2" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d2a" href="mod_core_evolution_engine.html">
+    <title>Post-run export call, gated on export_astra</title>
+    <rect x="20" y="30" width="270" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="155" y="52" text-anchor="middle">EvolutionEngine</text>
+    <text class="box-sub" x="155" y="68" text-anchor="middle">_export_astra</text>
+  </a>
+
+  <a class="box" id="d2b" href="../../sources/transparency/astra_exporter.py">
+    <title>Runs the export steps</title>
+    <rect x="20" y="110" width="270" height="52" rx="12" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="132" text-anchor="middle">AstraExporter</text>
+    <text class="box-sub" x="155" y="148" text-anchor="middle">export(best_uuid, goal)</text>
+  </a>
+
+  <a class="box" id="d2c" href="../../sources/transparency/trace_compaction.py">
+    <title>Loads every task trace</title>
+    <rect x="20" y="190" width="270" height="52" rx="6" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="212" text-anchor="middle">load_trace</text>
+    <text class="box-sub" x="155" y="228" text-anchor="middle">reads task_*.json</text>
+  </a>
+
+  <a class="box" id="d2d" href="../../sources/transparency/trace_compaction.py">
+    <title>Compacts and prefilters steps</title>
+    <rect x="20" y="270" width="270" height="52" rx="6" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="292" text-anchor="middle">compact_trace</text>
+    <text class="box-sub" x="155" y="308" text-anchor="middle">drops model_input_messages</text>
+  </a>
+
+  <a class="box" id="d2e" href="../../sources/transparency/decision_extractor.py">
+    <title>Per-step decision LLM pass</title>
+    <rect x="350" y="110" width="250" height="52" rx="6" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="475" y="132" text-anchor="middle">extract_decisions</text>
+    <text class="box-sub" x="475" y="148" text-anchor="middle">1 LLM call per step</text>
+  </a>
+
+  <a class="box" id="d2f" href="../../sources/transparency/yaml_writer.py">
+    <title>Builds the ASTRA dicts</title>
+    <rect x="350" y="190" width="250" height="52" rx="6" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="475" y="212" text-anchor="middle">build_analysis &#183; write_export</text>
+    <text class="box-sub" x="475" y="228" text-anchor="middle">build_universe, _dump</text>
+  </a>
+
+  <a class="box" id="d2g" href="data_runs.html">
+    <title>Written into the best run's capsule folder</title>
+    <rect x="350" y="270" width="250" height="52" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="475" y="292" text-anchor="middle">runs_capsule/&lt;uuid&gt;/</text>
+    <text class="box-sub" x="475" y="308" text-anchor="middle">astra.yaml &#183; best.yaml &#183; recipe.py</text>
+  </a>
+
+  <path class="edge" data-from="d2a" data-to="d2b" d="M155,82 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="165" y="100">best_uuid, goal</text>
+  <path class="edge" data-from="d2b" data-to="d2c" d="M155,162 V190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="165" y="180">task_*.json</text>
+  <path class="edge" data-from="d2c" data-to="d2d" d="M155,242 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="165" y="260">raw steps</text>
+  <path class="edge" data-from="d2d" data-to="d2e" d="M290,296 H320 V136 H350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="325" y="225">compact steps</text>
+  <path class="edge" data-from="d2e" data-to="d2f" d="M475,162 V190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="485" y="180">decisions</text>
+  <path class="edge" data-from="d2f" data-to="d2g" d="M475,242 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="485" y="260">astra.yaml</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - <code>AstraExporter.export</code> runs <code>AstraExporter._write_recipe</code> too, which writes <code class="path">runs_capsule/&lt;uuid&gt;/recipe.py</code> from <code>memory_trace.reconstruct_recipe</code>. Rounded corners = class, square corners = file or folder.</p>
+
+<div class="slotstrip">
+<span class="slot"><b>entry</b>EvolutionEngine._export_astra</span>
+<span class="slot"><b>gate</b><code>export_astra</code> default false</span>
+<span class="slot"><b>steps</b>1 LLM call per step, 6 workers</span>
+<span class="slot"><b>writes</b>astra.yaml, best.yaml, recipe.py</span>
+</div>
+
+<p class="note say">Why it matters: the whole export is opt-in (<code>config.export_astra</code> default is false) and a failure only logs a warning, so a thin capsule never stops the evolution loop.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Files</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/security/check_package.py">sources/security/check_package.py</a></td><td>Checks installed versions against a safe range.</td><td class="size">58</td><td class="sym">PackageCheck.run, PackageCheck._check_version</td></tr>
+<tr><td class="sym"><a href="../../sources/transparency/astra_exporter.py">sources/transparency/astra_exporter.py</a></td><td>Drives the post-run ASTRA export.</td><td class="size">268</td><td class="sym">AstraExporter.export</td></tr>
+<tr><td class="sym"><a href="../../sources/transparency/decision_extractor.py">sources/transparency/decision_extractor.py</a></td><td>One LLM call per step, deduped by decision id.</td><td class="size">420</td><td class="sym">extract_decisions, Decision, ExtractionResult</td></tr>
+<tr><td class="sym"><a href="../../sources/transparency/memory_trace.py">sources/transparency/memory_trace.py</a></td><td>Reads code and reasoning from step dumps.</td><td class="size">171</td><td class="sym">load_raw_steps, extract_code, reconstruct_recipe</td></tr>
+<tr><td class="sym"><a href="../../sources/transparency/trace_compaction.py">sources/transparency/trace_compaction.py</a></td><td>Cuts the trace down before the LLM sees it.</td><td class="size">124</td><td class="sym">compact_trace, compact_step, load_trace</td></tr>
+<tr><td class="sym"><a href="../../sources/transparency/yaml_writer.py">sources/transparency/yaml_writer.py</a></td><td>Builds and dumps the two ASTRA YAML files.</td><td class="size">209</td><td class="sym">build_analysis, build_universe, write_export</td></tr>
+</tbody>
+</table>
+<p class="sub">Line counts from <code>wc -l</code>. Path defaults (<code>memory_dir</code>, <code>runs_capsule_dir</code>) come from <code class="path">sources/utils/paths.py</code> &#8212; see <a href="area_utils.html">area_utils.html</a>.</p>
+
+<details><summary>the prompts/ folder and the two __init__.py shims</summary><div class="dbody">
+<pre>sources/transparency/
+  prompts/decision_extraction.md   1 file, 55 lines   the per-step extraction template
+  __init__.py                     11 lines           re-exports AstraExporter
+sources/security/
+  __init__.py                     12 lines           re-exports PackageCheck</pre>
+<p><code class="path">sources/transparency/prompts/decision_extraction.md</code> is the only file in that folder. It is a text template with placeholders <code>{goal}</code>, <code>{step_index}</code>, <code>{reasoning}</code>, <code>{code}</code>, <code>{observation}</code>, read by <code>decision_extractor.py:118</code> via <code class="path">_PROMPT_PATH</code>. Contents were counted, not read line by line (task scope).</p>
+<p>Both <code>__init__.py</code> files only re-export a public name; nothing else lives in them.</p>
+</div></details>
+
+<details><summary>who reads what on disk</summary><div class="dbody">
+<pre>read   &lt;config.memory_dir&gt;/&lt;uuid&gt;/task_*.json   memory_trace.load_raw_steps (name-sorted)
+read   /tmp/mimosa_run_*_&lt;uuid&gt;/                AstraExporter._resolve_artefacts_dir
+read   &lt;config.workspace_dir&gt;                   fallback when no /tmp snapshot exists
+write  &lt;config.runs_capsule_dir&gt;/&lt;uuid&gt;/astra.yaml
+write  &lt;config.runs_capsule_dir&gt;/&lt;uuid&gt;/universes/best.yaml
+write  &lt;config.runs_capsule_dir&gt;/&lt;uuid&gt;/recipe.py
+write  LLM call cache under &lt;config.memory_dir&gt;  LLMProvider(prompt, use_cache=True)</pre>
+<p>Only <code>astra.yaml</code> and <code>recipe.py</code> share the capsule root; the universe file sits in a <code>universes/</code> subfolder (<code>yaml_writer.py::write_export</code>).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File card - astra_exporter.py</h2>
+<div class="card steel">
+<h4><a href="../../sources/transparency/astra_exporter.py">sources/transparency/astra_exporter.py</a></h4>
+<p class="role">Post-run ASTRA export: loads the best run's memory, compacts it, extracts decisions, then writes the capsule YAML pair plus recipe.py.</p>
+<p class="meta">268 lines &#183; class: AstraExporter &#183; reads: <code>config.memory_dir</code>, <code>config.runs_capsule_dir</code>, <code>config.workspace_dir</code></p>
+<details><summary>signatures and config fields</summary><div class="dbody">
+<pre>AstraExporter.export(best_uuid: str, goal: str) -&gt; Path | None
+AstraExporter._write_recipe(capsule_dir, memory_path) -&gt; str
+AstraExporter._build_llm_config() -&gt; LLMConfig
+AstraExporter._resolve_artefacts_dir(best_uuid, workspace_dir) -&gt; Path
+AstraExporter._list_workspace_files(workspace_dir) -&gt; list[str]
+AstraExporter._SNAPSHOT_ROOT = Path("/tmp")</pre>
+<p>Returns <code>None</code> when the memory directory is missing or the trace is empty. Config fields read: <code>memory_dir</code>, <code>runs_capsule_dir</code>, <code>workspace_dir</code>, <code>smolagent_model_id</code>, <code>openrouter_provider_for</code>, <code>openrouter_quantizations_for</code>. Extraction runs at <code>temperature=0.0</code>.</p>
+<p>Called by <code>sources/core/evolution_engine.py::EvolutionEngine._export_astra</code>, gated on <code>config.export_astra</code>. Tests: <a href="../../tests/astra_exporter_test.py">tests/astra_exporter_test.py</a>, 649 lines.</p>
+</div></details>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File card - decision_extractor.py</h2>
+<div class="card steel">
+<h4><a href="../../sources/transparency/decision_extractor.py">sources/transparency/decision_extractor.py</a></h4>
+<p class="role">Asks the judge model once per compacted step; each reply is null or one decision JSON. Failures and malformed replies are counted, not hidden.</p>
+<p class="meta">420 lines &#183; classes: Decision, Option, ExtractionResult &#183; prompt: <code class="path">prompts/decision_extraction.md</code></p>
+<details><summary>signatures and constants</summary><div class="dbody">
+<pre>extract_decisions(steps, goal, memory_path, llm_config=None, max_workers=6) -&gt; ExtractionResult
+_extract_one(step, goal, template, memory_path, llm_config) -&gt; Decision | None | sentinel
+_parse_response(raw, source_step) -&gt; Decision | None | _MALFORMED
+_validate(payload, source_step) -&gt; Decision | None
+_merge_options(existing, later) -&gt; Decision
+_MAX_WORKERS = 6        _ID_PATTERN = ^[a-z][a-z0-9_]*\Z</pre>
+<p>Three outcomes stay distinct: <code>None</code> (the model said <code>null</code>), <code>_MALFORMED</code> (prose, truncated JSON, schema violation), <code>_EXTRACT_FAILED</code> (the LLM call raised). Counts land in <code class="path">astra.yaml</code> under <code>extraction</code>. An unresolvable <code>chosen_option_id</code> is never guessed unless the reply listed exactly one option.</p>
+<p>Steps are extracted concurrently (max 6 workers) but merged in trace order, so the first occurrence wins for label, rationale and chosen option; later alternatives are unioned by id.</p>
+</div></details>
+</div>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/security/check_package.py</code>, <code class="path">sources/security/__init__.py</code>, <code class="path">sources/transparency/astra_exporter.py</code>, <code class="path">sources/transparency/decision_extractor.py</code>, <code class="path">sources/transparency/memory_trace.py</code>, <code class="path">sources/transparency/trace_compaction.py</code>, <code class="path">sources/transparency/yaml_writer.py</code>, <code class="path">sources/transparency/__init__.py</code>, <code class="path">sources/transparency/prompts/</code> (file count and size only), <code class="path">sources/core/evolution_engine.py</code> (_export_astra, best-run restore), <code class="path">sources/core/orchestrator.py</code> (workflow_requirements_install), <code class="path">sources/core/workflow_runner.py</code> (symbol list), <code class="path">sources/cli/memory_chat_cli.py</code> (imports memory_trace), <code class="path">sources/cli/onboard_cli.py</code> (export_astra prompt), <code>config.py</code>, <code>config_default.json</code>, <code>main.py</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/precheck.py</code>, <code class="path">sources/utils/ensure_env.py</code>, <code class="path">tests/astra_exporter_test.py</code> (header), <code>AGENTS.md</code>, <code class="path">docs/info-flow/astra-export.md</code>, <code class="path">docs/usage/transparency.md</code>, <code class="path">docs/DEVELOPER_GUIDE.md</code>, <code class="path">docs/reference/file-layout.md</code> (grep hits for check_package), <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code class="path">docs/visual_clone/area_cli.html</code> (layout convention). Line counts from <code>wc -l</code>; symbol existence checked with <code>grep -n</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/transparency/prompts/decision_extraction.md</code> body (counted only, per task scope; the placeholders are named above) &#183; <code class="path">sources/security/__init__.py</code> and <code class="path">sources/transparency/__init__.py</code> (re-export shims, quoted in the collapsed block) &#183; <code class="path">sources/transparency/__pycache__/</code> (build output) &#183; <code>sources/core/*</code> and <code>sources/utils/*</code> beyond the cited symbols (own pages: <a href="area_sources_core.html">area_sources_core.html</a>, <a href="area_utils.html">area_utils.html</a>) &#183; <code>tests/*</code> (own page: <a href="area_tests.html">area_tests.html</a>); <code class="path">tests/astra_exporter_test.py</code> was opened only to confirm it exists and to count lines &#183; <code class="path">sources/memory/</code>, <code class="path">sources/workflows/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code>diversity_experiments/</code>, <code>experiments_verifiers/</code> (runtime data; own pages) &#183; <code>datasets/</code>, <code>webui/</code>, <code>audits/</code>, <code>CLA/</code>, <code class="path">docs/site/</code> (out of scope or generated) &#183; secrets (<code>.env</code>, <code>token.json</code>, <code>credentials.json</code>) never opened.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (<code>git status --porcelain</code>); <code>sources/security/*</code> and <code>sources/transparency/*</code> are not in that diff, so the code cited here matches the commit.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

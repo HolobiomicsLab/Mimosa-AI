@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19_gradient_duel.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; experiments_verifiers/harness &gt; e19_gradient_duel.py">
+<div class="wrap">
+
+<h1 class="hud">e19_gradient_duel.py</h1>
+<p class="intro">Runs the four-way gradient duel: the same E16 v2 judge prompt is fed four gradient texts (E19 hybrid, E18 scripted, E15 preference, verifier rubric) and only the gradient text varies. It is the only E19 script whose E19 side makes new LLM calls; the other three sides should be cache hits. Run with <code>uv run python experiments_verifiers/harness/e19_gradient_duel.py</code>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 330" role="img" aria-label="e19_gradient_duel stages: build quads, read texts, judge sides, verifier side, paired stats, verdict, write">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="b1" href="#panel-logic">
+    <title>build_quads joins the E19 gradient files with the E16 population and requires the E15/E18 twins</title>
+    <rect x="20" y="30" width="205" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="122" y="52" text-anchor="middle">build_quads</text>
+    <text class="box-sub" x="122" y="67" text-anchor="middle">L37 &#183; joins 4 sides</text>
+    <text class="box-sub" x="122" y="81" text-anchor="middle">drops counted</text>
+  </a>
+
+  <a class="box" id="b2" href="#panel-reads">
+    <title>Per quad, one() reads the three gradient texts from disk</title>
+    <rect x="253" y="30" width="205" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="355" y="52" text-anchor="middle">one() reads texts</text>
+    <text class="box-sub" x="355" y="67" text-anchor="middle">L93&#8211;97 &#183; e19, e18, e15</text>
+    <text class="box-sub" x="355" y="81" text-anchor="middle">10 worker threads</text>
+  </a>
+
+  <a class="box" id="b3" href="#panel-symbols">
+    <title>judge_with_text swaps only the gradient text inside the E16 prompt, then calls the shared E16 judge</title>
+    <rect x="486" y="30" width="205" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="588" y="52" text-anchor="middle">judge_with_text</text>
+    <text class="box-sub" x="588" y="67" text-anchor="middle">L71 &#183; E16.judge_messages L73</text>
+    <text class="box-sub" x="588" y="81" text-anchor="middle">E16._llm L75 &#183; parse L76</text>
+  </a>
+
+  <a class="box" id="b4" href="#panel-logic">
+    <title>The verifier side uses E16's own item path, no gradient swap</title>
+    <rect x="719" y="30" width="240" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="839" y="52" text-anchor="middle">verifier side</text>
+    <text class="box-sub" x="839" y="67" text-anchor="middle">E16.judge_item(item) L98</text>
+    <text class="box-sub" x="839" y="81" text-anchor="middle">grad_path from the cache</text>
+  </a>
+
+  <a class="box" id="b5" href="#panel-symbols">
+    <title>Rows collected, then paired cluster bootstrap over task groups on three axes</title>
+    <rect x="20" y="210" width="205" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="122" y="232" text-anchor="middle">paired stats</text>
+    <text class="box-sub" x="122" y="247" text-anchor="middle">rows L110&#8211;116 &#183; paired L119</text>
+    <text class="box-sub" x="122" y="261" text-anchor="middle">999 resamples, seed 0</text>
+  </a>
+
+  <a class="box" id="b6" href="#panel-logic">
+    <title>Three-branch verdict from the E19-minus-reference relevance CIs</title>
+    <rect x="253" y="210" width="205" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="355" y="232" text-anchor="middle">verdict</text>
+    <text class="box-sub" x="355" y="247" text-anchor="middle">L185&#8211;201</text>
+    <text class="box-sub" x="355" y="261" text-anchor="middle">YES &#183; MIXED &#183; NO</text>
+  </a>
+
+  <a class="box" id="b7" href="#panel-reads">
+    <title>Writes the full duel record and the markdown report</title>
+    <rect x="486" y="210" width="205" height="62" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="588" y="232" text-anchor="middle">writes out</text>
+    <text class="box-sub" x="588" y="247" text-anchor="middle">json L204</text>
+    <text class="box-sub" x="588" y="261" text-anchor="middle">md via _write_md L205</text>
+  </a>
+
+  <a class="box" id="b8" href="#panel-symbols">
+    <title>The markdown writer and its number formatter</title>
+    <rect x="719" y="210" width="240" height="62" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="839" y="232" text-anchor="middle">_write_md + _fmt</text>
+    <text class="box-sub" x="839" y="247" text-anchor="middle">_write_md L214 &#183; _fmt L210</text>
+    <text class="box-sub" x="839" y="261" text-anchor="middle">sides table + paired deltas</text>
+  </a>
+
+  <path class="edge" data-from="b1" data-to="b2" d="M225,61 H253" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="239" y="53" text-anchor="middle">quad paths</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M458,61 H486" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="472" y="53" text-anchor="middle">three texts</text>
+  <path class="edge" data-from="b2" data-to="b4" d="M458,72 H470 V100 H839 V92" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="112" text-anchor="middle">population item</text>
+  <path class="edge" data-from="b3" data-to="b5" d="M588,92 V150 H35 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="168" text-anchor="middle">judgments</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M839,92 V180 H400 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="196" text-anchor="middle">verifier judgment</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M225,241 H253" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="239" y="233" text-anchor="middle">paired deltas</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M458,241 H486" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="472" y="233" text-anchor="middle">answer</text>
+  <path class="edge" data-from="b7" data-to="b8" d="M691,241 H719" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="705" y="233" text-anchor="middle">out dict</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 8 boxes. <code>main</code> L85 drives the flow in this order: <code>build_quads</code> (L37), the per-quad worker <code>one</code> (L89&#8211;99), 4 judge results per quad, then the paired statistics (L119&#8211;150), the verdict (L185&#8211;201) and the two writers. The E16 cache ledger is shared, so unchanged prompt/input pairs cost nothing.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in and out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 330" role="img" aria-label="Files read and written by e19_gradient_duel">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1" href="#panel-reads">
+    <title>Population join key: campaign, task, uuid8, tier, SR, reward</title>
+    <rect x="20" y="20" width="260" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="150" y="40" text-anchor="middle">_e16_population.json</text>
+    <text class="box-sub" x="150" y="56" text-anchor="middle">via E16.POP_JSON, L39</text>
+  </a>
+
+  <a class="box" id="d2" href="#panel-reads">
+    <title>Three gradient roots, one .txt per (group, uuid)</title>
+    <rect x="20" y="96" width="260" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="150" y="116" text-anchor="middle">results/E19_bt_gradients</text>
+    <text class="box-sub" x="150" y="132" text-anchor="middle">E15_bt_gradients &#183; E18_bt_gradients</text>
+    <text class="box-sub" x="150" y="147" text-anchor="middle">dirs L27&#8211;29; files read L94</text>
+    <text class="box-sub" x="150" y="162" text-anchor="middle">all four sides required (L56&#8211;63)</text>
+  </a>
+
+  <a class="box" id="d3" href="#panel-reads">
+    <title>Constants instead of Config fields</title>
+    <rect x="20" y="188" width="260" height="76" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="150" y="208" text-anchor="middle">no config field read</text>
+    <text class="box-sub" x="150" y="224" text-anchor="middle">CAP_USD 3.0 L32 &#183; SIDES L34</text>
+    <text class="box-sub" x="150" y="239" text-anchor="middle">TODAY L26 &#183; judge model = E16.MODEL</text>
+    <text class="box-sub" x="150" y="254" text-anchor="middle">API key from the environment, L86</text>
+  </a>
+
+  <a class="box" id="d4" href="#panel-symbols">
+    <title>Entry point: returns nothing, prints the verdict</title>
+    <rect x="380" y="120" width="200" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="480" y="144" text-anchor="middle">main()</text>
+    <text class="box-sub" x="480" y="160" text-anchor="middle">L85 &#183; no return value</text>
+  </a>
+
+  <a class="box" id="d5" href="#panel-reads">
+    <title>Full record: population, stats, per-pair rows, calls and cost</title>
+    <rect x="670" y="20" width="290" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="815" y="40" text-anchor="middle">E19_gradient_duel_2026-09-23.json</text>
+    <text class="box-sub" x="815" y="56" text-anchor="middle">written L204</text>
+  </a>
+
+  <a class="box" id="d6" href="#panel-reads">
+    <title>Side table, paired deltas and verdict</title>
+    <rect x="670" y="96" width="290" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="815" y="116" text-anchor="middle">E19_gradient_duel_2026-09-23.md</text>
+    <text class="box-sub" x="815" y="132" text-anchor="middle">written L247</text>
+  </a>
+
+  <a class="box" id="d7" href="#panel-reads">
+    <title>Judge calls land in the shared E16 cache and cost ledgers</title>
+    <rect x="670" y="172" width="290" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="815" y="192" text-anchor="middle">E16 cache + cost ledger</text>
+    <text class="box-sub" x="815" y="208" text-anchor="middle">appended by E16._llm; cost counted L152&#8211;156</text>
+  </a>
+
+  <a class="box" id="d8" href="#panel-reads">
+    <title>Console output only</title>
+    <rect x="670" y="248" width="290" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="815" y="268" text-anchor="middle">returns none, prints verdict</text>
+    <text class="box-sub" x="815" y="284" text-anchor="middle">new calls and cost, L205&#8211;207</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d4" d="M280,50 H340 V140 H380" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="86" text-anchor="start">reads L39</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d4" d="M280,134 H380" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="310" y="126" text-anchor="middle">reads L94</text>
+  <path class="edge" data-from="d3" data-to="d4" d="M280,226 H340 V165 H380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="250" text-anchor="start">constants</text>
+  <path class="edge dashed-edge" data-from="d4" data-to="d5" d="M580,140 H630 V50 H670" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="612" y="94" text-anchor="start">writes</text>
+  <path class="edge dashed-edge" data-from="d4" data-to="d6" d="M580,145 H670" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="625" y="138" text-anchor="middle">writes</text>
+  <path class="edge dashed-edge" data-from="d4" data-to="d7" d="M580,160 H630 V202 H670" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="612" y="220" text-anchor="start">calls</text>
+  <path class="edge dashed-edge" data-from="d4" data-to="d8" d="M480,180 V276 H670" fill="none" stroke="#4D9FFF" stroke-width="1.2" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="520" y="270" text-anchor="start">prints</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; 8 boxes. The judge call and its cache row belong to <a href="../../experiments_verifiers/harness/e16_gradient_audit.py">e16_gradient_audit.py</a>; this file only counts the new calls and their reported cost (L155&#8211;161). <code>CAP_USD = 3.0</code> (L32) is flagged against the new-call cost at L179, not enforced during the run.</p>
+</div>
+
+<div class="panel" id="panel-logic"><span class="br"></span>
+<h2>Diagram 3 &mdash; join rule, statistical gate and verdict branches</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 340" role="img" aria-label="Join, uniqueness, correlation and verdict rules">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="q1" href="#panel-logic">
+    <title>Exact population key first, then a unique fallback on campaign plus uuid8</title>
+    <rect x="20" y="20" width="300" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="42" text-anchor="middle">exact key in population?</text>
+    <text class="box-sub" x="170" y="58" text-anchor="middle">no &#8594; unique (campaign, uuid8)? (L48&#8211;55)</text>
+    <text class="box-sub" x="170" y="73" text-anchor="middle">neither &#8594; drop no_population_join</text>
+  </a>
+
+  <a class="box" id="q2" href="#panel-logic">
+    <title>Both sibling gradient files must exist for the quad to be judged</title>
+    <rect x="20" y="102" width="300" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="124" text-anchor="middle">E15 and E18 .txt present?</text>
+    <text class="box-sub" x="170" y="140" text-anchor="middle">no &#8594; drop no_&lt;side&gt;_gradient</text>
+    <text class="box-sub" x="170" y="155" text-anchor="middle">and skip the quad (L58&#8211;63)</text>
+  </a>
+
+  <a class="box" id="q3" href="#panel-logic">
+    <title>Paired delta skips a row when either side is None</title>
+    <rect x="20" y="184" width="300" height="62" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="170" y="206" text-anchor="middle">both axes present?</text>
+    <text class="box-sub" x="170" y="222" text-anchor="middle">no &#8594; row excluded (L122&#8211;124)</text>
+    <text class="box-sub" x="170" y="237" text-anchor="middle">no rows at all &#8594; return None (L125)</text>
+  </a>
+
+  <a class="box" id="q4" href="#panel-logic">
+    <title>Bootstrap resamples whole task groups, not single rows</title>
+    <rect x="20" y="266" width="300" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="288" text-anchor="middle">cluster resample</text>
+    <text class="box-sub" x="170" y="304" text-anchor="middle">groups keyed campaign|task (L126&#8211;131)</text>
+    <text class="box-sub" x="170" y="319" text-anchor="middle">999 boot, seed 0</text>
+  </a>
+
+  <a class="box" id="q5" href="#panel-logic">
+    <title>Verdict branch one: all three relevance CIs exclude zero</title>
+    <rect x="390" y="20" width="300" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="540" y="42" text-anchor="middle">all three CI lower bounds &gt; 0?</text>
+    <text class="box-sub" x="540" y="58" text-anchor="middle">yes &#8594; YES (L188&#8211;190)</text>
+    <text class="box-sub" x="540" y="73" text-anchor="middle">some &#8594; MIXED (L191&#8211;193)</text>
+  </a>
+
+  <a class="box" id="q6" href="#panel-logic">
+    <title>Branch two: all mean deltas positive but a CI spans zero</title>
+    <rect x="390" y="102" width="300" height="62" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="540" y="124" text-anchor="middle">all mean deltas above 0?</text>
+    <text class="box-sub" x="540" y="140" text-anchor="middle">yes &#8594; DIRECTIONALLY YES (L194&#8211;197)</text>
+    <text class="box-sub" x="540" y="155" text-anchor="middle">else &#8594; NO (L198&#8211;200)</text>
+  </a>
+
+  <a class="box" id="q7" href="#panel-logic">
+    <title>A missing reference axis leaves the verdict out of the JSON entirely</title>
+    <rect x="390" y="184" width="300" height="62" rx="12" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="540" y="206" text-anchor="middle">e19-minus-reference defined?</text>
+    <text class="box-sub" x="540" y="222" text-anchor="middle">no &#8594; no verdict key written</text>
+    <text class="box-sub" x="540" y="237" text-anchor="middle">guard at L185, key set L201</text>
+  </a>
+
+  <a class="box" id="q8" href="#panel-logic">
+    <title>New-call count and cost exclude cache hits</title>
+    <rect x="390" y="266" width="300" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="540" y="288" text-anchor="middle">cached flag false?</text>
+    <text class="box-sub" x="540" y="304" text-anchor="middle">counted in new_calls and new_cost</text>
+    <text class="box-sub" x="540" y="319" text-anchor="middle">L152&#8211;156; cap flag L179</text>
+  </a>
+
+  <a class="box" id="q9" href="#panel-logic">
+    <title>The markdown writer prints a dash for a missing number</title>
+    <rect x="730" y="102" width="230" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="845" y="124" text-anchor="middle">value is None?</text>
+    <text class="box-sub" x="845" y="140" text-anchor="middle">yes &#8594; "_fmt" prints em dash</text>
+    <text class="box-sub" x="845" y="155" text-anchor="middle">_fmt L210&#8211;211</text>
+  </a>
+
+  <path class="edge" data-from="q1" data-to="q2" d="M170,82 V102" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="180" y="98" text-anchor="start">joined</text>
+  <path class="edge" data-from="q2" data-to="q3" d="M170,164 V184" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="180" y="180" text-anchor="start">quad kept</text>
+  <path class="edge" data-from="q3" data-to="q4" d="M170,246 V266" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="180" y="262" text-anchor="start">deltas</text>
+  <path class="edge" data-from="q4" data-to="q5" d="M320,297 H360 V51 H390" fill="none" stroke="#4D9FFF" stroke-width="1.2" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="364" y="180" text-anchor="middle">CI95</text>
+  <path class="edge" data-from="q5" data-to="q6" d="M540,82 V102" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="550" y="98" text-anchor="start">no</text>
+  <path class="edge" data-from="q6" data-to="q7" d="M540,164 V184" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="550" y="180" text-anchor="start">guard</text>
+  <path class="edge" data-from="q7" data-to="q8" d="M540,246 V266" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="550" y="262" text-anchor="start">cost</text>
+  <path class="edge" data-from="q8" data-to="q9" d="M690,297 H710 V133 H730" fill="none" stroke="#4D9FFF" stroke-width="1.2" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="220" text-anchor="middle">table</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; 9 boxes, one per real condition. The join fallback and the drop counters are at L44&#8211;63, the paired skip at L122&#8211;125, the cluster resample at L126&#8211;131, the verdict branches at L188&#8211;200, the verdict guard at L185, the new-call counting at L152&#8211;156, and <code>_fmt</code> at L210.</p>
+</div>
+
+<div class="panel" id="panel-reads"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">read</td><td class="sym">_e16_population.json</td><td class="sym">L39 (<code>E16.POP_JSON</code>)</td><td>Population items: campaign, task, uuid8, tier, SR, reward</td></tr>
+<tr><td class="sym">read</td><td class="sym">results/E19_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</td><td class="sym">dir L29, read L42&#8211;43, L94</td><td>The E19 side gradient text</td></tr>
+<tr><td class="sym">read</td><td class="sym">results/E15_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</td><td class="sym">dir L27, read L58&#8211;62, L94</td><td>The E15 preference side</td></tr>
+<tr><td class="sym">read</td><td class="sym">results/E18_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</td><td class="sym">dir L28, read L58&#8211;62, L94</td><td>The E18 scripted side</td></tr>
+<tr><td class="sym">read</td><td class="sym">E16 instrument code</td><td class="sym">import L23; calls L73&#8211;76, L98, L157</td><td>Prompt, judge call, parse, item path, cache count</td></tr>
+<tr><td class="sym">write</td><td class="sym">E19_gradient_duel_2026-09-23.json</td><td class="sym">L204</td><td>Population, stats, rows, calls, verdict</td></tr>
+<tr><td class="sym">write</td><td class="sym">E19_gradient_duel_2026-09-23.md</td><td class="sym">L247 via <code>_write_md</code></td><td>Side table, paired deltas, verdict, cost</td></tr>
+<tr><td class="sym">write</td><td class="sym">E16 cache + cost ledgers</td><td class="sym">inside <code>E16._llm</code>, L75</td><td>One row per judge call, cached or new</td></tr>
+<tr><td class="sym">config</td><td class="sym">none</td><td class="sym">no <code>config.py</code> import</td><td>Constants instead: L26&#8211;34</td></tr>
+<tr><td class="sym">state</td><td class="sym">none</td><td class="sym">no LangGraph import</td><td>Plain rows and dicts</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the duel holds the judge prompt and inputs fixed and varies only the gradient text, so a relevance delta is attributable to the gradient, not to the instrument.</p>
+<p class="note">Amber: the three non-E19 sides are expected cache hits; if the E16 cache is missing, this script silently pays for them and the new-call counts grow. The script reports the counts but does not stop on a cache miss.</p>
+<p class="note flag">Red mismatch: <code>CAP_USD = 3.0</code> (L32) is only written into the output as a flag (<code>within_cap</code>, L179); this file never raises or aborts when the cap is passed.</p>
+</div>
+
+<div class="panel" id="panel-symbols"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>every function and constant (5 functions, no classes)</summary><div class="dbody">
+<pre>build_quads()                                               # (campaign, task, uuid8) -&gt; four gradient paths (L37)
+judge_with_text(item, grad_text, role)                      # E16 prompt with substituted gradient (L71)
+main()                                                      # quads, judge, stats, verdict, write (L85)
+_fmt(x, nd=3)                                               # number or em dash (L210)
+_write_md(out)                                              # markdown report text (L214)</pre>
+<p>Inner functions inside <code>main</code>: <code>one(k)</code> judges one quad on four sides (L89&#8211;99) and <code>paired(side_x, side_y, field, boot=999, seed=0)</code> returns n, mean delta, CI95 and win counts (L119&#8211;140).</p>
+<p>Module constants: <code>EV</code> L21, <code>TODAY = "2026-09-23"</code> L26, <code>E15_DIR</code> L27, <code>E18_DIR</code> L28, <code>E19_DIR</code> L29, <code>OUT_JSON</code> L30, <code>OUT_MD</code> L31, <code>CAP_USD = 3.0</code> L32, <code>SIDES = ("e19", "e18", "e15", "ver")</code> L34. Imports: <code>collections</code>, <code>numpy</code>, <code>ThreadPoolExecutor</code>, <code>e16_gradient_audit as E16</code> L23, <code>e19_hybrid_bt as E19H</code> L24 (only for <code>HARD_CAP_USD</code> at L180). No class is defined here.</p>
+<p>Output keys (L159&#8211;181, verdict L201): <code>experiment</code>, <code>date</code>, <code>model</code>, <code>instrument</code>, <code>provenance_note</code>, <code>population</code>, <code>stats</code>, <code>pairs</code>, <code>calls</code>, and <code>verdict</code> when defined. <code>stats</code> holds six paired comparisons across three axes: <code>gold_relevance</code>, <code>alignment_signed</code>, <code>hallucination_flag</code> (L140&#8211;150).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>Kind</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td class="sym">e19b_gradient_duel.py</td><td>import</td><td><code>import e19_gradient_duel as V1D</code> L35; calls <code>V1D.build_quads()</code> at L36</td></tr>
+<tr><td class="sym">its own __main__</td><td>entry</td><td><code>if __name__ == "__main__": main()</code> L250&#8211;251</td></tr>
+<tr><td class="sym">e16_gradient_audit.py</td><td>callee</td><td>Judge prompt, <code>_llm</code>, <code>parse_judgment</code>, <code>judge_item</code>, cache count</td></tr>
+<tr><td class="sym">e19_hybrid_bt.py</td><td>callee</td><td>Reads <code>HARD_CAP_USD</code> for the meta cap field (L180)</td></tr>
+<tr><td class="sym">e19_bt_eval.py</td><td>consumer</td><td>Reads the duel JSON back into its own report (L550&#8211;552)</td></tr>
+<tr><td class="sym">tests/</td><td>tests</td><td>unknown &mdash; no test in <code>tests/</code> mentions this file (grep)</td></tr>
+<tr><td class="sym">exp_e19_gradient_duel.html</td><td>docs</td><td><a href="exp_e19_gradient_duel.html">Experiment page</a> for the same run</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+<p class="sub">Batch: <a href="file_index.html">file_index.html</a> &#183; <a href="file_harness_e18_symmetric.html">e18_symmetric</a> &#183; <a href="file_harness_e19_bt_eval.html">e19_bt_eval</a> &#183; <a href="file_harness_e19_cascade_analysis.html">e19_cascade_analysis</a> &#183; <a href="file_harness_e19_gradient_duel.html">e19_gradient_duel</a> &#183; <a href="file_harness_e19_hybrid_bt.html">e19_hybrid_bt</a></p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19_gradient_duel.py</code> (all 251 lines), <code class="path">experiments_verifiers/harness/e16_gradient_audit.py</code> (symbol names and the <code>POP_JSON</code>/<code>MODEL</code> constants), <code class="path">experiments_verifiers/harness/e19_hybrid_bt.py</code> (only <code>HARD_CAP_USD</code> at L86), <code class="path">experiments_verifiers/harness/e19b_gradient_duel.py</code> (import line only), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>. Directory existence from <code>ls experiments_verifiers/results/</code>. Related pages: <a href="exp_e19_gradient_duel.html">exp_e19_gradient_duel.html</a>, <a href="exp_e19b_gradient_duel.html">exp_e19b_gradient_duel.html</a>, <a href="file_harness_e19_hybrid_bt.html">file_harness_e19_hybrid_bt.html</a>, <a href="file_harness_e19_bt_eval.html">file_harness_e19_bt_eval.html</a>, <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p class="skips">Skipped: the API-key files and <code class="path">experiments_verifiers/.env</code> (never opened, build rule); the duel result JSON contents (only the file's own key names are cited, from the code); the E16 body beyond symbol names and two constants. No application run, no experiment run and no pytest run, by the build rules.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

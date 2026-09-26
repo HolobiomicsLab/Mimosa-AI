@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e8_blast_radius.py - file digest - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e8_blast_radius.py">
+<div class="wrap">
+
+<h1 class="hud">e8_blast_radius.py</h1>
+<p class="intro">This script audits the excluded-task fallback bug at <code>sources/benchmark_evaluation/csv_mode.py:455&ndash;457</code>: when a capsule evaluation was EXCLUDED, the run note fell back to <code>sab_runs[-1]</code> and carried the previous task's uuids, rewards and ablations. It finds every affected task by three independent signals, recovers the real per-generation verdicts from the log and from <code>run_metrics.json</code>, and writes corrected datasets plus a before/after E4 policy table. Everything it reads is read-only evidence; run it with <code>uv run python experiments_verifiers/harness/e8_blast_radius.py</code>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 480" role="img" aria-label="e8_blast_radius.py master diagram: evidence, main, four stage groups, two artifact groups">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="b1">
+    <title>read-only evidence: notes, capsules, log, workflows, ablations, manifest, claims</title>
+    <rect x="16" y="30" width="190" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="111" y="54" text-anchor="middle">read-only evidence</text>
+    <text class="box-sub" x="111" y="70" text-anchor="middle">run_notes, runs_capsule</text>
+    <text class="box-sub" x="111" y="86" text-anchor="middle">logs, sources/workflows</text>
+  </g>
+
+  <a class="box" id="b2" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>main L371 runs identification, recovery, the sane writes and both replays</title>
+    <rect x="16" y="140" width="190" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="111" y="170" text-anchor="middle">main</text>
+    <text class="box-sub" x="111" y="188" text-anchor="middle">L371</text>
+    <text class="box-sub" x="111" y="204" text-anchor="middle">identify, recover,</text>
+    <text class="box-sub" x="111" y="218" text-anchor="middle">replay, write</text>
+  </a>
+
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>signal a: capsule status; signal b: the log lines</title>
+    <rect x="286" y="30" width="340" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="456" y="56" text-anchor="middle">identify - capsule and log</text>
+    <text class="box-sub" x="456" y="74" text-anchor="middle">capsule_status L77 &#183; parse_log L98</text>
+    <text class="box-sub" x="456" y="90" text-anchor="middle">status=excluded, EXCLUDED lines</text>
+  </a>
+
+  <a class="box" id="b4" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>signal c: byte identity of ablations blocks and uuid lists</title>
+    <rect x="286" y="126" width="340" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="456" y="152" text-anchor="middle">identify - notes and matching</text>
+    <text class="box-sub" x="456" y="170" text-anchor="middle">match_notes_to_segments L137</text>
+    <text class="box-sub" x="456" y="186" text-anchor="middle">byte_identity_groups L160</text>
+  </a>
+
+  <a class="box" id="b5" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>recovery: real ablation rows from the log plus rewards from run_metrics.json</title>
+    <rect x="286" y="222" width="340" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="456" y="248" text-anchor="middle">recover real rows</text>
+    <text class="box-sub" x="456" y="266" text-anchor="middle">find_wf_dir L182 &#183; build_recovery L193</text>
+    <text class="box-sub" x="456" y="282" text-anchor="middle">reward from run_metrics.json L242</text>
+  </a>
+
+  <a class="box" id="b6" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>the corrected replay: frozen ablations versus log-recovered generations</title>
+    <rect x="286" y="318" width="340" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="456" y="344" text-anchor="middle">sane replay</text>
+    <text class="box-sub" x="456" y="362" text-anchor="middle">load_task_sequences L257 &#183; substitute_recovered L290</text>
+    <text class="box-sub" x="456" y="378" text-anchor="middle">run_policy L320 &#183; replay L350</text>
+  </a>
+
+  <g class="box" id="b7">
+    <title>sane dataset written at L495 and L501</title>
+    <rect x="726" y="30" width="290" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="871" y="54" text-anchor="middle">sane datasets</text>
+    <text class="box-sub" x="871" y="72" text-anchor="middle">data/manifest_sane.json L495</text>
+    <text class="box-sub" x="871" y="88" text-anchor="middle">data/verifier_claims_sane.jsonl L501</text>
+  </g>
+
+  <g class="box" id="b8">
+    <title>report written at L632 and L702</title>
+    <rect x="726" y="222" width="290" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="871" y="246" text-anchor="middle">report</text>
+    <text class="box-sub" x="871" y="264" text-anchor="middle">results/E8_blast_radius_&lt;date&gt;.json L632</text>
+    <text class="box-sub" x="871" y="280" text-anchor="middle">results/E8_blast_radius_&lt;date&gt;.md L702</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b2" d="M111,100 V140" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="121" y="124" text-anchor="start">reads evidence</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M206,150 L286,68" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="216" y="96" text-anchor="start">signals</text>
+  <path class="edge" data-from="b2" data-to="b4" d="M206,170 L286,164" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="216" y="152" text-anchor="start">matching</text>
+  <path class="edge" data-from="b2" data-to="b5" d="M206,190 L286,260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="216" y="240" text-anchor="start">recovery</text>
+  <path class="edge" data-from="b2" data-to="b6" d="M206,210 L286,356" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="216" y="312" text-anchor="start">sane replay</text>
+  <path class="edge" data-from="b4" data-to="b7" d="M626,164 L726,90" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="676" y="118" text-anchor="middle">owners</text>
+  <path class="edge" data-from="b5" data-to="b7" d="M626,255 L726,70" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="676" y="176" text-anchor="middle">recovered rows</text>
+  <path class="edge" data-from="b6" data-to="b8" d="M626,356 L726,265" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="676" y="320" text-anchor="middle">policy table</text>
+  <path class="edge" data-from="b3" data-to="b8" d="M626,68 L726,230" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="150" text-anchor="start">affected list</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>8 boxes</code>. Cyan = work inside <code>e8_blast_radius.py</code>, dashed grey = a read or a written path. Solid = call, dashed = read/write. <code>main</code> (L371) calls the four stage groups in this order: <code>capsule_status</code> L372, <code>parse_log</code> L373, <code>match_notes_to_segments</code> L375, <code>byte_identity_groups</code> L384, <code>build_recovery</code> L411, then the two replays L523 and L525. The identifiers in the labels are the real functions, not a pipeline invented for the drawing.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in and data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 400" role="img" aria-label="e8_blast_radius.py data flow: seven read paths, main, four written files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="g1">
+    <title>per-task campaign records, read in match_notes_to_segments L141</title>
+    <rect x="16" y="24" width="250" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="141" y="46" text-anchor="middle">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</text>
+    <text class="box-sub" x="141" y="62" text-anchor="middle">timestamp L145</text>
+  </g>
+
+  <g class="box" id="g2">
+    <title>the real verdict, read in capsule_status L85</title>
+    <rect x="16" y="88" width="250" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="141" y="110" text-anchor="middle">runs_capsule/&lt;cap&gt;/&lt;task&gt;/</text>
+    <text class="box-sub" x="141" y="126" text-anchor="middle">evaluation_results.json</text>
+  </g>
+
+  <g class="box" id="g3">
+    <title>the surviving log, parsed line by line at L107</title>
+    <rect x="16" y="152" width="250" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="141" y="174" text-anchor="middle">logs/evaluation_csv_mode.log</text>
+    <text class="box-sub" x="141" y="190" text-anchor="middle">[SAB EVAL] and [ABLATION]</text>
+  </g>
+
+  <g class="box" id="g4">
+    <title>real per-generation rewards, read in build_recovery L242</title>
+    <rect x="16" y="216" width="250" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="141" y="238" text-anchor="middle">sources/workflows/&lt;c&gt;/&lt;uuid&gt;/</text>
+    <text class="box-sub" x="141" y="254" text-anchor="middle">run_metrics.json</text>
+  </g>
+
+  <g class="box" id="g5">
+    <title>frozen note copies read by load_task_sequences L260</title>
+    <rect x="16" y="280" width="250" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="141" y="302" text-anchor="middle">experiments_verifiers/ablations/*.json</text>
+    <text class="box-sub" x="141" y="318" text-anchor="middle">name &lt;campaign&gt;__&lt;task&gt;</text>
+  </g>
+
+  <g class="box" id="g6">
+    <title>manifest.json L43 and verifier_claims.jsonl L44 are copied, never modified</title>
+    <rect x="16" y="344" width="250" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="141" y="366" text-anchor="middle">manifest.json + claims.jsonl</text>
+    <text class="box-sub" x="141" y="382" text-anchor="middle">L43-L44</text>
+  </g>
+
+  <a class="box" id="g7" href="../../experiments_verifiers/harness/e8_blast_radius.py">
+    <title>main L371 has no return value; it writes files</title>
+    <rect x="350" y="150" width="200" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="182" text-anchor="middle">main L371</text>
+    <text class="box-sub" x="450" y="200" text-anchor="middle">returns nothing</text>
+    <text class="box-sub" x="450" y="216" text-anchor="middle">writes four files</text>
+  </a>
+
+  <g class="box" id="g8">
+    <title>manifest_sane written at L495-L496</title>
+    <rect x="646" y="60" width="258" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="775" y="84" text-anchor="middle">data/manifest_sane.json</text>
+    <text class="box-sub" x="775" y="100" text-anchor="middle">nulled foreign rows + recovered rows</text>
+  </g>
+
+  <g class="box" id="g9">
+    <title>verifier_claims_sane written at L501-L519</title>
+    <rect x="646" y="140" width="258" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="775" y="164" text-anchor="middle">data/verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="775" y="180" text-anchor="middle">flagged rows, labels nulled</text>
+  </g>
+
+  <g class="box" id="g10">
+    <title>result JSON written at L632-L635</title>
+    <rect x="646" y="220" width="258" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="775" y="244" text-anchor="middle">results/E8_blast_radius_&lt;date&gt;.json</text>
+    <text class="box-sub" x="775" y="260" text-anchor="middle">bug, identification, recovery, policies</text>
+  </g>
+
+  <g class="box" id="g11">
+    <title>markdown written at L702-L703</title>
+    <rect x="646" y="300" width="258" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="775" y="324" text-anchor="middle">results/E8_blast_radius_&lt;date&gt;.md</text>
+    <text class="box-sub" x="775" y="340" text-anchor="middle">TL;DR, per-campaign tables, gaps</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="g1" data-to="g7" d="M266,50 H300 V170 H350" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g2" data-to="g7" d="M266,114 H320 V175 H350" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g3" data-to="g7" d="M266,178 H350" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="308" y="170" text-anchor="middle">parses</text>
+  <path class="edge dashed-edge" data-from="g4" data-to="g7" d="M266,242 H320 V205 H350" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g5" data-to="g7" d="M266,306 H300 V220 H350" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g6" data-to="g7" d="M266,370 H290 V232 H350" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g7" data-to="g8" d="M550,175 H600 V90 H646" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g7" data-to="g9" d="M550,190 H646" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g7" data-to="g10" d="M550,205 H600 V250 H646" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="g7" data-to="g11" d="M550,220 H580 V330 H646" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="598" y="348" text-anchor="middle">writes four files</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>11 boxes</code> (6 read paths, <code>main</code>, 4 written files). Every read is a plain <code>json.load</code> or line scan; nothing under <code>run_notes/</code>, <code>runs_capsule/</code>, <code>logs/</code> or <code>sources/</code> is written. <code>main</code> has no <code>return</code> statement (L371&ndash;715), so the four files are the whole output. The console digest at L707&ndash;711 prints counts only.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the selection rule replayed per task</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 400" role="img" aria-label="e8_blast_radius.py control: shippable filter and the four policy branches P0, P1, P2-3, PORACLE">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="h1">
+    <title>every generation of one task, loaded by load_task_sequences L257</title>
+    <rect x="20" y="30" width="240" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="140" y="54" text-anchor="middle">generations of one task</text>
+    <text class="box-sub" x="140" y="70" text-anchor="middle">gens list L286</text>
+  </g>
+
+  <g class="box" id="h2">
+    <title>shippable_of L312 drops failed slots and non-evaluated rows</title>
+    <polygon points="425,22 565,58 425,94 285,58" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="400" y="54" text-anchor="middle">shippable?</text>
+    <text class="box-sub" x="400" y="70" text-anchor="middle">not failed, status evaluated</text>
+  </g>
+
+  <g class="box" id="h3">
+    <title>ranked_desc L316 ranks by reward then index</title>
+    <rect x="640" y="30" width="280" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780" y="54" text-anchor="middle">ranked_desc</text>
+    <text class="box-sub" x="780" y="70" text-anchor="middle">L316 &#183; (reward, index) descending</text>
+  </g>
+
+  <g class="box" id="h4">
+    <title>P0 L325 ships the top generation by reward then index</title>
+    <rect x="20" y="130" width="200" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="156" text-anchor="middle">P0 L325</text>
+    <text class="box-sub" x="120" y="172" text-anchor="middle">max reward, latest</text>
+    <text class="box-sub" x="120" y="186" text-anchor="middle">SR of that gen</text>
+  </g>
+
+  <g class="box" id="h5">
+    <title>P1 L328-L332 needs a VER-true generation first</title>
+    <rect x="250" y="130" width="220" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="360" y="156" text-anchor="middle">P1 L328</text>
+    <text class="box-sub" x="360" y="172" text-anchor="middle">no VER-true gen?</text>
+    <text class="box-sub" x="360" y="186" text-anchor="middle">SR is False L332</text>
+  </g>
+
+  <g class="box" id="h6">
+    <title>P2-3 L335-L342 checks the top three by reward and stops at the first SR-true</title>
+    <rect x="500" y="130" width="220" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="610" y="156" text-anchor="middle">P2-3 L335</text>
+    <text class="box-sub" x="610" y="172" text-anchor="middle">top 3 by reward</text>
+    <text class="box-sub" x="610" y="186" text-anchor="middle">first SR-true wins</text>
+  </g>
+
+  <g class="box" id="h7">
+    <title>PORACLE L343 ships any SR-true generation, counting its rank as queries</title>
+    <rect x="750" y="130" width="190" height="64" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="845" y="156" text-anchor="middle">PORACLE L343</text>
+    <text class="box-sub" x="845" y="172" text-anchor="middle">any SR-true gen</text>
+    <text class="box-sub" x="845" y="186" text-anchor="middle">queries = its rank</text>
+  </g>
+
+  <g class="box" id="h8">
+    <title>replay L350 repeats the chosen policy per task and per campaign</title>
+    <rect x="330" y="270" width="300" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="480" y="296" text-anchor="middle">replay</text>
+    <text class="box-sub" x="480" y="314" text-anchor="middle">L350 &#183; SR count, rate, mean_queries</text>
+    <text class="box-sub" x="480" y="330" text-anchor="middle">overall plus per campaign L358</text>
+  </g>
+
+  <path class="edge" data-from="h1" data-to="h2" d="M260,58 H285" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="272" y="12" text-anchor="middle">filter</text>
+  <path class="edge" data-from="h2" data-to="h3" d="M565,58 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="590" y="22" text-anchor="middle">yes</text>
+  <path class="edge" data-from="h2" data-to="h4" d="M355,94 V130" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="362" y="118" text-anchor="start">no shippable gen</text>
+  <path class="edge" data-from="h3" data-to="h4" d="M700,86 V112 H120 V130" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="h4" data-to="h5" d="M220,162 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="235" y="154" text-anchor="middle">P1</text>
+  <path class="edge" data-from="h5" data-to="h6" d="M470,162 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="485" y="154" text-anchor="middle">P2-3</text>
+  <path class="edge" data-from="h6" data-to="h7" d="M720,162 H750" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="735" y="154" text-anchor="middle">ORACLE</text>
+  <path class="edge" data-from="h5" data-to="h8" d="M480,194 V270" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="490" y="240" text-anchor="start">per task</text>
+  <path class="edge" data-from="h7" data-to="h8" d="M845,194 V240 H630 V270" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>8 boxes</code>. <code>shippable_of</code> (L312) keeps only generations that are not <code>failed_slot</code> and whose <code>status</code> is <code>evaluated</code>. The four policies then differ only in which rank they ship: P0 the top of <code>ranked_desc</code> (L325), P1 the top VER-true generation, or SR False when none exists (L328&ndash;332), P2-3 the first SR-true inside the top three (L335&ndash;342), PORACLE any SR-true with its rank as the query count (L343&ndash;346). <code>replay</code> (L350) repeats the chosen policy over every task and every campaign. The note-to-log join uses a separate tolerance, <code>TS_MATCH_TOL_S = 5.0</code> seconds (L72, used at L155).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>file read</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td><td>via REPO L40, glob L141</td><td>note timestamp, contaminated fields</td></tr>
+<tr><td>file read</td><td class="sym">runs_capsule/&lt;cap&gt;/&lt;task&gt;/evaluation_results.json</td><td>L81, L85</td><td>real capsule status and VER</td></tr>
+<tr><td>file read</td><td class="sym">logs/evaluation_csv_mode.log</td><td>LOG_PATH L42, open L107</td><td>[SAB EVAL] and [ABLATION] rows</td></tr>
+<tr><td>file read</td><td class="sym">sources/workflows/&lt;c&gt;/&lt;uuid&gt;/run_metrics.json</td><td>WF_MAP L61&ndash;70, open L243</td><td>real <code>overall_score</code> per generation</td></tr>
+<tr><td>file read</td><td class="sym">experiments_verifiers/ablations/*.json</td><td>ABL_DIR L45, listdir L260</td><td>frozen generations and rewards</td></tr>
+<tr><td>file read</td><td class="sym">experiments_verifiers/manifest.json</td><td>MANIFEST L43, load L437</td><td>rows to flag and null</td></tr>
+<tr><td>file read</td><td class="sym">data/verifier_claims.jsonl</td><td>CLAIMS L44, load L500</td><td>claim rows to flag and null</td></tr>
+<tr><td>constant</td><td class="sym">CAMPAIGNS, NOTE_ONLY_CAMPAIGNS, WF_MAP</td><td>L48&ndash;70</td><td>campaign to note and workflow dirs</td></tr>
+<tr><td>constant</td><td class="sym">PLACEHOLDER_UUIDS, TS_MATCH_TOL_S</td><td>L71&ndash;72</td><td>failed slots, 5 s match tolerance</td></tr>
+<tr><td>arg</td><td class="sym">sys.argv[1] as DATE</td><td>L41</td><td>output filename date</td></tr>
+<tr><td>file write</td><td class="sym">data/manifest_sane.json</td><td>L495&ndash;496</td><td>nulled foreign rows plus recovered rows</td></tr>
+<tr><td>file write</td><td class="sym">data/verifier_claims_sane.jsonl</td><td>L501&ndash;519</td><td>one flagged row per line</td></tr>
+<tr><td>file write</td><td class="sym">results/E8_blast_radius_&lt;date&gt;.json</td><td>L632&ndash;635</td><td>bug, identification, recovery, blast radius</td></tr>
+<tr><td>file write</td><td class="sym">results/E8_blast_radius_&lt;date&gt;.md</td><td>L702&ndash;703</td><td>markdown digest</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: the docstring says the script is read-only on <code>run_notes/</code>, <code>runs_capsule/</code>, <code>logs/</code> and <code>sources/</code> (L25) and that the originals stay untouched (L20&ndash;21). Both hold in the code: the only writes are the four paths in <code>experiments_verifiers/</code> listed above.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File card</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e8_blast_radius.py">experiments_verifiers/harness/e8_blast_radius.py</a></h4>
+<p class="role">Finds every note with foreign execution data, recovers the real verdicts, and writes corrected datasets plus a sane policy table.</p>
+<p class="meta">715 lines &#183; 13 functions &#183; no imports from the harness &#183; writes 4 files under experiments_verifiers/</p>
+<details><summary>key signatures and constants</summary><div class="dbody">
+<pre>capsule_status() -&gt; dict                                     # L77
+parse_log() -&gt; list[dict]                                    # L98
+match_notes_to_segments(all_note_dirs, segments) -&gt; dict     # L137
+byte_identity_groups(all_note_dirs) -&gt; dict                  # L160
+find_wf_dir(base, uuid) -&gt; str | None                        # L182
+build_recovery(affected, matched, segments, capsule_stat)    # L193
+load_task_sequences() -&gt; dict                                # L257
+substitute_recovered(tasks, recovery) -&gt; dict                # L290
+shippable_of(t) -&gt; list                                      # L312
+ranked_desc(sh) -&gt; list                                      # L316
+run_policy(name, sh) -&gt; dict                                 # L320
+replay(tasks, policies=('P0', 'P1', 'P2-3', 'PORACLE'))      # L350
+main() -&gt; None                                               # L371</pre>
+<p>Constants: <code>LOG_PATH</code> L42, <code>MANIFEST</code> L43, <code>CLAIMS</code> L44, <code>ABL_DIR</code> L45, <code>CAMPAIGNS</code> L48&ndash;57, <code>NOTE_ONLY_CAMPAIGNS</code> L59, <code>WF_MAP</code> L61&ndash;70, <code>PLACEHOLDER_UUIDS</code> L71, <code>TS_MATCH_TOL_S = 5.0</code> L72.</p>
+</div></details>
+</div>
+<p class="note say">Why it matters: the corrected tables are the input of <a href="../../experiments_verifiers/harness/e9_deployment.py">e9_deployment.py</a>, which reads <code>data/verifier_claims_sane.jsonl</code> (L48) and <code>data/manifest_sane.json</code> (L64).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>every function, module constant and the entry point (13 functions)</summary><div class="dbody">
+<pre>capsule_status()
+  L77  status and VER per capsule
+
+parse_log()
+  L98  splits the log into note segments
+
+match_notes_to_segments(all_note_dirs, segments)
+  L137  joins notes to segments within 5 s
+
+byte_identity_groups(all_note_dirs)
+  L160  md5 groups of ablations and uuids
+
+find_wf_dir(base, uuid)
+  L182  locates a workflow dir by short uuid
+
+build_recovery(affected, matched, segments, capsule_stat)
+  L193  real verdict, rows and rewards
+
+load_task_sequences()
+  L257  frozen ablations into per-task generations
+
+substitute_recovered(tasks, recovery)
+  L290  swaps foreign generations for recovered ones
+
+shippable_of(t)
+  L312  keeps evaluated non-placeholder generations
+
+ranked_desc(sh)
+  L316  sorts by reward then index
+
+run_policy(name, sh)
+  L320  one of P0, P1, P2-3, PORACLE
+
+replay(tasks, policies=('P0', 'P1', 'P2-3', 'PORACLE'))
+  L350  per-campaign and overall SR counts
+
+main()
+  L371  identification, recovery, writes, digests</pre>
+<p>Module level, no class in the file:</p>
+<pre>BASE, REPO                                        # L39-L40
+DATE, LOG_PATH, MANIFEST, CLAIMS, ABL_DIR         # L41-L45
+CAMPAIGNS, NOTE_ONLY_CAMPAIGNS, WF_MAP            # L48-L70
+PLACEHOLDER_UUIDS, TS_MATCH_TOL_S                 # L71-L72
+if __name__ == "__main__": main()                 # L714-L715</pre>
+<p>Zero classes, zero methods. The only argument is the optional date string <code>sys.argv[1]</code> (L41); everything else comes from module constants and from disk.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>Where</th><th>What it uses</th></tr></thead>
+<tbody>
+<tr><td class="sym">run directly</td><td><code>uv run python experiments_verifiers/harness/e8_blast_radius.py</code></td><td>executes <code>main</code> at L714&ndash;715</td></tr>
+<tr><td class="sym">importers</td><td>grep of .py files for <code>e8_blast_radius</code>: no hit outside this file</td><td>no importer found</td></tr>
+<tr><td class="sym">tests/</td><td>grep of tests/ for <code>e8</code> or the module name: no hit</td><td>no test found</td></tr>
+<tr><td class="sym">downstream consumer</td><td><a href="../../experiments_verifiers/harness/e9_deployment.py">e9_deployment.py</a> L48, L64</td><td>reads both sane datasets this script writes</td></tr>
+<tr><td class="sym">related test (not this file)</td><td>tests/csv_mode_run_notes_fallback_test.py</td><td>tests the bug source <code>sources/benchmark_evaluation/csv_mode.py</code>, not this audit script</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: this script documents the bug at <code>csv_mode.py:455&ndash;457</code> but does not import or call that module. A fix in <code>csv_mode.py</code> cannot re-run the audit; the audit must be re-run by hand against the same frozen evidence.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e8_blast_radius.py</code> (715 lines, read in full; the script itself was not executed), <code class="path">experiments_verifiers/harness/e9_deployment.py</code> L46&ndash;70 (the consumers of its output), <code class="path">tests/csv_mode_run_notes_fallback_test.py</code> L1&ndash;30 (docstring only), directory listings of <code class="path">run_notes/</code>, <code class="path">runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">experiments_verifiers/data/</code> and <code class="path">experiments_verifiers/results/</code> (existence checks), <code class="path">logs/evaluation_csv_mode.log</code> (line count only: 49 374), <code class="path">docs/visual_clone/_reference.html</code> and <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p>Related pages: <a href="file_index.html">file_index.html</a> (hub), <a href="exp_e8_blast_radius.html">exp_e8_blast_radius.html</a>, <a href="file_harness_e9_deployment.html">e9_deployment.py</a> (reads its output), <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p class="skips">Skipped: the contents of <code class="path">run_notes/</code>, <code class="path">runs_capsule/</code> and <code class="path">logs/evaluation_csv_mode.log</code> (this page documents the script, not one audit run); <code class="path">experiments_verifiers/results/E8_blast_radius_20260922.json</code> and <code>.md</code> (results of one run); <code class="path">experiments_verifiers/REPORT_excluded_task_bug_and_sane_replay.html</code> (a report). No file outside <code class="path">docs/visual_clone/</code> was modified.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>metrics.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; metrics.py">
+<div class="wrap">
+
+<h1 class="hud">metrics.py</h1>
+<p class="intro">This file is the section-0 metric library of the verifier-search harness: it turns one score vector plus SR/VER labels into AUC, Brier, Kendall tau, within-task ranking accuracy, an exact McNemar test and two task-cluster bootstraps. It has no <code>main()</code> and reads no config, file or state, so it runs only when a caller imports it. Two scripts do that, <a href="file_harness_run_e1.html">run_e1.py</a> and <a href="file_harness_run_e2.html">run_e2.py</a>, and every number they publish is labelled "my computation".</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does: clean once, measure three ways, resample by task</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 360" role="img" aria-label="metrics.py: caller arrays pass through _clean, then four metric groups return floats or None">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="mIn" href="../../experiments_verifiers/harness/metrics.py">
+    <title>Caller arrays: one score per example, SR or VER label, task id</title>
+    <rect x="20" y="140" width="170" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="168" text-anchor="middle">scores, labels, tasks</text>
+    <text class="box-sub" x="105" y="186" text-anchor="middle">caller arrays</text>
+  </a>
+
+  <a class="box" id="mClean" href="../../experiments_verifiers/harness/metrics.py">
+    <title>_clean drops rows with a NaN score or label</title>
+    <rect x="225" y="143" width="150" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="300" y="169" text-anchor="middle">_clean</text>
+    <text class="box-sub" x="300" y="187" text-anchor="middle">drop NaN rows &#183; L15</text>
+  </a>
+
+  <a class="box" id="mRank" href="../../experiments_verifiers/harness/metrics.py">
+    <title>auc L23, brier L30, tau L38, tau_top_quartile L46</title>
+    <rect x="415" y="30" width="215" height="74" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="522" y="58" text-anchor="middle">auc &#183; brier &#183; tau</text>
+    <text class="box-sub" x="522" y="76" text-anchor="middle">tau_top_quartile &#183; L23&#8211;L61</text>
+  </a>
+
+  <a class="box" id="mWtr" href="../../experiments_verifiers/harness/metrics.py">
+    <title>within_task_ranking L64: SR-true beats SR-false inside a task</title>
+    <rect x="415" y="143" width="215" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="522" y="169" text-anchor="middle">within_task_ranking</text>
+    <text class="box-sub" x="522" y="187" text-anchor="middle">per-task pairs &#183; L64</text>
+  </a>
+
+  <a class="box" id="mMcn" href="../../experiments_verifiers/harness/metrics.py">
+    <title>mcnemar_exact L95: exact binomial test on discordant pairs</title>
+    <rect x="415" y="256" width="215" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="522" y="282" text-anchor="middle">mcnemar_exact</text>
+    <text class="box-sub" x="522" y="300" text-anchor="middle">discordant pairs &#183; L95</text>
+  </a>
+
+  <a class="box" id="mBoot" href="../../experiments_verifiers/harness/metrics.py">
+    <title>task_cluster_bootstrap_ci L123 and paired_auc_diff_bootstrap L146</title>
+    <rect x="680" y="120" width="185" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="772" y="152" text-anchor="middle">bootstrap CIs</text>
+    <text class="box-sub" x="772" y="170" text-anchor="middle">resample tasks, not rows</text>
+    <text class="box-sub" x="772" y="188" text-anchor="middle">L123 &#183; L146</text>
+  </a>
+
+  <g class="box" id="mExt">
+    <title>Imports only: scipy.stats and sklearn.metrics, lines 11-12</title>
+    <rect x="20" y="256" width="170" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="284" text-anchor="middle">scipy.stats &#183; sklearn</text>
+    <text class="box-sub" x="105" y="302" text-anchor="middle">imports only &#183; L11&#8211;L12</text>
+  </g>
+
+  <g class="box" id="mOut">
+    <title>Return value: a float, None, a tuple or a dict</title>
+    <rect x="895" y="120" width="105" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="947" y="158" text-anchor="middle">float | None</text>
+    <text class="box-sub" x="947" y="176" text-anchor="middle">or dict</text>
+  </g>
+
+  <path class="edge" data-from="mIn" data-to="mClean" d="M190,173 H225" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="207" y="164" text-anchor="middle">arrays</text>
+  <path class="edge" data-from="mClean" data-to="mRank" d="M375,155 C400,155 400,67 415,67" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="399" y="108" text-anchor="middle">clean</text>
+  <path class="edge" data-from="mClean" data-to="mWtr" d="M375,173 H415" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="395" y="164" text-anchor="middle">clean</text>
+  <path class="edge" data-from="mIn" data-to="mMcn" d="M190,190 C320,230 320,285 415,289" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="248" text-anchor="middle">pred_a, pred_b</text>
+  <path class="edge" data-from="mClean" data-to="mBoot" d="M375,188 C560,230 600,165 680,165" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="212" text-anchor="middle">_clean again</text>
+  <path class="edge" data-from="mRank" data-to="mOut" d="M630,67 H862 V140 H895" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="60" text-anchor="middle">float | None</text>
+  <path class="edge" data-from="mWtr" data-to="mOut" d="M630,176 H895" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="167" text-anchor="middle">dict</text>
+  <path class="edge" data-from="mMcn" data-to="mOut" d="M630,289 H862 V190 H895" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="282" text-anchor="middle">p_value, b01, b10</text>
+  <path class="edge" data-from="mBoot" data-to="mOut" d="M865,175 H895" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge dotted-edge" data-from="mExt" data-to="mRank" d="M190,270 C300,270 300,70 415,70" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="330" y="120" text-anchor="middle">kendalltau</text>
+  <path class="edge dotted-edge" data-from="mExt" data-to="mMcn" d="M190,296 H415" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="300" y="288" text-anchor="middle">binomtest</text>
+
+  <text class="box-sub" x="20" y="345">solid = call  |  dashed = caller data / external  |  dotted = import only  |  box sub-lines carry the line numbers</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the whole file in one graph. <code>_clean</code> L15 is the single shared gate; the ranking metrics and the bootstraps call it, <code>mcnemar_exact</code> L95 masks NaN itself L102. <code>roc_auc_score</code> (import L12) is called by <code>auc</code> L27 and by <code>paired_auc_diff_bootstrap</code> L165.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: in from the two runners, out as raw numbers, nothing written</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 300" role="img" aria-label="metrics.py data flow: run_e1 and run_e2 pass score vectors in and receive floats or dicts back; the file writes no file and holds no state">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="dE1" href="file_harness_run_e1.html">
+    <title>run_e1.py imports metrics as M at L36</title>
+    <rect x="20" y="40" width="200" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="70" text-anchor="middle">run_e1.py</text>
+    <text class="box-sub" x="120" y="88" text-anchor="middle">from harness import metrics &#183; L36</text>
+  </a>
+
+  <a class="box" id="dE2" href="file_harness_run_e2.html">
+    <title>run_e2.py imports metrics as M at L31</title>
+    <rect x="20" y="180" width="200" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="210" text-anchor="middle">run_e2.py</text>
+    <text class="box-sub" x="120" y="228" text-anchor="middle">from harness import metrics &#183; L31</text>
+  </a>
+
+  <a class="box" id="dMid" href="../../experiments_verifiers/harness/metrics.py">
+    <title>The nine public functions; defaults n_boot=1000 and seed=7</title>
+    <rect x="330" y="90" width="250" height="120" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="455" y="122" text-anchor="middle">nine metric functions</text>
+    <text class="box-sub" x="455" y="142" text-anchor="middle">no class, no main, no state</text>
+    <text class="box-sub" x="455" y="160" text-anchor="middle">n_boot 1000 &#183; seed 7</text>
+    <text class="box-sub" x="455" y="178" text-anchor="middle">L123 &#183; L146</text>
+  </a>
+
+  <g class="box" id="dOut">
+    <title>Returned to the caller: float, None, tuple or dict</title>
+    <rect x="690" y="40" width="300" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="840" y="70" text-anchor="middle">returns float | None / dict</text>
+    <text class="box-sub" x="840" y="88" text-anchor="middle">caller rounds and stores them</text>
+  </g>
+
+  <g class="box" id="dNone">
+    <title>metrics.py opens no file and keeps no state</title>
+    <rect x="690" y="180" width="300" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="840" y="210" text-anchor="middle">no file, no state</text>
+    <text class="box-sub" x="840" y="228" text-anchor="middle">caller writes results/*.json</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="dE1" data-to="dMid" d="M220,75 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="275" y="66" text-anchor="middle">scores, labels</text>
+  <path class="edge dashed-edge" data-from="dE2" data-to="dMid" d="M220,215 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="275" y="206" text-anchor="middle">scores, labels</text>
+  <path class="edge" data-from="dMid" data-to="dOut" d="M580,140 C640,140 640,75 690,75" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="640" y="120" text-anchor="middle">return</text>
+  <path class="edge dashed-edge" data-from="dMid" data-to="dNone" d="M580,170 C640,170 640,215 690,215" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="640" y="205" text-anchor="middle">writes none</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the file has no config keys and no <code>open()</code> call; the JSON files named in run_e1 (<code>results/E1_rubric_surgery_&lt;date&gt;.json</code>, run_e1 L530&#8211;L536) and run_e2 (<code>results/E2_static-grounding_&lt;date&gt;.json</code>, run_e2 L362) are written by those callers.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the decision rules: when a metric returns None instead of a number</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 360" role="img" aria-label="metrics.py guard rules: NaN rows dropped, single-class inputs return None, zero discordant pairs give p=1.0, thin bootstrap resamples return None">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="g1">
+    <title>Guard in _clean L19</title>
+    <rect x="20" y="30" width="230" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="56" text-anchor="middle">score or label is NaN?</text>
+    <text class="box-sub" x="135" y="74" text-anchor="middle">_clean &#183; L19</text>
+  </g>
+  <g class="box" id="g1y">
+    <title>NaN rows leave the sample</title>
+    <rect x="330" y="30" width="230" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="445" y="56" text-anchor="middle">drop the row</text>
+    <text class="box-sub" x="445" y="74" text-anchor="middle">return ok mask &#183; L20</text>
+  </g>
+  <path class="edge" data-from="g1" data-to="g1y" d="M250,59 H330" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="290" y="50" text-anchor="middle">yes</text>
+
+  <g class="box" id="g2">
+    <title>One class in labels, or no spread in scores</title>
+    <rect x="20" y="130" width="230" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="156" text-anchor="middle">fewer than 2 classes?</text>
+    <text class="box-sub" x="135" y="174" text-anchor="middle">auc L25 &#183; tau L40</text>
+  </g>
+  <g class="box" id="g2y">
+    <title>Undefined metric is reported as None</title>
+    <rect x="330" y="130" width="230" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="445" y="156" text-anchor="middle">return None</text>
+    <text class="box-sub" x="445" y="174" text-anchor="middle">caller counts it undefined</text>
+  </g>
+  <path class="edge" data-from="g2" data-to="g2y" d="M250,159 H330" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="290" y="150" text-anchor="middle">yes</text>
+
+  <g class="box" id="g3">
+    <title>tau_top_quartile cut choice L55</title>
+    <rect x="20" y="230" width="230" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="256" text-anchor="middle">threshold argument set?</text>
+    <text class="box-sub" x="135" y="274" text-anchor="middle">tau_top_quartile &#183; L55</text>
+  </g>
+  <g class="box" id="g3n">
+    <title>Default cut is the global q75</title>
+    <rect x="330" y="230" width="230" height="58" rx="2" fill="none" stroke="#00E5FF"/>
+    <text class="box-label" x="445" y="256" text-anchor="middle">cut = quantile 0.75</text>
+    <text class="box-sub" x="445" y="274" text-anchor="middle">run_e1 passes a fold cut</text>
+  </g>
+  <path class="edge" data-from="g3" data-to="g3n" d="M250,259 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="290" y="250" text-anchor="middle">no</text>
+
+  <g class="box" id="g4">
+    <title>mcnemar_exact L107</title>
+    <rect x="620" y="30" width="230" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735" y="56" text-anchor="middle">discordant pairs = 0?</text>
+    <text class="box-sub" x="735" y="74" text-anchor="middle">mcnemar_exact &#183; L107</text>
+  </g>
+  <g class="box" id="g4y">
+    <title>No discordant pair means p 1.0</title>
+    <rect x="620" y="130" width="230" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="735" y="156" text-anchor="middle">p_value 1.0, b01 0</text>
+    <text class="box-sub" x="735" y="174" text-anchor="middle">else binomtest &#183; L114</text>
+  </g>
+  <path class="edge" data-from="g4" data-to="g4y" d="M735,88 V130" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="760" y="112" text-anchor="middle">yes</text>
+
+  <g class="box" id="g5">
+    <title>Bootstrap guards L136 L141 L162 L170</title>
+    <rect x="620" y="230" width="230" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735" y="256" text-anchor="middle">resample rows &lt; 5, or</text>
+    <text class="box-sub" x="735" y="274" text-anchor="middle">valid draws &lt; 100</text>
+  </g>
+  <g class="box" id="g5y">
+    <title>Thin resample is skipped; a thin CI is None</title>
+    <rect x="620" y="308" width="230" height="46" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="735" y="336" text-anchor="middle">skip, else CI is None</text>
+  </g>
+  <path class="edge" data-from="g5" data-to="g5y" d="M735,288 V308" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="760" y="302" text-anchor="middle">yes</text>
+
+  <text class="box-sub" x="20" y="330">red = the failing branch returns None or a default; cyan = the metric proceeds</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the guards are the file's real logic. The bootstrap resamples whole tasks L132 and L158, never single rows, so task clusters stay together.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">scores</td><td>first argument of every metric</td><td>the score vector to rank or threshold</td><td class="size">L15 L23 L46 L64 L123</td></tr>
+<tr><td>reads</td><td class="sym">labels</td><td>second argument</td><td>SR or VER bit; None becomes zeros</td><td class="size">L16</td></tr>
+<tr><td>reads</td><td class="sym">tasks</td><td>argument of two metrics</td><td>group rows into task clusters</td><td class="size">L64 L123 L146</td></tr>
+<tr><td>reads</td><td class="sym">metric_fn</td><td>argument of the CI helper</td><td>the metric re-measured per resample</td><td class="size">L123 L138</td></tr>
+<tr><td>reads</td><td class="sym">n_boot, seed</td><td>defaults 1000 and 7</td><td>resample count and RNG seed</td><td class="size">L123 L128 L146 L154</td></tr>
+<tr><td>reads</td><td class="sym">threshold</td><td>argument of tau_top_quartile</td><td>explicit cut instead of q75</td><td class="size">L47 L55</td></tr>
+<tr><td>reads</td><td class="sym">scipy.stats</td><td>import, module scope</td><td>kendalltau and binomtest</td><td class="size">L11</td></tr>
+<tr><td>reads</td><td class="sym">sklearn roc_auc_score</td><td>import, module scope</td><td>AUC and the paired AUC diff</td><td class="size">L12 L27 L165</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td>no file, no state, no print</td><td>callers own the JSON output</td><td class="size">&#8212;</td></tr>
+<tr><td>returns</td><td class="sym">float | None / tuple / dict</td><td>return statements</td><td>raw numbers, no rounding</td><td class="size">L27 L88 L143 L173</td></tr>
+</tbody>
+</table>
+<p class="note say">One line of house style matters here: every routine is labelled "my computation" by the callers because this file computes numbers only, and never re-reads a stored verdict.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>9 top-level functions, no class &mdash; signatures and roles</summary><div class="dbody">
+<pre>_clean(scores, labels)                                                   L15   drop NaN score/label pairs
+auc(scores, labels) -&gt; float | None                                      L23   ROC AUC, None if one class
+brier(scores, labels) -&gt; float | None                                    L30   squared error of clipped score
+tau(scores, labels) -&gt; float | None                                      L38   Kendall tau over all rows
+tau_top_quartile(scores, labels, threshold=None)
+    -&gt; tuple[float | None, int, float | None]                            L46   tau inside the top score slice
+within_task_ranking(scores, labels, tasks) -&gt; dict                       L64   SR-true ranks above SR-false?
+mcnemar_exact(pred_a, pred_b, labels) -&gt; dict                            L95   exact test on discordant pairs
+task_cluster_bootstrap_ci(scores, labels, tasks, metric_fn,
+    n_boot=1000, seed=7)                                                 L123  task-resampled 95% CI
+paired_auc_diff_bootstrap(scores_v, scores_b, labels, tasks,
+    n_boot=1000, seed=7)                                                 L146  paired AUC(variant - baseline)</pre>
+<p>Module imports: <code>numpy</code> L10, <code>scipy.stats</code> L11, <code>sklearn.metrics.roc_auc_score</code> L12, <code>from __future__ import annotations</code> L8. Returned dict keys: <code>within_task_ranking_accuracy</code>, <code>n_contrast_tasks</code>, <code>n_pairs</code>, <code>tie_rate</code> L87&#8211;L92; <code>b01_variant_fp_baseline_correct</code>, <code>b10_variant_fn_baseline_correct</code>, <code>n_discordant</code>, <code>p_value</code> L115&#8211;L120; <code>mean</code>, <code>ci95</code>, <code>p_gt0</code> L173&#8211;L176. No class, no decorator, no module-level constant.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_harness_run_e1.html">run_e1.py</a></td><td><code>from harness import metrics as M</code>, after <code>EXP</code> joins <code>sys.path</code></td><td class="sym">L36</td></tr>
+<tr><td class="sym"><a href="file_harness_run_e2.html">run_e2.py</a></td><td><code>from harness import metrics as M</code>, after inserting <code>EV/harness</code> on <code>sys.path</code></td><td class="sym">L27 L31</td></tr>
+<tr><td class="sym"><a href="exp_metrics.html">exp_metrics.html</a></td><td>documents the same file; the BT scripts do not import it</td><td class="sym">page scope</td></tr>
+</tbody>
+</table>
+<p>Tests: <code>no test found</code>. A grep of <code>tests/</code> for <code>harness.metrics</code>, <code>import metrics</code>, <code>task_cluster_bootstrap_ci</code>, <code>mcnemar_exact</code>, <code>within_task_ranking</code>, <code>paired_auc_diff_bootstrap</code> and <code>tau_top_quartile</code> returns no file. The only <code>tests/</code> file that contains the word "harness" is <code>tests/brute_gold_eval.py</code> (L17, L198, L224), and that word means the benchmark harness there, not this file. Path is <code class="path">tests/brute_gold_eval.py</code>.</p>
+<p>External importers outside <code>experiments_verifiers/</code>: none found. No file under <code class="path">sources/</code> imports this module.</p>
+</div>
+
+<footer>
+<p>See also: the <a href="file_index.html">file digest index</a>, the <a href="exp_metrics.html">exp_metrics.html</a> experiment page, and <a href="data_experiments.html">data_experiments.html</a> for the folder tree.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/metrics.py</code> (177 lines, whole file), <code class="path">experiments_verifiers/harness/run_e1.py</code> (543 lines, import and call sites), <code class="path">experiments_verifiers/harness/run_e2.py</code> (398 lines, import and call sites), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> and repo <code class="path">.env</code> (never opened, secrets); <code class="path">experiments_verifiers/results/E1_rubric_surgery_20260921.json</code> and <code class="path">E2_static-grounding_20260921.json</code> (recorded numbers, not needed to describe the code; the callers' pages carry them); the remaining 49 <code class="path">experiments_verifiers/harness/*.py</code> scripts (grep shows they do not import this module); <code class="path">sources/**</code> (grep shows no importer); compiled <code class="path">__pycache__</code>; no pytest run and no script executed, as instructed.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>harness_import - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; harness_import">
+<div class="wrap">
+
+<h1 class="hud">harness_import.py &mdash; the shim nobody imports</h1>
+<p class="intro">This module is the designed fix for the harness's import problem: seven lines that put the harness directory on <code>sys.path</code> so its modules can import each other whether they run as scripts or as a package. The question this experiment answered is whether that fix is the one in use. It is not: no <code>.py</code> file in the working tree imports the module, and 40 of the 53 harness scripts insert the same path themselves.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 320" role="img" aria-label="harness_import design: the shim body inserts its directory on sys.path, but no module imports it and 40 files copy the idiom by hand">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="h1">
+    <title>hypothesis: one shim fits both script mode and package mode</title>
+    <rect x="20" y="30" width="260" height="56" rx="2" fill="rgba(183,156,255,0.08)" stroke="#B79CFF" stroke-dasharray="5 4"/><text class="box-label" x="150.0" y="56.0" text-anchor="middle">hypothesis: one shim fits both</text><text class="box-sub" x="150.0" y="72.0" text-anchor="middle">script mode and package mode</text>
+  </g>
+  <a class="box" id="i1" href="../../experiments_verifiers/harness/harness_import.py">
+    <title>harness_import.py 7 lines, 230 bytes</title>
+    <rect x="320" y="30" width="300" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/><text class="box-label" x="470.0" y="56.0" text-anchor="middle">harness_import.py</text><text class="box-sub" x="470.0" y="72.0" text-anchor="middle">7 lines, 230 bytes</text>
+  </a>
+  <g class="box" id="c1">
+    <title>expected: both run modes docstring line 1</title>
+    <rect x="660" y="30" width="320" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/><text class="box-label" x="820.0" y="56.0" text-anchor="middle">expected: both run modes</text><text class="box-sub" x="820.0" y="72.0" text-anchor="middle">docstring line 1</text>
+  </g>
+  <a class="box" id="s1" href="../../experiments_verifiers/harness/harness_import.py">
+    <title>_here = Path(__file__) L5, resolve().parent</title>
+    <rect x="20" y="140" width="260" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/><text class="box-label" x="150.0" y="166.0" text-anchor="middle">_here = Path(__file__)</text><text class="box-sub" x="150.0" y="182.0" text-anchor="middle">L5, resolve().parent</text>
+  </a>
+  <a class="box" id="s2" href="../../experiments_verifiers/harness/harness_import.py">
+    <title>sys.path.insert(0, _here) L6-7, guarded by a check</title>
+    <rect x="320" y="140" width="300" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/><text class="box-label" x="470.0" y="166.0" text-anchor="middle">sys.path.insert(0, _here)</text><text class="box-sub" x="470.0" y="182.0" text-anchor="middle">L6-7, guarded by a check</text>
+  </a>
+  <g class="box" id="o1">
+    <title>observed: 0 importers grep over all .py files</title>
+    <rect x="660" y="140" width="320" height="56" rx="2" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/><text class="box-label" x="820.0" y="166.0" text-anchor="middle">observed: 0 importers</text><text class="box-sub" x="820.0" y="182.0" text-anchor="middle">grep over all .py files</text>
+  </g>
+  <g class="box" id="n1">
+    <title>hand-copied instead 40 files, 48 insert lines</title>
+    <rect x="20" y="250" width="940" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/><text class="box-label" x="490.0" y="276.0" text-anchor="middle">hand-copied instead</text><text class="box-sub" x="490.0" y="292.0" text-anchor="middle">40 files, 48 sys.path.insert lines (my computation)</text>
+  </g>
+  <path class="edge" data-from="h1" data-to="i1" d="M280,58 H320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="51" text-anchor="middle">test</text>
+  <path class="edge" data-from="i1" data-to="c1" d="M620,58 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="51" text-anchor="middle">docstring claim</text>
+  <path class="edge" data-from="i1" data-to="s1" d="M380,86 L150,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="250" y="118" text-anchor="start">module body</text>
+  <path class="edge" data-from="s1" data-to="s2" d="M280,168 H320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="161" text-anchor="middle">if missing</text>
+  <path class="edge" data-from="s2" data-to="o1" d="M620,168 H660" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="161" text-anchor="middle">grep count</text>
+  <path class="edge" data-from="s2" data-to="n1" d="M420,196 L300,250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="352" y="228" text-anchor="start">copied 40 times</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>7 boxes</code>. Violet = hypothesis, steel = module file, mint = statement in that file, red = measured outcome, dashed = expected behaviour. The whole "pipeline" is the module body: <code>_here = Path(__file__).resolve().parent</code> (L5) and the guarded <code>sys.path.insert(0, str(_here))</code> (L6&ndash;7). There is no function, no class and no <code>__main__</code> block. Related pages: <a href="exp_harness_init.html">exp_harness_init.html</a>, <a href="exp_metrics.html">exp_metrics.html</a>, <a href="exp_run_e1.html">exp_run_e1.html</a>, <a href="exp_run_e2.html">exp_run_e2.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/harness_import.py">experiments_verifiers/harness/harness_import.py</a></h4>
+<p class="role">Module-level shim: adds its own directory to <code>sys.path</code> once, so sibling harness modules resolve as top-level names.</p>
+<p class="meta">7 lines, 230 bytes &#183; entry point: none (import side effect) &#183; 0 functions, 0 classes &#183; CLI: none</p>
+<details><summary>full module body and import order</summary><div class="dbody">
+<pre>"""Shim so harness modules import each other whether run as scripts or as packages."""
+import sys
+from pathlib import Path
+
+_here = Path(__file__).resolve().parent
+if str(_here) not in sys.path:
+    sys.path.insert(0, str(_here))</pre>
+<p>That is the complete file (7 lines, quoted from <code class="path">experiments_verifiers/harness/harness_import.py</code>). The guard <code>if str(_here) not in sys.path</code> keeps the import idempotent. The inserted path is <code>experiments_verifiers/harness</code>, which is what the sibling scripts need for <code>import e15_bt_eval</code> style imports.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td><code>sys.path</code> (the interpreter's module search list)</td><td>one entry appended at index 0</td><td class="sym"><a href="../../experiments_verifiers/harness/harness_import.py">experiments_verifiers/harness/harness_import.py</a> L6&ndash;7</td></tr>
+<tr><td>Its own file location</td><td>nothing else; no file, no stdout</td><td class="sym">same file L5</td></tr>
+<tr><td>Nothing else</td><td>a <code>.pyc</code> in <code>__pycache__</code> when a normal import runs</td><td class="sym">experiments_verifiers/harness/__pycache__/harness_import.cpython-311.pyc</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the module is dead code in the working tree at measurement time. <code>grep -rn harness_import --include=*.py .</code> matches no Python file (the only hits anywhere are this module's own <code>.pyc</code>, one <code>.ruff_cache</code> entry, and the visual-clone pages that link it). The behaviour it encodes is instead hand-copied: 40 of the 53 <code>.py</code> files in <code>harness/</code> call <code>sys.path.insert</code> themselves, on 48 lines.</p>
+<p class="note">Amber: the cached bytecode is older than the source. Its header records a 229-byte source at 2026-09-21 13:39:16; the file on disk is 230 bytes at 13:46:03, so the current revision has no cached bytecode and was not imported after that edit (my computation, read from the <code>.pyc</code> header).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 820 260" role="img" aria-label="Bar chart of three counted facts about harness_import.py and the harness package">
+<defs><filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<text x="20" y="22" font-size="11" fill="#8FB8C9">counted facts, my computation from grep over the working tree</text>
+<path d="M70,200.0 H790" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="62" y="203.0" text-anchor="end" font-size="9" fill="#4F7486">0</text>
+<path d="M70,164.3 H790" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="62" y="167.3" text-anchor="end" font-size="9" fill="#4F7486">10</text>
+<path d="M70,128.6 H790" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="62" y="131.6" text-anchor="end" font-size="9" fill="#4F7486">20</text>
+<path d="M70,92.9 H790" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="62" y="95.9" text-anchor="end" font-size="9" fill="#4F7486">30</text>
+<path d="M70,57.1 H790" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+<text x="62" y="60.1" text-anchor="end" font-size="9" fill="#4F7486">40</text>
+<rect x="145.0" y="200.0" width="90" height="0.0" fill="#FF4D6A" fill-opacity="0.30" stroke="#FF4D6A"/>
+<path d="M145.0,200.0 H235.0" fill="none" stroke="#FF4D6A" stroke-width="3"/>
+<text x="190.0" y="195.0" text-anchor="middle" font-size="11">0</text>
+<text x="190.0" y="214" text-anchor="middle" font-size="8.5" fill="#8FB8C9">modules that import</text>
+<text x="190.0" y="225" text-anchor="middle" font-size="8.5" fill="#8FB8C9">harness_import</text>
+<rect x="385.0" y="57.1" width="90" height="142.9" fill="#5E8CA3" fill-opacity="0.30" stroke="#5E8CA3"/>
+<text x="430.0" y="52.1" text-anchor="middle" font-size="11">40</text>
+<text x="430.0" y="214" text-anchor="middle" font-size="8.5" fill="#8FB8C9">files in harness/ that insert</text>
+<text x="430.0" y="225" text-anchor="middle" font-size="8.5" fill="#8FB8C9">the dir on sys.path</text>
+<rect x="625.0" y="192.9" width="90" height="7.1" fill="#7DF9C7" fill-opacity="0.30" stroke="#7DF9C7"/>
+<text x="670.0" y="187.9" text-anchor="middle" font-size="11">2</text>
+<text x="670.0" y="214" text-anchor="middle" font-size="8.5" fill="#8FB8C9">files that import the</text>
+<text x="670.0" y="225" text-anchor="middle" font-size="8.5" fill="#8FB8C9">harness package</text>
+<path d="M70,200.0 H790" fill="none" stroke="#1B4B6B" stroke-width="1.4"/>
+<text x="70" y="248" font-size="9" fill="#4F7486">The zero bar is a measurement, not a missing value: <code>grep -rn harness_import --include=*.py .</code> matches no file.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the three counts are my computation from <code>grep -rn --include=*.py</code> over the repository. The 40 files are the real alternative in use; the 2 package importers are <code>run_e1.py</code> L36 and <code>run_e2.py</code> L31, the only places that do <code>from harness import ...</code>.</p>
+<div class="note flag">No results file exists for this module, and none could: it writes no artifact and prints nothing. The numbers below are measurements of the working tree, not values read from a results file.</div>
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Lines / bytes</td><td class="size">7 / 230</td><td class="sym">harness_import.py (<code>wc -l</code>, <code>ls -l</code>)</td></tr>
+<tr><td>Functions / classes / CLI / <code>__main__</code></td><td class="size">0 / 0 / none / absent</td><td class="sym">harness_import.py, whole file</td></tr>
+<tr><td>Modules that import it (my computation)</td><td class="size">0</td><td class="sym"><code>grep -rn harness_import --include=*.py .</code></td></tr>
+<tr><td>Harness <code>.py</code> files / files inserting the path</td><td class="size">53 / 40 (48 lines)</td><td class="sym"><code>grep -rn sys.path.insert experiments_verifiers/harness/</code></td></tr>
+<tr><td>Files importing the <code>harness</code> package</td><td class="size">2</td><td class="sym">run_e1.py L36, run_e2.py L31</td></tr>
+<tr><td>Who sets the path in those two files</td><td class="size">run_e1 L29, run_e2 L26&ndash;27</td><td class="sym">explicit <code>sys.path.insert</code>, not this shim</td></tr>
+<tr><td>Cached bytecode source mtime / size</td><td class="size">2026-09-21 13:39:16 / 229 B</td><td class="sym">harness_import.cpython-311.pyc header (my computation)</td></tr>
+<tr><td>Current source mtime / size</td><td class="size">2026-09-21 13:46:03 / 230 B</td><td class="sym">harness_import.py (<code>stat</code>)</td></tr>
+<tr><td>Sibling modules imported as top-level names</td><td class="size">61 <code>import eN_*</code> lines</td><td class="sym"><code>grep -n '^import e[0-9]' experiments_verifiers/harness/</code></td></tr>
+<tr><td>Documentation naming the shim</td><td class="size">0 lines in EXPERIMENTS.md and README.md</td><td class="sym"><code>grep -n harness_import</code> on both files</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: the import convention of this harness is per-file, not central. Any change to how harness modules find each other must be applied at 40 sites, and that is the state the experiment recorded.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>4 key lines: the whole module, plus the two importers</summary><div class="dbody">
+<blockquote>"""Shim so harness modules import each other whether run as scripts or as packages."""</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/harness/harness_import.py</code> line 1.</p>
+<blockquote>_here = Path(__file__).resolve().parent
+if str(_here) not in sys.path:
+    sys.path.insert(0, str(_here))</blockquote>
+<p class="sub">Same file, lines 5&ndash;7. These are the final three lines of the file.</p>
+<blockquote>sys.path.insert(0, EXP)
+
+from scorers.e1_aggregators import (  # noqa: E402
+    claim_group_features,
+    score_all_variants,
+)
+
+from harness import metrics as M  # noqa: E402</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/harness/run_e1.py</code> lines 29&ndash;36: the path insert targets the parent package, so the shim is not needed here.</p>
+<blockquote>sys.path.insert(0, str(EV))
+sys.path.insert(0, str(EV / "harness"))
+...
+from harness import metrics as M  # noqa: E402</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/harness/run_e2.py</code> lines 26&ndash;27 and 31; line 27 duplicates exactly what the shim would do.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/harness_import.py</code> (7 lines, read in full), <code class="path">experiments_verifiers/harness/__pycache__/harness_import.cpython-311.pyc</code> (16-byte header only, read with <code>struct</code>), <code class="path">experiments_verifiers/harness/run_e1.py</code> L1&ndash;40 and <code class="path">run_e2.py</code> L1&ndash;35, <code class="path">experiments_verifiers/EXPERIMENTS.md</code> and <code class="path">experiments_verifiers/README.md</code> (both searched for the module name: no hit), <code class="path">experiments_verifiers/harness/</code> file list and its 48 <code>sys.path.insert</code> lines (grep). Line counts from <code>wc -l</code>; the <code>.pyc</code> header fields, the 0-importer count and the 40-file count are my computation.</p>
+<p class="skips">Skipped, with reason: <code>experiments_verifiers/.env</code> (key material, never opened); the 40 files that hand-roll the path insert (only their <code>sys.path.insert</code> lines were counted; each has its own page); <code>metrics.py</code> (own page: <a href="exp_metrics.html">exp_metrics.html</a>); the <code>.ruff_cache</code> entry that mentions the name (linter cache, not code); the two docs pages that link this page (they are the clone, not evidence); no experiment, application, or pytest run, per the build rules.</p>
+<p>experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

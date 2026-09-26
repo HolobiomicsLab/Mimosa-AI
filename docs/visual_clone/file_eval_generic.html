@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/evaluators/generic.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<!-- file_eval_generic.html - file digest: sources/evaluators/generic.py.
+     Sources and skip decisions: see the footer. Read-only page, nothing outside docs/visual_clone/ touched. -->
+<body data-crumb="File digests > sources/evaluators > generic.py">
+<div class="wrap">
+
+<h1 class="hud">generic.py</h1>
+<p class="intro"><code>GenericEvaluator</code> scores one workflow run with four independent LLM judges: goal alignment, agent collaboration, output quality and answer plausibility. It averages the four scores, can subtract a numerical-fraud penalty, and writes <code>evaluation.txt</code> plus the <code>evaluation.generic</code> block of <code>state_result.json</code>. The module header marks it <code>[DEPRECATED](V1)</code>; the default verifier channel is the hybrid package.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Main diagram - four judges, one averaged score</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 440" role="img" aria-label="GenericEvaluator: execution text, four criterion judges, score extraction, aggregation, optional penalty and the two written artefacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="g1">
+    <title>Entry: WorkflowEvaluator.evaluate(..., "generic") calls GenericEvaluator.evaluate(uuid, agent_answers) at line 166.</title>
+    <rect x="20" y="150" width="170" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="184" text-anchor="middle">caller</text>
+    <text class="box-sub" x="105" y="204" text-anchor="middle">evaluator.py:166</text>
+    <text class="box-sub" x="105" y="220" text-anchor="middle">evaluate(uuid,</text>
+    <text class="box-sub" x="105" y="236" text-anchor="middle">agent_answers)</text>
+  </g>
+
+  <a class="box" id="g2" href="../../sources/evaluators/generic.py">
+    <title>evaluate() (line 334): reads the run text, gates grounding on the success flag, then runs the four criteria.</title>
+    <rect x="250" y="140" width="190" height="130" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345" y="166" text-anchor="middle">evaluate() 334</text>
+    <text class="box-sub" x="345" y="186" text-anchor="middle">workflow_execution_text 348</text>
+    <text class="box-sub" x="345" y="202" text-anchor="middle">success test 352</text>
+    <text class="box-sub" x="345" y="218" text-anchor="middle">logger.info per criterion</text>
+    <text class="box-sub" x="345" y="238" text-anchor="middle">prints the grounding box 354</text>
+  </a>
+
+  <a class="box" id="g3" href="../../sources/evaluators/grounding.py">
+    <title>When the run produced answers, get_perspicacite_grounding(execution_text) supplies literature text (line 353).</title>
+    <rect x="490" y="30" width="200" height="100" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="590" y="56" text-anchor="middle">literature grounding</text>
+    <text class="box-sub" x="590" y="76" text-anchor="middle">get_perspicacite_grounding 353</text>
+    <text class="box-sub" x="590" y="94" text-anchor="middle">only when success is true</text>
+    <text class="box-sub" x="590" y="112" text-anchor="middle">else "No grounding available." 346</text>
+  </a>
+
+  <a class="box" id="g4" href="../../sources/evaluators/generic.py">
+    <title>The four criterion methods: _evaluate_goal_alignment (121), _evaluate_agent_collaboration (147), _evaluate_output_quality (169), _evaluate_answer_plausibility (191).</title>
+    <rect x="490" y="180" width="200" height="130" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="590" y="206" text-anchor="middle">four criterion judges</text>
+    <text class="box-sub" x="590" y="226" text-anchor="middle">_evaluate_goal_alignment 121</text>
+    <text class="box-sub" x="590" y="242" text-anchor="middle">_evaluate_agent_collaboration 147</text>
+    <text class="box-sub" x="590" y="258" text-anchor="middle">_evaluate_output_quality 169</text>
+    <text class="box-sub" x="590" y="274" text-anchor="middle">_evaluate_answer_plausibility 191</text>
+    <text class="box-sub" x="590" y="294" text-anchor="middle">each has its own prompt string</text>
+  </a>
+
+  <a class="box" id="g5" href="../../sources/evaluators/generic.py">
+    <title>_evaluate_single_criterion (line 63) builds one LLMProvider per criterion with a fresh context (lines 103-109).</title>
+    <rect x="740" y="30" width="190" height="110" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="835" y="56" text-anchor="middle">single criterion 63</text>
+    <text class="box-sub" x="835" y="76" text-anchor="middle">LLMProvider(...) 103</text>
+    <text class="box-sub" x="835" y="94" text-anchor="middle">agent generic_judge_&lt;category&gt;</text>
+    <text class="box-sub" x="835" y="112" text-anchor="middle">empty reply raises 112</text>
+  </a>
+
+  <a class="box" id="g6" href="../../sources/evaluators/generic.py">
+    <title>_extract_single_score (line 259) pulls the JSON object, checks the three fields, normalizes the category and clamps the score to 0.0-1.0.</title>
+    <rect x="740" y="180" width="190" height="130" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="835" y="206" text-anchor="middle">_extract_single_score 259</text>
+    <text class="box-sub" x="835" y="226" text-anchor="middle">re.search JSON 279</text>
+    <text class="box-sub" x="835" y="242" text-anchor="middle">needs category, score, evidence 295</text>
+    <text class="box-sub" x="835" y="258" text-anchor="middle">answer_correctness renamed 304</text>
+    <text class="box-sub" x="835" y="274" text-anchor="middle">score outside 0-1 raises 310</text>
+    <text class="box-sub" x="835" y="294" text-anchor="middle">returns category, score, evidence</text>
+  </a>
+
+  <a class="box" id="g7" href="../../sources/evaluators/bs_detection.py">
+    <title>Aggregation (lines 406-441): mean of the four scores, then the optional numerical-fraud penalty.</title>
+    <rect x="970" y="30" width="190" height="280" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1065" y="58" text-anchor="middle">score aggregate 406</text>
+    <text class="box-sub" x="1065" y="80" text-anchor="middle">four scores in a dict</text>
+    <text class="box-sub" x="1065" y="98" text-anchor="middle">overall = mean 415</text>
+    <text class="box-sub" x="1065" y="120" text-anchor="middle">optional penalty 421</text>
+    <text class="box-sub" x="1065" y="138" text-anchor="middle">analyze_all_agents_numerical 423</text>
+    <text class="box-sub" x="1065" y="156" text-anchor="middle">generate_short_fraud_report 424</text>
+    <text class="box-sub" x="1065" y="174" text-anchor="middle">propose_penalty_score 427</text>
+    <text class="box-sub" x="1065" y="196" text-anchor="middle">overall_score_pre_penalty 432</text>
+    <text class="box-sub" x="1065" y="214" text-anchor="middle">overall = max(0, overall - p) 433</text>
+    <text class="box-sub" x="1065" y="236" text-anchor="middle">failure: penalty 0.0 440</text>
+    <text class="box-sub" x="1065" y="258" text-anchor="middle">bs_penalty and rationale keys</text>
+    <text class="box-sub" x="1065" y="280" text-anchor="middle">skipped when the flag is false</text>
+  </a>
+
+  <g class="box" id="g8">
+    <title>Outputs: workflow_dir/&lt;uuid&gt;/evaluation.txt (lines 444-460) and state_result.json evaluation.generic (line 464).</title>
+    <rect x="250" y="330" width="680" height="96" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="590" y="356" text-anchor="middle">artefacts written</text>
+    <text class="box-sub" x="590" y="376" text-anchor="middle">workflow_dir/&lt;uuid&gt;/evaluation.txt 445, header at 448</text>
+    <text class="box-sub" x="590" y="394" text-anchor="middle">per-criterion score and evidence 451-452, overall 454, BS penalty 456-457</text>
+    <text class="box-sub" x="590" y="412" text-anchor="middle">state_result.json evaluation.generic via base._save_results 464</text>
+  </g>
+
+  <path class="edge" data-from="g1" data-to="g2" d="M190,205 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="197" text-anchor="middle">calls</text>
+  <path class="edge" data-from="g2" data-to="g3" d="M440,180 H465 V80 H490" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="465" y="130" text-anchor="middle">literature</text>
+  <path class="edge" data-from="g2" data-to="g4" d="M440,230 H490" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="465" y="222" text-anchor="middle">four calls</text>
+  <path class="edge dashed-edge" data-from="g3" data-to="g4" d="M590,130 V180" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="640" y="158" text-anchor="middle">grounding text</text>
+  <path class="edge" data-from="g4" data-to="g5" d="M690,215 H715 V85 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="715" y="150" text-anchor="middle">prompts</text>
+  <path class="edge" data-from="g5" data-to="g6" d="M835,140 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="885" y="164" text-anchor="middle">parses reply</text>
+  <path class="edge" data-from="g6" data-to="g7" d="M930,245 H970" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="950" y="237" text-anchor="middle">scores</text>
+  <path class="edge dashed-edge" data-from="g7" data-to="g8" d="M1065,310 V360 H930" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="1096" y="340" text-anchor="middle">writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - one pass over a finished run: build the execution text, fetch optional literature grounding, run four single-criterion judge calls, parse each score, average, then write the two artefacts. Line numbers are from <code class="path">sources/evaluators/generic.py</code>; solid arrows are direct calls, dashed arrows are value or file movement.</p>
+<p class="note say">Each criterion is judged in a fresh <code>LLMProvider</code> context, and the file says why: "to avoid inter-criteria bias" (line 65).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Data flow - what goes in, what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 400" role="img" aria-label="Data flow of generic.py: config fields, judge memory files, the two written artefacts and the None return value">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="f1">
+    <title>Constructor arguments: config plus use_bs_penalty (True here) and bs_fraud_threshold 5.0 (lines 41-58).</title>
+    <rect x="20" y="30" width="280" height="140" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="160" y="54" text-anchor="middle">arguments in</text>
+    <text class="box-sub" x="160" y="76" text-anchor="middle">config: "Config" 41</text>
+    <text class="box-sub" x="160" y="94" text-anchor="middle">use_bs_penalty = True 41</text>
+    <text class="box-sub" x="160" y="112" text-anchor="middle">bs_fraud_threshold = 5.0 42</text>
+    <text class="box-sub" x="160" y="130" text-anchor="middle">evaluate(uuid, agent_answers) 334</text>
+    <text class="box-sub" x="160" y="150" text-anchor="middle">detector built only when the flag is set 55-58</text>
+  </g>
+
+  <g class="box" id="f2">
+    <title>Config fields read, all through BaseEvaluator.__init__ (lines 108-140 of base.py).</title>
+    <rect x="20" y="220" width="280" height="150" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="160" y="244" text-anchor="middle">config fields read</text>
+    <text class="box-sub" x="160" y="266" text-anchor="middle">memory_dir, workflow_dir</text>
+    <text class="box-sub" x="160" y="284" text-anchor="middle">judge_model, reasoning_effort</text>
+    <text class="box-sub" x="160" y="302" text-anchor="middle">max_tokens, model_pricing</text>
+    <text class="box-sub" x="160" y="320" text-anchor="middle">no generic_* field exists</text>
+    <text class="box-sub" x="160" y="338" text-anchor="middle">the bs knobs are arguments, not fields</text>
+    <text class="box-sub" x="160" y="358" text-anchor="middle">read by sources/evaluators/base.py</text>
+  </g>
+
+  <g class="box" id="f3">
+    <title>The evaluator instance holds the judge config, the memory dir and the optional detector (lines 52-58).</title>
+    <rect x="340" y="100" width="230" height="130" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="455" y="128" text-anchor="middle">GenericEvaluator</text>
+    <text class="box-sub" x="455" y="148" text-anchor="middle">self.use_bs_penalty 53</text>
+    <text class="box-sub" x="455" y="166" text-anchor="middle">self.bs_fraud_threshold 54</text>
+    <text class="box-sub" x="455" y="184" text-anchor="middle">self._bs_detector 55</text>
+    <text class="box-sub" x="455" y="204" text-anchor="middle">llm_config and memory_dir from base</text>
+  </g>
+
+  <g class="box" id="f4">
+    <title>Returned value: evaluate() returns None; the scores leave through the two written artefacts.</title>
+    <rect x="620" y="30" width="340" height="140" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="790" y="54" text-anchor="middle">values out</text>
+    <text class="box-sub" x="790" y="76" text-anchor="middle">evaluate -&gt; None (annotation line 334)</text>
+    <text class="box-sub" x="790" y="94" text-anchor="middle">per-criterion dicts: category, score, evidence</text>
+    <text class="box-sub" x="790" y="112" text-anchor="middle">scores dict keys: 4 criteria, overall_score</text>
+    <text class="box-sub" x="790" y="130" text-anchor="middle">optional: bs_penalty, bs_penalty_rationale</text>
+    <text class="box-sub" x="790" y="148" text-anchor="middle">optional: overall_score_pre_penalty 432</text>
+    <text class="box-sub" x="790" y="168" text-anchor="middle">raising path: LLMEvaluationError or WorkflowDataError</text>
+  </g>
+
+  <g class="box" id="f5">
+    <title>Judge memory files, one per criterion, named generic_judge_&lt;category&gt; (lines 103-108, 241-246).</title>
+    <rect x="620" y="220" width="340" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="790" y="244" text-anchor="middle">files written</text>
+    <text class="box-sub" x="790" y="266" text-anchor="middle">memory_dir/&lt;uuid&gt;/ 100-101, 238-239</text>
+    <text class="box-sub" x="790" y="284" text-anchor="middle">4 cache files per run, LLMProvider names</text>
+    <text class="box-sub" x="790" y="302" text-anchor="middle">workflow_dir/&lt;uuid&gt;/evaluation.txt 447</text>
+    <text class="box-sub" x="790" y="320" text-anchor="middle">workflow_dir/&lt;uuid&gt;/state_result.json 464</text>
+    <text class="box-sub" x="790" y="338" text-anchor="middle">reading: state_result.json, genotype, goal, answers</text>
+    <text class="box-sub" x="790" y="358" text-anchor="middle">through workflow_execution_text 348</text>
+  </g>
+
+  <path class="edge" data-from="f1" data-to="f3" d="M300,110 H320 V150 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="320" y="102" text-anchor="middle">builds</text>
+  <path class="edge" data-from="f2" data-to="f3" d="M300,290 H320 V190 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="320" y="250" text-anchor="middle">reads</text>
+  <path class="edge" data-from="f3" data-to="f4" d="M570,140 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="595" y="132" text-anchor="middle">returns</text>
+  <path class="edge dashed-edge" data-from="f3" data-to="f5" d="M570,200 H595 V290 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="595" y="250" text-anchor="middle">writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - inputs, in-memory state and outputs. The four judge calls are cached on disk under <code>memory_dir/&lt;uuid&gt;/</code>; the grades leave through <code>evaluation.txt</code> and the <code>evaluation.generic</code> block of <code>state_result.json</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic - per-criterion failure, penalty clamp, save fallback</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 400" role="img" aria-label="Branch logic of GenericEvaluator.evaluate: criterion errors become zero, penalty clamp, save fallback">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="20" y="18">lane A - each of the four criteria is wrapped on its own (lines 363-404)</text>
+  <g class="box" id="h1">
+    <title>Four try blocks, one per criterion, each with the same shape.</title>
+    <rect x="20" y="34" width="230" height="80" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="60" text-anchor="middle">criterion call</text>
+    <text class="box-sub" x="135" y="80" text-anchor="middle">goal, collaboration, quality,</text>
+    <text class="box-sub" x="135" y="98" text-anchor="middle">plausibility</text>
+  </g>
+  <g class="box" id="h2">
+    <title>LLMEvaluationError or ScoreExtractionError is caught; the criterion is appended as score 0.0 with the error as evidence (e.g. lines 368-371).</title>
+    <rect x="300" y="34" width="270" height="80" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="435" y="60" text-anchor="middle">failed?</text>
+    <text class="box-sub" x="435" y="80" text-anchor="middle">yes: score 0.0, evidence</text>
+    <text class="box-sub" x="435" y="98" text-anchor="middle">"Evaluation failed: ..." 370</text>
+  </g>
+  <g class="box" id="h3">
+    <title>Yes and no both land in criteria_results, so all four criteria reach the average.</title>
+    <rect x="620" y="34" width="250" height="80" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="745" y="60" text-anchor="middle">criteria_results list</text>
+    <text class="box-sub" x="745" y="80" text-anchor="middle">three keys per entry 407-409</text>
+    <text class="box-sub" x="745" y="98" text-anchor="middle">four entries after the four blocks</text>
+  </g>
+  <g class="box" id="h4">
+    <title>overall_score is the mean of the four keys that are present (lines 412-417).</title>
+    <rect x="920" y="34" width="240" height="80" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1040" y="60" text-anchor="middle">mean of available keys 415</text>
+    <text class="box-sub" x="1040" y="80" text-anchor="middle">empty list: warning only 417</text>
+    <text class="box-sub" x="1040" y="98" text-anchor="middle">score_keys fixed at 412</text>
+  </g>
+
+  <text class="box-sub" x="20" y="160">lane B - the optional penalty (lines 419-441)</text>
+  <g class="box" id="h5">
+    <title>Both the flag and the detector instance must be set (line 421).</title>
+    <rect x="20" y="176" width="180" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="110" y="202" text-anchor="middle">penalty enabled?</text>
+    <text class="box-sub" x="110" y="220" text-anchor="middle">line 421</text>
+  </g>
+  <g class="box" id="h6">
+    <title>analyze_all_agents_numerical, generate_short_fraud_report with the threshold, then propose_penalty_score (lines 423-427).</title>
+    <rect x="240" y="176" width="250" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="365" y="202" text-anchor="middle">detector chain 423-427</text>
+    <text class="box-sub" x="365" y="220" text-anchor="middle">threshold passed at 425</text>
+  </g>
+  <g class="box" id="h7">
+    <title>overall_score_pre_penalty keeps the raw value, then the penalty is subtracted with a floor of 0.0 (lines 431-433).</title>
+    <rect x="530" y="176" width="280" height="70" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="670" y="202" text-anchor="middle">max(0.0, overall - penalty) 433</text>
+    <text class="box-sub" x="670" y="220" text-anchor="middle">pre-penalty value kept at 432</text>
+  </g>
+  <g class="box" id="h8">
+    <title>Any exception in the chain is logged and the penalty is recorded as 0.0 (lines 438-441).</title>
+    <rect x="850" y="176" width="310" height="70" rx="6" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="1005" y="202" text-anchor="middle">detector raised?</text>
+    <text class="box-sub" x="1005" y="220" text-anchor="middle">yes: bs_penalty 0.0, rationale holds error 440-441</text>
+  </g>
+
+  <text class="box-sub" x="20" y="292">lane C - the two save steps (lines 443-467)</text>
+  <g class="box" id="h9">
+    <title>evaluation.txt is written with the per-criterion report; an OSError is logged and evaluation continues (lines 444-460).</title>
+    <rect x="20" y="308" width="330" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="185" y="334" text-anchor="middle">write evaluation.txt 447</text>
+    <text class="box-sub" x="185" y="352" text-anchor="middle">OSError: log only 460, no raise</text>
+  </g>
+  <g class="box" id="h10">
+    <title>_save_results writes the state block; a ScoreExtractionError stores an empty dict instead (lines 463-467).</title>
+    <rect x="390" y="308" width="330" height="70" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="555" y="334" text-anchor="middle">_save_results(scores) 464</text>
+    <text class="box-sub" x="555" y="352" text-anchor="middle">ScoreExtractionError: save {} 467</text>
+  </g>
+  <g class="box" id="h11">
+    <title>Only WorkflowDataError and LLMEvaluationError leave evaluate(); everything else is wrapped in LLMEvaluationError (lines 469-472).</title>
+    <rect x="760" y="308" width="400" height="70" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="960" y="334" text-anchor="middle">finally</text>
+    <text class="box-sub" x="960" y="352" text-anchor="middle">other exceptions become LLMEvaluationError 472</text>
+  </g>
+
+  <path class="edge" data-from="h1" data-to="h2" d="M250,74 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="275" y="66" text-anchor="middle">raised?</text>
+  <path class="edge" data-from="h2" data-to="h3" d="M570,74 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="595" y="66" text-anchor="middle">either</text>
+  <path class="edge" data-from="h3" data-to="h4" d="M870,74 H920" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="895" y="66" text-anchor="middle">aggregate</text>
+  <path class="edge" data-from="h5" data-to="h6" d="M200,211 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="203" text-anchor="middle">yes</text>
+  <path class="edge" data-from="h6" data-to="h7" d="M490,211 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="203" text-anchor="middle">penalty</text>
+  <path class="edge" data-from="h6" data-to="h8" d="M490,228 H670 V270 H1005 V246" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="860" y="266" text-anchor="middle">exception</text>
+  <path class="edge" data-from="h9" data-to="h10" d="M350,343 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="370" y="335" text-anchor="middle">then</text>
+  <path class="edge" data-from="h10" data-to="h11" d="M720,343 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="740" y="335" text-anchor="middle">then</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - three branch groups: per-criterion failure handling (<code class="path">sources/evaluators/generic.py:368-404</code>), the optional penalty with its clamp and its 0.0 fallback (<code class="path">:419-441</code>), and the two save steps with their local error handling (<code class="path">:443-472</code>).</p>
+<p class="note">Amber: the comment at line 411 says the overall score is "excluding answer_plausibility", but the key list immediately below (line 412) includes <code>answer_plausibility</code>, so all four criteria are averaged.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>config field</td><td class="sym">memory_dir</td><td class="sym">via base, used at lines 100 and 238</td><td>judge memory folders per uuid.</td></tr>
+<tr><td>config field</td><td class="sym">workflow_dir</td><td class="sym">via base, used at lines 445 and in <code>_save_results</code></td><td>run folder for <code>evaluation.txt</code>.</td></tr>
+<tr><td>config field</td><td class="sym">judge_model, reasoning_effort, max_tokens, model_pricing</td><td class="sym">via base <code>__init__</code> (base lines 113-135)</td><td>one judge LLMConfig shared by the four calls.</td></tr>
+<tr><td>argument</td><td class="sym">use_bs_penalty</td><td class="sym">default True line 41, stored line 53</td><td>gates the fraud penalty block.</td></tr>
+<tr><td>argument</td><td class="sym">bs_fraud_threshold</td><td class="sym">default 5.0 line 42, used line 425</td><td>minimum per-value fraud score to report.</td></tr>
+<tr><td>argument</td><td class="sym">agent_answers</td><td class="sym">line 334, documented "for API compatibility" 340</td><td>never read in the body.</td></tr>
+<tr><td>state key</td><td class="sym">goal, answers, code</td><td class="sym">read inside base <code>workflow_execution_text</code> line 348</td><td>the judge prompt text.</td></tr>
+<tr><td>state key</td><td class="sym">evaluation.generic</td><td class="sym">written by <code>_save_results</code> line 464</td><td>the score dict of this evaluator.</td></tr>
+<tr><td>file read</td><td class="sym">workflow_dir/&lt;uuid&gt;/state_result.json, workflow_genotype_&lt;uuid&gt;.py</td><td class="sym">through base line 348</td><td>execution text and success flag.</td></tr>
+<tr><td>file write</td><td class="sym">workflow_dir/&lt;uuid&gt;/evaluation.txt</td><td class="sym">open(..., "w") line 447</td><td>per-criterion scores, evidence, overall, penalty.</td></tr>
+<tr><td>file write</td><td class="sym">workflow_dir/&lt;uuid&gt;/state_result.json</td><td class="sym">via base <code>_save_results</code>, line 464</td><td>merged score block under <code>evaluation.generic</code>.</td></tr>
+<tr><td>file write</td><td class="sym">memory_dir/&lt;uuid&gt;/generic_judge_&lt;category&gt;.json</td><td class="sym">LLMProvider lines 103-108, 241-246</td><td>judge call cache, one file per criterion.</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the module docstring starts with <code>[DEPRECATED](V1)</code> (<code class="path">sources/evaluators/generic.py:2</code>) and the pipeline agrees: the evolution engine always asks for <code>evaluator_type="verifier"</code> (<code class="path">sources/core/evolution_engine.py:808-810</code>), and the facade forwards <code>use_bs_penalty=False</code> (<code class="path">sources/evaluators/evaluator.py:54</code>). Nothing in <code class="path">sources/</code> calls this evaluator on the default run path.</p>
+<p class="note">Amber: <code>from .base import *</code> (line 29) supplies <code>BaseEvaluator</code>, the exception classes and <code>_save_results</code> without naming them; a reader cannot see the parent's members from this file alone. Imports <code>datetime</code> (line 14) and the colour names <code>CYAN</code>, <code>YELLOW</code>, <code>RED</code>, <code>DIM</code>, <code>RESET</code>, <code>BOLD</code> (line 26) are unused; only <code>GREEN</code> and <code>print_box</code> are used (line 354).</p>
+<p class="note">Amber: the file has no <code>__main__</code> block at the end; the <code>if __name__ == "__main__":</code> at line 20 only appends the repository root to <code>sys.path</code>. The class docstring counts four judges and the code runs four, one per criterion.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>1 class, 8 methods: 9 symbols, no module-level function</summary><div class="dbody">
+<pre>GenericEvaluator(BaseEvaluator)                                 line 33   four-judge generic evaluator
+  __init__(self, config: "Config", use_bs_penalty: bool = True,
+           bs_fraud_threshold: float = 5.0) -&gt; None            line 41   stores flags, builds the detector
+  _evaluate_single_criterion(self, uuid: str, execution_text: str,
+           category: str, criterion_prompt: str) -&gt; dict[str, Any]  line 63   one judge call, fresh context
+  _evaluate_goal_alignment(self, uuid: str, execution_text: str,
+           litterature_grounding: str) -&gt; dict[str, Any]        line 121  criterion 1 prompt
+  _evaluate_agent_collaboration(self, uuid: str, execution_text: str)
+           -&gt; dict[str, Any]                                    line 147  criterion 2 prompt
+  _evaluate_output_quality(self, uuid: str, execution_text: str)
+           -&gt; dict[str, Any]                                    line 169  criterion 3 prompt
+  _evaluate_answer_plausibility(self, uuid: str, execution_text: str,
+           litterature_grounding: str) -&gt; dict[str, Any]        line 191  criterion 4 prompt with grounding
+  _extract_single_score(self, evaluation_text: str, expected_category: str)
+           -&gt; dict[str, Any]                                    line 259  parse and validate one score
+  evaluate(self, uuid: str, agent_answers: str | None = None) -&gt; None  line 334  the whole run, writes artefacts</pre>
+<p>Module level: <code>if __name__ == "__main__":</code> at line 20 appends the repository root to <code>sys.path</code>. Imports: <code>json</code>, <code>logging</code>, <code>re</code>, <code>datetime</code> (unused), <code>Path</code>, <code>Any</code>, <code>sys</code>, <code>os</code> at lines 11-18; <code>sources.core.llm_provider</code> at line 23; <code>sources.cli.pretty_print</code> at lines 24-27; <code>.base</code> star import, <code>.grounding</code> and <code>.bs_detection</code> at lines 29-31. The prompt strings live inline: lines 79-98 (single criterion), 133-144, 157-166 and 179-188 (three criteria) and 210-236 (plausibility).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<h3>Importers in the repository</h3>
+<table>
+<thead><tr><th>Importer</th><th>What it calls</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_eval_evaluator.html">sources/evaluators/evaluator.py</a></td><td>imports <code>GenericEvaluator</code>; builds it at line 77; calls it twice</td><td class="sym">lines 16-20, 77-81, 158, 166</td></tr>
+<tr><td class="sym"><a href="file_eval_bs_detection.html">sources/evaluators/bs_detection.py</a></td><td>imported by this file, not the other way round</td><td class="sym">line 31 here</td></tr>
+<tr><td class="sym"><a href="area_tests.html">tests/hybrid_verifier_test.py</a></td><td>stubs <code>evaluator_mod.GenericEvaluator</code> so the facade builds without a judge</td><td class="sym">lines 893, 933</td></tr>
+</tbody>
+</table>
+<p>No other file imports this module. No importer of <code class="path">sources/evaluators/generic.py</code> calls the private helpers from outside the class: the four criterion methods are called only from <code>evaluate()</code> (lines 364, 375, 386, 397), <code>_evaluate_single_criterion</code> is called by those four (lines 145, 167, 189), and <code>_extract_single_score</code> is called at lines 114 and 252.</p>
+<h3>Tests that exercise it</h3>
+<ul>
+<li>No test file imports <code>GenericEvaluator</code> for its own body. The only two mentions are the stub monkeypatches in <code class="path">tests/hybrid_verifier_test.py:893</code> and <code class="path">:933</code>, which replace the class before the facade is built.</li>
+<li>No test asserts <code>evaluation.txt</code> content or the <code>evaluation.generic</code> block produced by this evaluator.</li>
+<li><code class="path">tests/hybrid_verifier_test.py:1024-1026</code> tests <code>extract_json_payload</code>, which lives in <code class="path">sources/evaluators/base.py</code> and is not used by this file.</li>
+</ul>
+<p>Related pages: <a href="file_index.html">file_index.html</a>, <a href="area_evaluators.html">area_evaluators.html</a>, <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>, <a href="file_eval_base.html">file_eval_base.html</a>, <a href="file_eval_bs_detection.html">file_eval_bs_detection.html</a>, <a href="file_eval_evaluator.html">file_eval_evaluator.html</a>, <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="flow_verification.html">flow_verification.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/generic.py</code> (471 lines, every def and class), <code class="path">sources/evaluators/base.py</code> (lines 108-145, 189-225, 227-286, 288-332), <code class="path">sources/evaluators/bs_detection.py</code> (lines 148-181, 228-301, 419-481, 528-583, 642-786), <code class="path">sources/evaluators/grounding.py</code> (entry point <code>get_perspicacite_grounding</code>, signature only), <code class="path">sources/evaluators/evaluator.py</code> (lines 16-20, 50-109, 146-167), <code class="path">sources/core/evolution_engine.py</code> (lines 29, 800-815), <code class="path">sources/cli/pretty_print.py</code> (imported names only), <code class="path">config.py</code> (lines 65-76, 160-165), <code class="path">tests/hybrid_verifier_test.py</code> (lines 886-964), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code> and <code class="path">docs/visual_clone/_clone.js</code> for the page skeleton.</p>
+<p class="skips">Skipped: the four long inline judge prompts (quoted only by their criterion names and line ranges); the bodies of <code class="path">sources/evaluators/grounding.py</code> and <code class="path">sources/evaluators/bs_detection.py</code> (own digest pages); <code class="path">sources/cli/pretty_print.py</code> internals (print formatting only); runtime folders <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code> and <code>tmp/</code> (not read); <code class="path">.env</code>-style files (not opened; the Perspicacité client handles its own configuration). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

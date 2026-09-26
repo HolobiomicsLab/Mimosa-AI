@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Harness experiments - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > all 54 scripts">
+<div class="wrap">
+
+<h1 class="hud">Harness experiments</h1>
+<p class="intro"><code class="path">experiments_verifiers/harness/</code> holds 54 Python scripts that ran the verifier research, from E1 to E25. Each script has its own page here: what it tested, how it ran, and the numbers it produced. The folder is not tracked by git, so every number below is a dated snapshot.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>The experiment arc</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 300" role="img" aria-label="Experiment arc from E1 to E25">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <a class="box" id="c1" href="exp_run_e1.html">
+    <title>Early diagnosis experiments</title>
+    <rect x="20" y="40" width="170" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="105" y="64" text-anchor="middle">E1 - E4</text>
+    <text class="box-sub" x="105" y="82" text-anchor="middle">diagnosis: rubric,</text>
+    <text class="box-sub" x="105" y="96" text-anchor="middle">grounding, replay</text>
+  </a>
+  <a class="box" id="c2" href="exp_e5_run.html">
+    <title>Claim importance track</title>
+    <rect x="215" y="40" width="170" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="300" y="64" text-anchor="middle">E5 - E13</text>
+    <text class="box-sub" x="300" y="82" text-anchor="middle">claim importance,</text>
+    <text class="box-sub" x="300" y="96" text-anchor="middle">splits, falsifier</text>
+  </a>
+  <a class="box" id="c3" href="exp_e14_bt_enabler.html">
+    <title>Bradley-Terry track</title>
+    <rect x="410" y="40" width="170" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="495" y="64" text-anchor="middle">E14 - E18</text>
+    <text class="box-sub" x="495" y="82" text-anchor="middle">pairwise reward,</text>
+    <text class="box-sub" x="495" y="96" text-anchor="middle">gradient duels</text>
+  </a>
+  <a class="box" id="c4" href="exp_index.html">
+    <title>Hybrid verifier track</title>
+    <rect x="605" y="40" width="170" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="690" y="64" text-anchor="middle">E19 - E19c</text>
+    <text class="box-sub" x="690" y="82" text-anchor="middle">hybrid claims +</text>
+    <text class="box-sub" x="690" y="96" text-anchor="middle">policy scorers</text>
+  </a>
+  <a class="box" id="c5" href="exp_e24_reexec.html">
+    <title>Re-execution and holdout</title>
+    <rect x="790" y="40" width="80" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="830" y="64" text-anchor="middle">E24</text>
+    <text class="box-sub" x="830" y="82" text-anchor="middle">re-run,</text>
+    <text class="box-sub" x="830" y="96" text-anchor="middle">holdout</text>
+  </a>
+  <a class="box" id="c5b" href="exp_e25_creed.html">
+    <title>Autopsy of the E18 comparison scripts plus the label-free retrial</title>
+    <rect x="885" y="40" width="95" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="932" y="64" text-anchor="middle">E25</text>
+    <text class="box-sub" x="932" y="82" text-anchor="middle">depth autopsy,</text>
+    <text class="box-sub" x="932" y="96" text-anchor="middle">retrial</text>
+  </a>
+
+  <path class="edge" data-from="c1" data-to="c2" d="M190,72 H215" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="c3" d="M385,72 H410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c3" data-to="c4" d="M580,72 H605" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c4" data-to="c5" d="M775,72 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c5" data-to="c5b" d="M870,72 H885" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+
+  <a class="box" id="c6" href="mod_evaluators_hybrid_verifier.html">
+    <title>The code that shipped from these experiments</title>
+    <rect x="605" y="150" width="335" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="772" y="172" text-anchor="middle">sources/evaluators/hybrid_verifier/</text>
+    <text class="box-sub" x="772" y="192" text-anchor="middle">the shipped default verifier (E19 / E19b design)</text>
+  </a>
+  <a class="box" id="c7" href="data_experiments.html">
+    <title>Where the raw results live</title>
+    <rect x="20" y="150" width="335" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="187" y="172" text-anchor="middle">experiments_verifiers/results/</text>
+    <text class="box-sub" x="187" y="192" text-anchor="middle">145 entries, not tracked by git</text>
+  </a>
+  <path class="edge dashed-edge" data-from="c7" data-to="c6" d="M355,178 H605" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="480" y="171" text-anchor="middle">measured design</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - five experiment tracks and the two folders they connect. Every box links to a page.</p>
+
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 995 220" role="img" aria-label="Harness script lines per experiment">
+  <defs>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <filter id="glow2" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <line x1="30" y1="190" x2="985" y2="190" stroke="#1B4B6B"/>
+  <rect x="40" y="161" width="26" height="29" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="53.0" y="205" text-anchor="middle">E1</text>
+  <text class="edge-label" x="53.0" y="156" text-anchor="middle">543</text>
+  <rect x="76" y="169" width="26" height="21" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="89.0" y="205" text-anchor="middle">E2</text>
+  <text class="edge-label" x="89.0" y="164" text-anchor="middle">398</text>
+  <rect x="112" y="115" width="26" height="75" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="125.0" y="205" text-anchor="middle">E3</text>
+  <text class="edge-label" x="125.0" y="110" text-anchor="middle">1407</text>
+  <rect x="148" y="164" width="26" height="26" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="161.0" y="205" text-anchor="middle">E4</text>
+  <text class="edge-label" x="161.0" y="159" text-anchor="middle">484</text>
+  <rect x="184" y="141" width="26" height="49" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="197.0" y="205" text-anchor="middle">E5</text>
+  <text class="edge-label" x="197.0" y="136" text-anchor="middle">922</text>
+  <rect x="220" y="167" width="26" height="23" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="233.0" y="205" text-anchor="middle">E5B</text>
+  <text class="edge-label" x="233.0" y="162" text-anchor="middle">438</text>
+  <rect x="256" y="167" width="26" height="23" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="269.0" y="205" text-anchor="middle">E5C</text>
+  <text class="edge-label" x="269.0" y="162" text-anchor="middle">427</text>
+  <rect x="292" y="190" width="26" height="2" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="305.0" y="205" text-anchor="middle">E6</text>
+  <text class="edge-label" x="305.0" y="185" text-anchor="middle">0</text>
+  <rect x="328" y="190" width="26" height="2" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="341.0" y="205" text-anchor="middle">E7</text>
+  <text class="edge-label" x="341.0" y="185" text-anchor="middle">0</text>
+  <rect x="364" y="152" width="26" height="38" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="377.0" y="205" text-anchor="middle">E8</text>
+  <text class="edge-label" x="377.0" y="147" text-anchor="middle">715</text>
+  <rect x="400" y="160" width="26" height="30" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="413.0" y="205" text-anchor="middle">E9</text>
+  <text class="edge-label" x="413.0" y="155" text-anchor="middle">557</text>
+  <rect x="436" y="190" width="26" height="2" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="449.0" y="205" text-anchor="middle">E10</text>
+  <text class="edge-label" x="449.0" y="185" text-anchor="middle">0</text>
+  <rect x="472" y="190" width="26" height="2" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="485.0" y="205" text-anchor="middle">E11</text>
+  <text class="edge-label" x="485.0" y="185" text-anchor="middle">0</text>
+  <rect x="508" y="157" width="26" height="33" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="521.0" y="205" text-anchor="middle">E12</text>
+  <text class="edge-label" x="521.0" y="152" text-anchor="middle">618</text>
+  <rect x="544" y="94" width="26" height="96" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="557.0" y="205" text-anchor="middle">E13</text>
+  <text class="edge-label" x="557.0" y="89" text-anchor="middle">1788</text>
+  <rect x="580" y="110" width="26" height="80" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="593.0" y="205" text-anchor="middle">E14</text>
+  <text class="edge-label" x="593.0" y="105" text-anchor="middle">1488</text>
+  <rect x="616" y="124" width="26" height="66" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="629.0" y="205" text-anchor="middle">E15</text>
+  <text class="edge-label" x="629.0" y="119" text-anchor="middle">1229</text>
+  <rect x="652" y="106" width="26" height="84" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="665.0" y="205" text-anchor="middle">E16</text>
+  <text class="edge-label" x="665.0" y="101" text-anchor="middle">1571</text>
+  <rect x="688" y="176" width="26" height="14" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="701.0" y="205" text-anchor="middle">E17</text>
+  <text class="edge-label" x="701.0" y="171" text-anchor="middle">265</text>
+  <rect x="724" y="55" width="26" height="135" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="737.0" y="205" text-anchor="middle">E18</text>
+  <text class="edge-label" x="737.0" y="50" text-anchor="middle">2526</text>
+  <rect x="760" y="50" width="26" height="140" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="773.0" y="205" text-anchor="middle">E19</text>
+  <text class="edge-label" x="773.0" y="45" text-anchor="middle">2610</text>
+  <rect x="796" y="53" width="26" height="137" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="809.0" y="205" text-anchor="middle">E19B</text>
+  <text class="edge-label" x="809.0" y="48" text-anchor="middle">2556</text>
+  <rect x="832" y="76" width="26" height="114" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="845.0" y="205" text-anchor="middle">E19C</text>
+  <text class="edge-label" x="845.0" y="71" text-anchor="middle">2132</text>
+  <rect x="868" y="51" width="26" height="139" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="881.0" y="205" text-anchor="middle">E24</text>
+  <text class="edge-label" x="881.0" y="46" text-anchor="middle">2591</text>
+  <rect x="904" y="81" width="26" height="109" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="917.0" y="205" text-anchor="middle">E25</text>
+  <text class="edge-label" x="917.0" y="76" text-anchor="middle">2038</text>
+  <rect x="940" y="138" width="26" height="52" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="953.0" y="205" text-anchor="middle">shared</text>
+  <text class="edge-label" x="953.0" y="133" text-anchor="middle">963</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - 28 266 Python lines in total; the biggest scripts are the Bradley-Terry evaluators and the E19 family.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>All 54 scripts, one page each</h2>
+<table>
+<thead><tr><th>Experiment</th><th>Scripts (lines)</th><th class="size">Lines</th><th>Results artifacts</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym">E1</td><td><a href="exp_run_e1.html">run_e1.py</a></td><td class="size">543</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E2</td><td><a href="exp_run_e2.html">run_e2.py</a></td><td class="size">398</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E3</td><td><a href="exp_e3_common.html">e3_common.py</a> <a href="exp_e3_md.html">e3_md.py</a> <a href="exp_e3_run.html">e3_run.py</a> <a href="exp_e3_run2.html">e3_run2.py</a></td><td class="size">1407</td><td>0 md, 5 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E4</td><td><a href="exp_e4_policy_replay.html">e4_policy_replay.py</a></td><td class="size">484</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E5</td><td><a href="exp_e5_common.html">e5_common.py</a> <a href="exp_e5_embed.html">e5_embed.py</a> <a href="exp_e5_md.html">e5_md.py</a> <a href="exp_e5_run.html">e5_run.py</a></td><td class="size">922</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E5B</td><td><a href="exp_e5b_splits.html">e5b_splits.py</a></td><td class="size">438</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E5C</td><td><a href="exp_e5c_curve.html">e5c_curve.py</a></td><td class="size">427</td><td>1 md, 1 json, 0 jsonl, 2 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E6</td><td><span class="sub">no script in this tree</span></td><td class="size">-</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip warn">results, no script</span></td></tr>
+<tr><td class="sym">E7</td><td><span class="sub">no script in this tree</span></td><td class="size">-</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip warn">results, no script</span></td></tr>
+<tr><td class="sym">E8</td><td><a href="exp_e8_blast_radius.html">e8_blast_radius.py</a></td><td class="size">715</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E9</td><td><a href="exp_e9_deployment.html">e9_deployment.py</a></td><td class="size">557</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E10</td><td><span class="sub">no script in this tree</span></td><td class="size">-</td><td>1 md, 2 json, 0 jsonl, 0 img</td><td><span class="chip warn">results, no script</span></td></tr>
+<tr><td class="sym">E11</td><td><span class="sub">no script in this tree</span></td><td class="size">-</td><td>1 md, 0 json, 0 jsonl, 0 img</td><td><span class="chip warn">results, no script</span></td></tr>
+<tr><td class="sym">E12</td><td><a href="exp_e12_falsifier.html">e12_falsifier.py</a></td><td class="size">618</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E13</td><td><a href="exp_e13_common.html">e13_common.py</a> <a href="exp_e13_l3_extreme.html">e13_l3_extreme.py</a> <a href="exp_e13_umap.html">e13_umap.py</a></td><td class="size">1788</td><td>1 md, 1 json, 0 jsonl, 1 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E14</td><td><a href="exp_e14_bt_enabler.html">e14_bt_enabler.py</a></td><td class="size">1488</td><td>1 md, 2 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E15</td><td><a href="exp_e15_bt_eval.html">e15_bt_eval.py</a> <a href="exp_e15_bt_pilot.html">e15_bt_pilot.py</a></td><td class="size">1229</td><td>1 md, 1 json, 2 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E16</td><td><a href="exp_e16_gradient_audit.html">e16_gradient_audit.py</a></td><td class="size">1571</td><td>1 md, 4 json, 1 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E17</td><td><a href="exp_e17_gradient_duel.html">e17_gradient_duel.py</a></td><td class="size">265</td><td>1 md, 1 json, 0 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E18</td><td><a href="exp_e18_bt_eval.html">e18_bt_eval.py</a> <a href="exp_e18_gradient_duel.html">e18_gradient_duel.py</a> <a href="exp_e18_scripted_bt.html">e18_scripted_bt.py</a> <a href="exp_e18_symmetric.html">e18_symmetric.py</a></td><td class="size">2526</td><td>2 md, 3 json, 4 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E19</td><td><a href="exp_e19_bt_eval.html">e19_bt_eval.py</a> <a href="exp_e19_cascade_analysis.html">e19_cascade_analysis.py</a> <a href="exp_e19_gradient_duel.html">e19_gradient_duel.py</a> <a href="exp_e19_hybrid_bt.html">e19_hybrid_bt.py</a></td><td class="size">2610</td><td>2 md, 4 json, 7 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E19B</td><td><a href="exp_e19b_diagnose.html">e19b_diagnose.py</a> <a href="exp_e19b_dryrun.html">e19b_dryrun.py</a> <a href="exp_e19b_eval.html">e19b_eval.py</a> <a href="exp_e19b_extract.html">e19b_extract.py</a> <a href="exp_e19b_gradient_duel.html">e19b_gradient_duel.py</a></td><td class="size">2556</td><td>2 md, 5 json, 6 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E19C</td><td><a href="exp_e19c_confirm.html">e19c_confirm.py</a> <a href="exp_e19c_eval.html">e19c_eval.py</a> <a href="exp_e19c_gradient_duel.html">e19c_gradient_duel.py</a> <a href="exp_e19c_online_bt.html">e19c_online_bt.py</a> <a href="exp_e19c_ratchet.html">e19c_ratchet.py</a></td><td class="size">2132</td><td>2 md, 3 json, 6 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E24</td><td><a href="exp_e24_common.html">e24_common.py</a> <a href="exp_e24_eval.html">e24_eval.py</a> <a href="exp_e24_gradient_duel.html">e24_gradient_duel.py</a> <a href="exp_e24_holdout.html">e24_holdout.py</a> <a href="exp_e24_iomap.html">e24_iomap.py</a> <a href="exp_e24_reexec.html">e24_reexec.py</a></td><td class="size">2591</td><td>2 md, 5 json, 6 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E25</td><td><a href="exp_e25_creed.html">e25_creed.py</a></td><td class="size">2038</td><td>1 md, 2 json, 4 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">shared</td><td><a href="exp_harness_init.html">__init__.py</a> <a href="exp_claims_pattern_analysis.html">claims_pattern_analysis.py</a> <a href="exp_claims_pca_3d.html">claims_pca_3d.py</a> <a href="exp_harness_import.html">harness_import.py</a> <a href="exp_metrics.html">metrics.py</a></td><td class="size">963</td><td>0 md, 0 json, 0 jsonl, 0 img</td><td><span class="chip warn">artifacts only</span></td></tr>
+</tbody>
+</table>
+<details><summary>result files per experiment (full names)</summary><div class="dbody">
+<p class="sub">Names as measured on disk on 2026-10-02, under <code class="path">experiments_verifiers/results/</code>. Quote them; never edit them.</p>
+<pre>.gitkeep
+A_bugfix_fallback_2026-09-22.md
+B2_provisioning_pintest_2026-09-23.json
+B2_provisioning_pintest_2026-09-23.md
+CROSS_CHANNEL_PICK_MATRIX_2026-09-24.md
+E10_per_task_oracle_2026-09-22.json
+E10_per_task_oracle_2026-09-22.md
+E10_weights_visualization_2026-09-23.json
+E11_theory_learned_weights_2026-09-23.md
+E12_instability_falsifier_2026-09-23.json
+E12_instability_falsifier_2026-09-23.md
+E13_l3_extreme_2026-09-23.json
+E13_l3_extreme_2026-09-23.md
+E13_umap_claims_2026-09-23.png
+E14_bt_enabler_2026-09-23.json
+E14_bt_enabler_2026-09-23.md
+E14_bt_population.json
+E15_bt_cost_ledger_2026-09-23.jsonl
+E15_bt_pilot_2026-09-23.json
+E15_bt_pilot_2026-09-23.md
+E15_bt_pilot_judgments_2026-09-23.jsonl
+E16_gradient_relevance_2026-09-23.json
+E16_gradient_relevance_2026-09-23.md
+E17_gradient_duel_2026-09-23.json
+E17_gradient_duel_2026-09-23.md
+E18_bt_cost_ledger_2026-09-23.jsonl
+E18_bt_judgments_2026-09-23.jsonl
+E18_gradient_duel_2026-09-23.json
+E18_gradient_duel_2026-09-23.md
+E18_scripted_bt_2026-09-23.json
+E18_scripted_bt_2026-09-23.md
+E19_bt_cost_ledger_2026-09-23.jsonl
+E19_claims_2026-09-23.jsonl
+E19_gradient_duel_2026-09-23.json
+E19_gradient_duel_2026-09-23.md
+E19_hybrid_bt_2026-09-23.json
+E19_hybrid_bt_2026-09-23.md
+E19_scorers_2026-09-23.jsonl
+E19_scores_2026-09-23.jsonl
+E19b_bt_cost_ledger_2026-09-24.jsonl
+E19b_claims_v2_2026-09-24.jsonl
+E19b_gradient_duel_2026-09-24.json
+E19b_gradient_duel_2026-09-24.md
+E19b_hybrid_bt_v2_2026-09-24.json
+E19b_hybrid_bt_v2_2026-09-24.md
+E19b_scorers_v1c_2026-09-24.jsonl
+E19b_scorers_v2_2026-09-24.jsonl
+E19b_scores_v1c_2026-09-24.jsonl
+E19b_scores_v2_2026-09-24.jsonl
+E19c_bt_cost_ledger_2026-09-25.jsonl
+E19c_claims_2026-09-25.jsonl
+E19c_digests_2026-09-25.jsonl
+E19c_gradient_duel_2026-09-25.json
+E19c_gradient_duel_2026-09-25.md
+E19c_ratchet_2026-09-25.json
+E19c_ratchet_2026-09-25.md
+E19c_scorers_2026-09-25.jsonl
+E19c_scores_2026-09-25.jsonl
+E1_rubric_surgery_20260921.json
+E1_rubric_surgery_20260921.md
+E24_bt_cost_ledger_2026-09-24.jsonl
+E24_gradient_duel_2026-09-24.json
+E24_gradient_duel_2026-09-24.md
+E24_reexec_holdout_2026-09-24.json
+E24_reexec_holdout_2026-09-24.md
+E25_creED_autopsy_2026-09-25.json
+E25_creED_autopsy_2026-09-25.md
+E25_creED_bt_cost_ledger_2026-09-25.jsonl
+E25_creED_judgments_2026-09-25.jsonl
+E2_static-grounding_20260921.json
+E2_static-grounding_20260921.md
+E3_designA-pilot_20260921.json
+E3_designA-salvaged_20260921.json
+E3_designA_full_state.json
+E3_designA_state.json
+E3_llm_cache.json
+E4_policy_replay_20260921.json
+E4_summary.md
+E5_learned_importance_2026-09-21.json
+E5_learned_importance_2026-09-21.md
+E5b_L3_splits_2026-09-21.json
+E5b_L3_splits_2026-09-21.md
+E5c_data_efficiency.png
+E5c_data_efficiency.svg
+E5c_data_efficiency_2026-09-21.json
+E5c_data_efficiency_2026-09-21.md
+E6_capsule_crash_audit_2026-09-21.json
+E6_capsule_crash_audit_2026-09-21.md
+E7_venv_divergence_2026-09-21.json
+E7_venv_divergence_2026-09-21.md
+E8_blast_radius_20260922.json
+E8_blast_radius_20260922.md
+E9_l3_deployment_sane_2026-09-22.json
+E9_l3_deployment_sane_2026-09-22.md
+_B2_inventory_raw.json
+_cache_claims_emb_asb_full_iterative_1.npz
+_cache_e10_goal_emb.npz
+_cache_e13_goal_headtail_2026-09-23.npz
+_cache_e5_embeddings.npz
+_e10_oracle.py
+_e10_weights_html.py
+_e10_weights_viz.py
+_e16_judge_cache.jsonl
+_e16_phase1.json
+_e16_phase2.json
+_e16_population.json
+_e18_determinism_2026-09-23.jsonl
+_e18_pilot_2026-09-23.json
+_e18_symmetric_2026-09-23.jsonl
+_e19_determinism_2026-09-23.jsonl
+_e19_pilot1_gate_FAILED.json
+_e19_pilot1_scorers_archived.jsonl
+_e19_pilot1_scores_archived.jsonl
+_e19_pilot_2026-09-23.json
+_e19b_diagnosis_2026-09-24.json
+_e19b_dryrun_2026-09-24.json
+_e19b_pilot_judge_2026-09-24.json
+_e19c_label_free_2026-09-25.json
+_e19c_scores_archive_2026-09-25.jsonl
+_e24_gates_2026-09-24.json
+_e24_holdout_keys_2026-09-24.json
+_e24_holdout_ledger_2026-09-24.jsonl
+_e24_holdout_pilot_2026-09-24.jsonl
+_e24_iomap_2026-09-24.jsonl
+_e24_pilot_2026-09-24.json
+_e24_reexec_det_2026-09-24.jsonl
+_e24_reexec_ledger_2026-09-24.jsonl
+_e25_depth_llm_2026-09-25.jsonl
+_e25_depth_sample_2026-09-25.jsonl
+_e25_flip_cases_2026-09-25.json
+claims_patterns_asb_full_iterative_1_2026-09-23.html
+claims_pca_3d_asb_full_iterative_1_2026-09-23.csv
+claims_pca_3d_asb_full_iterative_1_2026-09-23.html</pre>
+</div></details>
+<p class="note say">Four experiments have results but no script in this tree: E6 (capsule crash audit), E7 (venv divergence), E10 (per-task oracle), E11 (learned-weights theory). Their evidence is on <a href="data_experiments.html">data_experiments.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>How to read one experiment page</h2>
+<table>
+<thead><tr><th>Block</th><th>Answers</th></tr></thead>
+<tbody>
+<tr><td>Design diagram</td><td>What the experiment tested and in what order.</td></tr>
+<tr><td>The script</td><td>Entry point, arguments, what it reads, what it writes.</td></tr>
+<tr><td>Results chart</td><td>The measured numbers, with the results file and line cited.</td></tr>
+<tr><td>Quoted lines</td><td>The headline sentences from the results markdown or JSON.</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+<p>Sources: <code class="path">experiments_verifiers/harness/*.py</code> (54 files, 28 266 lines by <code>wc -l</code>), <code class="path">experiments_verifiers/results/</code> (145 entries: 133 files, 12 folders, my computation), <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>.</p>
+<p class="skips">Skipped: every script body (each has its own page), <code>results/_e24_venv/</code> (virtualenv, size only), <code>results/_e3_sabotage/</code> (sabotage control), <code>experiments_verifiers/.env</code> (secrets - never opened), the 7 helper scripts in <code>diversity_experiments/scripts/</code> (covered by <a href="data_experiments.html">data_experiments.html</a>).</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

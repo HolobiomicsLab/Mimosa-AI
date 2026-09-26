@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>orchestrator.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > core > orchestrator.py">
+<div class="wrap">
+
+<h1 class="hud">orchestrator.py</h1>
+<p class="intro">sources/core/orchestrator.py holds <code>WorkflowOrchestrator</code>: it turns a goal plus craft instructions into one generated workflow genotype, then runs that genotype inside the Python sandbox. It runs once per evolution candidate, because <code>EvolutionEngine</code> calls <code>orchestrate_workflow()</code> for every generation (sources/core/evolution_engine.py:495). The call returns the four-tuple <code>(output, uuid, workflow_genotype_code, executed)</code>, and the evolution loop turns <code>executed=False</code> into <code>on_error = True</code> (sources/core/evolution_engine.py:510) before it retries.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 - call order of orchestrate_workflow() and its helpers</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 560" role="img" aria-label="orchestrator.py call order">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="20" y="30" width="1140" height="110" rx="3" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+  <text class="box-sub" x="30" y="22">orchestrate_workflow() - the entry point, lines 297-376</text>
+
+  <g class="box" id="s1">
+    <title>Arguments of orchestrate_workflow</title>
+    <rect x="40" y="50" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="74" text-anchor="middle">call arguments</text>
+    <text class="box-sub" x="140" y="92" text-anchor="middle">original_task,</text>
+    <text class="box-sub" x="140" y="106" text-anchor="middle">single_agent_mode, no_run</text>
+  </g>
+
+  <g class="box" id="s2">
+    <title>Step 1: prepend or deny the per-agent model choice</title>
+    <rect x="270" y="50" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="370" y="74" text-anchor="middle">_prompt_agents_model_list</text>
+    <text class="box-sub" x="370" y="92" text-anchor="middle">orchestrator_choose_model</text>
+    <text class="box-sub" x="370" y="106" text-anchor="middle">smolagent_model_id</text>
+  </g>
+
+  <g class="box" id="s3">
+    <title>Step 2: optional literature grounding</title>
+    <rect x="500" y="50" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="600" y="74" text-anchor="middle">_ground_with_perspicacite</text>
+    <text class="box-sub" x="600" y="92" text-anchor="middle">literrature_grounding</text>
+    <text class="box-sub" x="600" y="106" text-anchor="middle">perspicacite_grounding_task()</text>
+  </g>
+
+  <g class="box" id="s4">
+    <title>Step 3: generate the workflow code</title>
+    <rect x="730" y="50" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="830" y="74" text-anchor="middle">_generate_workflow_code</text>
+    <text class="box-sub" x="830" y="92" text-anchor="middle">single_agent_mode ?</text>
+    <text class="box-sub" x="830" y="106" text-anchor="middle">calls one factory</text>
+  </g>
+
+  <g class="box" id="s5">
+    <title>Step 4: install dependencies, then execute</title>
+    <rect x="960" y="50" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1060" y="74" text-anchor="middle">_execute_in_sandbox</text>
+    <text class="box-sub" x="1060" y="92" text-anchor="middle">install deps, then run</text>
+    <text class="box-sub" x="1060" y="106" text-anchor="middle">returns (out, t1, t2)</text>
+  </g>
+
+  <path class="edge" data-from="s1" data-to="s2" d="M240,85 H270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="255" y="78" text-anchor="middle">then</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M470,85 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="485" y="78" text-anchor="middle">then</text>
+  <path class="edge" data-from="s3" data-to="s4" d="M700,85 H730" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="715" y="78" text-anchor="middle">then</text>
+  <path class="edge" data-from="s4" data-to="s5" d="M930,85 H960" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="945" y="78" text-anchor="middle">then</text>
+
+  <g class="box" id="ha1">
+    <title>Called by _ground_with_perspicacite on line 157</title>
+    <rect x="490" y="250" width="240" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="610" y="274" text-anchor="middle">perspicacite_grounding_task</text>
+    <text class="box-sub" x="610" y="292" text-anchor="middle">query_perspicacite(prompt)</text>
+    <text class="box-sub" x="610" y="306" text-anchor="middle">format_scientific_context()</text>
+  </g>
+
+  <g class="box" id="ha2">
+    <title>Called by _generate_workflow_code on lines 196-200</title>
+    <rect x="740" y="250" width="190" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="835" y="274" text-anchor="middle">factories</text>
+    <text class="box-sub" x="835" y="292" text-anchor="middle">WorkflowFactory.craft_workflow</text>
+    <text class="box-sub" x="835" y="306" text-anchor="middle">SingleAgentFactory.craft_*</text>
+  </g>
+
+  <g class="box" id="ha3">
+    <title>Called by _execute_in_sandbox on line 243</title>
+    <rect x="980" y="250" width="180" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1070" y="274" text-anchor="middle">requirements install</text>
+    <text class="box-sub" x="1070" y="292" text-anchor="middle">workflow_requirements_install</text>
+    <text class="box-sub" x="1070" y="306" text-anchor="middle">install_dependencies(deps)</text>
+  </g>
+
+  <path class="edge" data-from="s3" data-to="ha1" d="M600,120 V250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="612" y="190">calls</text>
+  <path class="edge" data-from="s4" data-to="ha2" d="M830,120 V250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="842" y="190">calls</text>
+  <path class="edge" data-from="s5" data-to="ha3" d="M1080,120 V250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1175" y="190" text-anchor="end">install_dependencies()</text>
+
+  <g class="box" id="hb2">
+    <title>Consumes the exception raised by the generation stage (line 334)</title>
+    <rect x="490" y="350" width="240" height="70" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="610" y="374" text-anchor="middle">_parse_generation_error</text>
+    <text class="box-sub" x="610" y="392" text-anchor="middle">"UUID:&lt;uuid&gt;|&lt;msg&gt;" split</text>
+    <text class="box-sub" x="610" y="406" text-anchor="middle">else "generation_failed"</text>
+  </g>
+
+  <g class="box" id="hb4">
+    <title>Called from the except block on line 358</title>
+    <rect x="750" y="350" width="200" height="70" rx="12" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="850" y="374" text-anchor="middle">_notify_execution_failure</text>
+    <text class="box-sub" x="850" y="392" text-anchor="middle">PushNotifier.send_message</text>
+    <text class="box-sub" x="850" y="406" text-anchor="middle">priority 1, exception path</text>
+  </g>
+
+  <g class="box" id="hb3">
+    <title>Called by _execute_in_sandbox on line 249</title>
+    <rect x="980" y="350" width="180" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1070" y="374" text-anchor="middle">workflow_sandbox_run</text>
+    <text class="box-sub" x="1070" y="392" text-anchor="middle">workflow_runner.execute()</text>
+    <text class="box-sub" x="1070" y="406" text-anchor="middle">progress_handler prints</text>
+  </g>
+
+  <path class="edge" data-from="s4" data-to="hb2" d="M735,120 V340 H610 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="332" text-anchor="middle">on exception</text>
+  <path class="edge" data-from="s5" data-to="hb4" d="M960,70 H955 V385 H950" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="940" y="330" text-anchor="end">on exception</text>
+  <path class="edge" data-from="s5" data-to="hb3" d="M975,120 V370 H980" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="986" y="200">execute()</text>
+  <path class="edge" data-from="ha3" data-to="hb3" d="M1070,320 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1078" y="340">then</text>
+
+  <g class="box" id="out">
+    <title>Return value of orchestrate_workflow (lines 371-376)</title>
+    <rect x="980" y="450" width="180" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1070" y="474" text-anchor="middle">returns 4-tuple</text>
+    <text class="box-sub" x="1070" y="492" text-anchor="middle">(output, uuid,</text>
+    <text class="box-sub" x="1070" y="506" text-anchor="middle">genotype_code, executed)</text>
+  </g>
+  <path class="edge" data-from="hb3" data-to="out" d="M1070,420 V450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1078" y="442">then</text>
+  <path class="edge" data-from="hb2" data-to="out" d="M610,420 V438 H1040 V450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="820" y="434" text-anchor="middle">error tuple</text>
+
+  <text class="box-sub" x="20" y="548">context-manager exit: __aexit__ (line 382) and __del__ (line 392) call workflow_runner.cleanup() - no box edge, they are not called from the stages above</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - solid arrow = call or call order ("then" = next stage inside orchestrate_workflow; a named label = a real method call). The error-handling box takes the exception raised by the generation stage (line 334), so the arrow into it starts there; <code>_notify_execution_failure</code> is called from the except block on line 358, which wraps <code>_execute_in_sandbox</code>. Related pages: <a href="flow_task_run.html">flow_task_run.html</a>, <a href="mod_core_runner.html">mod_core_runner.html</a>, <a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a>, <a href="file_index.html">file_index.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 - what goes in and what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 460" role="img" aria-label="orchestrator.py data flow">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="cfg">
+    <title>Config fields read in __init__ (lines 40-49) and in the branches</title>
+    <rect x="20" y="40" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="64" text-anchor="middle">config</text>
+    <text class="box-sub" x="145" y="84" text-anchor="middle">workflow_dir, workspace_dir</text>
+    <text class="box-sub" x="145" y="100" text-anchor="middle">runner_default_python_version,</text>
+    <text class="box-sub" x="145" y="114" text-anchor="middle">runner_temp_dir, runner_requirements</text>
+  </g>
+
+  <g class="box" id="args">
+    <title>Positional and keyword arguments of orchestrate_workflow</title>
+    <rect x="20" y="160" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="184" text-anchor="middle">call arguments</text>
+    <text class="box-sub" x="145" y="204" text-anchor="middle">goal, craft_instructions,</text>
+    <text class="box-sub" x="145" y="220" text-anchor="middle">original_task,</text>
+    <text class="box-sub" x="145" y="234" text-anchor="middle">single_agent_mode, no_run</text>
+  </g>
+
+  <g class="box" id="persp">
+    <title>Outgoing HTTP query to Perspicacite-AI when literrature_grounding is True</title>
+    <rect x="20" y="300" width="250" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="324" text-anchor="middle">Perspicacite-AI</text>
+    <text class="box-sub" x="145" y="344" text-anchor="middle">query_perspicacite(prompt)</text>
+    <text class="box-sub" x="145" y="360" text-anchor="middle">network read, line 136</text>
+    <text class="box-sub" x="145" y="374" text-anchor="middle">failure is swallowed</text>
+  </g>
+
+  <g class="box" id="core">
+    <title>WorkflowOrchestrator.orchestrate_workflow</title>
+    <rect x="470" y="150" width="240" height="140" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="590" y="200" text-anchor="middle">WorkflowOrchestrator</text>
+    <text class="box-sub" x="590" y="222" text-anchor="middle">orchestrate_workflow()</text>
+    <text class="box-sub" x="590" y="240" text-anchor="middle">line 297</text>
+    <text class="box-sub" x="590" y="262" text-anchor="middle">async, one call per generation</text>
+  </g>
+
+  <g class="box" id="ret">
+    <title>The returned tuple consumed by EvolutionEngine line 495</title>
+    <rect x="880" y="40" width="280" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1020" y="64" text-anchor="middle">returns</text>
+    <text class="box-sub" x="1020" y="84" text-anchor="middle">(output, uuid,</text>
+    <text class="box-sub" x="1020" y="100" text-anchor="middle">workflow_genotype_code, executed)</text>
+    <text class="box-sub" x="1020" y="114" text-anchor="middle">executed False on any error</text>
+  </g>
+
+  <g class="box" id="push">
+    <title>PushNotifier on the execution-failure path</title>
+    <rect x="880" y="160" width="280" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1020" y="184" text-anchor="middle">Pushover</text>
+    <text class="box-sub" x="1020" y="204" text-anchor="middle">PushNotifier.send_message</text>
+    <text class="box-sub" x="1020" y="220" text-anchor="middle">pushover_token, pushover_user</text>
+    <text class="box-sub" x="1020" y="234" text-anchor="middle">priority 1, line 268</text>
+  </g>
+
+  <g class="box" id="tmp">
+    <title>Sandbox working directory the executed workflow writes into</title>
+    <rect x="880" y="280" width="280" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1020" y="304" text-anchor="middle">sandbox workspace</text>
+    <text class="box-sub" x="1020" y="324" text-anchor="middle">runner_temp_dir (tmp/) - the workflow</text>
+  </g>
+
+  <g class="box" id="wfdir">
+    <title>Genotype file written by the factory, not by this module</title>
+    <rect x="880" y="380" width="280" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1020" y="404" text-anchor="middle">workflow_dir</text>
+    <text class="box-sub" x="1020" y="424" text-anchor="middle">factory writes the genotype .py file</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="cfg" data-to="core" d="M270,90 H380 V190 H470" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="330" y="112" text-anchor="middle">reads fields</text>
+  <path class="edge" data-from="args" data-to="core" d="M270,200 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="370" y="192" text-anchor="middle">called with</text>
+  <path class="edge dashed-edge" data-from="core" data-to="persp" d="M470,290 H270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="370" y="282" text-anchor="middle">queries</text>
+  <path class="edge" data-from="core" data-to="ret" d="M710,175 H800 V90 H880" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="790" y="140" text-anchor="middle">returns</text>
+  <path class="edge dashed-edge" data-from="core" data-to="push" d="M710,200 H880" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="795" y="192" text-anchor="middle">on failure</text>
+  <path class="edge dashed-edge" data-from="core" data-to="tmp" d="M710,260 H800 V300 H880" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="760" y="280" text-anchor="middle">executes in</text>
+  <path class="edge dashed-edge" data-from="core" data-to="wfdir" d="M710,275 H840 V400 H880" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="845" y="350" text-anchor="middle">factory saves</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - dashed = reads or writes, solid = a value handed over. This module opens no file itself: the genotype file under <code>workflow_dir</code> is written by the factory it calls, and the sandbox writes the workflow's own outputs under <code>runner_temp_dir</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 - the decision rules inside the entry point</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 620" role="img" aria-label="orchestrate_workflow decision tree">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="c1">
+    <title>Entry point</title>
+    <rect x="30" y="30" width="300" height="56" rx="26" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="180" y="63" text-anchor="middle">orchestrate_workflow()</text>
+  </g>
+
+  <g class="box" id="c2">
+    <title>Line 281</title>
+    <rect x="30" y="120" width="300" height="56" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="180" y="153" text-anchor="middle">config.orchestrator_choose_model ?</text>
+  </g>
+
+  <g class="box" id="c7">
+    <title>max 4 words per arrow label, real branches</title>
+    <rect x="390" y="120" width="330" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-sub" x="555" y="144" text-anchor="middle">True -&gt; prepend allowed-model list</text>
+    <text class="box-sub" x="555" y="162" text-anchor="middle">False -&gt; append "not allowed" banner</text>
+  </g>
+
+  <g class="box" id="c3">
+    <title>Line 327</title>
+    <rect x="30" y="210" width="300" height="56" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="180" y="243" text-anchor="middle">config.literrature_grounding ?</text>
+  </g>
+
+  <g class="box" id="c8">
+    <title>Lines 327-331</title>
+    <rect x="390" y="210" width="330" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-sub" x="555" y="234" text-anchor="middle">True -&gt; _ground_with_perspicacite()</text>
+    <text class="box-sub" x="555" y="252" text-anchor="middle">False -&gt; keep instructions as-is</text>
+  </g>
+
+  <g class="box" id="c4">
+    <title>Lines 333-338</title>
+    <rect x="30" y="300" width="300" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="180" y="333" text-anchor="middle">try _generate_workflow_code()</text>
+  </g>
+
+  <g class="box" id="c9">
+    <title>Lines 337-341</title>
+    <rect x="390" y="300" width="330" height="56" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-sub" x="555" y="324" text-anchor="middle">except Exception -&gt; _parse_generation_error(e)</text>
+    <text class="box-sub" x="555" y="342" text-anchor="middle">return error text, executed=False</text>
+  </g>
+
+  <g class="box" id="c5">
+    <title>Line 347</title>
+    <rect x="30" y="390" width="300" height="56" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="180" y="423" text-anchor="middle">if no_run: return</text>
+  </g>
+
+  <g class="box" id="c10">
+    <title>Lines 347-348</title>
+    <rect x="390" y="390" width="330" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-sub" x="555" y="414" text-anchor="middle">True -&gt; return "", uuid, code, True</text>
+    <text class="box-sub" x="555" y="432" text-anchor="middle">False -&gt; run the sandbox</text>
+  </g>
+
+  <g class="box" id="c6">
+    <title>Lines 350-376</title>
+    <rect x="30" y="480" width="300" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="180" y="513" text-anchor="middle">try _execute_in_sandbox(code)</text>
+  </g>
+
+  <g class="box" id="c11">
+    <title>Lines 352-359</title>
+    <rect x="390" y="480" width="330" height="56" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-sub" x="555" y="504" text-anchor="middle">except Exception -&gt; notify + return str(e)</text>
+    <text class="box-sub" x="555" y="522" text-anchor="middle">executed=False (line 359)</text>
+  </g>
+
+  <path class="edge" data-from="c1" data-to="c2" d="M180,86 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="c3" d="M180,176 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c3" data-to="c4" d="M180,266 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c4" data-to="c5" d="M180,356 V390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c5" data-to="c6" d="M180,446 V480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="c7" d="M330,148 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="360" y="140" text-anchor="middle">branch</text>
+  <path class="edge" data-from="c3" data-to="c8" d="M330,238 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="360" y="230" text-anchor="middle">branch</text>
+  <path class="edge" data-from="c4" data-to="c9" d="M330,328 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="360" y="320" text-anchor="middle">raises</text>
+  <path class="edge" data-from="c5" data-to="c10" d="M330,418 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="360" y="410" text-anchor="middle">branch</text>
+  <path class="edge" data-from="c6" data-to="c11" d="M330,508 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="360" y="500" text-anchor="middle">raises</text>
+
+  <text class="box-sub" x="30" y="570">success exit: line 364 logger.info, 365 print_summary, 375-376 return output, uuid, genotype_code, True</text>
+  <text class="box-sub" x="30" y="592">workflow_sandbox_run classifies a failure: "TimeoutExpired" or "timed out" -&gt; TIMEOUT; "SyntaxError" -&gt; SYNTAX_ERROR; else RUNTIME_ERROR (lines 94-99)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - amber = a check, red = an error exit, cyan = the next stage. Every condition is quoted from the source with its line number.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>config field</td><td class="sym">workflow_dir</td><td class="sym">config.py:222, read at orchestrator.py:40</td><td>Value stored on the instance; no file opened here.</td></tr>
+<tr><td>config field</td><td class="sym">workspace_dir</td><td class="sym">config.py:44, read at orchestrator.py:49</td><td>cwd handed to <code>WorkflowRunner</code>.</td></tr>
+<tr><td>config field</td><td class="sym">pushover_token, pushover_user</td><td class="sym">config.py:262-263, read at orchestrator.py:41</td><td>Build the <code>PushNotifier</code>.</td></tr>
+<tr><td>config field</td><td class="sym">runner_default_python_version</td><td class="sym">config.py:229, read at orchestrator.py:44</td><td>Interpreter version for the sandbox.</td></tr>
+<tr><td>config field</td><td class="sym">runner_default_timeout</td><td class="sym">config.py:230, read at orchestrator.py:45</td><td>Sandbox timeout in seconds.</td></tr>
+<tr><td>config field</td><td class="sym">runner_default_max_memory_mb</td><td class="sym">config.py:234, read at orchestrator.py:46</td><td>Sandbox memory limit.</td></tr>
+<tr><td>config field</td><td class="sym">runner_temp_dir</td><td class="sym">config.py:236, read at orchestrator.py:47</td><td>Sandbox temporary directory.</td></tr>
+<tr><td>config field</td><td class="sym">runner_requirements</td><td class="sym">config.py:242, read at orchestrator.py:58</td><td>Package list installed before the run.</td></tr>
+<tr><td>config field</td><td class="sym">orchestrator_choose_model</td><td class="sym">config.py:101, read at orchestrator.py:281</td><td>Yes: model list prompt. No: refusal banner.</td></tr>
+<tr><td>config field</td><td class="sym">smolagent_model_id</td><td class="sym">config.py:64, read at orchestrator.py:287</td><td>Allowed model names in that list.</td></tr>
+<tr><td>config field</td><td class="sym">literrature_grounding</td><td class="sym">config.py:103, read at orchestrator.py:327</td><td>Turns the Perspicacite query on or off.</td></tr>
+<tr><td>argument</td><td class="sym">goal, craft_instructions</td><td class="sym">orchestrator.py:297-302</td><td>Passed to the factory that writes the genotype.</td></tr>
+<tr><td>argument</td><td class="sym">original_task, single_agent_mode, no_run</td><td class="sym">orchestrator.py:300-303</td><td>Similarity key, factory choice, skip-run switch.</td></tr>
+<tr><td>network read</td><td class="sym">Perspicacite-AI</td><td class="sym">orchestrator.py:136 via query_perspicacite</td><td>Literature text prepended to the instructions.</td></tr>
+<tr><td>network write</td><td class="sym">Pushover alert</td><td class="sym">orchestrator.py:263</td><td>Notify the operator that a workflow failed.</td></tr>
+<tr><td>return value</td><td class="sym">(output, uuid, workflow_genotype_code, executed)</td><td class="sym">orchestrator.py:341, 348, 359, 376</td><td>Four exits, same shape; <code>executed</code> gates retry.</td></tr>
+<tr><td>state</td><td class="sym">self.workflow_runner, self.notifier, self.runner_config</td><td class="sym">orchestrator.py:38-49</td><td>Instance state reused for every call.</td></tr>
+<tr><td>file write</td><td class="sym">none</td><td class="sym">unknown</td><td>This module opens no file for writing.</td></tr>
+</tbody>
+</table>
+<p class="note">The sandbox writes the workflow's own outputs, and the factory writes the genotype file. Both happen behind calls this module makes, so neither path is opened here.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>WorkflowOrchestrator - every method with its real signature (16 symbols)</summary><div class="dbody">
+<pre>class WorkflowOrchestrator:                                   line 23
+
+__init__(self, config: "Config") -&gt; None                       line 30
+workflow_requirements_install(self) -&gt; None   [async]          line 51
+workflow_sandbox_run(self, workflow_genotype_code: str) -&gt; str [async]   line 64
+perspicacite_grounding_task(self, task: str) -&gt; str            line 103
+_ground_with_perspicacite(self, task: str,
+                          craft_instructions: str) -&gt; str      line 141
+_generate_workflow_code(self, goal: str, craft_instructions: str,
+                        single_agent_mode: bool,
+                        original_task: str | None)
+    -&gt; tuple[str, str, str]   [async]                          line 169
+_parse_generation_error(error: Exception)
+    -&gt; tuple[str, str]   [staticmethod]                        line 205
+_execute_in_sandbox(self, complete_code: str)
+    -&gt; tuple[str, float, float]   [async]                      line 224
+_notify_execution_failure(self, uuid: str, goal: str,
+                          workflow_time: float,
+                          error: Exception) -&gt; None            line 254
+_prompt_agents_model_list(self,
+                          craft_instructions: str) -&gt; str      line 271
+orchestrate_workflow(self, goal: str, craft_instructions: str,
+                     original_task: str | None = None,
+                     single_agent_mode: bool = False,
+                     no_run: bool = False)
+    -&gt; tuple[str, str, str, bool]   [async]                    line 297
+__aenter__(self) -&gt; "WorkflowOrchestrator"   [async]           line 378
+__aexit__(self, exc_type: Any, exc_val: Any,
+          exc_tb: Any) -&gt; None   [async]                       line 382
+__del__(self) -&gt; None                                          line 392
+
+test_workflow_orchestrator() -&gt; None   [async, module level]   line 414
+
+# nested closure not listed: progress_handler(line: str) -&gt; None, line 80, local to workflow_sandbox_run</pre>
+<table>
+<thead><tr><th>Symbol</th><th>Role (8 words max)</th></tr></thead>
+<tbody>
+<tr><td class="sym">WorkflowOrchestrator</td><td>Generates one workflow and runs it in the sandbox.</td></tr>
+<tr><td class="sym">__init__</td><td>Builds both factories, runner, notifier, runner config.</td></tr>
+<tr><td class="sym">workflow_requirements_install</td><td>Installs <code>runner_requirements</code>; raises on non-COMPLETED.</td></tr>
+<tr><td class="sym">workflow_sandbox_run</td><td>Runs the code; classifies timeout, syntax, runtime errors.</td></tr>
+<tr><td class="sym">perspicacite_grounding_task</td><td>Builds the literature prompt; returns a fallback on error.</td></tr>
+<tr><td class="sym">_ground_with_perspicacite</td><td>Prepends formatted scientific context to the instructions.</td></tr>
+<tr><td class="sym">_generate_workflow_code</td><td>Dispatches to single-agent or multi-agent factory.</td></tr>
+<tr><td class="sym">_parse_generation_error</td><td>Splits the "UUID:...|..." error convention.</td></tr>
+<tr><td class="sym">_execute_in_sandbox</td><td>Installs dependencies, then executes; returns both timings.</td></tr>
+<tr><td class="sym">_notify_execution_failure</td><td>Sends a Pushover alert with uuid, goal, error.</td></tr>
+<tr><td class="sym">_prompt_agents_model_list</td><td>Adds allowed model list, or a refusal banner.</td></tr>
+<tr><td class="sym">orchestrate_workflow</td><td>Public entry; returns four-tuple, never raises.</td></tr>
+<tr><td class="sym">__aenter__, __aexit__</td><td>Async context manager; exit cleans the runner.</td></tr>
+<tr><td class="sym">__del__</td><td>Sync cleanup fallback; swallows every error.</td></tr>
+<tr><td class="sym">test_workflow_orchestrator</td><td>Module-level manual test; initials a Config.</td></tr>
+</tbody>
+</table>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>Line</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/core/__init__.py">sources/core/__init__.py</a></td><td class="sym">20, 51</td><td>Re-exports <code>WorkflowOrchestrator</code>.</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td class="sym">37, 91, 495</td><td>Builds one instance, calls <code>orchestrate_workflow()</code> per generation.</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/eval_workflow_generation.py">sources/benchmark_evaluation/eval_workflow_generation.py</a></td><td class="sym">11, 22, 80</td><td>Calls the same method behind a timeout wrapper.</td></tr>
+<tr><td class="sym"><a href="../../sources/core/schema.py">sources/core/schema.py</a></td><td class="sym">69</td><td>Comment only: <code>IndividualRun</code> fields are set before the call.</td></tr>
+<tr><td class="sym">tests/</td><td class="sym">unknown</td><td>No test found: the grep match is an unrelated preset name.</td></tr>
+<tr><td class="sym"><a href="../../main.py">main.py</a></td><td class="sym">398-404</td><td>Reads <code>orchestrator_choose_model</code>, does not import this module.</td></tr>
+</tbody>
+</table>
+<p class="note">No importer inside <code>tests/</code>. The module-level <code>test_workflow_orchestrator</code> at line 414 is a manual script, not a pytest test.</p>
+</div>
+
+<footer>
+<p>Sources: <a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a> (427 lines, read in full), <a href="../../config.py">config.py</a> (field defaults), <a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a> (call site), <a href="../../sources/benchmark_evaluation/eval_workflow_generation.py">sources/benchmark_evaluation/eval_workflow_generation.py</a> (second call site), docs/visual_clone/_reference.html, _clone.css.</p>
+<p class="skips">Skipped: <code>sources/prompts/*.md</code> - prompt text only, no code path in this file. <code>WorkflowFactory</code>, <code>SingleAgentFactory</code>, <code>WorkflowRunner</code> bodies - other files, described elsewhere. <code>sources/core/__pycache__</code> - build artifacts. The Perspicacite client body - only the two called functions matter here.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

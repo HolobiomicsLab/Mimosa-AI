@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Variation: how a genotype changes - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources > core > variation">
+<div class="wrap">
+
+<h1 class="hud">Variation: how a genotype changes</h1>
+<p class="intro"><code>VariationEngine</code> turns a parent genotype plus verifier feedback into a prompt for the workflow LLM. Mutation edits one parent; crossover recombines two or more. The new genotype is embedded so the QD archive can read how different it is.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 - variation pipeline</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1140 300" role="img" aria-label="variation pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="v1" href="data_runs.html">
+    <title>Parent genotype: the previous workflow source</title>
+    <rect x="16" y="40" width="190" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="30" y="63">Parent genotype</text>
+    <text class="box-sub" x="30" y="79">workflow_genotype_*.py</text>
+  </a>
+
+  <a class="box" id="v2" href="mod_evaluators_hybrid_verifier.html">
+    <title>Verifier feedback for the parent</title>
+    <rect x="16" y="104" width="190" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="30" y="127">Verifier feedback</text>
+    <text class="box-sub" x="30" y="143">gradient + score 0-1</text>
+  </a>
+
+  <a class="box" id="v3" href="#card-variation">
+    <title>Prompt builder and search-state observer</title>
+    <rect x="266" y="44" width="210" height="112" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="280" y="88">VariationEngine</text>
+    <text class="box-sub" x="280" y="106">mutation_prompt</text>
+    <text class="box-sub" x="280" y="122">crossover_prompt</text>
+    <text class="box-sub" x="280" y="138">_search_state_block</text>
+  </a>
+
+  <a class="box" id="v4" href="mod_core_tools_llm.html">
+    <title>Dedicated LLM call that writes the directive</title>
+    <rect x="556" y="72" width="230" height="58" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="570" y="96">Directive LLM</text>
+    <text class="box-sub" x="570" y="112">llm_think_mutation_directive</text>
+  </a>
+
+  <a class="box" id="v5" href="#card-variation">
+    <title>Assembled prompt sent to the workflow LLM</title>
+    <rect x="866" y="72" width="250" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="880" y="96">Mutation prompt</text>
+    <text class="box-sub" x="880" y="112">directive + parent code</text>
+  </a>
+
+  <a class="box" id="v6" href="area_sources_core.html">
+    <title>Workflow-creator LLM call inside the factory</title>
+    <rect x="16" y="210" width="230" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="30" y="233">Workflow LLM call</text>
+    <text class="box-sub" x="30" y="249">WorkflowFactory.llm_make_workflow</text>
+  </a>
+
+  <a class="box" id="v7" href="data_runs.html">
+    <title>Generated workflow source</title>
+    <rect x="326" y="210" width="230" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="340" y="233">New genotype</text>
+    <text class="box-sub" x="340" y="249">workflow_genotype_*.py</text>
+  </a>
+
+  <a class="box" id="v8" href="#card-embedding">
+    <title>Embedding of the new genotype</title>
+    <rect x="636" y="210" width="220" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="650" y="233">GenotypeEmbedder</text>
+    <text class="box-sub" x="650" y="249">embed() to unit vector</text>
+  </a>
+
+  <path class="edge" data-from="v1" data-to="v3" d="M206,68 H266" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="236" y="60" text-anchor="middle">code str</text>
+  <path class="edge" data-from="v2" data-to="v3" d="M206,132 H266" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="236" y="152" text-anchor="middle">diagnosis</text>
+  <path class="edge" data-from="v3" data-to="v4" d="M476,100 H556" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="516" y="92" text-anchor="middle">search state</text>
+  <path class="edge" data-from="v4" data-to="v5" d="M786,100 H866" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="826" y="92" text-anchor="middle">directive</text>
+  <path class="edge" data-from="v5" data-to="v6" d="M991,130 V195 H131 V210" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="560" y="188" text-anchor="middle">prompt text</text>
+  <path class="edge" data-from="v6" data-to="v7" d="M246,238 H326" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="286" y="230" text-anchor="middle">prompt</text>
+  <path class="edge" data-from="v7" data-to="v8" d="M556,238 H636" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="596" y="230" text-anchor="middle">code str</text>
+
+  <text class="box-sub" x="16" y="292">blue dashed arrow = external LLM call | green arrow = verifier signal | 8 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - parent code + diagnosis go in, a prompt leaves, a new genotype and its vector come out. Symbols: <code>sources/core/variation_engine.py::VariationEngine.mutation_prompt</code>, <code>::llm_think_mutation_directive</code>, <code>sources/core/workflow_factory.py::WorkflowFactory.llm_make_workflow</code>, <code>sources/core/genotype_embedding.py::GenotypeEmbedder.embed</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Mutation vs crossover</h2>
+<table>
+<thead><tr><th>Aspect</th><th>Mutation</th><th>Crossover</th></tr></thead>
+<tbody>
+<tr><td>Trigger</td><td><code>select_parent_workflow</code> returns one parent</td><td>Two or more parents drawn, <code>use_crossover=True</code></td></tr>
+<tr><td>Parents</td><td>One parent, drawn by <code>SelectionPressure.select_parent</code></td><td>2+ parents, sorted best score first</td></tr>
+<tr><td>Prompt builder</td><td><code>mutation_prompt</code></td><td><code>crossover_prompt</code></td></tr>
+<tr><td>Diagnosis input</td><td>Gradient + agent answers + <code>&lt;search_state&gt;</code></td><td>Per-parent code and per-parent gradient</td></tr>
+<tr><td>Agent count</td><td>Parent count plus or minus 1, clamp 1..7</td><td>Cap equals highest parent agent count</td></tr>
+<tr><td>Keep rule</td><td>Keep 90% of previous prompts and code</td><td>Recombine, do not patch one parent</td></tr>
+</tbody>
+</table>
+<p class="sub">Directive <code>crossover_rate</code>: <code>config.py:149</code> default 0.4; <code>config_default.json:79</code> sets 0.25. <code>select_parents</code> draws it with <code>random.random() &lt; crossover_rate</code> (<code>selection.py:267</code>).</p>
+
+<details><summary>prompt builders in detail</summary><div class="dbody">
+<pre>VariationEngine.seed_genome_prompt(goal: str) -&gt; str
+VariationEngine.llm_think_mutation_directive(agent_answers, textual_gradient_block, search_state, goal) -&gt; str
+VariationEngine.mutation_prompt(goal, wf_info, genotype, run_stderr, iteration_count, max_iterations=10) -&gt; str
+VariationEngine.crossover_prompt(goal, wf_infos, genotypes, run_stderrs, iteration_count, max_iterations=10) -&gt; str</pre>
+<p>Mutation rules written into the prompt (<code>variation_engine.py:448-453</code>): follow the directive, add or remove at most one agent, use at most <code>agent_budget</code> agents, keep the topology unless the directive says otherwise, keep 90% of the previous code, and edit no prompt outside the directive scope.</p>
+<p>The gradient reaches the prompt as <code>&lt;directive&gt;...&lt;/directive&gt;</code> only. The raw verifier diagnosis and agent answers are consumed by the directive LLM, not by the workflow LLM (<code>variation_engine.py:426-446</code>).</p>
+<p>Gradient text is cleaned before use: underscores become spaces, the block is cut at 2048 characters, and an empty gradient falls back to the run stderr, then to a fixed failure sentence (<code>variation_engine.py:402-407</code>). Crossover falls back to the last 1024 characters of stderr per parent (<code>variation_engine.py:489</code>).</p>
+<p>Gotcha: crossover builds an <code>answers</code> field per parent but never prints it; the prompt shows code and gradient only (<code>variation_engine.py:490</code> vs <code>:505-512</code>).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 - genotype embedding and novelty path</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1470 170" role="img" aria-label="genotype embedding path">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="e1" href="../../sources/core/code_features.py">
+    <title>Genotype source text as a string</title>
+    <rect x="16" y="30" width="160" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="30" y="53">genotype code</text>
+    <text class="box-sub" x="30" y="69">str, 1k-12k chars</text>
+  </a>
+
+  <a class="box" id="e2" href="#card-embedding">
+    <title>Comment-only and blank lines dropped</title>
+    <rect x="246" y="30" width="180" height="56" rx="28" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="260" y="53">canonicalise</text>
+    <text class="box-sub" x="260" y="69">_canonicalise_for_embedding</text>
+  </a>
+
+  <a class="box" id="e3" href="#card-embedding">
+    <title>One chunk per top-level statement, capped at 900 chars</title>
+    <rect x="496" y="30" width="190" height="56" rx="28" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="510" y="53">AST chunking</text>
+    <text class="box-sub" x="510" y="69">_split_top_level_blocks</text>
+  </a>
+
+  <a class="box" id="e4" href="mod_core_tools_llm.html">
+    <title>Local sentence-transformers model, 256 word-pieces per chunk</title>
+    <rect x="756" y="30" width="180" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="770" y="53">all-MiniLM-L6-v2</text>
+    <text class="box-sub" x="770" y="69">256 word-pieces max</text>
+  </a>
+
+  <a class="box" id="e5" href="#card-embedding">
+    <title>Per-chunk vectors averaged, then L2-normalised</title>
+    <rect x="1006" y="30" width="180" height="56" rx="28" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1020" y="53">mean-pool + L2</text>
+    <text class="box-sub" x="1020" y="69">_l2_normalize</text>
+  </a>
+
+  <a class="box" id="e6" href="mod_core_selection.html">
+    <title>QD novelty from cosine distance to archive peers</title>
+    <rect x="1256" y="30" width="200" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1270" y="53">kNN cosine novelty</text>
+    <text class="box-sub" x="1270" y="69">SelectionPressure</text>
+  </a>
+
+  <path class="edge" data-from="e1" data-to="e2" d="M176,58 H246" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="211" y="50" text-anchor="middle">code str</text>
+  <path class="edge" data-from="e2" data-to="e3" d="M426,58 H496" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="461" y="50" text-anchor="middle">clean code</text>
+  <path class="edge" data-from="e3" data-to="e4" d="M686,58 H756" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="721" y="50" text-anchor="middle">chunks</text>
+  <path class="edge" data-from="e4" data-to="e5" d="M936,58 H1006" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="971" y="50" text-anchor="middle">encode()</text>
+  <path class="edge" data-from="e5" data-to="e6" d="M1186,58 H1256" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1221" y="50" text-anchor="middle">vector</text>
+
+  <text class="box-sub" x="16" y="130">code_features.py::genotype_embedding_descriptor returns this vector as list[float], or None | SHA-1 cache per process | 6 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - code to chunks to vectors to a novelty number. Novelty is the mean cosine distance to the comparison set (<code>selection.py::SelectionPressure._compute_novelty</code>), so the kNN step is owned by <a href="mod_core_selection.html">mod_core_selection.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File cards</h2>
+
+<div class="card l2" id="card-variation">
+<h4><a href="../../sources/core/variation_engine.py">sources/core/variation_engine.py</a></h4>
+<p class="role">Assembles mutation and crossover prompts, samples the agent budget, and records offspring scores for the search-state block.</p>
+<p class="meta">609 lines &#183; class: <code>VariationEngine</code> (15 methods) &#183; reads: <code>workflow_llm_model</code>, <code>reasoning_effort</code>, <code>max_tokens</code> &#183; tests: <code class="path">tests/variation_engine_test.py</code> (20 tests)</p>
+<details><summary>signature list, constants, state written</summary><div class="dbody">
+<pre>VariationEngine.__init__(config)
+VariationEngine.setup_llm(config)
+VariationEngine.record_offspring_gradient(gradient, *, is_failure=False, child_score=None, best_before=None) -&gt; None
+VariationEngine.seed_genome_prompt(goal) -&gt; str
+VariationEngine.llm_think_mutation_directive(agent_answers, textual_gradient_block, search_state, goal) -&gt; str
+VariationEngine.mutation_prompt(goal, wf_info, genotype, run_stderr, iteration_count, max_iterations=10) -&gt; str
+VariationEngine.crossover_prompt(goal, wf_infos, genotypes, run_stderrs, iteration_count, max_iterations=10) -&gt; str
+VariationEngine._sample_agent_count(lo, hi) -&gt; int
+VariationEngine._sample_mutation_agent_budget(parent_agents) -&gt; int
+VariationEngine._count_parent_agents(wf_state) -&gt; int | None
+VariationEngine._iters_since_improvement() -&gt; int
+VariationEngine._compute_success_rate(window=5) -&gt; float | None
+VariationEngine._recent_score_trajectory(window=5) -&gt; list[float]
+VariationEngine._search_state_block(parent_score, iteration_count, max_iterations) -&gt; str
+VariationEngine._extract_agent_answers(wf_state) -&gt; str</pre>
+<p>Constants: <code>max_possible_agents = 7</code> (<code>:34</code>), <code>_PLATEAU_PATIENCE = 6</code> (<code>:158</code>). History buffers: <code>textual_gradient_history</code>, <code>score_history</code>, <code>agent_count_history</code>.</p>
+<p><code>last_variation_state</code> keys: <code>iters_since_improvement</code>, <code>plateau</code>, <code>success_rate</code>, <code>parent_score</code> (<code>:231-236</code>) plus <code>agent_budget</code> (<code>:423</code>). The engine writes them to <code>variation_log.jsonl</code> (<code>evolution_engine.py::EvolutionEngine._build_variation_log_entry</code>).</p>
+<p>The directive LLM uses <code>config.workflow_llm_model</code> at temperature 1.0 (<code>:41-47</code>).</p>
+<p>Note: <code>_compute_success_rate</code> is a diagnostic observer; its docstring states it no longer drives controller arithmetic (<code>:160-166</code>).</p>
+</div></details>
+</div>
+
+<div class="card l2" id="card-embedding">
+<h4><a href="../../sources/core/genotype_embedding.py">sources/core/genotype_embedding.py</a></h4>
+<p class="role">Embeds workflow source into a unit-norm vector: local MiniLM by default, optional OpenAI backend, chunked and mean-pooled, cached by SHA-1.</p>
+<p class="meta">329 lines &#183; classes: <code>_LocalMiniLMEmbedder</code>, <code>_OpenAIEmbedder</code>, <code>GenotypeEmbedder</code> &#183; 11 module functions &#183; tests: <code class="path">tests/genotype_embedding_chunking_test.py</code> (12 tests)</p>
+<details><summary>signature list</summary><div class="dbody">
+<pre>load_sentence_transformer(model_name)
+genotype_embedding._hub_model_id(model_name) -&gt; str
+genotype_embedding._cached_snapshot_path(model_name) -&gt; str | None
+genotype_embedding._l2_normalize(vec) -&gt; np.ndarray
+genotype_embedding._canonicalise_for_embedding(code) -&gt; str
+genotype_embedding._split_oversized(text, max_chars) -&gt; list[str]
+genotype_embedding._split_top_level_blocks(code, max_chars=900) -&gt; list[str]
+genotype_embedding._select_default_backend() -&gt; _Embedder
+genotype_embedding.get_default_embedder() -&gt; GenotypeEmbedder
+genotype_embedding.embed_genotype(genotype) -&gt; np.ndarray | None
+genotype_embedding.reset_default_embedder() -&gt; None
+GenotypeEmbedder.embed(genotype) -&gt; np.ndarray | None
+_LocalMiniLMEmbedder.encode(text) -&gt; np.ndarray
+_OpenAIEmbedder.encode(text) -&gt; np.ndarray</pre>
+<p>Degenerate input (<code>None</code>, empty, non-string, backend error, non-finite vector) returns <code>None</code>. Identical code text is embedded once per process (<code>hashlib.sha1</code> key, <code>:256</code>). The model loads from the local HF cache when present, otherwise from the hub with <code>token=False</code> (<code>:44-70</code>).</p>
+</div></details>
+</div>
+
+<div class="card l2" id="card-codefeatures">
+<h4><a href="../../sources/core/code_features.py">sources/core/code_features.py</a></h4>
+<p class="role">Thin QD-facing shim: returns the genotype embedding as a plain list of floats, or <code>None</code> so selection can stay neutral.</p>
+<p class="meta">37 lines &#183; 1 function: <code>genotype_embedding_descriptor</code> &#183; calls <code>genotype_embedding.embed_genotype</code> &#183; caller: <code>selection.py:488</code></p>
+<details><summary>signature and return contract</summary><div class="dbody">
+<pre>code_features.genotype_embedding_descriptor(code: str | None) -&gt; list[float] | None</pre>
+<p><code>None</code> for missing source, empty string, or backend failure. A real vector is <code>[float(x) for x in vec.tolist()]</code> from <code>embed_genotype</code>.</p>
+<p>Same file exists byte-identical at <code class="path">diversity_experiments/code_reference/code_features.py</code> (verified with <code>diff -q</code>).</p>
+</div></details>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What the descriptor contains</h2>
+<p>Named features extracted by <code>code_features.py</code>: <strong>0</strong>. The file computes no named feature list; it returns the whole embedding vector. The QD archive stores that vector under the key <code>qd_descriptor</code> (<code>evolution_engine.py:1016</code> and <code>:1033</code>).</p>
+<details><summary>embedding and chunking parameters</summary><div class="dbody">
+<table>
+<thead><tr><th>Parameter</th><th>Value</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td>Local model id</td><td><code>all-MiniLM-L6-v2</code></td><td class="sym">genotype_embedding.py:35</td></tr>
+<tr><td>OpenAI model id</td><td><code>text-embedding-3-small</code></td><td class="sym">genotype_embedding.py:36</td></tr>
+<tr><td>Backend switch</td><td>env <code>MIMOSA_GENOTYPE_EMBEDDING_BACKEND</code>, default <code>local</code></td><td class="sym">genotype_embedding.py:273-274</td></tr>
+<tr><td>Chunk cap</td><td><code>_MAX_CHUNK_CHARS = 900</code> chars</td><td class="sym">genotype_embedding.py:92</td></tr>
+<tr><td>Chunk boundary</td><td>One chunk per AST top-level statement</td><td class="sym">genotype_embedding.py:151</td></tr>
+<tr><td>Oversize split order</td><td>Paragraphs, then lines, then raw characters</td><td class="sym">genotype_embedding.py:110-149</td></tr>
+<tr><td>Model input cap</td><td><code>max_seq_length = 256</code> word-pieces</td><td class="sym">genotype_embedding.py:85-86</td></tr>
+<tr><td>Pooling</td><td>Mean over chunks, then L2-normalise</td><td class="sym">genotype_embedding.py:196-205</td></tr>
+<tr><td>Vector width</td><td>384 (local MiniLM); OpenAI width unknown</td><td class="sym">genotype_embedding.py (backend-defined)</td></tr>
+<tr><td>Cache</td><td>SHA-1 of the source, per process</td><td class="sym">genotype_embedding.py:256</td></tr>
+</tbody>
+</table>
+<p>Comment: the code states MiniLM truncates at 256 word-pieces, about 950 characters of code (3.7 chars/token measured on real genotypes) (<code>genotype_embedding.py:85-86</code>). Whole-workflow sources run 1,000-12,000 characters, so the 900-character cap keeps every agent prompt inside the budget.</p>
+<p>Width 384 is not hardcoded: it comes from the model cache. I read the local cache config as 384 hidden size, e.g. <code>~/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2/&lt;snapshot&gt;/config.json</code> (my observation, not a repo file).</p>
+<p>The retired structural descriptor had 4 named fields, <code>[n_agents, n_edges, n_branches, prompt_chars]</code> per <code>docs/concepts/evolution-engine.md:139</code>; a grep over <code>sources/*.py</code> finds no code that computes them now.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Where this differs from a classic GA</h2>
+<p class="note say">There is no gene string, no fixed mutation rate, and no generation-wide replacement: the directive LLM chooses the magnitude from a plain score block, and variation edits free Python text.</p>
+<details><summary>citations for each difference</summary><div class="dbody">
+<table>
+<thead><tr><th>Point</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>No fixed-length genome</td><td>Parents are source strings; <code>select_parent_workflow</code> passes <code>wf.code</code> (<code>evolution_engine.py:668</code>)</td></tr>
+<tr><td>Magnitude is judged, not scheduled</td><td><code>llm_think_mutation_directive</code> docstring: no boldness level or scope band to obey</td></tr>
+<tr><td>The 1/5 rule is telemetry only</td><td><code>_compute_success_rate</code> docstring: no longer drives any controller arithmetic</td></tr>
+<tr><td>One discrete knob</td><td><code>_sample_mutation_agent_budget</code> draws parent count plus or minus 1</td></tr>
+<tr><td>Crossover has no crossover points</td><td><code>crossover_prompt</code>: genuinely recombine; a new topology is allowed</td></tr>
+<tr><td>Steady-state archive, not generations</td><td><code>SelectionPressure.validate_survivor</code> admits or evicts by <code>qd_score</code> (<a href="mod_core_selection.html">mod_core_selection.html</a>)</td></tr>
+<tr><td>Extra randomness</td><td>Workflow LLM temperature is <code>random.uniform(0.7, 1.3)</code> per call (<code>workflow_factory.py:144</code>)</td></tr>
+</tbody>
+</table>
+<p>Design read: the population is an archive of individuals, and the variation operator is a language model reading a diagnosis, so step size and locality are decided per step rather than by a rate parameter.</p>
+</div></details>
+</div>
+
+<p class="note">Amber note: the "features by name" question has no answer in this file - <code>code_features.py</code> returns the full 384-value embedding, so novelty cannot be read feature by feature with the current code.</p>
+<p class="note flag">Red note: <code>docs/concepts/evolution-engine.md:66</code> (working-tree copy) says <code>population_size = 20</code> and <code>:76</code> says <code>k = 15</code>; <code>config.py:143-144</code> and <code>config_default.json:74-75</code> both ship <code>population_size = 16</code> and <code>novelty_k_neighbours = 16</code>.</p>
+
+<footer>
+<p>Sources read: <code class="path">sources/core/variation_engine.py</code> (609 lines), <code class="path">sources/core/genotype_embedding.py</code> (329), <code class="path">sources/core/code_features.py</code> (37), <code class="path">sources/core/selection.py</code> (novelty path), <code class="path">sources/core/evolution_engine.py</code> (call sites and logs), <code class="path">sources/core/workflow_factory.py</code> (prompt to code call), <code class="path">sources/core/workflow_info.py</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, <code class="path">docs/concepts/evolution-engine.md</code>, <code class="path">tests/variation_engine_test.py</code>, <code class="path">tests/genotype_embedding_chunking_test.py</code>, <code class="path">tests/selection_test.py</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/core/__init__.py</code> (re-export list only) &#183; <code class="path">sources/core/failure_fingerprint.py</code> (retired novelty descriptor, shown on <a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a>) &#183; <code class="path">sources/core/workflow_selection.py</code> (parent retrieval, owned by <a href="mod_core_selection.html">mod_core_selection.html</a>) &#183; <code class="path">sources/core/orchestrator.py</code> and the rest of <code>workflow_factory.py</code> (sandbox path, owned by <a href="area_sources_core.html">area_sources_core.html</a>) &#183; <code class="path">sources/evaluators/hybrid_verifier/</code> (writes the gradient, owned by <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>) &#183; <code>diversity_experiments/code_reference/*.py</code> (byte-identical copies of these three files, verified with <code>diff -q</code>) &#183; <code>sources/prompts/workflow_v*.md</code> and <code>sources/modules/*</code> (injected templates, owned by <a href="data_modules_prompts.html">data_modules_prompts.html</a>) &#183; <code>__pycache__/*.pyc</code> &#183; <code class="path">docs/site/</code> (generated) &#183; <code>.env</code>, <code>token.json</code>, <code>credentials.json</code> (secrets, never opened).</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (for example <code>config.py</code>, <code>README.md</code>, <code class="path">docs/concepts/evolution-engine.md</code>); the three files on this page were clean at <code>7e8463b</code> (<code>git status --porcelain</code> returned nothing for them).</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

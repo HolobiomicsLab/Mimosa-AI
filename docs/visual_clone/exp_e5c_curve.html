@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E5c data-efficiency curve - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e5c_curve">
+<div class="wrap">
+
+<h1 class="hud">e5c_curve &mdash; with how few tasks does L3 still work?</h1>
+<p class="intro">This experiment trains L3 on a random task fraction F of the 136 tasks and scores the held-out complement, for F in 0.10 to 0.90 and 40 seeds per fraction. It answers the data-efficiency question E5 left open: how small can the training task set be? It reuses the split, fit and statistics machinery of <a href="exp_e5b_splits.html">exp_e5b_splits.html</a> verbatim.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="E5c data-efficiency pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="hy">
+    <title>How few tasks suffice?</title>
+    <rect x="20" y="16" width="340" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="190.0" y="40.0" text-anchor="middle">How few tasks suffice?</text>
+    <text class="box-sub" x="190.0" y="57.0" text-anchor="middle">hypothesis</text>
+  </g>
+  <a class="box" id="a1" href="../../experiments_verifiers/data/verifier_claims.jsonl">
+    <title>verifier_claims.jsonl</title>
+    <rect x="20" y="116" width="170" height="48" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105.0" y="138.0" text-anchor="middle">verifier_claims.jsonl</text>
+    <text class="box-sub" x="105.0" y="155.0" text-anchor="middle">607 rows · 136 tasks</text>
+  </a>
+  <a class="box" id="a2" href="../../experiments_verifiers/results/_cache_e5_embeddings.npz">
+    <title>_cache_e5_embeddings.npz</title>
+    <rect x="20" y="186" width="170" height="48" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105.0" y="208.0" text-anchor="middle">_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="105.0" y="225.0" text-anchor="middle">MiniLM name+desc vectors</text>
+  </a>
+  <a class="box" id="b1" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>e5b_splits.load_all()</title>
+    <rect x="230" y="116" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="325.0" y="138.0" text-anchor="middle">e5b_splits.load_all()</text>
+    <text class="box-sub" x="325.0" y="155.0" text-anchor="middle">L45 · reused verbatim</text>
+  </a>
+  <a class="box" id="c1" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>run_fraction()</title>
+    <rect x="230" y="196" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="325.0" y="218.0" text-anchor="middle">run_fraction()</text>
+    <text class="box-sub" x="325.0" y="235.0" text-anchor="middle">L53 · 40 seeds per F</text>
+  </a>
+  <a class="box" id="c2" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>fraction_block()</title>
+    <rect x="230" y="280" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="325.0" y="304.0" text-anchor="middle">fraction_block()</text>
+    <text class="box-sub" x="325.0" y="321.0" text-anchor="middle">L84 · per-F summary</text>
+  </a>
+  <a class="box" id="d1" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>min_viable_f()</title>
+    <rect x="470" y="40" width="200" height="44" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="570.0" y="60.0" text-anchor="middle">min_viable_f()</text>
+    <text class="box-sub" x="570.0" y="77.0" text-anchor="middle">L113 · ≥60% win-rate</text>
+  </a>
+  <a class="box" id="d2" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>saturation_f()</title>
+    <rect x="470" y="100" width="200" height="44" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="570.0" y="120.0" text-anchor="middle">saturation_f()</text>
+    <text class="box-sub" x="570.0" y="137.0" text-anchor="middle">L128 · within 0.01</text>
+  </a>
+  <a class="box" id="d3" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>log2_reconciliation()</title>
+    <rect x="470" y="160" width="200" height="44" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="570.0" y="180.0" text-anchor="middle">log2_reconciliation()</text>
+    <text class="box-sub" x="570.0" y="197.0" text-anchor="middle">L137 · E5 slope fit</text>
+  </a>
+  <a class="box" id="m1" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>make_plot()</title>
+    <rect x="470" y="230" width="200" height="44" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="570.0" y="250.0" text-anchor="middle">make_plot()</text>
+    <text class="box-sub" x="570.0" y="267.0" text-anchor="middle">L163 · matplotlib Agg</text>
+  </a>
+  <a class="box" id="w1" href="../../experiments_verifiers/harness/e5c_curve.py">
+    <title>write_md()</title>
+    <rect x="470" y="300" width="200" height="44" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="570.0" y="320.0" text-anchor="middle">write_md()</text>
+    <text class="box-sub" x="570.0" y="337.0" text-anchor="middle">L343 · markdown digest</text>
+  </a>
+  <a class="box" id="out" href="../../experiments_verifiers/results/">
+    <title>E5c_data_efficiency_*</title>
+    <rect x="700" y="150" width="190" height="96" rx="2" fill="rgba(125,249,199,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="795.0" y="196.0" text-anchor="middle">E5c_data_efficiency_*</text>
+    <text class="box-sub" x="795.0" y="207.0" text-anchor="middle">.json L36 · .md L37</text>
+    <text class="box-sub" x="795.0" y="223.0" text-anchor="middle">.svg L38 · .png L39</text>
+  </a>
+
+  <path class="edge" data-from="hy" data-to="a1" d="M190,68 L105,116" fill="none" stroke="#B79CFF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="150" y="96" text-anchor="start">drives</text>
+  <path class="edge" data-from="a1" data-to="b1" d="M190,140 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="196" y="132" text-anchor="start">reads rows</text>
+  <path class="edge dashed-edge" data-from="a2" data-to="b1" d="M190,210 L230,160" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="196" y="200" text-anchor="start">loads cache</text>
+  <path class="edge" data-from="b1" data-to="c1" d="M325,164 V196" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="331" y="184" text-anchor="start">y + task ids</text>
+  <path class="edge" data-from="c1" data-to="c2" d="M325,244 V280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="331" y="266" text-anchor="start">splits</text>
+  <path class="edge" data-from="c2" data-to="d1" d="M420,288 L470,82" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="426" y="150" text-anchor="start">blocks</text>
+  <path class="edge" data-from="c2" data-to="d2" d="M420,296 L470,142" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="426" y="214" text-anchor="start">blocks</text>
+  <path class="edge" data-from="c2" data-to="d3" d="M420,304 L470,202" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="426" y="268" text-anchor="start">blocks</text>
+  <path class="edge" data-from="c2" data-to="m1" d="M420,310 L470,252" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="426" y="296" text-anchor="start">plots</text>
+  <path class="edge" data-from="c2" data-to="w1" d="M420,318 L470,322" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="426" y="336" text-anchor="start">writes</text>
+  <path class="edge" data-from="d1" data-to="out" d="M670,62 L700,170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="104" text-anchor="middle">criteria</text>
+  <path class="edge" data-from="d2" data-to="out" d="M670,122 L700,180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d3" data-to="out" d="M670,182 L700,190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="m1" data-to="out" d="M670,252 L700,215" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="258" text-anchor="end">svg + png</text>
+  <path class="edge" data-from="w1" data-to="out" d="M670,322 L700,230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="330" text-anchor="end">json + md</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>12 boxes</code>. Mint pills = functions in <code>e5c_curve.py</code> (plus the reused <code>e5b_splits.load_all</code>), dashed grey = frozen inputs, cyan = written artifacts. <code>run_fraction</code> (L53) loops the 40 seeds of <code>SEEDS</code> (L42) for one <code>F</code> of <code>FRACTIONS</code> (L41), calls <code>e5b_splits.group_split</code> with hold-fraction <code>1-F</code>, then <code>select_C_inner</code> and <code>fit_eval</code>. <code>fraction_block</code> (L84) summarises 40 seeds into one row. Four consumers take that row list: <code>min_viable_f</code> (L113), <code>saturation_f</code> (L128), <code>log2_reconciliation</code> (L137) and <code>make_plot</code> (L163). <code>write_md</code> (L343) renders the Markdown digest; every scorer and C-grid stage is inherited from <code>e5b_splits.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e5c_curve.py">experiments_verifiers/harness/e5c_curve.py</a></h4>
+<p class="role">Sweeps nine training-task fractions with 40 seeds each and derives the smallest workable training size.</p>
+<p class="meta">427 lines &#183; entry <code>main()</code> L236 &#183; CLI arguments: none (module docstring L12: <code>uv run python experiments_verifiers/harness/e5c_curve.py</code>) &#183; imports matplotlib L24 and <code>e5b_splits</code> L33</p>
+<details><summary>signatures and constants</summary><div class="dbody">
+<pre>run_fraction(X, y, yver, tid, uni, v0, F, seeds) -&gt; dict        # L53  one train fraction, 40 seeds
+fraction_block(rec) -&gt; dict                                      # L84  summary of one fraction
+min_viable_f(blocks) -&gt; dict | None                              # L113 smallest F passing both gates
+saturation_f(blocks) -&gt; (dict | None, float)                     # L128 first F within 0.01 of F=0.9
+log2_reconciliation(blocks) -&gt; dict                              # L137 measured vs E5 log2 fit
+make_plot(blocks, mv_blk, sat_blk, sat_ref, pop) -&gt; None         # L163 writes svg + png
+write_md(out)                                                    # L343</pre>
+<p>Constants: <code>FRACTIONS = [0.10 ... 0.90]</code> (L41), <code>SEEDS = list(range(40))</code> (L42), <code>N_SEEDS_ABLATION = 10</code> (L43), <code>LOTO_AUC_E5 = 0.753</code> (L44), <code>LOG2_FIT = {"intercept": 0.526, "slope_per_log2": 0.042}</code> (L45). C is selected per training side by <code>e5b_splits.select_C_inner</code> from <code>{0.01, 0.03, 0.1, 0.3, 1.0}</code>.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Example rows with claim verdicts (via <code>e5b_splits.load_all</code>)</td><td>nothing</td><td class="sym"><code class="path">../../experiments_verifiers/data/verifier_claims.jsonl</code></td></tr>
+<tr><td>Frozen MiniLM claim embeddings</td><td>nothing</td><td class="sym"><code class="path">../../experiments_verifiers/results/_cache_e5_embeddings.npz</code></td></tr>
+<tr><td>E5b split, fit, C-selection and stats helpers</td><td>nothing</td><td class="sym"><code>e5b_splits.py</code>, imported at e5c_curve.py L33</td></tr>
+<tr><td>nothing</td><td>Per-fraction rows, gates, gaps</td><td class="sym"><code class="path">../../experiments_verifiers/results/E5c_data_efficiency_&lt;date&gt;.json</code> L36</td></tr>
+<tr><td>the JSON of record above</td><td>Markdown digest</td><td class="sym"><code class="path">../../experiments_verifiers/results/E5c_data_efficiency_&lt;date&gt;.md</code> L37</td></tr>
+<tr><td>the block list, gates and population</td><td>Two-panel figure (svg + png)</td><td class="sym"><code class="path">../../experiments_verifiers/results/E5c_data_efficiency.svg</code> L38 and <code>..._png</code> L39</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: the left chart panel is not a pure learning curve. The test side is the <code>(1-F)</code> complement, so it shrinks as F grows; <code>log2_reconciliation</code> therefore compares slopes, not point identities (.md L99).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; the measured curve</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 828 460" role="img" aria-label="bar chart of the measured metrics">
+  <path d="M307,38 V420" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="307" y="436" text-anchor="middle">0.60</text>
+  <path d="M405,38 V420" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="405" y="436" text-anchor="middle">0.65</text>
+  <path d="M503,38 V420" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="503" y="436" text-anchor="middle">0.70</text>
+  <path d="M600,38 V420" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="600" y="436" text-anchor="middle">0.75</text>
+  <path d="M698,38 V420" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="698" y="436" text-anchor="middle">0.80</text>
+  <text class="box-sub" x="258" y="70" text-anchor="end">F=0.10 · 14 train tasks</text>
+  <rect x="268" y="58" width="178" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="454" y="70" text-anchor="start">0.671</text>
+  <text class="box-sub" x="258" y="100" text-anchor="end">F=0.20 · 27 train tasks</text>
+  <rect x="268" y="88" width="236" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="512" y="100" text-anchor="start">0.701</text>
+  <text class="box-sub" x="258" y="130" text-anchor="end">F=0.30 · 41 train tasks</text>
+  <rect x="268" y="118" width="262" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="538" y="130" text-anchor="start">0.714</text>
+  <text class="box-sub" x="258" y="160" text-anchor="end">F=0.40 · 54 train tasks</text>
+  <rect x="268" y="148" width="287" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="563" y="160" text-anchor="start">0.727</text>
+  <text class="box-sub" x="258" y="190" text-anchor="end">F=0.50 · 68 train tasks</text>
+  <rect x="268" y="178" width="324" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="600" y="190" text-anchor="start">0.746</text>
+  <text class="box-sub" x="258" y="220" text-anchor="end">F=0.60 · 82 train tasks</text>
+  <rect x="268" y="208" width="332" height="15" fill="#7DF9C7" fill-opacity="0.30" stroke="#7DF9C7"/>
+  <text class="box-label" x="608" y="220" text-anchor="start">0.750</text>
+  <text class="box-sub" x="258" y="250" text-anchor="end">F=0.70 · 95 train tasks</text>
+  <rect x="268" y="238" width="330" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="606" y="250" text-anchor="start">0.748</text>
+  <text class="box-sub" x="258" y="280" text-anchor="end">F=0.80 · 109 train tasks</text>
+  <rect x="268" y="268" width="358" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="634" y="280" text-anchor="start">0.763</text>
+  <text class="box-sub" x="258" y="310" text-anchor="end">F=0.90 · 122 train tasks</text>
+  <rect x="268" y="298" width="350" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="626" y="310" text-anchor="start">0.759</text>
+  <text class="box-sub" x="258" y="340" text-anchor="end">F=0.50 · uniform pass-rate</text>
+  <rect x="268" y="328" width="121" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="397" y="340" text-anchor="start">0.642</text>
+  <text class="box-sub" x="258" y="370" text-anchor="end">F=0.50 · v0 recompute</text>
+  <rect x="268" y="358" width="104" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="380" y="370" text-anchor="start">0.633</text>
+  <text class="box-sub" x="258" y="400" text-anchor="end">F=0.50 · ver_bit</text>
+  <rect x="268" y="388" width="55" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="331" y="400" text-anchor="start">0.608</text>
+  <text class="box-sub" x="12" y="452" text-anchor="start">mean L3 auc_sr over 40 seeds per fraction, held-out complement · source: E5c_data_efficiency_2026-09-21.md L15-L23 (baselines from L19)</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; held-out AUC per training fraction, drawn by hand from the recorded values; the mint bar is the saturation point. The experiment's own figure is <code class="path">../../experiments_verifiers/results/E5c_data_efficiency.svg</code> (L38), written by <code>make_plot</code> L163.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Minimum viable fraction</td><td>F = 0.10, about 14 tasks, 62 examples</td><td class="sym">.md L59; json <code>derivation_c_min_viable_f</code></td></tr>
+<tr><td>Gate at that fraction</td><td>win-rate 0.70 uniform, 0.72 v0, 0.95 ver_bit</td><td class="sym">.md L61</td></tr>
+<tr><td>Smallest fractions tested</td><td>none smaller: F=0.10 is the first grid point</td><td class="sym">.md L64; json <code>all_smaller_f_failed: []</code></td></tr>
+<tr><td>Saturation fraction</td><td>F = 0.60, 0.750 vs 0.759 at F=0.9</td><td class="sym">.md L68</td></tr>
+<tr><td>L3 AUC at F=0.10</td><td>0.671, std 0.040</td><td class="sym">.md L15</td></tr>
+<tr><td>L3 AUC at F=0.90</td><td>0.759, std 0.142</td><td class="sym">.md L23</td></tr>
+<tr><td>Peak gain over best baseline</td><td>+0.100 at F=0.60, +0.099 at F=0.50</td><td class="sym">.md L19&ndash;L20</td></tr>
+<tr><td>Baselines across all fractions</td><td>uniform 0.642&ndash;0.658, v0 0.633&ndash;0.646</td><td class="sym">.md L15&ndash;L23</td></tr>
+<tr><td>Fixed-C vs inner-CV at F=0.5</td><td>0.695 vs 0.712, delta +0.018, 10 seeds</td><td class="sym">.md L72</td></tr>
+<tr><td>Refit slope on measured curve</td><td>0.029 AUC per doubling vs E5's 0.042</td><td class="sym">.md L90</td></tr>
+<tr><td>Recorded residuals vs E5 fit</td><td>&minus;0.014 at F=0.10 down to &minus;0.058 at F=0.90</td><td class="sym">.md L80&ndash;L88</td></tr>
+<tr><td>Runtime</td><td>7.0 s</td><td class="sym">.md L104</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: at F=0.10 only about 14 tasks train the model, so inner-CV folds go single-class and are skipped inside <code>select_C_inner</code>; C selection is noisy there (.md L98).</p>
+<p class="note say">Why it matters: 14 training tasks already beat every baseline, which supports L3 as a cheap between-task instrument.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>results markdown, 5 quoted lines</summary><div class="dbody">
+<blockquote>| 0.10 | 14 | 0.671±0.040 | 0.647 | 0.638 | 0.608 | uniform_passrate (39/40) | +0.024 | 0.045 |</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E5c_data_efficiency_2026-09-21.md</code> line 15</p>
+<blockquote>**F = 0.10** &mdash; the smallest fraction where L3's paired win-rate vs EVERY baseline is ≥ 60% AND mean dAUC &gt; 0 with p &lt; 0.05. That is ≈ 14 training tasks (~10% of the 136 tasks), about **62 training examples**.</blockquote>
+<p class="sub">Same file, line 59</p>
+<blockquote>First F within 0.01 of the F=0.9 mean: **F = 0.60** (0.750 vs 0.759 at F=0.9).</blockquote>
+<p class="sub">Same file, line 68</p>
+<blockquote>fixed C=0.1 mean 0.695 vs inner-CV mean 0.712 (mean delta +0.018, 10 seeds); C choices: [0.1, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]</blockquote>
+<p class="sub">Same file, line 72</p>
+<blockquote>My refit on the measured curve: AUC = 0.560 + 0.029·log2(n_tasks) &mdash; each doubling of training tasks buys 0.029 AUC here vs E5's 0.042.</blockquote>
+<p class="sub">Same file, line 90</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e5c_curve.py</code> (427 lines), <code class="path">experiments_verifiers/results/E5c_data_efficiency_2026-09-21.md</code> and <code>.json</code>, <code class="path">experiments_verifiers/harness/e5b_splits.py</code> (reused helpers and their paths), <code class="path">experiments_verifiers/harness/e5_common.py</code> (function list only), <code class="path">experiments_verifiers/README.md</code> (codename table L28, reproduction targets L133). Link targets checked with <code>os.path.exists</code> on 2026-10-02.</p>
+<p class="skips">Skipped: <code>E5c_data_efficiency.svg</code> and <code>.png</code> bodies (binary or generator output, cited as artifacts only; the inline chart above is drawn from the recorded numbers); <code>e5b_splits.py</code>, <code>e5_common.py</code> and <code>metrics.py</code> bodies (named helpers only, owned by <a href="exp_e5b_splits.html">exp_e5b_splits.html</a> and other pages); <code>experiments_verifiers/__pycache__/</code> (bytecode); every other E5*, E8, E9 result pair (outside this page); <code>experiments_verifiers/.env</code> (never opened, by rule). No experiment was run. Nothing in this experiment's evidence chain is missing: script, JSON, MD, SVG and PNG all exist.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

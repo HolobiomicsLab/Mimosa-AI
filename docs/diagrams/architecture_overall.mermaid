@@ -37,8 +37,8 @@ flowchart TB
     subgraph L4["Layer 4 — Judge / Evaluation"]
         direction TB
         Eval["WorkflowEvaluator<br/>(evaluators/evaluator.py)"]
-        Verifier["VerifierEvaluator<br/>5-source per-claim<br/>(evaluators/verifier.py)"]
-        Sources["claim sources (5)<br/>literature · user goal · math<br/>stats · visual"]
+        Verifier["HybridVerifierEvaluator<br/>key claims + deterministic scorers<br/>+ pairwise reward<br/>(evaluators/hybrid_verifier/)"]
+        Legacy["VerifierEvaluator (deprecated)<br/>5-source per-claim<br/>(evaluators/verifier.py)"]
         Generic["GenericEvaluator<br/>(generic.py)"]
         Scenario["ScenarioEvaluator<br/>(scenario.py)"]
     end
@@ -68,6 +68,7 @@ flowchart TB
     State --> Eval
     Eval --> Verifier
     Verifier --> Sources
+    Eval -.verifier_kind=legacy.-> Legacy
     Eval --> Generic
     Eval --> Scenario
 

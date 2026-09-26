@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mimosa-AI visual clone - menu</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > menu">
+<div class="wrap">
+
+<h1 class="hud">Mimosa-AI visual clone</h1>
+<p class="intro">This is the map of the Mimosa-AI code and architecture: 174 offline HTML pages, from the whole system down to a single file or experiment script. Each page starts with a diagram; text only labels it. Every claim comes from the code at commit <code>7e8463b</code>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>L0 - whole system</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 430" role="img" aria-label="Five layers of Mimosa-AI">
+  <defs>
+    <linearGradient id="hud" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFFFFF"/><stop offset="25%" stop-color="#BFF6FF"/>
+      <stop offset="50%" stop-color="#5CE1FF"/><stop offset="75%" stop-color="#00B8F0"/>
+      <stop offset="100%" stop-color="#0077C8"/>
+    </linearGradient>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5CE1FF"/></marker>
+    <marker id="arw7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/></marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect x="4" y="4" width="932" height="422" rx="3" fill="none" stroke="url(#hud)" stroke-width="1.25" opacity="0.6"/>
+
+  <a class="box" id="a1" href="overview.html"><title>Entry and configuration</title>
+    <rect x="30" y="30" width="230" height="56" rx="2" fill="rgba(230,251,255,0.07)" stroke="#E6FBFF"/>
+    <text class="box-label" x="145" y="54" text-anchor="middle">main.py + config.py</text>
+    <text class="box-sub" x="145" y="72" text-anchor="middle">CLI entry, config</text>
+  </a>
+  <a class="box" id="a2" href="mod_core_planner.html"><title>Layer 0 planner</title>
+    <rect x="330" y="30" width="200" height="56" rx="2" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="430" y="54" text-anchor="middle">L0 Planner</text>
+    <text class="box-sub" x="430" y="72" text-anchor="middle">goal -&gt; tasks</text>
+  </a>
+  <a class="box" id="a3" href="mod_core_tools_llm.html"><title>Layer 1 tools</title>
+    <rect x="600" y="30" width="200" height="56" rx="2" fill="rgba(60,240,210,0.08)" stroke="#3CF0D2"/>
+    <text class="box-label" x="700" y="54" text-anchor="middle">L1 Tools / MCP</text>
+    <text class="box-sub" x="700" y="72" text-anchor="middle">tool discovery</text>
+  </a>
+
+  <a class="box" id="a4" href="mod_core_evolution_engine.html"><title>Layer 2 evolution</title>
+    <rect x="30" y="140" width="300" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="180" y="166" text-anchor="middle">L2 EvolutionEngine</text>
+    <text class="box-sub" x="180" y="186" text-anchor="middle">synthesis + QD loop</text>
+  </a>
+  <a class="box" id="a5" href="mod_core_runner.html"><title>Layer 3 runner</title>
+    <rect x="30" y="260" width="300" height="66" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="180" y="286" text-anchor="middle">L3 WorkflowRunner</text>
+    <text class="box-sub" x="180" y="306" text-anchor="middle">sandboxed run</text>
+  </a>
+  <a class="box" id="a6" href="mod_evaluators_hybrid_verifier.html"><title>Layer 4 verifier</title>
+    <rect x="30" y="356" width="300" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="180" y="380" text-anchor="middle">L4 HybridVerifier</text>
+    <text class="box-sub" x="180" y="398" text-anchor="middle">claims -&gt; scorers -&gt; reward</text>
+  </a>
+
+  <path class="edge" data-from="a4" data-to="a5" d="M180,206 V260" fill="none" stroke="url(#hud)" stroke-width="2" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="188" y="238">workflows</text>
+  <path class="edge" data-from="a5" data-to="a6" d="M180,326 V356" fill="none" stroke="url(#hud)" stroke-width="2" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="188" y="346">workspaces</text>
+  <path class="edge dashed-edge" data-from="a6" data-to="a4" d="M330,386 H400 V170 H330" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw7)"/>
+  <text class="edge-label" x="406" y="285" transform="rotate(90 406 285)" text-anchor="middle">gradient -&gt; next genotype</text>
+  <path class="edge" data-from="a2" data-to="a4" d="M430,86 V110 H180 V140" fill="none" stroke="#B79CFF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="250" y="128">tasks</text>
+  <path class="edge" data-from="a3" data-to="a4" d="M700,86 V112 H180 V140" fill="none" stroke="#3CF0D2" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="106">tools</text>
+  <path class="edge dashed-edge" data-from="a1" data-to="a4" d="M145,86 V140" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="152" y="115">start</text>
+
+  <g class="box" id="a7"><title>External MCP tool platform</title>
+    <rect x="600" y="140" width="310" height="50" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="755" y="162" text-anchor="middle">Toolomics MCP</text>
+    <text class="box-sub" x="755" y="179" text-anchor="middle">external service</text>
+  </g>
+  <g class="box" id="a8"><title>External LLM providers</title>
+    <rect x="600" y="210" width="310" height="50" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="755" y="232" text-anchor="middle">LLM providers (litellm)</text>
+    <text class="box-sub" x="755" y="249" text-anchor="middle">external service</text>
+  </g>
+  <g class="box" id="a9"><title>Optional literature grounding</title>
+    <rect x="600" y="280" width="310" height="50" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="755" y="302" text-anchor="middle">Perspicacite-AI</text>
+    <text class="box-sub" x="755" y="319" text-anchor="middle">optional</text>
+  </g>
+  <path class="edge dashed-edge" data-from="a7" data-to="a3" d="M700,140 V86" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dashed-edge" data-from="a8" data-to="a5" d="M600,235 H420 V293 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dashed-edge" data-from="a9" data-to="a5" d="M600,305 H420 V300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+
+  <a class="box" id="a10" href="data_runs.html"><title>Runtime artifacts on disk</title>
+    <rect x="470" y="356" width="440" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="690" y="380" text-anchor="middle">runtime: sources/workflows, runs_capsule, /tmp/mimosa_run_*</text>
+    <text class="box-sub" x="690" y="398" text-anchor="middle">the verifier reads these back</text>
+  </a>
+  <path class="edge dashed-edge" data-from="a5" data-to="a10" d="M330,300 H470 V366" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arwE)"/>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - L0 overview. Every box is clickable. Full version: <a href="overview.html">overview.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Pages</h2>
+<p class="intro">Type to filter the tree by page name.</p>
+<input id="search" type="text" placeholder="filter pages..." aria-label="filter pages"
+ style="width:100%;max-width:420px;background:var(--bg-void);color:var(--text);border:1px solid var(--line);padding:8px 10px;font-family:var(--mono);font-size:13px">
+<span id="searchcount" class="sub" style="margin-left:10px"></span>
+
+<section class="treesection">
+<h3>System level</h3>
+<p data-name="reference style legend skeleton"><a href="_reference.html">_reference.html</a> <span class="chip ok">fresh</span> <span class="sub">style reference - the page skeleton, legend and shapes</span></p>
+<p data-name="overview l0 whole system"><a href="overview.html">overview.html</a> <span class="chip ok">fresh</span> <span class="sub">L0 - five layers, external services, runtime folders</span></p>
+<p data-name="flow task run single task"><a href="flow_task_run.html">flow_task_run.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - one task, CLI to first score</span></p>
+<p data-name="flow evolution loop qd archive"><a href="flow_evolution_loop.html">flow_evolution_loop.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - generation N to N+1</span></p>
+<p data-name="flow verification claims scorers ladder reward"><a href="flow_verification.html">flow_verification.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - hybrid verifier, claim by claim</span></p>
+<p data-name="flow sab batch csv benchmark"><a href="flow_sab_batch.html">flow_sab_batch.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - CSV batch mode and grading</span></p>
+</section>
+
+<section class="treesection">
+<h3>Entry, config and <code>sources/core</code></h3>
+<p data-name="area entry config main py"><a href="area_entry_config.html">area_entry_config.html</a> <span class="chip ok">fresh</span> <span class="sub">main.py, config.py, config_default.json, helper scripts</span></p>
+<p data-name="area sources core map"><a href="area_sources_core.html">area_sources_core.html</a> <span class="chip ok">fresh</span> <span class="sub">L1 - map of sources/core</span></p>
+<details><summary>sources/core - L2 pages</summary><div class="dbody">
+<p data-name="mod core evolution engine"><a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a> <span class="chip ok">fresh</span> <span class="sub">evolution_engine.py, code_features.py, failure_fingerprint.py, orchestrator.py</span></p>
+<p data-name="mod core selection archive novelty qd"><a href="mod_core_selection.html">mod_core_selection.html</a> <span class="chip ok">fresh</span> <span class="sub">selection.py, workflow_selection.py</span></p>
+<p data-name="mod core variation mutation crossover embedding"><a href="mod_core_variation.html">mod_core_variation.html</a> <span class="chip ok">fresh</span> <span class="sub">variation_engine.py, genotype_embedding.py, code_features.py</span></p>
+<p data-name="mod core lineage workflow info schema"><a href="mod_core_lineage.html">mod_core_lineage.html</a> <span class="chip ok">fresh</span> <span class="sub">lineage.py, workflow_info.py, schema.py</span></p>
+<p data-name="mod core runner sandbox factory"><a href="mod_core_runner.html">mod_core_runner.html</a> <span class="chip ok">fresh</span> <span class="sub">workflow_runner.py and the factories</span></p>
+<p data-name="mod core planner goal mode"><a href="mod_core_planner.html">mod_core_planner.html</a> <span class="chip ok">fresh</span> <span class="sub">planner.py</span></p>
+<p data-name="mod core tools llm mcp provider"><a href="mod_core_tools_llm.html">mod_core_tools_llm.html</a> <span class="chip ok">fresh</span> <span class="sub">tools_manager.py, llm_provider.py</span></p>
+</div></details>
+</section>
+
+<section class="treesection">
+<h3>Evaluators and benchmarks</h3>
+<p data-name="area evaluators map verifier"><a href="area_evaluators.html">area_evaluators.html</a> <span class="chip ok">fresh</span> <span class="sub">L1 - which evaluator is used when</span></p>
+<p data-name="mod evaluators hybrid verifier default"><a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> <span class="chip ok">fresh</span> <span class="sub">the default verifier package, file by file</span></p>
+<p data-name="area evaluators legacy deprecated claims"><a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a> <span class="chip warn">deprecated</span> <span class="sub">legacy claims verifier and the other evaluators</span></p>
+<p data-name="area benchmark evaluation csv sandbox grader"><a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a> <span class="chip ok">fresh</span> <span class="sub">batch mode, execution sandboxes, graders</span></p>
+</section>
+
+<section class="treesection">
+<h3>Front ends, helpers, tests</h3>
+<p data-name="area cli onboard wizard"><a href="area_cli.html">area_cli.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/cli - onboard, evaluation, memory chat</span></p>
+<p data-name="area extensibility human mode tts"><a href="area_extensibility.html">area_extensibility.html</a> <span class="chip ok">fresh</span> <span class="sub">human mode, text-to-speech hook</span></p>
+<p data-name="area utils helpers paths pricing"><a href="area_utils.html">area_utils.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/utils - 21 shared helpers</span></p>
+<p data-name="area security transparency astra"><a href="area_security_transparency.html">area_security_transparency.html</a> <span class="chip ok">fresh</span> <span class="sub">package vetting, ASTRA export, memory traces</span></p>
+<p data-name="area tests coverage matrix"><a href="area_tests.html">area_tests.html</a> <span class="chip ok">fresh</span> <span class="sub">test file to module coverage matrix</span></p>
+</section>
+
+<section class="treesection">
+<h3>File digests (89 files, one page each)</h3>
+<p data-name="file index hub digest"><a href="file_index.html">file_index.html</a> <span class="chip ok">fresh</span> <span class="sub">hub - one digest page per file, scope and index</span></p>
+<details><summary>sources/core (19 files)</summary><div class="dbody">
+<p data-name="file core init __init__.py file digest"><a href="file_core_init.html">file_core_init.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/__init__.py - 77 lines</span></p>
+<p data-name="file core code features code_features.py file digest"><a href="file_core_code_features.html">file_core_code_features.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/code_features.py - 37 lines</span></p>
+<p data-name="file core evolution engine evolution_engine.py file digest"><a href="file_core_evolution_engine.html">file_core_evolution_engine.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/evolution_engine.py - 1109 lines</span></p>
+<p data-name="file core factory factory.py file digest"><a href="file_core_factory.html">file_core_factory.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/factory.py - 208 lines</span></p>
+<p data-name="file core failure fingerprint failure_fingerprint.py file digest"><a href="file_core_failure_fingerprint.html">file_core_failure_fingerprint.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/failure_fingerprint.py - 195 lines</span></p>
+<p data-name="file core genotype embedding genotype_embedding.py file digest"><a href="file_core_genotype_embedding.html">file_core_genotype_embedding.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/genotype_embedding.py - 329 lines</span></p>
+<p data-name="file core lineage lineage.py file digest"><a href="file_core_lineage.html">file_core_lineage.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/lineage.py - 173 lines</span></p>
+<p data-name="file core llm provider llm_provider.py file digest"><a href="file_core_llm_provider.html">file_core_llm_provider.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/llm_provider.py - 643 lines</span></p>
+<p data-name="file core orchestrator orchestrator.py file digest"><a href="file_core_orchestrator.html">file_core_orchestrator.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/orchestrator.py - 428 lines</span></p>
+<p data-name="file core planner planner.py file digest"><a href="file_core_planner.html">file_core_planner.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/planner.py - 1053 lines</span></p>
+<p data-name="file core schema schema.py file digest"><a href="file_core_schema.html">file_core_schema.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/schema.py - 163 lines</span></p>
+<p data-name="file core selection selection.py file digest"><a href="file_core_selection.html">file_core_selection.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/selection.py - 842 lines</span></p>
+<p data-name="file core single agent factory single_agent_factory.py file digest"><a href="file_core_single_agent_factory.html">file_core_single_agent_factory.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/single_agent_factory.py - 315 lines</span></p>
+<p data-name="file core tools manager tools_manager.py file digest"><a href="file_core_tools_manager.html">file_core_tools_manager.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/tools_manager.py - 679 lines</span></p>
+<p data-name="file core variation engine variation_engine.py file digest"><a href="file_core_variation_engine.html">file_core_variation_engine.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/variation_engine.py - 609 lines</span></p>
+<p data-name="file core workflow factory workflow_factory.py file digest"><a href="file_core_workflow_factory.html">file_core_workflow_factory.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/workflow_factory.py - 514 lines</span></p>
+<p data-name="file core workflow info workflow_info.py file digest"><a href="file_core_workflow_info.html">file_core_workflow_info.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/workflow_info.py - 271 lines</span></p>
+<p data-name="file core workflow runner workflow_runner.py file digest"><a href="file_core_workflow_runner.html">file_core_workflow_runner.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/workflow_runner.py - 651 lines</span></p>
+<p data-name="file core workflow selection workflow_selection.py file digest"><a href="file_core_workflow_selection.html">file_core_workflow_selection.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/workflow_selection.py - 396 lines</span></p>
+</div></details>
+<details><summary>experiments_verifiers/harness (54 files)</summary><div class="dbody">
+<p data-name="file harness init __init__.py file digest"><a href="file_harness_init.html">file_harness_init.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/__init__.py - 0 lines</span></p>
+<p data-name="file harness claims pattern analysis claims_pattern_analysis.py file digest"><a href="file_harness_claims_pattern_analysis.html">file_harness_claims_pattern_analysis.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/claims_pattern_analysis.py - 567 lines</span></p>
+<p data-name="file harness claims pca 3d claims_pca_3d.py file digest"><a href="file_harness_claims_pca_3d.html">file_harness_claims_pca_3d.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/claims_pca_3d.py - 212 lines</span></p>
+<p data-name="file harness e12 falsifier e12_falsifier.py file digest"><a href="file_harness_e12_falsifier.html">file_harness_e12_falsifier.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e12_falsifier.py - 618 lines</span></p>
+<p data-name="file harness e13 common e13_common.py file digest"><a href="file_harness_e13_common.html">file_harness_e13_common.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e13_common.py - 255 lines</span></p>
+<p data-name="file harness e13 l3 extreme e13_l3_extreme.py file digest"><a href="file_harness_e13_l3_extreme.html">file_harness_e13_l3_extreme.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e13_l3_extreme.py - 1444 lines</span></p>
+<p data-name="file harness e13 umap e13_umap.py file digest"><a href="file_harness_e13_umap.html">file_harness_e13_umap.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e13_umap.py - 89 lines</span></p>
+<p data-name="file harness e14 bt enabler e14_bt_enabler.py file digest"><a href="file_harness_e14_bt_enabler.html">file_harness_e14_bt_enabler.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e14_bt_enabler.py - 1488 lines</span></p>
+<p data-name="file harness e15 bt eval e15_bt_eval.py file digest"><a href="file_harness_e15_bt_eval.html">file_harness_e15_bt_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e15_bt_eval.py - 731 lines</span></p>
+<p data-name="file harness e15 bt pilot e15_bt_pilot.py file digest"><a href="file_harness_e15_bt_pilot.html">file_harness_e15_bt_pilot.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e15_bt_pilot.py - 498 lines</span></p>
+<p data-name="file harness e16 gradient audit e16_gradient_audit.py file digest"><a href="file_harness_e16_gradient_audit.html">file_harness_e16_gradient_audit.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e16_gradient_audit.py - 1571 lines</span></p>
+<p data-name="file harness e17 gradient duel e17_gradient_duel.py file digest"><a href="file_harness_e17_gradient_duel.html">file_harness_e17_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e17_gradient_duel.py - 265 lines</span></p>
+<p data-name="file harness e18 bt eval e18_bt_eval.py file digest"><a href="file_harness_e18_bt_eval.html">file_harness_e18_bt_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e18_bt_eval.py - 629 lines</span></p>
+<p data-name="file harness e18 gradient duel e18_gradient_duel.py file digest"><a href="file_harness_e18_gradient_duel.html">file_harness_e18_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e18_gradient_duel.py - 285 lines</span></p>
+<p data-name="file harness e18 scripted bt e18_scripted_bt.py file digest"><a href="file_harness_e18_scripted_bt.html">file_harness_e18_scripted_bt.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e18_scripted_bt.py - 1223 lines</span></p>
+<p data-name="file harness e18 symmetric e18_symmetric.py file digest"><a href="file_harness_e18_symmetric.html">file_harness_e18_symmetric.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e18_symmetric.py - 389 lines</span></p>
+<p data-name="file harness e19 bt eval e19_bt_eval.py file digest"><a href="file_harness_e19_bt_eval.html">file_harness_e19_bt_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19_bt_eval.py - 881 lines</span></p>
+<p data-name="file harness e19 cascade analysis e19_cascade_analysis.py file digest"><a href="file_harness_e19_cascade_analysis.html">file_harness_e19_cascade_analysis.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19_cascade_analysis.py - 434 lines</span></p>
+<p data-name="file harness e19 gradient duel e19_gradient_duel.py file digest"><a href="file_harness_e19_gradient_duel.html">file_harness_e19_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19_gradient_duel.py - 251 lines</span></p>
+<p data-name="file harness e19 hybrid bt e19_hybrid_bt.py file digest"><a href="file_harness_e19_hybrid_bt.html">file_harness_e19_hybrid_bt.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19_hybrid_bt.py - 1044 lines</span></p>
+<p data-name="file harness e19b diagnose e19b_diagnose.py file digest"><a href="file_harness_e19b_diagnose.html">file_harness_e19b_diagnose.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19b_diagnose.py - 418 lines</span></p>
+<p data-name="file harness e19b dryrun e19b_dryrun.py file digest"><a href="file_harness_e19b_dryrun.html">file_harness_e19b_dryrun.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19b_dryrun.py - 469 lines</span></p>
+<p data-name="file harness e19b eval e19b_eval.py file digest"><a href="file_harness_e19b_eval.html">file_harness_e19b_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19b_eval.py - 545 lines</span></p>
+<p data-name="file harness e19b extract e19b_extract.py file digest"><a href="file_harness_e19b_extract.html">file_harness_e19b_extract.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19b_extract.py - 891 lines</span></p>
+<p data-name="file harness e19b gradient duel e19b_gradient_duel.py file digest"><a href="file_harness_e19b_gradient_duel.html">file_harness_e19b_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19b_gradient_duel.py - 233 lines</span></p>
+<p data-name="file harness e19c confirm e19c_confirm.py file digest"><a href="file_harness_e19c_confirm.html">file_harness_e19c_confirm.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19c_confirm.py - 573 lines</span></p>
+<p data-name="file harness e19c eval e19c_eval.py file digest"><a href="file_harness_e19c_eval.html">file_harness_e19c_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19c_eval.py - 338 lines</span></p>
+<p data-name="file harness e19c gradient duel e19c_gradient_duel.py file digest"><a href="file_harness_e19c_gradient_duel.html">file_harness_e19c_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19c_gradient_duel.py - 246 lines</span></p>
+<p data-name="file harness e19c online bt e19c_online_bt.py file digest"><a href="file_harness_e19c_online_bt.html">file_harness_e19c_online_bt.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19c_online_bt.py - 179 lines</span></p>
+<p data-name="file harness e19c ratchet e19c_ratchet.py file digest"><a href="file_harness_e19c_ratchet.html">file_harness_e19c_ratchet.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e19c_ratchet.py - 796 lines</span></p>
+<p data-name="file harness e24 common e24_common.py file digest"><a href="file_harness_e24_common.html">file_harness_e24_common.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e24_common.py - 301 lines</span></p>
+<p data-name="file harness e24 eval e24_eval.py file digest"><a href="file_harness_e24_eval.html">file_harness_e24_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e24_eval.py - 634 lines</span></p>
+<p data-name="file harness e24 gradient duel e24_gradient_duel.py file digest"><a href="file_harness_e24_gradient_duel.html">file_harness_e24_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e24_gradient_duel.py - 379 lines</span></p>
+<p data-name="file harness e24 holdout e24_holdout.py file digest"><a href="file_harness_e24_holdout.html">file_harness_e24_holdout.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e24_holdout.py - 435 lines</span></p>
+<p data-name="file harness e24 iomap e24_iomap.py file digest"><a href="file_harness_e24_iomap.html">file_harness_e24_iomap.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e24_iomap.py - 369 lines</span></p>
+<p data-name="file harness e24 reexec e24_reexec.py file digest"><a href="file_harness_e24_reexec.html">file_harness_e24_reexec.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e24_reexec.py - 473 lines</span></p>
+<p data-name="file harness e3 common e3_common.py file digest"><a href="file_harness_e3_common.html">file_harness_e3_common.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e3_common.py - 264 lines</span></p>
+<p data-name="file harness e3 md e3_md.py file digest"><a href="file_harness_e3_md.html">file_harness_e3_md.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e3_md.py - 129 lines</span></p>
+<p data-name="file harness e3 run e3_run.py file digest"><a href="file_harness_e3_run.html">file_harness_e3_run.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e3_run.py - 503 lines</span></p>
+<p data-name="file harness e3 run2 e3_run2.py file digest"><a href="file_harness_e3_run2.html">file_harness_e3_run2.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e3_run2.py - 511 lines</span></p>
+<p data-name="file harness e4 policy replay e4_policy_replay.py file digest"><a href="file_harness_e4_policy_replay.html">file_harness_e4_policy_replay.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e4_policy_replay.py - 484 lines</span></p>
+<p data-name="file harness e5 common e5_common.py file digest"><a href="file_harness_e5_common.html">file_harness_e5_common.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e5_common.py - 223 lines</span></p>
+<p data-name="file harness e5 embed e5_embed.py file digest"><a href="file_harness_e5_embed.html">file_harness_e5_embed.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e5_embed.py - 35 lines</span></p>
+<p data-name="file harness e5 md e5_md.py file digest"><a href="file_harness_e5_md.html">file_harness_e5_md.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e5_md.py - 140 lines</span></p>
+<p data-name="file harness e5 run e5_run.py file digest"><a href="file_harness_e5_run.html">file_harness_e5_run.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e5_run.py - 524 lines</span></p>
+<p data-name="file harness e5b splits e5b_splits.py file digest"><a href="file_harness_e5b_splits.html">file_harness_e5b_splits.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e5b_splits.py - 438 lines</span></p>
+<p data-name="file harness e5c curve e5c_curve.py file digest"><a href="file_harness_e5c_curve.html">file_harness_e5c_curve.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e5c_curve.py - 427 lines</span></p>
+<p data-name="file harness e8 blast radius e8_blast_radius.py file digest"><a href="file_harness_e8_blast_radius.html">file_harness_e8_blast_radius.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e8_blast_radius.py - 715 lines</span></p>
+<p data-name="file harness e9 deployment e9_deployment.py file digest"><a href="file_harness_e9_deployment.html">file_harness_e9_deployment.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e9_deployment.py - 557 lines</span></p>
+<p data-name="file harness e25 creed file digest"><a href="file_harness_e25_creed.html">file_harness_e25_creed.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/e25_creed.py - 2038 lines</span></p>
+<p data-name="file harness harness import harness_import.py file digest"><a href="file_harness_harness_import.html">file_harness_harness_import.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/harness_import.py - 7 lines</span></p>
+<p data-name="file harness metrics metrics.py file digest"><a href="file_harness_metrics.html">file_harness_metrics.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/metrics.py - 177 lines</span></p>
+<p data-name="file harness run e1 run_e1.py file digest"><a href="file_harness_run_e1.html">file_harness_run_e1.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/run_e1.py - 543 lines</span></p>
+<p data-name="file harness run e2 run_e2.py file digest"><a href="file_harness_run_e2.html">file_harness_run_e2.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers/harness/run_e2.py - 398 lines</span></p>
+</div></details>
+<details><summary>sources/evaluators (16 files)</summary><div class="dbody">
+<p data-name="file hybrid init __init__.py file digest"><a href="file_hybrid_init.html">file_hybrid_init.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/__init__.py - 89 lines</span></p>
+<p data-name="file hybrid aggregation aggregation.py file digest"><a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/aggregation.py - 434 lines</span></p>
+<p data-name="file hybrid claims claims.py file digest"><a href="file_hybrid_claims.html">file_hybrid_claims.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/claims.py - 375 lines</span></p>
+<p data-name="file hybrid digest digest.py file digest"><a href="file_hybrid_digest.html">file_hybrid_digest.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/digest.py - 175 lines</span></p>
+<p data-name="file hybrid evaluator evaluator.py file digest"><a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/evaluator.py - 645 lines</span></p>
+<p data-name="file hybrid gradient gradient.py file digest"><a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/gradient.py - 294 lines</span></p>
+<p data-name="file hybrid inventory inventory.py file digest"><a href="file_hybrid_inventory.html">file_hybrid_inventory.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/inventory.py - 253 lines</span></p>
+<p data-name="file hybrid layers layers.py file digest"><a href="file_hybrid_layers.html">file_hybrid_layers.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/layers.py - 497 lines</span></p>
+<p data-name="file hybrid registry registry.py file digest"><a href="file_hybrid_registry.html">file_hybrid_registry.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/registry.py - 274 lines</span></p>
+<p data-name="file hybrid scorers scorers.py file digest"><a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/scorers.py - 309 lines</span></p>
+<p data-name="file eval base base.py file digest"><a href="file_eval_base.html">file_eval_base.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/base.py - 380 lines</span></p>
+<p data-name="file eval bs detection bs_detection.py file digest"><a href="file_eval_bs_detection.html">file_eval_bs_detection.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/bs_detection.py - 801 lines</span></p>
+<p data-name="file eval evaluator evaluator.py file digest"><a href="file_eval_evaluator.html">file_eval_evaluator.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/evaluator.py - 193 lines</span></p>
+<p data-name="file eval generic generic.py file digest"><a href="file_eval_generic.html">file_eval_generic.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/generic.py - 472 lines</span></p>
+<p data-name="file eval grounding grounding.py file digest"><a href="file_eval_grounding.html">file_eval_grounding.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/grounding.py - 55 lines</span></p>
+<p data-name="file eval scenario scenario.py file digest"><a href="file_eval_scenario.html">file_eval_scenario.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/scenario.py - 654 lines</span></p>
+</div></details>
+</section>
+<section class="treesection">
+<h3>Harness experiments (54 scripts, one page each)</h3>
+<p data-name="exp index hub experiment arc"><a href="exp_index.html">exp_index.html</a> <span class="chip ok">fresh</span> <span class="sub">hub - the experiment arc E1 to E25, all 54 scripts</span></p>
+<details><summary>E1 to E25 script pages (54)</summary><div class="dbody">
+<p data-name="exp run e1 run_e1 experiment harness"><a href="exp_run_e1.html">exp_run_e1.html</a> <span class="chip ok">fresh</span> <span class="sub">run_e1.py - experiment E1</span></p>
+<p data-name="exp run e2 run_e2 experiment harness"><a href="exp_run_e2.html">exp_run_e2.html</a> <span class="chip ok">fresh</span> <span class="sub">run_e2.py - experiment E2</span></p>
+<p data-name="exp e3 common e3_common experiment harness"><a href="exp_e3_common.html">exp_e3_common.html</a> <span class="chip ok">fresh</span> <span class="sub">e3_common.py - experiment E3</span></p>
+<p data-name="exp e3 md e3_md experiment harness"><a href="exp_e3_md.html">exp_e3_md.html</a> <span class="chip ok">fresh</span> <span class="sub">e3_md.py - experiment E3</span></p>
+<p data-name="exp e3 run e3_run experiment harness"><a href="exp_e3_run.html">exp_e3_run.html</a> <span class="chip ok">fresh</span> <span class="sub">e3_run.py - experiment E3</span></p>
+<p data-name="exp e3 run2 e3_run2 experiment harness"><a href="exp_e3_run2.html">exp_e3_run2.html</a> <span class="chip ok">fresh</span> <span class="sub">e3_run2.py - experiment E3</span></p>
+<p data-name="exp e4 policy replay e4_policy_replay experiment harness"><a href="exp_e4_policy_replay.html">exp_e4_policy_replay.html</a> <span class="chip ok">fresh</span> <span class="sub">e4_policy_replay.py - experiment E4</span></p>
+<p data-name="exp e5 common e5_common experiment harness"><a href="exp_e5_common.html">exp_e5_common.html</a> <span class="chip ok">fresh</span> <span class="sub">e5_common.py - experiment E5</span></p>
+<p data-name="exp e5 embed e5_embed experiment harness"><a href="exp_e5_embed.html">exp_e5_embed.html</a> <span class="chip ok">fresh</span> <span class="sub">e5_embed.py - experiment E5</span></p>
+<p data-name="exp e5 md e5_md experiment harness"><a href="exp_e5_md.html">exp_e5_md.html</a> <span class="chip ok">fresh</span> <span class="sub">e5_md.py - experiment E5</span></p>
+<p data-name="exp e5 run e5_run experiment harness"><a href="exp_e5_run.html">exp_e5_run.html</a> <span class="chip ok">fresh</span> <span class="sub">e5_run.py - experiment E5</span></p>
+<p data-name="exp e5b splits e5b_splits experiment harness"><a href="exp_e5b_splits.html">exp_e5b_splits.html</a> <span class="chip ok">fresh</span> <span class="sub">e5b_splits.py - experiment E5B</span></p>
+<p data-name="exp e5c curve e5c_curve experiment harness"><a href="exp_e5c_curve.html">exp_e5c_curve.html</a> <span class="chip ok">fresh</span> <span class="sub">e5c_curve.py - experiment E5C</span></p>
+<p data-name="exp e8 blast radius e8_blast_radius experiment harness"><a href="exp_e8_blast_radius.html">exp_e8_blast_radius.html</a> <span class="chip ok">fresh</span> <span class="sub">e8_blast_radius.py - experiment E8</span></p>
+<p data-name="exp e9 deployment e9_deployment experiment harness"><a href="exp_e9_deployment.html">exp_e9_deployment.html</a> <span class="chip ok">fresh</span> <span class="sub">e9_deployment.py - experiment E9</span></p>
+<p data-name="exp e12 falsifier e12_falsifier experiment harness"><a href="exp_e12_falsifier.html">exp_e12_falsifier.html</a> <span class="chip ok">fresh</span> <span class="sub">e12_falsifier.py - experiment E12</span></p>
+<p data-name="exp e13 common e13_common experiment harness"><a href="exp_e13_common.html">exp_e13_common.html</a> <span class="chip ok">fresh</span> <span class="sub">e13_common.py - experiment E13</span></p>
+<p data-name="exp e13 l3 extreme e13_l3_extreme experiment harness"><a href="exp_e13_l3_extreme.html">exp_e13_l3_extreme.html</a> <span class="chip ok">fresh</span> <span class="sub">e13_l3_extreme.py - experiment E13</span></p>
+<p data-name="exp e13 umap e13_umap experiment harness"><a href="exp_e13_umap.html">exp_e13_umap.html</a> <span class="chip ok">fresh</span> <span class="sub">e13_umap.py - experiment E13</span></p>
+<p data-name="exp e14 bt enabler e14_bt_enabler experiment harness"><a href="exp_e14_bt_enabler.html">exp_e14_bt_enabler.html</a> <span class="chip ok">fresh</span> <span class="sub">e14_bt_enabler.py - experiment E14</span></p>
+<p data-name="exp e15 bt eval e15_bt_eval experiment harness"><a href="exp_e15_bt_eval.html">exp_e15_bt_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">e15_bt_eval.py - experiment E15</span></p>
+<p data-name="exp e15 bt pilot e15_bt_pilot experiment harness"><a href="exp_e15_bt_pilot.html">exp_e15_bt_pilot.html</a> <span class="chip ok">fresh</span> <span class="sub">e15_bt_pilot.py - experiment E15</span></p>
+<p data-name="exp e16 gradient audit e16_gradient_audit experiment harness"><a href="exp_e16_gradient_audit.html">exp_e16_gradient_audit.html</a> <span class="chip ok">fresh</span> <span class="sub">e16_gradient_audit.py - experiment E16</span></p>
+<p data-name="exp e17 gradient duel e17_gradient_duel experiment harness"><a href="exp_e17_gradient_duel.html">exp_e17_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">e17_gradient_duel.py - experiment E17</span></p>
+<p data-name="exp e18 bt eval e18_bt_eval experiment harness"><a href="exp_e18_bt_eval.html">exp_e18_bt_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">e18_bt_eval.py - experiment E18</span></p>
+<p data-name="exp e18 gradient duel e18_gradient_duel experiment harness"><a href="exp_e18_gradient_duel.html">exp_e18_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">e18_gradient_duel.py - experiment E18</span></p>
+<p data-name="exp e18 scripted bt e18_scripted_bt experiment harness"><a href="exp_e18_scripted_bt.html">exp_e18_scripted_bt.html</a> <span class="chip ok">fresh</span> <span class="sub">e18_scripted_bt.py - experiment E18</span></p>
+<p data-name="exp e18 symmetric e18_symmetric experiment harness"><a href="exp_e18_symmetric.html">exp_e18_symmetric.html</a> <span class="chip ok">fresh</span> <span class="sub">e18_symmetric.py - experiment E18</span></p>
+<p data-name="exp e19 bt eval e19_bt_eval experiment harness"><a href="exp_e19_bt_eval.html">exp_e19_bt_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">e19_bt_eval.py - experiment E19</span></p>
+<p data-name="exp e19 cascade analysis e19_cascade_analysis experiment harness"><a href="exp_e19_cascade_analysis.html">exp_e19_cascade_analysis.html</a> <span class="chip ok">fresh</span> <span class="sub">e19_cascade_analysis.py - experiment E19</span></p>
+<p data-name="exp e19 gradient duel e19_gradient_duel experiment harness"><a href="exp_e19_gradient_duel.html">exp_e19_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">e19_gradient_duel.py - experiment E19</span></p>
+<p data-name="exp e19 hybrid bt e19_hybrid_bt experiment harness"><a href="exp_e19_hybrid_bt.html">exp_e19_hybrid_bt.html</a> <span class="chip ok">fresh</span> <span class="sub">e19_hybrid_bt.py - experiment E19</span></p>
+<p data-name="exp e19b diagnose e19b_diagnose experiment harness"><a href="exp_e19b_diagnose.html">exp_e19b_diagnose.html</a> <span class="chip ok">fresh</span> <span class="sub">e19b_diagnose.py - experiment E19B</span></p>
+<p data-name="exp e19b dryrun e19b_dryrun experiment harness"><a href="exp_e19b_dryrun.html">exp_e19b_dryrun.html</a> <span class="chip ok">fresh</span> <span class="sub">e19b_dryrun.py - experiment E19B</span></p>
+<p data-name="exp e19b eval e19b_eval experiment harness"><a href="exp_e19b_eval.html">exp_e19b_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">e19b_eval.py - experiment E19B</span></p>
+<p data-name="exp e19b extract e19b_extract experiment harness"><a href="exp_e19b_extract.html">exp_e19b_extract.html</a> <span class="chip ok">fresh</span> <span class="sub">e19b_extract.py - experiment E19B</span></p>
+<p data-name="exp e19b gradient duel e19b_gradient_duel experiment harness"><a href="exp_e19b_gradient_duel.html">exp_e19b_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">e19b_gradient_duel.py - experiment E19B</span></p>
+<p data-name="exp e19c confirm e19c_confirm experiment harness"><a href="exp_e19c_confirm.html">exp_e19c_confirm.html</a> <span class="chip ok">fresh</span> <span class="sub">e19c_confirm.py - experiment E19C</span></p>
+<p data-name="exp e19c eval e19c_eval experiment harness"><a href="exp_e19c_eval.html">exp_e19c_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">e19c_eval.py - experiment E19C</span></p>
+<p data-name="exp e19c gradient duel e19c_gradient_duel experiment harness"><a href="exp_e19c_gradient_duel.html">exp_e19c_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">e19c_gradient_duel.py - experiment E19C</span></p>
+<p data-name="exp e19c online bt e19c_online_bt experiment harness"><a href="exp_e19c_online_bt.html">exp_e19c_online_bt.html</a> <span class="chip ok">fresh</span> <span class="sub">e19c_online_bt.py - experiment E19C</span></p>
+<p data-name="exp e19c ratchet e19c_ratchet experiment harness"><a href="exp_e19c_ratchet.html">exp_e19c_ratchet.html</a> <span class="chip ok">fresh</span> <span class="sub">e19c_ratchet.py - experiment E19C</span></p>
+<p data-name="exp e24 common e24_common experiment harness"><a href="exp_e24_common.html">exp_e24_common.html</a> <span class="chip ok">fresh</span> <span class="sub">e24_common.py - experiment E24</span></p>
+<p data-name="exp e24 eval e24_eval experiment harness"><a href="exp_e24_eval.html">exp_e24_eval.html</a> <span class="chip ok">fresh</span> <span class="sub">e24_eval.py - experiment E24</span></p>
+<p data-name="exp e24 gradient duel e24_gradient_duel experiment harness"><a href="exp_e24_gradient_duel.html">exp_e24_gradient_duel.html</a> <span class="chip ok">fresh</span> <span class="sub">e24_gradient_duel.py - experiment E24</span></p>
+<p data-name="exp e24 holdout e24_holdout experiment harness"><a href="exp_e24_holdout.html">exp_e24_holdout.html</a> <span class="chip ok">fresh</span> <span class="sub">e24_holdout.py - experiment E24</span></p>
+<p data-name="exp e24 iomap e24_iomap experiment harness"><a href="exp_e24_iomap.html">exp_e24_iomap.html</a> <span class="chip ok">fresh</span> <span class="sub">e24_iomap.py - experiment E24</span></p>
+<p data-name="exp e24 reexec e24_reexec experiment harness"><a href="exp_e24_reexec.html">exp_e24_reexec.html</a> <span class="chip ok">fresh</span> <span class="sub">e24_reexec.py - experiment E24</span></p>
+<p data-name="exp e25 creed experiment harness"><a href="exp_e25_creed.html">exp_e25_creed.html</a> <span class="chip ok">fresh</span> <span class="sub">e25_creed.py - experiment E25</span></p>
+<p data-name="exp harness init __init__ experiment harness"><a href="exp_harness_init.html">exp_harness_init.html</a> <span class="chip ok">fresh</span> <span class="sub">__init__.py - experiment shared</span></p>
+<p data-name="exp claims pattern analysis claims_pattern_analysis experiment harness"><a href="exp_claims_pattern_analysis.html">exp_claims_pattern_analysis.html</a> <span class="chip ok">fresh</span> <span class="sub">claims_pattern_analysis.py - experiment shared</span></p>
+<p data-name="exp claims pca 3d claims_pca_3d experiment harness"><a href="exp_claims_pca_3d.html">exp_claims_pca_3d.html</a> <span class="chip ok">fresh</span> <span class="sub">claims_pca_3d.py - experiment shared</span></p>
+<p data-name="exp harness import harness_import experiment harness"><a href="exp_harness_import.html">exp_harness_import.html</a> <span class="chip ok">fresh</span> <span class="sub">harness_import.py - experiment shared</span></p>
+<p data-name="exp metrics metrics experiment harness"><a href="exp_metrics.html">exp_metrics.html</a> <span class="chip ok">fresh</span> <span class="sub">metrics.py - experiment shared</span></p>
+</div></details>
+</section>
+<section class="treesection">
+<h3>Data and experiment folders (pattern summaries)</h3>
+<p data-name="data modules prompts templates injected"><a href="data_modules_prompts.html">data_modules_prompts.html</a> <span class="chip ok">fresh</span> <span class="sub">templates injected into generated workflows</span></p>
+<p data-name="data runs run notes capsule workflows logs"><a href="data_runs.html">data_runs.html</a> <span class="chip ok">fresh</span> <span class="sub">run_notes, runs_capsule, sources/workflows, logs</span></p>
+<p data-name="data audits reports"><a href="data_audits.html">data_audits.html</a> <span class="chip ok">fresh</span> <span class="sub">audits - which report answers what</span></p>
+<p data-name="data experiments verifiers diversity"><a href="data_experiments.html">data_experiments.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers, diversity_experiments</span></p>
+</section>
+
+<p class="note">Freshness: every page was built at commit <code>7e8463b</code>, which is HEAD, so no page is stale by the <code>git diff &lt;page.commit&gt;..HEAD</code> rule. The build read a working tree with uncommitted edits (<code class="path">main.py</code>, <code class="path">config.py</code>, <code class="path">sources/benchmark_evaluation/*.py</code>, <code class="path">sources/evaluators/*</code>, <code class="path">datasets/</code> and the untracked <code class="path">sources/evaluators/hybrid_verifier/</code>), so the pages describe the working tree, not a clean checkout of <code>7e8463b</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What the clone does not cover</h2>
+<table>
+<thead><tr><th>Path</th><th>Why</th></tr></thead>
+<tbody>
+<tr><td class="sym">webui/</td><td>Tier D in UPDATE_VISUAL_CLONE.md section 4: out of scope.</td></tr>
+<tr><td class="sym">datasets/</td><td>Tier D: 4.5 GB of benchmark data; graders live in <a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a>.</td></tr>
+<tr><td class="sym">docs/, READMEs</td><td>Tier D: the documentation does not need a diagram of itself.</td></tr>
+<tr><td class="sym">.venv/, node_modules/, tmp/, CLA/</td><td>Tier D: dependencies, transient state, legal files.</td></tr>
+<tr><td class="sym">.env, token.json, credentials.json</td><td>Secrets. Never opened.</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Changelog</h2>
+<table>
+<thead><tr><th>Date</th><th>Commit</th><th>Pages</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td class="sym">2026-10-02</td><td class="sym">7e8463b</td><td>all 174</td><td>First build of the visual clone.</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+<p>Sources: UPDATE_VISUAL_CLONE.md (build rules), AGENTS.md, config_default.json, sources/core/, sources/evaluators/hybrid_verifier/, sources/utils/paths.py.</p>
+<p class="skips">Skipped: see "What the clone does not cover" above.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E19c RATCHET confirmatory readout - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e19c_confirm">
+<div class="wrap">
+
+<h1 class="hud">E19c RATCHET &mdash; confirmatory readout</h1>
+<p class="intro">Does the production temporal ladder beat flat aggregation at ranking, and how do the E19c arms compare with the earlier cycle-2 channels? <code>e19c_confirm.py</code> opens the label-free table once, joins the frozen E19/E19b/E24 per-generation tables, and computes pairs-correct, paired deltas, M2 replay and independence. This is the only E19c stage that reads the SR labels.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis to artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="confirmatory readout stages and outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="h3">
+    <title>Hypothesis: the ladder beats flat aggregation; the online view tracks success</title>
+    <rect x="10" y="180" width="150" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="85" y="206" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="85" y="224" text-anchor="middle">ladder beats flat?</text>
+    <text class="box-sub" x="85" y="238" text-anchor="middle">SR read once</text>
+  </g>
+
+  <a class="box" id="k1" href="../../experiments_verifiers/results/_e19c_label_free_2026-09-25.json">
+    <title>Label-free vectors and pair winners from the eval stage</title>
+    <rect x="205" y="50" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="300" y="76" text-anchor="middle">_e19c_label_free.json</text>
+    <text class="box-sub" x="300" y="92" text-anchor="middle">arms, vectors, pairs</text>
+  </a>
+
+  <a class="box" id="k2" href="../../experiments_verifiers/results/E19_hybrid_bt_2026-09-23.json">
+    <title>Frozen prior per-generation tables: E19, E19b and E24</title>
+    <rect x="205" y="180" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="300" y="206" text-anchor="middle">E19 / E19b / E24</text>
+    <text class="box-sub" x="300" y="222" text-anchor="middle">prior arm tables</text>
+  </a>
+
+  <a class="box" id="k3" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>Arena plan supplies the contrast flag and the SR labels</title>
+    <rect x="205" y="310" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="300" y="336" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="300" y="352" text-anchor="middle">SR label, contrast flag</text>
+  </a>
+
+  <a class="box" id="u1" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>load_baselines reads the three prior JSON tables (line 66)</title>
+    <rect x="460" y="10" width="185" height="52" rx="14" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="552" y="32" text-anchor="middle">load_baselines()</text>
+    <text class="box-sub" x="552" y="48" text-anchor="middle">uuid to arm value</text>
+  </a>
+
+  <a class="box" id="u2" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>pairfn turns two scores into 1, 0.5 or 0 (line 57)</title>
+    <rect x="460" y="92" width="185" height="52" rx="14" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="552" y="114" text-anchor="middle">pairfn()</text>
+    <text class="box-sub" x="552" y="130" text-anchor="middle">score pair to win</text>
+  </a>
+
+  <a class="box" id="u3" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>E15E.pairs_correct plus cluster_boot for the CI (lines 119, 133)</title>
+    <rect x="460" y="174" width="185" height="52" rx="14" fill="rgba(60,240,210,0.10)" stroke="#3CF0D2"/>
+    <text class="box-label" x="552" y="196" text-anchor="middle">pairs_correct()</text>
+    <text class="box-sub" x="552" y="212" text-anchor="middle">pooled + CI95</text>
+  </a>
+
+  <a class="box" id="u4" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>E15E.paired_boot_diff gives the cluster-bootstrap delta (line 156)</title>
+    <rect x="460" y="256" width="185" height="52" rx="14" fill="rgba(60,240,210,0.10)" stroke="#3CF0D2"/>
+    <text class="box-label" x="552" y="278" text-anchor="middle">paired_boot_diff()</text>
+    <text class="box-sub" x="552" y="294" text-anchor="middle">arm minus baseline</text>
+  </a>
+
+  <a class="box" id="u5" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>E15E.argmax_ship picks the argmax arm per group, latest uuid wins ties (line 190)</title>
+    <rect x="460" y="338" width="185" height="52" rx="14" fill="rgba(60,240,210,0.10)" stroke="#3CF0D2"/>
+    <text class="box-label" x="552" y="360" text-anchor="middle">argmax_ship()</text>
+    <text class="box-sub" x="552" y="376" text-anchor="middle">M2 pick per group</text>
+  </a>
+
+  <a class="box" id="q1" href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.json">
+    <title>Readouts A, B, C plus the per-group table</title>
+    <rect x="700" y="50" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="76" text-anchor="middle">E19c_ratchet.json</text>
+    <text class="box-sub" x="795" y="92" text-anchor="middle">readouts A, B, C</text>
+  </a>
+
+  <a class="box" id="q2" href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.md">
+    <title>The written report: four TL;DR verdicts and the tables</title>
+    <rect x="700" y="310" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="336" text-anchor="middle">E19c_ratchet.md</text>
+    <text class="box-sub" x="795" y="352" text-anchor="middle">4 verdicts, tables</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="h3" data-to="k1" d="M160,200 L205,78" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="h3" data-to="k2" d="M160,214 H205" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="h3" data-to="k3" d="M160,232 L205,338" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="172" y="150" text-anchor="start">reads</text>
+
+  <path class="edge" data-from="k1" data-to="u1" d="M395,78 L460,38" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k2" data-to="u1" d="M395,208 L460,44" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k3" data-to="u1" d="M395,338 L460,50" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="428" y="140" text-anchor="middle">joins</text>
+
+  <path class="edge" data-from="u1" data-to="u2" d="M552,62 V92" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="82" text-anchor="start">arms</text>
+  <path class="edge" data-from="u2" data-to="u3" d="M552,144 V174" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="164" text-anchor="start">pair fn</text>
+  <path class="edge" data-from="u3" data-to="u4" d="M552,226 V256" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="246" text-anchor="start">arms</text>
+  <path class="edge" data-from="u4" data-to="u5" d="M552,308 V338" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="328" text-anchor="start">arm values</text>
+
+  <path class="edge" data-from="u5" data-to="q1" d="M645,360 L700,78" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="u5" data-to="q2" d="M645,376 L700,338" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="672" y="440" text-anchor="middle">writes</text>
+</svg>
+</div>
+<p class="figcap">11 boxes. Cyan = a function of <a href="../../experiments_verifiers/harness/e19c_confirm.py">experiments_verifiers/harness/e19c_confirm.py</a>, teal = the shared helper <a href="../../experiments_verifiers/harness/e15_bt_eval.py">harness/e15_bt_eval.py</a>, steel = frozen data. The script first asserts that every baseline reproduces its published value within 0.011 (L122&ndash;123) and fails if not.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card steel">
+<h4><a href="../../experiments_verifiers/harness/e19c_confirm.py">experiments_verifiers/harness/e19c_confirm.py</a></h4>
+<p class="role">Recomputes eight baselines, scores six E19c arms on the contrast pairs, replays M2 and writes the JSON and markdown of record.</p>
+<p class="meta">573 lines (<code>wc -l</code>) &#183; entry: <code>main()</code> L80, guard L572 &#183; CLI arguments: none found (no <code>argparse</code> import)</p>
+<details><summary>signatures, arms, baselines</summary><div class="dbody">
+<pre>pairfn(scorer) -&gt; callable                     # L57
+load_baselines() -&gt; tuple                      # L66, E19 / E19b / E24 tables
+main()                                         # L80
+write_md(out, lf, groups_data, ...)            # L348
+mode_pairs_keys(diffs) -&gt; list[str]            # L567</pre>
+<p>E19c arms: <code>e19c_temporal</code>, <code>e19c_temporal_strict</code>, <code>e19c_sign_sum</code>, <code>e19c_mean_diff</code>, <code>e19c_mean_claim</code>, <code>e19c_online</code> (L44&ndash;45). Baselines: <code>e19_md</code>, <code>e19</code>, <code>e19b</code>, <code>e15</code>, <code>uniform</code>, <code>e24</code>, <code>recorded_reward</code>, <code>e18</code> (L46&ndash;47), with published values in <code>PUBLISHED</code> (L52&ndash;54).</p>
+<p>Readouts: A pairs-correct with cluster-bootstrap CI and paired deltas (L131&ndash;166), B M2 replay with a 10 000-draw group bootstrap (L187&ndash;221), C per-group Spearman independence (L224&ndash;254).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What</th><th>Detail</th><th>Path and code cite</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td>label-free arms and vectors</td><td class="sym">results/_e19c_label_free_2026-09-25.json &#183; L35</td></tr>
+<tr><td>reads</td><td>E19, E19b, E24 prior tables</td><td class="sym">results/E19_hybrid_bt_2026-09-23.json etc. &#183; L36&ndash;38</td></tr>
+<tr><td>reads</td><td>SR labels and contrast flag</td><td class="sym"><code>RC.load_plan_groups()</code> L82 &#183; <code>g["gens"][*]["sr"]</code></td></tr>
+<tr><td>reads</td><td>gradient duel summary, if present</td><td class="sym">results/E19c_gradient_duel_2026-09-25.json &#183; L39, L256</td></tr>
+<tr><td>asserts</td><td>baseline reproduction within 0.011</td><td class="sym"><code>PUBLISHED</code> L52&ndash;54, assert L122</td></tr>
+<tr><td>writes</td><td>full readout JSON</td><td class="sym">results/E19c_ratchet_2026-09-25.json &#183; L40, L335</td></tr>
+<tr><td>writes</td><td>readout markdown</td><td class="sym">results/E19c_ratchet_2026-09-25.md &#183; L41, L564</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; pairs-correct on the 147 contrast pairs</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 842 320" role="img" aria-label="bar chart of measured values">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <line x1="64" y1="250.0" x2="804" y2="250.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="254.0" text-anchor="end">0</text>
+  <line x1="64" y1="197.5" x2="804" y2="197.5" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="201.5" text-anchor="end">0.2</text>
+  <line x1="64" y1="145.0" x2="804" y2="145.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="149.0" text-anchor="end">0.4</text>
+  <line x1="64" y1="92.5" x2="804" y2="92.5" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="96.5" text-anchor="end">0.6</text>
+  <line x1="64" y1="40.0" x2="804" y2="40.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="44.0" text-anchor="end">0.8</text>
+  <rect x="80" y="55.4" width="64" height="194.6" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+  <text class="box-label" x="112" y="48.4" text-anchor="middle">0.7415</text>
+  <text class="box-sub" x="112" y="267" text-anchor="middle">online</text>
+  <rect x="188" y="70.8" width="64" height="179.2" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="220" y="63.8" text-anchor="middle">0.6828</text>
+  <text class="box-sub" x="220" y="267" text-anchor="middle">e19-md</text>
+  <rect x="296" y="77.7" width="64" height="172.3" rx="2" fill="rgba(125,249,199,0.10)" stroke="#7DF9C7"/>
+  <text class="box-label" x="328" y="70.7" text-anchor="middle">0.6565</text>
+  <text class="box-sub" x="328" y="267" text-anchor="middle">temporal</text>
+  <rect x="404" y="78.6" width="64" height="171.4" rx="2" fill="rgba(125,249,199,0.10)" stroke="#7DF9C7"/>
+  <text class="box-label" x="436" y="71.6" text-anchor="middle">0.6531</text>
+  <text class="box-sub" x="436" y="267" text-anchor="middle">mean_claim</text>
+  <rect x="512" y="78.6" width="64" height="171.4" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="544" y="71.6" text-anchor="middle">0.6531</text>
+  <text class="box-sub" x="544" y="267" text-anchor="middle">e19b</text>
+  <rect x="620" y="103.6" width="64" height="146.4" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="652" y="96.6" text-anchor="middle">0.5578</text>
+  <text class="box-sub" x="652" y="267" text-anchor="middle">reward</text>
+  <rect x="728" y="124.1" width="64" height="125.9" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+  <text class="box-label" x="760" y="117.1" text-anchor="middle">0.4796</text>
+  <text class="box-sub" x="760" y="267" text-anchor="middle">e18</text>
+  <text class="edge-label" x="421" y="292" text-anchor="middle">147 pairs, chance 0.5</text>
+</svg>
+</div>
+<p class="figcap">Chart &mdash; pooled pairs-correct per arm over the 147 contrast gen-pairs of 9 groups. Cyan = the production online win-rate view, mint = an E19c offline mode, steel = a baseline recomputed from a frozen table. Values from <code class="path">results/E19c_ratchet_2026-09-25.json</code> L26&ndash;302 and <code class="path">results/E19c_ratchet_2026-09-25.md</code> L19&ndash;34.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file and line</th></tr></thead>
+<tbody>
+<tr><td>contrast groups</td><td>9 of 19</td><td class="sym">_ratchet.json L24 (n_contrast_groups)</td></tr>
+<tr><td>contrast gen-pairs</td><td>147</td><td class="sym">_ratchet.json L28 (n_pairs)</td></tr>
+<tr><td>e19c_online pairs-correct</td><td>0.7415 [0.620, 0.799]</td><td class="sym">_ratchet.json L126&ndash;131</td></tr>
+<tr><td>e19c_temporal pairs-correct</td><td>0.6565 [0.516, 0.790]</td><td class="sym">_ratchet.json L26&ndash;31</td></tr>
+<tr><td>e19c_mean_diff pairs-correct</td><td>0.6565 [0.516, 0.790]</td><td class="sym">_ratchet.json L86&ndash;91</td></tr>
+<tr><td>delta temporal minus e19_md</td><td>-0.0181 [-0.1325, +0.1263]</td><td class="sym">_ratchet.md L49</td></tr>
+<tr><td>delta online minus e18</td><td>+0.2548 [+0.0938, +0.3549]</td><td class="sym">_ratchet.md L96</td></tr>
+<tr><td>M2 shipped, oracle</td><td>12 of 19</td><td class="sym">_ratchet.md L124</td></tr>
+<tr><td>M2 shipped, e19c_temporal</td><td>9 of 19</td><td class="sym">_ratchet.md L111</td></tr>
+<tr><td>M2 shipped, recorded_reward</td><td>8 of 19</td><td class="sym">_ratchet.md L122</td></tr>
+<tr><td>mean rho online vs reward</td><td>0.2017</td><td class="sym">_ratchet.md L177</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: 9 contrast groups only, so every CI is wide by construction; the results MD states that the arena is underpowered (L196). One contrast group failed the claim contract and its 6 pairs tie under every arm (MD L201&ndash;204).</p>
+<p class="note flag">Red: the point estimate does not favour the production temporal mode over flat aggregation. The temporal arm posts the same pooled 0.6565 as <code>mean_diff</code>, sits below <code>e19_md</code>, and only the online win-rate view rises above the baselines &mdash; still with a CI that overlaps E19-md (MD L11, L15).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim excerpt</h2>
+<details><summary>the four TL;DR verdicts of the E19c report</summary><div class="dbody">
+<p>Path: <code class="path">experiments_verifiers/results/E19c_ratchet_2026-09-25.md</code> L11, L13, L15, L126 and L230&ndash;233.</p>
+<blockquote>1. **Does the temporal ladder beat flat aggregation at ranking?** E19c-temporal (production default) pairs-correct 0.656 [0.516,0.790] &hellip; Point estimate does NOT favor temporal; every CI spans 0 &mdash; underpowered (9 contrast groups).<br>
+3. **Does the ladder change M2/ties?** M2 SR-shipped (19 groups): E19c-temporal 9 vs E19 8 / E19b 8 / uniform 9 / oracle 12; production online view 9.<br>
+4. **Production online view is the best ranker measured on this arena:** win-rate vs PREVIOUS generations in evolution order (what live Mimosa consumes) scores 0.742 [0.620,0.799] on the 147 contrast pairs &mdash; above every offline arm and every baseline &hellip; (CIs still underpowered).<br>
+M2 bootstrap diffs (e19c_temporal &minus; X): recorded_reward +0.052 [+0.000,+0.158]; e19b +0.053 [+0.000,+0.158]; e19 +0.052 [+0.000,+0.158].<br>
+Paired &Delta; (online_bt &minus; online win-rate): -0.0967<br>
+[-0.1799,-0.0297] (CI excludes 0).</blockquote>
+<p>Elisions marked with &hellip; are mine and drop whole clauses; every number kept is verbatim. Source line wraps are joined onto one line. The files are read-only evidence.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19c_confirm.py</code> (all 573 lines), <code class="path">experiments_verifiers/results/E19c_ratchet_2026-09-25.md</code>, <code class="path">experiments_verifiers/results/E19c_ratchet_2026-09-25.json</code> (readouts A, B, C and <code>baseline_reproduction</code>), <code class="path">experiments_verifiers/results/_e19c_label_free_2026-09-25.json</code> (cost block), <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> (helper names), <code class="path">experiments_verifiers/README.md</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (no E19c section at this build). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">results/E19_hybrid_bt_2026-09-23.json</code>, <code class="path">results/E19b_hybrid_bt_v2_2026-09-24.json</code>, <code class="path">results/E24_reexec_holdout_2026-09-24.json</code> (opened for key names only; their arm values are already reproduced inside the E19c readout); <code class="path">results/E19c_bt_gradients/**</code> and <code class="path">results/E19c_registries/*.json</code> (not read here); <code class="path">experiments_verifiers/.env</code> (never opened, by rule); <code class="path">datasets/ScienceAgentBench/**</code> (this stage reads SR labels from the arena plan, not gold programs); the script was not run, by rule.</p>
+<p class="skips">experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

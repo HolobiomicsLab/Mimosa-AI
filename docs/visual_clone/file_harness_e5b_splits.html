@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5b_splits.py - file digest - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e5b_splits.py">
+<div class="wrap">
+
+<h1 class="hud">e5b_splits.py</h1>
+<p class="intro">This script stress-tests the E5 rung L3 (score-weighted MiniLM name+desc vectors into a logistic regression) across many random 80/20 splits, to see whether E5's leave-one-task-out 0.753 was a lucky fold. It runs three split units: example-level (leaky), task-level (honest) and campaign-level holdout. It writes one JSON and one Markdown file per run; run it with <code>uv run python experiments_verifiers/harness/e5b_splits.py</code> (L12).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 400" role="img" aria-label="e5b_splits.py master diagram: inputs, loading, main, splits, fit, summaries, e5_run anchor, report, outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="b1" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>frozen population and embedding cache read at L46-47</title>
+    <rect x="16" y="40" width="180" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="106" y="66" text-anchor="middle">frozen inputs</text>
+    <text class="box-sub" x="106" y="82" text-anchor="middle">claims jsonl + npz</text>
+    <text class="box-sub" x="106" y="96" text-anchor="middle">607 examples</text>
+  </a>
+
+  <a class="box" id="b2" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>load_all L45 builds X, y, tid and the two extra label vectors</title>
+    <rect x="266" y="40" width="190" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="361" y="66" text-anchor="middle">load_all</text>
+    <text class="box-sub" x="361" y="82" text-anchor="middle">L45 &#183; l3_features L59</text>
+    <text class="box-sub" x="361" y="96" text-anchor="middle">mean s&#183;emb vector</text>
+  </a>
+
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>main L154 runs the three split units, the ablation and the writes</title>
+    <rect x="526" y="40" width="170" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="611" y="66" text-anchor="middle">main</text>
+    <text class="box-sub" x="611" y="82" text-anchor="middle">L154</text>
+    <text class="box-sub" x="611" y="96" text-anchor="middle">three split units</text>
+  </a>
+
+  <a class="box" id="b4" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>example_split L69 and group_split L76 build the train/test index pairs</title>
+    <rect x="766" y="40" width="200" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="866" y="66" text-anchor="middle">split builders</text>
+    <text class="box-sub" x="866" y="82" text-anchor="middle">L69 &#183; L76</text>
+    <text class="box-sub" x="866" y="96" text-anchor="middle">example / task / campaign</text>
+  </a>
+
+  <a class="box" id="b5" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>fit_eval L90 fits the logistic; select_C_inner L101 picks C</title>
+    <rect x="766" y="160" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="866" y="186" text-anchor="middle">fit_eval</text>
+    <text class="box-sub" x="866" y="202" text-anchor="middle">L90 &#183; select_C_inner L101</text>
+    <text class="box-sub" x="866" y="216" text-anchor="middle">C grid, 4 task folds</text>
+  </a>
+
+  <a class="box" id="b6" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>summarize L127 and paired_stats L135 turn per-seed AUCs into tables</title>
+    <rect x="490" y="160" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590" y="186" text-anchor="middle">summarize</text>
+    <text class="box-sub" x="590" y="202" text-anchor="middle">L127 &#183; paired_stats L135</text>
+    <text class="box-sub" x="590" y="216" text-anchor="middle">win-rate + t-test</text>
+  </a>
+
+  <a class="box" id="b7" href="../../experiments_verifiers/harness/e5_run.py">
+    <title>e5_run.loto_eval re-runs E5's own LOTO machinery as the anchor</title>
+    <rect x="216" y="290" width="200" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="316" y="316" text-anchor="middle">e5_run anchor</text>
+    <text class="box-sub" x="316" y="332" text-anchor="middle">make_f_l3 L299</text>
+    <text class="box-sub" x="316" y="346" text-anchor="middle">loto_eval L302-303</text>
+  </a>
+
+  <a class="box" id="b8" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>write_md L360 renders the markdown digest from the out dict</title>
+    <rect x="490" y="290" width="200" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="590" y="316" text-anchor="middle">write_md</text>
+    <text class="box-sub" x="590" y="332" text-anchor="middle">L360</text>
+    <text class="box-sub" x="590" y="346" text-anchor="middle">markdown tables</text>
+  </a>
+
+  <a class="box" id="b9" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>results written by main L354 and write_md L433</title>
+    <rect x="766" y="290" width="200" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="866" y="316" text-anchor="middle">results/</text>
+    <text class="box-sub" x="866" y="332" text-anchor="middle">E5b_L3_splits_&lt;date&gt;.json</text>
+    <text class="box-sub" x="866" y="346" text-anchor="middle">E5b_L3_splits_&lt;date&gt;.md</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b2" d="M196,72 H266" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="231" y="34" text-anchor="middle">reads claims</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M456,72 H526" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="491" y="34" text-anchor="middle">X, y, tid</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M696,72 H766" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="731" y="34" text-anchor="middle">split(seed)</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M866,104 V160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="876" y="136" text-anchor="start">per seed</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M766,195 H690" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="728" y="187" text-anchor="middle">per-seed AUC</text>
+  <path class="edge" data-from="b3" data-to="b6" d="M676,104 V132 H640 V160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="668" y="126" text-anchor="end">summarize()</text>
+  <path class="edge" data-from="b3" data-to="b7" d="M546,104 V130 H316 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="430" y="124" text-anchor="middle">loto_eval()</text>
+  <path class="edge" data-from="b6" data-to="b8" d="M590,230 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="266" text-anchor="start">out dict</text>
+  <path class="edge" data-from="b7" data-to="b8" d="M416,322 H490" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="453" y="314" text-anchor="middle">anchor rows</text>
+  <path class="edge dashed-edge" data-from="b8" data-to="b9" d="M690,322 H766" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="728" y="314" text-anchor="middle">writes .md</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. Cyan = work inside <code>e5b_splits.py</code>, dashed grey = file outside it. Solid = call, dashed = read/write. <code>main</code> (L154) calls <code>example_split</code> (L69) or <code>group_split</code> (L76) per seed, then <code>fit_eval</code> (L90), then <code>summarize</code> (L127) and <code>paired_stats</code> (L135) for each of the three blocks (L187, L190). It also calls <code>e5_run.make_f_l3</code> (L299) and <code>e5_run.loto_eval</code> (L302&ndash;303) for the LOTO anchor, writes the JSON itself (L354) and calls <code>write_md</code> (L356). <code>select_C_inner</code> (L101) is only reached from the ablation (L281) and the inner-CV block (L320).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in and data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 300" role="img" aria-label="e5b_splits.py data flow: two read files, constants, the out dict and two written files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="d1">
+    <title>labels and claims, read by e5_common.load_examples L34-35</title>
+    <rect x="20" y="30" width="230" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="54" text-anchor="middle">verifier_claims.jsonl</text>
+    <text class="box-sub" x="135" y="70" text-anchor="middle">experiments_verifiers/data/</text>
+    <text class="box-sub" x="135" y="84" text-anchor="middle">SR, VER, claims</text>
+  </g>
+
+  <g class="box" id="d2">
+    <title>384-dim name+desc vectors, loaded at L47</title>
+    <rect x="20" y="120" width="230" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="144" text-anchor="middle">_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="135" y="160" text-anchor="middle">experiments_verifiers/results/</text>
+    <text class="box-sub" x="135" y="174" text-anchor="middle">names, name_desc_emb</text>
+  </g>
+
+  <g class="box" id="d3">
+    <title>module constants L35-39 set the loop counts and the C grid</title>
+    <rect x="20" y="210" width="230" height="60" rx="2" fill="rgba(230,251,255,0.06)" stroke="#E6FBFF"/>
+    <text class="box-label" x="135" y="234" text-anchor="middle">module constants</text>
+    <text class="box-sub" x="135" y="250" text-anchor="middle">N_SEEDS 40, N_SEEDS_CAMP 25</text>
+    <text class="box-sub" x="135" y="264" text-anchor="middle">C_GRID 5 values, C_FIXED 0.1</text>
+  </g>
+
+  <a class="box" id="d4" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>main L154 holds the out dict and returns it at L357</title>
+    <rect x="370" y="110" width="180" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="140" text-anchor="middle">main L154</text>
+    <text class="box-sub" x="460" y="156" text-anchor="middle">out dict: splits,</text>
+    <text class="box-sub" x="460" y="170" text-anchor="middle">leakage_gap, ablation</text>
+  </a>
+
+  <g class="box" id="d5">
+    <title>written at L354 by main</title>
+    <rect x="670" y="60" width="230" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="785" y="84" text-anchor="middle">results/E5b_L3_splits_&lt;date&gt;.json</text>
+    <text class="box-sub" x="785" y="100" text-anchor="middle">every block + gaps + runtime</text>
+  </g>
+
+  <g class="box" id="d6">
+    <title>written at L433 by write_md</title>
+    <rect x="670" y="180" width="230" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="785" y="204" text-anchor="middle">results/E5b_L3_splits_&lt;date&gt;.md</text>
+    <text class="box-sub" x="785" y="220" text-anchor="middle">six tables + caveats</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d4" d="M250,60 H330 V130 H370" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="258" y="54" text-anchor="start">load_examples()</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d4" d="M250,150 H370" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="310" y="142" text-anchor="middle">np.load(L47)</text>
+  <path class="edge" data-from="d3" data-to="d4" d="M250,240 H460 V190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="352" y="232" text-anchor="middle">loop counts</text>
+  <path class="edge dashed-edge" data-from="d4" data-to="d5" d="M550,130 H620 V90 H670" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="600" y="70" text-anchor="middle">writes</text>
+  <path class="edge dashed-edge" data-from="d4" data-to="d6" d="M550,170 H620 V210 H670" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="600" y="248" text-anchor="middle">returns out</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. <code>main</code> returns the <code>out</code> dict (L357) and is the only writer of the JSON (L354); the Markdown comes from <code>write_md(out)</code> (L356, write at L433). There is no config file and no shared state object: every input is a module constant (L35&ndash;39), a frozen data file, or the embedding cache.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the seed loop and the C-selection loop</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 340" role="img" aria-label="e5b_splits.py control: per-seed loop with a single-class skip, and the inner-CV C loop">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="c1">
+    <title>main L177, L197, L232: three loops over seeds</title>
+    <rect x="20" y="30" width="230" height="54" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="54" text-anchor="middle">for seed in 0..39</text>
+    <text class="box-sub" x="135" y="70" text-anchor="middle">N_SEEDS L35 / N_SEEDS_CAMP L36</text>
+  </g>
+
+  <g class="box" id="c2">
+    <title>fit_eval L90 returns nan when either side is single-class</title>
+    <polygon points="370,20 500,57 370,94 240,57" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="370" y="54" text-anchor="middle">single-class side?</text>
+    <text class="box-sub" x="370" y="70" text-anchor="middle">L92 / L96</text>
+  </g>
+
+  <g class="box" id="c3">
+    <title>fit_eval L98 computes the AUC on the held-out side</title>
+    <rect x="580" y="30" width="230" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="695" y="54" text-anchor="middle">AUC on test side</text>
+    <text class="box-sub" x="695" y="70" text-anchor="middle">C._auc L98, baselines L185</text>
+  </g>
+
+  <g class="box" id="c4">
+    <title>seeds with a nan AUC are dropped from every list</title>
+    <rect x="20" y="130" width="230" height="54" rx="2" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="135" y="154" text-anchor="middle">seed skipped</text>
+    <text class="box-sub" x="135" y="170" text-anchor="middle">nan not appended L180</text>
+  </g>
+
+  <g class="box" id="c5">
+    <title>select_C_inner L110 loops the C grid and L112 the four folds</title>
+    <rect x="240" y="230" width="250" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="365" y="254" text-anchor="middle">for Cv in C_GRID</text>
+    <text class="box-sub" x="365" y="270" text-anchor="middle">4 folds, fold_of = i % 4 L107</text>
+    <text class="box-sub" x="365" y="284" text-anchor="middle">skips single-class folds L115</text>
+  </g>
+
+  <g class="box" id="c6">
+    <title>L122-L123 keep the C with the best mean fold AUC</title>
+    <rect x="560" y="230" width="250" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="685" y="254" text-anchor="middle">best mean fold AUC</text>
+    <text class="box-sub" x="685" y="270" text-anchor="middle">outer AUC NaN -> keeps C_FIXED</text>
+    <text class="box-sub" x="685" y="284" text-anchor="middle">select_C_inner L125</text>
+  </g>
+
+  <path class="edge" data-from="c1" data-to="c2" d="M250,57 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="245" y="22" text-anchor="middle">split</text>
+  <path class="edge" data-from="c2" data-to="c3" d="M500,57 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="22" text-anchor="middle">no</text>
+  <path class="edge" data-from="c2" data-to="c4" d="M370,94 V130" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="380" y="118" text-anchor="start">yes</text>
+  <path class="edge" data-from="c3" data-to="c1" d="M695,84 V112 H40 V84" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="368" y="108" text-anchor="middle">next seed</text>
+  <path class="edge" data-from="c5" data-to="c6" d="M490,265 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="525" y="257" text-anchor="middle">mean</text>
+  <path class="edge" data-from="c4" data-to="c5" d="M170,184 V265 H240" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="180" y="208" text-anchor="start">ablation L277</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>6 boxes</code>. Two loops. The outer loop walks the seeds: <code>fit_eval</code> (L90) returns <code>nan</code> when the train side (L92) or the test side (L96) holds one class, and <code>main</code> then drops that seed (L180, L200, L237). The inner loop lives in <code>select_C_inner</code> (L101): five C values from <code>C_GRID</code> (L38), four task folds, single-class folds skipped (L115), best mean AUC wins (L122), and C stays at <code>C_FIXED</code> = 0.1 (L39) when no C improves.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>file read</td><td class="sym">verifier_claims.jsonl</td><td>experiments_verifiers/data/, via <code>e5_common.load_examples</code> (e5_common.py L34&ndash;35)</td><td>SR and VER labels, claims</td></tr>
+<tr><td>file read</td><td class="sym">_cache_e5_embeddings.npz</td><td>experiments_verifiers/results/ (this file L47)</td><td>384-dim name+desc vectors</td></tr>
+<tr><td>module</td><td class="sym">e5_common as C</td><td>import L29</td><td>load_examples, _auc, uniform_score, v0_reward</td></tr>
+<tr><td>module</td><td class="sym">e5_run as R</td><td>import inside main L298</td><td>make_f_l3 L299, loto_eval L302</td></tr>
+<tr><td>constant</td><td class="sym">N_SEEDS 40, N_SEEDS_CAMP 25</td><td>L35&ndash;36</td><td>seed counts per split unit</td></tr>
+<tr><td>constant</td><td class="sym">N_SEEDS_CABLATION 10</td><td>L37</td><td>fixed-C vs inner-CV ablation</td></tr>
+<tr><td>constant</td><td class="sym">C_GRID, C_FIXED</td><td>L38&ndash;39</td><td>C values, default 0.1</td></tr>
+<tr><td>return</td><td class="sym">out dict</td><td>returned at L357</td><td>splits, leakage_gap, ablation, gaps</td></tr>
+<tr><td>file write</td><td class="sym">E5b_L3_splits_&lt;date&gt;.json</td><td>path L32, <code>write_text</code> L354</td><td>full result block</td></tr>
+<tr><td>file write</td><td class="sym">E5b_L3_splits_&lt;date&gt;.md</td><td>path L33, <code>write_text</code> L433</td><td>six report tables</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: the script reads no config field and no environment variable. The population size is not a constant either, it is counted from the jsonl (L157&ndash;159), and the docstring's &ldquo;607 examples&rdquo; is a run-time count, not a literal in the code.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File card</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e5b_splits.py">experiments_verifiers/harness/e5b_splits.py</a></h4>
+<p class="role">Repeats 80/20 splits at three units, pairs three baselines per seed, and reports the leakage gap plus a LOTO anchor.</p>
+<p class="meta">438 lines &#183; 10 functions &#183; reads: claims jsonl, embedding npz &#183; writes: results/E5b_L3_splits_&lt;date&gt;.json + .md</p>
+<details><summary>key signatures and constants</summary><div class="dbody">
+<pre>load_all() -&gt; exs, embz, emb_idx, X, y, yver, tid, uni, v0        # L45
+l3_features(e, embz, emb_idx) -&gt; np.ndarray                       # L59
+example_split(n, seed) -&gt; (tr, te)                                # L69
+group_split(groups, frac, seed) -&gt; (tr, te, hold)                 # L76
+fit_eval(X, y, tr, te, Cval=C_FIXED) -&gt; (auc, clf)                # L90
+select_C_inner(X, y, tr, groups, seed) -&gt; float                   # L101
+summarize(aucs) -&gt; dict                                           # L127
+paired_stats(deltas) -&gt; dict                                      # L135
+main() -&gt; dict                                                    # L154
+write_md(out) -&gt; None                                             # L360</pre>
+<p>Constants: <code>N_SEEDS = 40</code>, <code>N_SEEDS_CAMP = 25</code>, <code>N_SEEDS_CABLATION = 10</code> (L35&ndash;37), <code>C_GRID = [0.01, 0.03, 0.1, 0.3, 1.0]</code>, <code>C_FIXED = 0.1</code> (L38&ndash;39).</p>
+</div></details>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>every function, module constant and the entry point (10 functions, 9 constants)</summary><div class="dbody">
+<pre>load_all()
+  L45  loads examples, embeddings, labels, baselines
+
+l3_features(e, embz, emb_idx)
+  L59  mean score-weighted name+desc vector
+
+example_split(n, seed)
+  L69  leaky 80/20 split of examples
+
+group_split(groups, frac, seed)
+  L76  holds out whole groups, returns index pair
+
+fit_eval(X, y, tr, te, Cval=C_FIXED)
+  L90  fits logistic, returns test AUC
+
+select_C_inner(X, y, tr, groups, seed)
+  L101  task-grouped 4-fold CV picks C
+
+summarize(aucs)
+  L127  mean, std, min, max, percentiles
+
+paired_stats(deltas)
+  L135  per-seed win-rate, t-test, sign test
+
+main()
+  L154  runs three split units, ablation, writes
+
+write_md(out)
+  L360  renders the markdown digest</pre>
+<p>Module level, no class in the file:</p>
+<pre>EV, TODAY, OUT_JSON, OUT_MD                       # L27, L31-L33
+N_SEEDS, N_SEEDS_CAMP, N_SEEDS_CABLATION          # L35-L37
+C_GRID, C_FIXED                                   # L38-L39
+if __name__ == "__main__": main()                 # L437-L438</pre>
+<p>Zero classes, zero methods, zero CLI flags. <code>DATE</code> style argument parsing is absent: <code>TODAY</code> always comes from <code>datetime.date.today()</code> (L31).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>Where</th><th>What it uses</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_harness_e5c_curve.html">e5c_curve.py</a></td><td>import L33 (<code>import e5b_splits as B</code>)</td><td>load_all L238, group_split L61, select_C_inner L68, fit_eval L69, summarize L101, paired_stats L105, C_FIXED L264</td></tr>
+<tr><td class="sym">e13_l3_extreme.py</td><td>import L385 and L1032 (inside functions)</td><td>load_all, group_split, select_C_inner, fit_eval, summarize, paired_stats, C_FIXED (L386&ndash;447, L1033)</td></tr>
+<tr><td class="sym">run directly</td><td><code>uv run python experiments_verifiers/harness/e5b_splits.py</code> (L12)</td><td>executes <code>main</code> at L437&ndash;438</td></tr>
+<tr><td class="sym">tests/</td><td>grep of tests/ for <code>e5b_splits</code>: no hit</td><td>no test found; this is experiment code, not library code</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: <code>e5c_curve.py</code> and <code>e13_l3_extreme.py</code> reuse the split, fit, C-selection and paired-stats helpers instead of copying them, so a change to <code>group_split</code> (L76) or <code>select_C_inner</code> (L101) changes three experiments at once.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e5b_splits.py</code> (438 lines, read in full), <code class="path">experiments_verifiers/harness/e5_common.py</code> L1&ndash;45 and L128, L211, L222 (for the read path and the helpers used), <code class="path">experiments_verifiers/harness/e5_run.py</code> function list (L204, L216), <code class="path">experiments_verifiers/harness/e5c_curve.py</code> and <code class="path">e13_l3_extreme.py</code> (import sites), <code class="path">tests/</code> (grep for the module name: no hit), <code class="path">docs/visual_clone/_reference.html</code> and <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p>Related pages: <a href="file_index.html">file_index.html</a> (hub), <a href="exp_e5b_splits.html">exp_e5b_splits.html</a>, <a href="file_harness_e5c_curve.html">e5c_curve.py</a> (reuses this file), <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p class="skips">Skipped: the result files <code class="path">experiments_verifiers/results/E5b_L3_splits_2026-09-21.json</code> and <code>.md</code> (this page documents the file, not one run); <code class="path">experiments_verifiers/REPORT_experiments.html</code> (a report, not source). No file outside <code class="path">docs/visual_clone/</code> was modified.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

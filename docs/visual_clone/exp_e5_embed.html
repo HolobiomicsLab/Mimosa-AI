@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e5_embed - E5 embedding cache - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e5_embed">
+<div class="wrap">
+
+<h1 class="hud">e5_embed &mdash; the MiniLM claim-embedding cache</h1>
+<p class="intro">E5's embedding rung needed one vector per distinct claim name before any fitting could start. This page covers <code>e5_embed.py</code>, the script that precomputes that cache into one <code>.npz</code> file. The cache is then read by <code>e5_run.py</code> L56, <code>e5b_splits.py</code> L47, <code>e9_deployment.py</code> L84 and <code>e13_common.py</code> L36.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; text to normalized vectors</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 400" role="img" aria-label="e5_embed inputs, encoding steps and cache members">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="hyp">
+    <title>The hypothesis this cache serves: claim text carries importance signal</title>
+    <rect x="20" y="20" width="430" height="48" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="235" y="40" text-anchor="middle">hypothesis: text proxies the claim</text>
+    <text class="box-sub" x="235" y="56" text-anchor="middle">a frozen encoder stands in for the LLM judge</text>
+  </g>
+
+  <a class="box" id="a1" href="../../experiments_verifiers/data/verifier_claims.jsonl">
+    <title>607 frozen claim evaluations</title>
+    <rect x="20" y="100" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="124" text-anchor="middle">frozen claims file</text>
+    <text class="box-sub" x="155" y="140" text-anchor="middle">data/verifier_claims.jsonl</text>
+  </a>
+  <a class="box" id="b1" href="exp_e5_common.html">
+    <title>load_examples returns the examples used to list names</title>
+    <rect x="340" y="100" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="124" text-anchor="middle">load_examples L18</text>
+    <text class="box-sub" x="460" y="140" text-anchor="middle">607 rows, 15 542 verdicts</text>
+  </a>
+  <g class="box" id="c1">
+    <title>Sorted distinct claim names</title>
+    <rect x="630" y="100" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="124" text-anchor="middle">distinct claim names</text>
+    <text class="box-sub" x="755" y="140" text-anchor="middle">2480 names, sorted L22</text>
+  </g>
+
+  <g class="box" id="a2">
+    <title>Claim descriptions parsed from evaluation.txt</title>
+    <rect x="20" y="200" width="270" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="155" y="224" text-anchor="middle">evaluation.txt files</text>
+    <text class="box-sub" x="155" y="240" text-anchor="middle">via load_eval_paths, L19</text>
+  </g>
+  <a class="box" id="b2" href="exp_e5_common.html">
+    <title>parse_descriptions builds the name to description map</title>
+    <rect x="340" y="200" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="224" text-anchor="middle">parse_descriptions L19</text>
+    <text class="box-sub" x="460" y="240" text-anchor="middle">name + rationale text</text>
+  </a>
+  <g class="box" id="c2">
+    <title>One name-dot-description string per name</title>
+    <rect x="630" y="200" width="250" height="60" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="755" y="224" text-anchor="middle">name + description strings</text>
+    <text class="box-sub" x="755" y="240" text-anchor="middle">L23, one per name</text>
+  </g>
+
+  <g class="box" id="a3">
+    <title>The encoder model, downloaded by sentence-transformers</title>
+    <rect x="20" y="300" width="270" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="155" y="324" text-anchor="middle">all-MiniLM-L6-v2</text>
+    <text class="box-sub" x="155" y="340" text-anchor="middle">sentence-transformers, L28</text>
+  </g>
+  <a class="box" id="b3" href="../../experiments_verifiers/harness/e5_embed.py">
+    <title>model.encode with normalization and batch 128</title>
+    <rect x="340" y="300" width="240" height="60" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="324" text-anchor="middle">model.encode L29-L30</text>
+    <text class="box-sub" x="460" y="340" text-anchor="middle">batch 128, normalized</text>
+  </a>
+  <a class="box" id="c3" href="../../experiments_verifiers/results/_cache_e5_embeddings.npz">
+    <title>The written cache file</title>
+    <rect x="630" y="300" width="250" height="60" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="755" y="324" text-anchor="middle">_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="755" y="340" text-anchor="middle">name_emb, name_desc_emb</text>
+  </a>
+
+  <path class="edge" data-from="hyp" data-to="a1" d="M155,68 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="163" y="88" text-anchor="start">tested on</text>
+
+  <path class="edge" data-from="a1" data-to="b1" d="M290,130 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="122" text-anchor="middle">reads</text>
+  <path class="edge" data-from="b1" data-to="c1" d="M580,130 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="122" text-anchor="middle">names</text>
+
+  <path class="edge" data-from="a2" data-to="b2" d="M290,230 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="222" text-anchor="middle">reads</text>
+  <path class="edge" data-from="b2" data-to="c2" d="M580,230 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="222" text-anchor="middle">text lines</text>
+
+  <path class="edge" data-from="a3" data-to="b3" d="M290,330 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="315" y="322" text-anchor="middle">loads model</text>
+  <path class="edge" data-from="b3" data-to="c3" d="M580,330 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="605" y="322" text-anchor="middle">writes</text>
+
+  <text class="box-sub" x="20" y="384">dashed = external library or model &#183; cyan pill = call into e5_embed.py or e5_common.py &#183; 10 boxes, no crossing arrows</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. The encoder box is dashed because <code>sentence-transformers</code> is an external package, not repo code. The cache box is the only file <code>e5_embed.py</code> writes.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e5_embed.py">experiments_verifiers/harness/e5_embed.py</a></h4>
+<p class="role">Precomputes MiniLM embeddings for every distinct claim name and for name plus description, then stores both matrices and the name list in one .npz file.</p>
+<p class="meta">35 lines &#183; 0 functions, 0 classes, module-level script &#183; entry point: <code>uv run python experiments_verifiers/harness/e5_embed.py</code> (docstring L3) &#183; CLI arguments: none found, it ignores <code>sys.argv</code></p>
+<details><summary>the whole body, in order</summary><div class="dbody">
+<pre>exs = C.load_examples()                                     # L18
+eval_paths = C.load_eval_paths()                            # L19
+descs = C.parse_descriptions(exs, eval_paths)               # L20
+names = sorted({c["name"] for e in exs for c in e["claims"]})   # L22
+texts_nd = [f"{n}. {descs.get(n, {}).get('description', '')}".strip() for n in names]  # L23
+model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")   # L28
+emb_n = model.encode(names, batch_size=128, show_progress_bar=True, normalize_embeddings=True)     # L29
+emb_nd = model.encode(texts_nd, batch_size=128, show_progress_bar=True, normalize_embeddings=True) # L30
+np.savez_compressed(out, name_emb=emb_n, name_desc_emb=emb_nd,
+                    names=np.array(names), has_desc=np.array([n in descs for n in names]))   # L33-L34
+print("wrote", out, emb_n.shape, emb_nd.shape)              # L35</pre>
+<p>Both calls pass <code>show_progress_bar=True</code> and <code>normalize_embeddings=True</code> (L29, L30), so rows are unit vectors.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th>Cited at</th></tr></thead>
+<tbody>
+<tr><td>607 frozen claim evaluations</td><td>nothing</td><td class="sym">experiments_verifiers/data/verifier_claims.jsonl</td><td class="sym">load_examples, e5_common.py L34</td></tr>
+<tr><td>Evaluation paths per uuid</td><td>nothing</td><td class="sym">experiments_verifiers/data/manifest_run_notes.json</td><td class="sym">load_eval_paths, e5_common.py L55</td></tr>
+<tr><td>Claim descriptions</td><td>nothing</td><td class="sym">sources/workflows/&lt;campaign&gt;/&lt;uuid&gt;/evaluation.txt</td><td class="sym">parse_descriptions, e5_common.py L67</td></tr>
+<tr><td>Encoder weights</td><td>nothing</td><td class="sym">sentence-transformers/all-MiniLM-L6-v2</td><td class="sym">e5_embed.py L28</td></tr>
+<tr><td>No cached embeddings</td><td>One compressed <code>.npz</code> archive</td><td class="sym">experiments_verifiers/results/_cache_e5_embeddings.npz</td><td class="sym">np.savez_compressed L33</td></tr>
+</tbody>
+</table>
+<p class="sub">Read row 1 is indirect: <code>e5_embed.py</code> L18 calls <code>e5_common.load_examples</code>, which opens the JSONL file at L35.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; what the cache holds</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 270" role="img" aria-label="Claim verdict count against cached name count">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="110" y="50.0" width="140" height="160.0" fill="rgba(0,229,255,0.16)" stroke="#00E5FF"/>
+  <text class="box-label" x="180" y="43.0" text-anchor="middle">15542</text>
+  <text class="box-sub" x="180" y="226" text-anchor="middle">claim verdicts</text>
+  <rect x="330" y="184.5" width="140" height="25.5" fill="rgba(0,229,255,0.16)" stroke="#00E5FF"/>
+  <text class="box-label" x="400" y="177.5" text-anchor="middle">2480</text>
+  <text class="box-sub" x="400" y="226" text-anchor="middle">distinct names</text>
+  <rect x="550" y="184.5" width="140" height="25.5" fill="rgba(0,229,255,0.16)" stroke="#00E5FF"/>
+  <text class="box-label" x="620" y="177.5" text-anchor="middle">2480</text>
+  <text class="box-sub" x="620" y="226" text-anchor="middle">names with description</text>
+  <path d="M40,210 H840" fill="none" stroke="#1B4B6B" stroke-width="1.2"/>
+  <path d="M40,50 H840" fill="none" stroke="#0E2A3F" stroke-width="1" stroke-dasharray="4 4"/>
+  <text class="box-sub" x="34" y="214" text-anchor="end">0</text>
+  <text class="box-sub" x="34" y="54" text-anchor="end">15542</text>
+  <text class="box-sub" x="40" y="250">counts read from results/_cache_e5_embeddings.npz members and from the E5 JSON data block (L28)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; bar scale is the largest value (15 542 claim verdicts from the JSON <code>data.claims_total</code>). The two 2480 bars are the cache rows; the third counts names whose <code>has_desc</code> flag is true (all of them).</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Cached names</td><td class="size">2480</td><td class="sym">_cache_e5_embeddings.npz member <code>names</code>, shape (2480,)</td></tr>
+<tr><td>Dimensions per name</td><td class="size">384</td><td class="sym">_cache_e5_embeddings.npz member <code>name_emb</code>, shape (2480, 384)</td></tr>
+<tr><td><code>name_emb</code> rows</td><td class="size">2480 &#215; 384 float32</td><td class="sym">_cache_e5_embeddings.npz, read with numpy</td></tr>
+<tr><td><code>name_desc_emb</code> rows</td><td class="size">2480 &#215; 384 float32</td><td class="sym">_cache_e5_embeddings.npz, read with numpy</td></tr>
+<tr><td>Names with a parsed description</td><td class="size">2480 of 2480</td><td class="sym">_cache_e5_embeddings.npz member <code>has_desc</code></td></tr>
+<tr><td>Claim verdicts in the input</td><td class="size">15 542</td><td class="sym">E5_learned_importance_2026-09-21.json L28</td></tr>
+<tr><td>Raw float32 bytes per matrix</td><td class="size">2480 &#215; 384 &#215; 4 = 3 809 280 (my computation)</td><td class="sym">shapes and dtype from the npz</td></tr>
+<tr><td>Cache file size</td><td class="size">7 096 706 bytes (my computation)</td><td class="sym">os.path.getsize at 2026-10-02</td></tr>
+<tr><td>Consumer rung result</td><td class="size">L3 auc_sr 0.753</td><td class="sym">E5_learned_importance_2026-09-21.json L228</td></tr>
+</tbody>
+</table>
+<p class="sub">The npz has 4 members: <code>name_emb</code>, <code>name_desc_emb</code>, <code>names</code>, <code>has_desc</code>. My file-size reading is a dated snapshot; the cache is a results file, not tracked by git.</p>
+
+<details><summary>verbatim: cache members, and the results lines that report the rung</summary><div class="dbody">
+<p>e5_embed.py has no markdown or JSON results file of its own. Its only on-disk output is the npz cache, so the first quote is the cache read back:</p>
+<blockquote>['name_emb', 'name_desc_emb', 'names', 'has_desc']
+name_emb (2480, 384) float32
+name_desc_emb (2480, 384) float32
+names (2480,) &lt;U51
+has_desc (2480,) bool</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/_cache_e5_embeddings.npz</code> &mdash; printed member names and shapes from <code>numpy.load</code>. Binary file, so no line numbers; this line is my read at 2026-10-02.</p>
+<p>No results markdown or JSON line describes the cache build itself, so the remaining quotes are the recorded rung that consumes it:</p>
+<blockquote>| L3_embed_name_desc_logistic | 607 | 191 | 0.753 | 0.617 | 0.333 | 0.204 | 0.693 | 293 | 4 | (293 / 4) |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E5_learned_importance_2026-09-21.md</code> line 33 (row of the ladder table; the trailing <code>(293 / 4)</code> cell has no header column, see <a href="exp_e5_md.html">exp_e5_md.html</a>).</p>
+<blockquote>0.753 (task-LOTO, inner-CV C); E5b task-level 0.735&#177;0.113; E9 reward/L3 = 35/93, uniform/ver_bit</blockquote>
+<p>Path: <code class="path">experiments_verifiers/README.md</code> line 134 (reproduction target for this cache).</p>
+</div></details>
+
+<p class="note flag">Red: the module docstring (L4) says the cache holds <code>names, descs</code>, but the write call (L33&ndash;34) stores <code>names</code> and a boolean <code>has_desc</code>. No <code>descs</code> member exists in the file, and no consumer reads <code>has_desc</code> (grep for <code>has_desc</code> over e5_run.py, e5b_splits.py, e9_deployment.py, e13_common.py: 0 uses).</p>
+<p class="note">Amber: the script re-encodes both text variants in full on every run; it never checks for an existing cache, so a re-run spends GPU or CPU time again.</p>
+<p class="note say">Why it matters: two versions of the same text are cached, name only and name plus description. The rung built on the description version wins the ladder, which is what makes this cache the E5 input that mattered.</p>
+</div>
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e5_embed.py</code> (whole file, 35 lines), <code class="path">e5_common.py</code> (loaders used at L18&ndash;L20), <code class="path">results/_cache_e5_embeddings.npz</code> (member names, shapes, dtype, <code>has_desc</code> sum, file size), <code class="path">results/E5_learned_importance_2026-09-21.json</code> (L28, L228) and <code class="path">.md</code> (L33), <code class="path">experiments_verifiers/README.md</code> (L87, L134), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (L84); consumer line numbers from <code>grep -n _cache_e5_embeddings</code> over <code class="path">harness/</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; never opened, by the build rules. <code class="path">data/verifier_claims.jsonl</code> claim text &mdash; only its row count and the distinct-name count from the cache are used here; the claim names themselves live on <a href="exp_e5_run.html">exp_e5_run.html</a>. <code class="path">REPORT_e10_weights_visualization.html</code> &mdash; 0 matches for <code>E5</code>. <code class="path">REPORT_e11_theory.html</code> &mdash; quotes E5's lexical rung, not this cache; cited on <a href="exp_e5_run.html">exp_e5_run.html</a>. No model download, no encode run, no pytest: the cache was read, not rebuilt.</p>
+<p>Gone at 2026-10-02: nothing this page needed. The npz is a runtime cache under <code class="path">results/</code>, so its bytes change if the script is re-run.</p>
+<p>The folder <code class="path">experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

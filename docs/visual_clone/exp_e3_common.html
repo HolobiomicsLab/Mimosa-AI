@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e3_common - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e3_common">
+<div class="wrap">
+
+<h1 class="hud">e3_common &mdash; the shared E3 harness</h1>
+<p class="intro">E3 asked whether two LLM families from different labs, each writing and answering its own binary checklist, rank benchmark artifacts better than the recorded verifier reward. <code>e3_common.py</code> is the layer both E3 runners import: it loads the frozen population, builds bounded artifact previews, and caches every judge call on disk. It holds no experiment logic of its own, and the reward it competes with is written by the <a href="mod_evaluators_hybrid_verifier.html">hybrid verifier</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 440" role="img" aria-label="e3_common design: hypothesis, inputs, shared stages, artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bH">
+    <title>Hypothesis the two E3 runners test with this layer</title>
+    <rect x="20" y="20" width="200" height="52" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="42" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="120" y="58" text-anchor="middle">two families beat reward</text>
+  </g>
+
+  <g class="box" id="bI1">
+    <title>Frozen manifest rows plus the task goal text in the run note</title>
+    <rect x="20" y="100" width="200" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="122" text-anchor="middle">manifest.json + notes</text>
+    <text class="box-sub" x="120" y="140" text-anchor="middle">1 104 rows, goal text</text>
+  </g>
+
+  <g class="box" id="bI2">
+    <title>Frozen per-generation workspaces read for the preview packet</title>
+    <rect x="20" y="180" width="200" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="202" text-anchor="middle">snapshots/&lt;uuid_long&gt;</text>
+    <text class="box-sub" x="120" y="220" text-anchor="middle">148 frozen workspaces</text>
+  </g>
+
+  <g class="box" id="bS1">
+    <title>load_population selects rows with a snapshot and non-empty pred_results</title>
+    <rect x="270" y="70" width="200" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="92" text-anchor="middle">load_population()</text>
+    <text class="box-sub" x="370" y="110" text-anchor="middle">135 rows kept</text>
+  </g>
+
+  <g class="box" id="bS2">
+    <title>build_evidence walks the workspace and previews bounded heads</title>
+    <rect x="270" y="170" width="200" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="192" text-anchor="middle">build_evidence()</text>
+    <text class="box-sub" x="370" y="210" text-anchor="middle">listing + 2 KB previews</text>
+  </g>
+
+  <g class="box" id="bS3">
+    <title>LLMClient.complete caches on sha256(model + messages)</title>
+    <rect x="270" y="260" width="200" height="54" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="282" text-anchor="middle">LLMClient.complete()</text>
+    <text class="box-sub" x="370" y="300" text-anchor="middle">cache first, 8 parallel</text>
+  </g>
+
+  <g class="box" id="bS4">
+    <title>extract_json pulls the first balanced JSON object out of a reply</title>
+    <rect x="270" y="350" width="200" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="372" text-anchor="middle">extract_json()</text>
+    <text class="box-sub" x="370" y="390" text-anchor="middle">returns dict | None</text>
+  </g>
+
+  <g class="box" id="bA1">
+    <title>Evidence packet handed to the judge prompt, never persisted</title>
+    <rect x="540" y="60" width="190" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="635" y="82" text-anchor="middle">evidence packet</text>
+    <text class="box-sub" x="635" y="100" text-anchor="middle">in memory only</text>
+  </g>
+
+  <a class="box" id="bA2" href="../../experiments_verifiers/results/E3_llm_cache.json">
+    <title>Disk cache shared by e3_run.py and e3_run2.py</title>
+    <rect x="540" y="180" width="190" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="635" y="202" text-anchor="middle">E3_llm_cache.json</text>
+    <text class="box-sub" x="635" y="220" text-anchor="middle">564 cached judge calls</text>
+  </a>
+
+  <g class="box" id="bA3">
+    <title>Parsed checks and answers consumed by the runner</title>
+    <rect x="540" y="290" width="190" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="635" y="312" text-anchor="middle">checks and answers</text>
+    <text class="box-sub" x="635" y="330" text-anchor="middle">returned to the runner</text>
+  </g>
+
+  <path class="edge" data-from="bH" data-to="bS1" d="M220,45 L270,90" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="228" y="80" text-anchor="start">design A</text>
+
+  <path class="edge dashed-edge" data-from="bI1" data-to="bS1" d="M220,122 L270,102" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="224" y="152" text-anchor="start">reads rows</text>
+
+  <path class="edge dashed-edge" data-from="bI2" data-to="bS2" d="M220,208 L270,198" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="224" y="240" text-anchor="start">reads files</text>
+
+  <path class="edge" data-from="bS1" data-to="bS2" d="M370,124 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="378" y="150" text-anchor="start">rows, goal</text>
+
+  <path class="edge" data-from="bS2" data-to="bS3" d="M370,224 V260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="378" y="246" text-anchor="start">packet text</text>
+
+  <path class="edge" data-from="bS3" data-to="bS4" d="M370,314 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="378" y="336" text-anchor="start">reply text</text>
+
+  <path class="edge" data-from="bS2" data-to="bA1" d="M470,197 H540" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="505" y="189" text-anchor="middle">prompt</text>
+
+  <path class="edge dashed-edge" data-from="bS3" data-to="bA2" d="M470,287 H540" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="505" y="279" text-anchor="middle">cache</text>
+
+  <path class="edge" data-from="bS4" data-to="bA3" d="M470,377 L540,318" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="478" y="358" text-anchor="start">parsed dict</text>
+
+  <text class="box-sub" x="20" y="424">10 boxes &#183; mint = shared code</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 10 boxes. The four helper functions sit inside the two green boxes: <code>_safe_read_head()</code> L57, <code>image_info()</code> L66, <code>build_listing()</code> L76 and <code>goal_files()</code> L92 all serve <code>build_evidence()</code>. <code>load_dotenv()</code> L154 and <code>save()</code> L237 are named in the script card. The packet is built for the judge prompts that live in <code>experiments_verifiers/scorers/llm_judge_ensemble.py</code>, outside this script.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/e3_common.py">experiments_verifiers/harness/e3_common.py</a></h4>
+<p class="role">Shared E3 layer: selects the frozen population, builds bounded artifact preview packets, and caches every LLM completion on disk.</p>
+<p class="meta">264 lines &#183; 9 module functions + class <code>LLMClient</code> &#183; no entry point, no CLI &#183; imported by <a href="exp_e3_run.html">e3_run.py</a> and <a href="exp_e3_run2.html">e3_run2.py</a></p>
+<details><summary>signatures, constants, freezes</summary><div class="dbody">
+<pre>load_population() -&gt; list[dict]                                  # L31
+_safe_read_head(path, n=2048) -&gt; str                             # L57
+image_info(path) -&gt; str                                          # L66
+build_listing(ws, cap=200) -&gt; list[tuple[str, int]]              # L76
+goal_files(goal) -&gt; set[str]                                     # L92
+build_evidence(ws, goal, max_files=10, head_bytes=2048) -&gt; str   # L98
+build_listing_only(ws) -&gt; str                                    # L136
+load_dotenv(path=None) -&gt; None                                   # L154
+LLMClient(cache_path, concurrency=8)                             # L166
+LLMClient.complete(model, messages, max_tokens=6000, label="")   # L203
+extract_json(text) -&gt; dict | None                                # L246</pre>
+<p>Constants: <code>RESULTS</code> L17, <code>SNAPSHOTS</code> L18, <code>TEXT_EXTS</code> L20, <code>BINARY_EXTS</code> L24, <code>IMAGE_EXTS</code> L25, <code>MODELS</code> L144 (keys <code>glm</code>, <code>dsk</code>), <code>PRICING_PER_TOKEN</code> L148.</p>
+<p>Caps found in the code: listing 200 entries (<code>build_listing</code> cap), 10 preview files and 24 000 bytes of preview budget, 2 048 bytes per text head (<code>build_evidence</code> L98), completion concurrency 8 (<code>LLMClient</code> L169). A reply shorter than 30 characters is retried once at three times the token budget, in a second cache slot (L203&ndash;231). <code>save()</code> L237 writes a <code>.tmp</code> file and replaces the cache; <code>_maybe_save()</code> L233 calls it every 10 fresh calls.</p>
+<p><code>BINARY_EXTS</code> files are never previewed (L118&ndash;119); images report pixel size only (<code>image_info</code> L66).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Frozen manifest rows (<code>load_population</code> L34)</td><td>nothing</td><td class="sym">experiments_verifiers/manifest.json</td></tr>
+<tr><td>Task goal text (<code>load_population</code> L40)</td><td>nothing</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td></tr>
+<tr><td>Workspace listing and file heads (<code>build_listing</code> L76, <code>_safe_read_head</code> L57)</td><td>nothing</td><td class="sym">experiments_verifiers/workspace_artefacts/snapshots/&lt;uuid_long&gt;/</td></tr>
+<tr><td>API key (<code>load_dotenv</code> L154)</td><td>nothing</td><td class="sym">repo-root .env &mdash; skipped, never opened</td></tr>
+<tr><td>Cached replies (<code>LLMClient.__init__</code> L169)</td><td>one entry per unique call (<code>save</code> L237)</td><td class="sym">experiments_verifiers/results/E3_llm_cache.json</td></tr>
+<tr><td>nothing</td><td>evidence packet, in memory (<code>build_evidence</code> L98)</td><td class="sym">not persisted</td></tr>
+</tbody>
+</table>
+<p class="sub">Citation form: <code>path::Symbol</code>. Line numbers are <code>e3_common.py</code>. Paths are the ones the script names in its own constants (L15&ndash;18).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; what the shared cache holds</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 280" role="img" aria-label="cached judge calls per model">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-label" x="20" y="26" text-anchor="start">cached calls per model</text>
+
+  <path d="M60,50 H840" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="4 4"/>
+  <text class="box-sub" x="52" y="54" text-anchor="end">250</text>
+  <path d="M60,130 H840" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="4 4"/>
+  <text class="box-sub" x="52" y="134" text-anchor="end">125</text>
+  <path d="M60,210 H840" fill="none" stroke="#00E5FF" stroke-width="1.25"/>
+  <text class="box-sub" x="52" y="214" text-anchor="end">0</text>
+
+  <rect x="120" y="64" width="90" height="146" rx="2" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7"/>
+  <text class="box-label" x="165" y="58" text-anchor="middle">229</text>
+  <text class="box-sub" x="165" y="232" text-anchor="middle">deepseek-v4.1-flash</text>
+  <text class="box-sub" x="165" y="248" text-anchor="middle">judge B</text>
+
+  <rect x="290" y="80" width="90" height="130" rx="2" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7"/>
+  <text class="box-label" x="335" y="74" text-anchor="middle">204</text>
+  <text class="box-sub" x="335" y="232" text-anchor="middle">qwen3.7-flash</text>
+  <text class="box-sub" x="335" y="248" text-anchor="middle">judge A in e3_run2</text>
+
+  <rect x="460" y="126" width="90" height="84" rx="2" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7"/>
+  <text class="box-label" x="505" y="120" text-anchor="middle">131</text>
+  <text class="box-sub" x="505" y="232" text-anchor="middle">glm-5.3</text>
+  <text class="box-sub" x="505" y="248" text-anchor="middle">judge A (e3_run)</text>
+
+  <text class="box-sub" x="640" y="140" text-anchor="start">bar height = 250 calls</text>
+  <text class="box-sub" x="640" y="160" text-anchor="start">source: E3_llm_cache.json, one line</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; bar chart of the 564 cache entries counted per model key inside <code class="path">experiments_verifiers/results/E3_llm_cache.json</code>. The file is written as a single JSON line, so it has no line numbers. These are my computation from the file: the script itself never counts entries, it only writes them.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>Cache entries, total</td><td class="size">564</td><td class="sym">E3_llm_cache.json, line 1 &mdash; my computation</td></tr>
+<tr><td>Entries, deepseek-v4.1-flash</td><td class="size">229</td><td class="sym">E3_llm_cache.json, line 1 &mdash; my computation</td></tr>
+<tr><td>Entries, qwen3.7-flash</td><td class="size">204</td><td class="sym">E3_llm_cache.json, line 1 &mdash; my computation</td></tr>
+<tr><td>Entries, glm-5.3</td><td class="size">131</td><td class="sym">E3_llm_cache.json, line 1 &mdash; my computation</td></tr>
+<tr><td>Checklist generation calls</td><td class="size">270</td><td class="sym">key label prefix <code>gen:</code> &mdash; my computation</td></tr>
+<tr><td>Checklist execution calls</td><td class="size">285</td><td class="sym">key label prefix <code>exec:</code> &mdash; my computation</td></tr>
+<tr><td>Repair calls</td><td class="size">9</td><td class="sym">labels <code>gen-repair</code> (8) + <code>exec-repair</code> (1)</td></tr>
+<tr><td>Replies shorter than 30 chars</td><td class="size">9</td><td class="sym">all hold empty text; 6 budget-escalated retry slots exist (L203&ndash;231)</td></tr>
+<tr><td>Population rows selected</td><td class="size">135 of 1 104</td><td class="sym"><code>load_population</code> L31 on manifest.json</td></tr>
+<tr><td>Snapshot directories on disk</td><td class="size">148</td><td class="sym">workspace_artefacts/snapshots &mdash; my computation</td></tr>
+</tbody>
+</table>
+<p class="note say">One sentence of why it matters: the cache is keyed on <code>sha256(model + messages)</code>, so the three E3 scripts share replies and a repeated stage costs no new calls.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>cache shape and the population contract (4 quotes)</summary><div class="dbody">
+<blockquote>{"157497af564a5cdb76f99d2b52fdda631e911add6a55b1cc68c6ef17193ef395": {"model": "openrouter/z-ai/glm-5.3", "label": "gen:glm", "text": "{\"checks\": [{\"id\": 1, \"check\": \"The file pred_results/clintox_test_pred.csv exists at the exact required path within the workspace.\", \"files\": \"pred_resul</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_llm_cache.json</code> &mdash; line 1, truncated at 300 characters. The whole file is one line (no newline character in the file).</p>
+<blockquote>"population": "manifest.json rows with snapshot AND non-empty pred_results (n=135; SR-true=50; campaigns: chemistry_iterative_v4_flash + run_1)"</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code> &mdash; line 12, key <code>sampling_frame.population</code>. This is the population <code>load_population()</code> selects.</p>
+<blockquote>"design": "Design A: each family independently generates K=6-10 binary checks from goal + file listing, then answers them against artifact previews (first 2KB text / image dims). Aggregation at score level only."</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code> &mdash; line 4, key <code>design</code>. The two preview limits are the ones <code>build_evidence()</code> implements.</p>
+<blockquote>"metrics_note": "all computed numbers are 'my computation'"</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-pilot_20260921.json</code> &mdash; line 39, key <code>metrics_note</code>.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e3_common.py</code> (all 264 lines), <code class="path">experiments_verifiers/harness/e3_run.py</code> and <code class="path">e3_run2.py</code> (import sites and constants only), <code class="path">experiments_verifiers/manifest.json</code> (row keys and counters), <code class="path">experiments_verifiers/README.md</code> (E3 row in the codename table: SPOCK, "died mid-run and was salvaged"), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (&sect;2 constitution, &sect;3 data map, &sect;5 norms), <code class="path">experiments_verifiers/results/E3_llm_cache.json</code> (counted), <code class="path">results/E3_designA-pilot_20260921.json</code> (lines 4, 10&ndash;12, 39), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <code class="path">mod_evaluators_hybrid_verifier.html</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; secrets, never opened. <code class="path">experiments_verifiers/scorers/llm_judge_ensemble.py</code> &mdash; read only for the two imported names <code>DesignAJudge</code> and <code>aggregate</code>, which belong to <a href="exp_e3_run.html">exp_e3_run.html</a>. <code class="path">experiments_verifiers/workspace_artefacts/snapshots/*</code> &mdash; counted (148 dirs), contents not opened. <code class="path">experiments_verifiers/EXPERIMENTS.md</code> &mdash; holds no per-experiment E3 section; only <code class="path">README.md</code> names E3, so the design intent comes from the scripts. <code class="path">E3_designA_state.json</code>, <code class="path">E3_designA_full_state.json</code>, <code class="path">E3_designA-salvaged_20260921.json</code> &mdash; opened by the sibling pages, not this one. No experiment, application or pytest run, by the build rules.</p>
+<p>experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

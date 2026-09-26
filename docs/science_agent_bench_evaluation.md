@@ -6,8 +6,9 @@
 
     - **The judge / verifier** ([Evaluation pipeline](concepts/evaluation-pipeline.md))
       runs after every workflow execution and produces the **pressure
-      signal** that drives workflow evolution. It writes deterministic
-      Python programs that recompute claims from the workspace.
+      signal** that drives workflow evolution. It scores workspaces with
+      deterministic Python policy scorers against a temporal claim
+      ladder.
     - **ScienceAgentBench evaluation** (this page) is an **external
       benchmark grader** that compares a workflow's output file against
       a **ground-truth file shipped by the ScienceAgentBench authors**.
@@ -310,11 +311,12 @@ ScienceAgentBench CSV requires these columns:
 
 ## What this is *not*
 
-This page does **not** describe the multi-source per-claim verifier that
-drives workflow evolution. The verifier runs on every workflow execution
-(benchmark or not), writes deterministic Python programs to check the
-agents' claims against the workspace, and emits a coarse prompt gradient
-that the mutator can act on. For that, see
+This page does **not** describe the hybrid temporal-ladder verifier
+that drives workflow evolution. The verifier runs on every workflow
+execution (benchmark or not), scores each workspace with cached
+deterministic Python policy scorers (code → logs → deliverables), and
+emits an elimination-point textual gradient that the mutator can act
+on. For that, see
 [Evaluation pipeline](concepts/evaluation-pipeline.md).
 
 When running ScienceAgentBench in `--learn` mode, both systems run: the

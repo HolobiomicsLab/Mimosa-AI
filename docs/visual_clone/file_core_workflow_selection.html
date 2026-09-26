@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>sources/core/workflow_selection.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<!-- file_core_workflow_selection.html - file digest: sources/core/workflow_selection.py.
+     Built by the visual-clone worker "file-digests-core-workflow". Sources: see footer. -->
+<body data-crumb="File digests > sources/core > workflow_selection.py">
+<div class="wrap">
+
+<h1 class="hud">workflow_selection.py</h1>
+<p class="intro"><code>WorkflowSelector</code> finds stored workflows under <code>config.workflow_dir</code> and picks the parents for the next generation. One path samples the live <code>SelectionPressure</code> archive; the other is a cold-start disk scan filtered by goal similarity and by score. Similarity uses MiniLM embeddings when they load, and a word-overlap fallback when they do not.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Main diagram - discovery, then the two parent paths</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 440" role="img" aria-label="WorkflowSelector discovery and the two parent selection paths">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="b1">
+    <title>The workflow folder on disk: one sub-folder per uuid.</title>
+    <rect x="20" y="30" width="200" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="56" text-anchor="middle">config.workflow_dir</text>
+    <text class="box-sub" x="120" y="76" text-anchor="middle">workflows/&lt;uuid&gt;/</text>
+    <text class="box-sub" x="120" y="96" text-anchor="middle">one folder per generation</text>
+  </g>
+
+  <g class="box" id="b2">
+    <title>__init__ stores the config and calls discover_workflows at construction (lines 43-57).</title>
+    <rect x="260" y="30" width="200" height="90" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="360" y="56" text-anchor="middle">WorkflowSelector</text>
+    <text class="box-sub" x="360" y="76" text-anchor="middle">__init__(config)</text>
+    <text class="box-sub" x="360" y="96" text-anchor="middle">discover_workflows()</text>
+  </g>
+
+  <g class="box" id="b3">
+    <title>discover_workflows keeps only valid, non-empty, non-single-agent folders (lines 99-121).</title>
+    <rect x="500" y="30" width="200" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="600" y="56" text-anchor="middle">folder filter</text>
+    <text class="box-sub" x="600" y="76" text-anchor="middle">is_valid(), state, code</text>
+    <text class="box-sub" x="600" y="96" text-anchor="middle">skips "single_agent" uuids</text>
+  </g>
+
+  <g class="box" id="b6">
+    <title>The cold-start ranking chain (lines 151-224).</title>
+    <rect x="740" y="30" width="200" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="840" y="52" text-anchor="middle">sort_similar_workflows()</text>
+    <text class="box-sub" x="840" y="70" text-anchor="middle">sort_workflows_by_score()</text>
+    <text class="box-sub" x="840" y="88" text-anchor="middle">select_best_workflows()</text>
+    <text class="box-sub" x="840" y="106" text-anchor="middle">filters by threshold</text>
+  </g>
+
+  <g class="box" id="b7">
+    <title>select_parent_workflows decides archive or cold start (lines 300-373).</title>
+    <rect x="980" y="30" width="200" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1080" y="56" text-anchor="middle">select_parent_workflows()</text>
+    <text class="box-sub" x="1080" y="76" text-anchor="middle">returns parents, use_crossover</text>
+    <text class="box-sub" x="1080" y="96" text-anchor="middle">logs the chosen mode</text>
+  </g>
+
+  <g class="box" id="b4">
+    <title>_get_model loads all-MiniLM-L6-v2 on the first similarity call, once per selector (lines 59-74).</title>
+    <rect x="260" y="180" width="200" height="90" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="360" y="206" text-anchor="middle">_get_model()</text>
+    <text class="box-sub" x="360" y="226" text-anchor="middle">all-MiniLM-L6-v2</text>
+    <text class="box-sub" x="360" y="244" text-anchor="middle">None when loading fails</text>
+  </g>
+
+  <g class="box" id="b5">
+    <title>cosine_similarity uses the model, else _lexical_similarity (lines 123-149, 76-83).</title>
+    <rect x="500" y="180" width="200" height="90" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="600" y="206" text-anchor="middle">cosine_similarity()</text>
+    <text class="box-sub" x="600" y="226" text-anchor="middle">_lexical_similarity()</text>
+    <text class="box-sub" x="600" y="244" text-anchor="middle">Jaccard over word tokens</text>
+  </g>
+
+  <g class="box" id="b9">
+    <title>_count_children_on_disk reads lineage records (lines 241-256).</title>
+    <rect x="740" y="180" width="200" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="840" y="206" text-anchor="middle">_count_children_on_disk()</text>
+    <text class="box-sub" x="840" y="226" text-anchor="middle">lineage.scan_all()</text>
+    <text class="box-sub" x="840" y="244" text-anchor="middle">{parent: n_children}</text>
+  </g>
+
+  <g class="box" id="b8">
+    <title>_select_from_archive samples the live archive and rehydrates each member (lines 258-298).</title>
+    <rect x="980" y="180" width="200" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1080" y="202" text-anchor="middle">_select_from_archive()</text>
+    <text class="box-sub" x="1080" y="220" text-anchor="middle">select_parents(archive)</text>
+    <text class="box-sub" x="1080" y="238" text-anchor="middle">_rehydrate_workflow_info()</text>
+    <text class="box-sub" x="1080" y="256" text-anchor="middle">forces crossover off under 2</text>
+  </g>
+
+  <g class="box" id="b10">
+    <title>The two return values leave the file (lines 342, 373).</title>
+    <rect x="260" y="320" width="920" height="90" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="720" y="346" text-anchor="middle">values out</text>
+    <text class="box-sub" x="720" y="366" text-anchor="middle">list[WorkflowInfo] parents, newest first by score where the cold-start path ran</text>
+    <text class="box-sub" x="720" y="386" text-anchor="middle">use_crossover: bool  ->  consumed by the variation engine</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b2" d="M220,75 H260" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="240" y="67" text-anchor="middle">folders</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M460,75 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="67" text-anchor="middle">iterdir</text>
+  <path class="edge" data-from="b3" data-to="b6" d="M700,75 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="67" text-anchor="middle">workflows_info</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M940,75 H980" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="960" y="67" text-anchor="middle">candidates</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M460,225 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="217" text-anchor="middle">model.encode</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M600,180 V160 H840 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="154" text-anchor="middle">similarity key</text>
+  <path class="edge dashed-edge" data-from="b1" data-to="b9" d="M120,120 V160 H840 V180" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="400" y="154" text-anchor="middle">lineage records</text>
+  <path class="edge" data-from="b9" data-to="b8" d="M940,225 H980" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="960" y="217" text-anchor="middle">child_counts</text>
+  <path class="edge" data-from="b7" data-to="b8" d="M1080,120 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1130" y="154" text-anchor="middle">if archive</text>
+  <path class="edge" data-from="b8" data-to="b10" d="M1080,270 V320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1130" y="298" text-anchor="middle">selected</text>
+  <path class="edge" data-from="b7" data-to="b10" d="M980,120 H960 V365 H1180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="990" y="290" text-anchor="middle">flag</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - two stages. Discovery (top row) scans the folder and embeds goal text; parent selection (bottom row) either samples the archive or ranks the disk candidates. Every box names a real method with its line range. Group page: <a href="mod_core_selection.html">mod_core_selection.html</a>.</p>
+<p class="note say">The similarity model is loaded on the first similarity call, not at startup: the comment at lines 52-55 says an eager download crashes the app where the model host is unreachable, and the <code>HF_ENDPOINT</code> mirror is suggested there.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Data flow - config and folders in, parents out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 320" role="img" aria-label="Config field, files read, lineage records and returned values">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="f1">
+    <title>Only two config reads: workflow_dir at line 50, and the selection knobs the caller passes in.</title>
+    <rect x="20" y="40" width="240" height="180" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="140" y="66" text-anchor="middle">config fields</text>
+    <text class="box-sub" x="140" y="86" text-anchor="middle">workflow_dir (line 50)</text>
+    <text class="box-sub" x="140" y="106" text-anchor="middle">passed in by the caller:</text>
+    <text class="box-sub" x="140" y="124" text-anchor="middle">n_parents (line 304)</text>
+    <text class="box-sub" x="140" y="142" text-anchor="middle">crossover_rate (line 305)</text>
+    <text class="box-sub" x="140" y="160" text-anchor="middle">threshold_similarity (line 306)</text>
+    <text class="box-sub" x="140" y="178" text-anchor="middle">threshold_score (line 307)</text>
+    <text class="box-sub" x="140" y="200" text-anchor="middle">evolution_engine.py:299-306</text>
+  </g>
+
+  <g class="box" id="f2">
+    <title>Every file read goes through WorkflowInfo or lineage.scan_all.</title>
+    <rect x="310" y="40" width="270" height="180" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="445" y="66" text-anchor="middle">files and state read</text>
+    <text class="box-sub" x="445" y="86" text-anchor="middle">workflows/&lt;uuid&gt;/state_result.json</text>
+    <text class="box-sub" x="445" y="104" text-anchor="middle">workflows/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py</text>
+    <text class="box-sub" x="445" y="122" text-anchor="middle">workflows/&lt;uuid&gt;/original_task_&lt;uuid&gt;.txt</text>
+    <text class="box-sub" x="445" y="140" text-anchor="middle">lineage records, via _scan_lineage (line 252)</text>
+    <text class="box-sub" x="445" y="158" text-anchor="middle">SelectionPressure._archive (line 277)</text>
+    <text class="box-sub" x="445" y="176" text-anchor="middle">model weights, first similarity call (line 65)</text>
+    <text class="box-sub" x="445" y="198" text-anchor="middle">file paths owned by workflow_info.py</text>
+  </g>
+
+  <g class="box" id="f3">
+    <title>The selector object holds workflows_info and the lazy model.</title>
+    <rect x="620" y="40" width="150" height="180" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="695" y="120" text-anchor="middle">WorkflowSelector</text>
+    <text class="box-sub" x="695" y="140" text-anchor="middle">workflows_info</text>
+    <text class="box-sub" x="695" y="158" text-anchor="middle">_model, _model_load_failed</text>
+  </g>
+
+  <g class="box" id="f4">
+    <title>Returned tuple, consumed by the variation engine.</title>
+    <rect x="620" y="245" width="360" height="60" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="800" y="270" text-anchor="middle">values out</text>
+    <text class="box-sub" x="800" y="290" text-anchor="middle">(list[WorkflowInfo], use_crossover: bool)</text>
+  </g>
+
+  <g class="box" id="f5">
+    <title>No write call exists in this file.</title>
+    <rect x="30" y="245" width="520" height="60" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="50" y="270">writes: none</text>
+    <text class="box-sub" x="50" y="290">no open(...,"w"), no lineage record written, no score written; the file only reads and ranks</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="f1" data-to="f3" d="M260,120 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="360" y="112" text-anchor="middle">workflow_dir</text>
+  <path class="edge dashed-edge" data-from="f2" data-to="f3" d="M580,130 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="600" y="122" text-anchor="middle">parsed</text>
+  <path class="edge" data-from="f3" data-to="f4" d="M695,220 V245" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="745" y="238" text-anchor="middle">returns</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - the config surface is one field wide; the rest of the knobs arrive as call arguments. The amber box records the negative result of the write check.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic - archive first, cold start second</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 340" role="img" aria-label="Decision tree of select_parent_workflows">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="q1">
+    <title>Caller entry: select_parent_workflows (line 300).</title>
+    <rect x="20" y="130" width="180" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="110" y="158" text-anchor="middle">select_parent_</text>
+    <text class="box-label" x="110" y="174" text-anchor="middle">workflows()</text>
+  </g>
+  <g class="box" id="q2">
+    <title>Truthiness test on the in-memory archive (line 329).</title>
+    <rect x="240" y="130" width="190" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="335" y="158" text-anchor="middle">selection_pressure</text>
+    <text class="box-label" x="335" y="174" text-anchor="middle">._archive truthy?</text>
+  </g>
+  <g class="box" id="q3">
+    <title>Archive path: sample and rehydrate (lines 258-298).</title>
+    <rect x="470" y="30" width="230" height="80" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="58" text-anchor="middle">_select_from_archive()</text>
+    <text class="box-sub" x="585" y="78" text-anchor="middle">select_parents(archive, ...)</text>
+    <text class="box-sub" x="585" y="96" text-anchor="middle">rehydrate every sampled member</text>
+  </g>
+  <g class="box" id="q4">
+    <title>Rehydration can fail for all members and then the cold-start path runs (lines 292-294).</title>
+    <rect x="740" y="30" width="240" height="80" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="860" y="58" text-anchor="middle">any member rehydrated?</text>
+    <text class="box-sub" x="860" y="78" text-anchor="middle">no: return [], False</text>
+    <text class="box-sub" x="860" y="96" text-anchor="middle">caller treats it as cold start</text>
+  </g>
+  <g class="box" id="q5">
+    <title>Cold-start path builds disk candidates (lines 344-349).</title>
+    <rect x="470" y="150" width="230" height="80" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="178" text-anchor="middle">select_best_workflows()</text>
+    <text class="box-sub" x="585" y="198" text-anchor="middle">similarity floor, then score floor</text>
+    <text class="box-sub" x="585" y="216" text-anchor="middle">defaults 0.8 and 0.1</text>
+  </g>
+  <g class="box" id="q6">
+    <title>Empty candidate list ends the call (lines 351-353).</title>
+    <rect x="740" y="150" width="240" height="80" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="860" y="178" text-anchor="middle">candidates empty?</text>
+    <text class="box-sub" x="860" y="198" text-anchor="middle">yes: log, return [], False</text>
+  </g>
+  <g class="box" id="q7">
+    <title>Adapters wrap WorkflowInfo so select_parents can read a reward attribute (lines 355-362).</title>
+    <rect x="470" y="270" width="230" height="60" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="298" text-anchor="middle">_WorkflowScoreAdapter()</text>
+    <text class="box-sub" x="585" y="316" text-anchor="middle">reward = overall_score</text>
+  </g>
+  <g class="box" id="q8">
+    <title>Post-condition: crossover needs at least two parents after rehydration (lines 296-297).</title>
+    <rect x="740" y="270" width="240" height="60" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="860" y="290" text-anchor="middle">use_crossover and len &lt; 2</text>
+    <text class="box-sub" x="860" y="310" text-anchor="middle">forces use_crossover = False</text>
+  </g>
+
+  <path class="edge" data-from="q1" data-to="q2" d="M200,165 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="157" text-anchor="middle">tests</text>
+  <path class="edge" data-from="q2" data-to="q3" d="M430,145 H450 V70 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="452" y="110" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q2" data-to="q5" d="M430,185 H450 V190 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="452" y="230" text-anchor="middle">no</text>
+  <path class="edge" data-from="q3" data-to="q4" d="M700,70 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="62" text-anchor="middle">check</text>
+  <path class="edge" data-from="q5" data-to="q6" d="M700,190 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="182" text-anchor="middle">test</text>
+  <path class="edge" data-from="q6" data-to="q7" d="M860,230 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="900" y="252" text-anchor="middle">no</text>
+  <path class="edge dashed-edge" data-from="q4" data-to="q5" d="M1000,70 H1040 V190 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1050" y="130" text-anchor="middle">fall through</text>
+  <path class="edge" data-from="q7" data-to="q8" d="M700,300 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="292" text-anchor="middle">select_parents()</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - the dispatch rule of <code>select_parent_workflows</code>, conditions quoted from <code class="path">sources/core/workflow_selection.py:329</code>, <code class="path">:351</code> and <code class="path">:296</code>. The same two-parent rule is applied inside the archive path at line 296.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Control logic - which folders become candidates</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 240" role="img" aria-label="Filter chain inside discover_workflows">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="w1">
+    <title>Folder missing returns an empty dict with a printed message (lines 95-97).</title>
+    <rect x="20" y="80" width="160" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="100" y="108" text-anchor="middle">folder exists?</text>
+    <text class="box-sub" x="100" y="128" text-anchor="middle">line 95</text>
+  </g>
+  <g class="box" id="w2">
+    <title>Non-directories are skipped (line 100).</title>
+    <rect x="220" y="80" width="160" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="300" y="108" text-anchor="middle">is_dir()?</text>
+    <text class="box-sub" x="300" y="128" text-anchor="middle">line 100</text>
+  </g>
+  <g class="box" id="w3">
+    <title>Single-agent uuids never enter the population (line 104).</title>
+    <rect x="420" y="80" width="170" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="505" y="108" text-anchor="middle">"single_agent" in uuid?</text>
+    <text class="box-sub" x="505" y="128" text-anchor="middle">line 104</text>
+  </g>
+  <g class="box" id="w4">
+    <title>WorkflowInfo.is_valid checks state_result.json and the genotype file (line 108).</title>
+    <rect x="630" y="80" width="170" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="715" y="108" text-anchor="middle">is_valid()?</text>
+    <text class="box-sub" x="715" y="128" text-anchor="middle">line 108</text>
+  </g>
+  <g class="box" id="w5">
+    <title>Empty state result and empty code are skipped (lines 112-117).</title>
+    <rect x="840" y="80" width="180" height="70" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="930" y="108" text-anchor="middle">state and code non-empty?</text>
+    <text class="box-sub" x="930" y="128" text-anchor="middle">lines 112-117</text>
+  </g>
+
+  <path class="edge" data-from="w1" data-to="w2" d="M180,115 H220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="107" text-anchor="middle">yes</text>
+  <path class="edge" data-from="w2" data-to="w3" d="M380,115 H420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="107" text-anchor="middle">yes</text>
+  <path class="edge" data-from="w3" data-to="w4" d="M590,115 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="610" y="107" text-anchor="middle">no</text>
+  <path class="edge" data-from="w4" data-to="w5" d="M800,115 H840" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="820" y="107" text-anchor="middle">yes</text>
+  <text class="box-sub" x="20" y="200">each "no" or skip branch drops the folder from the returned dict; the kept folders form self.workflows_info (lines 119-121)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 4 - the filter chain inside <code>discover_workflows</code> (<code class="path">sources/core/workflow_selection.py:93-121</code>). A directory without <code>state_result.json</code>, or without genotype source, never becomes a candidate.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>config field</td><td class="sym">workflow_dir</td><td class="sym">line 50</td><td>folder to scan, stored as <code>self.workflows_folder</code>.</td></tr>
+<tr><td>argument</td><td class="sym">n_parents, crossover_rate, threshold_similarity, threshold_score</td><td class="sym">lines 304-307</td><td>passed at the call site, not read from config here.</td></tr>
+<tr><td>config field</td><td class="sym">parent_threshold_similarity, parent_threshold_score, n_parents, crossover_rate</td><td class="sym">config.py:149-154, used at evolution_engine.py:297-305</td><td>supply the arguments above.</td></tr>
+<tr><td>file</td><td class="sym">workflows/&lt;uuid&gt;/state_result.json</td><td class="sym">via <code>load_state_result()</code> line 112</td><td>validity test and the <code>overall_score</code> key.</td></tr>
+<tr><td>file</td><td class="sym">workflows/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py</td><td class="sym">via <code>load_code()</code> line 115</td><td>candidate must have source text.</td></tr>
+<tr><td>file</td><td class="sym">workflows/&lt;uuid&gt;/original_task_&lt;uuid&gt;.txt</td><td class="sym">via <code>original_task</code> line 173</td><td>text compared with the goal, last 512 chars.</td></tr>
+<tr><td>file</td><td class="sym">lineage records</td><td class="sym">_scan_lineage() line 252</td><td>count children per parent uuid.</td></tr>
+<tr><td>memory</td><td class="sym">SelectionPressure._archive</td><td class="sym">lines 277-284</td><td>live population sampled in the steady-state path.</td></tr>
+<tr><td>network</td><td class="sym">MiniLM weights</td><td class="sym">line 65, first similarity call</td><td>embeddings for cosine similarity.</td></tr>
+<tr><td>return</td><td class="sym">(list[WorkflowInfo], bool)</td><td class="sym">lines 342, 353, 373</td><td>parents plus the crossover flag.</td></tr>
+<tr><td>write</td><td class="sym">none</td><td class="sym">whole file</td><td>no write call anywhere in the module.</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: <code>select_best_workflows</code> (line 209) is named for one workflow but returns a list, and the same goal text is embedded up to three times in one call: sort key (line 173), debug loop (line 179) and threshold filter (line 188).</p>
+<p class="note">Amber: <code>__main__</code> (line 376) hardcodes <code>config.workflow_dir = "../workflows"</code> (line 378) and builds <code>SelectionPressure(config={}, strategy="tournament")</code> (line 386); the empty dict is only safe because that class tolerates it.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>2 classes, 13 methods, 15 symbols</summary><div class="dbody">
+<pre>_WorkflowScoreAdapter                                     line 17   exposes overall_score as reward
+  __slots__ = ("workflow_info", "reward")                 line 27
+  __init__(self, wf: WorkflowInfo) -&gt; None                line 29   copies wf.overall_score into reward
+WorkflowSelector                                          line 40   discovers workflows, picks parents
+  __init__(self, config: Config) -&gt; None                  line 43   scans disk at construction
+  _get_model(self)                                        line 59   loads MiniLM once, else None
+  _lexical_similarity(a: str, b: str) -&gt; float  static    line 77   Jaccard token overlap fallback
+  discover_workflows(self) -&gt; dict[str, WorkflowInfo]     line 85   folder scan with five filters
+  cosine_similarity(self, a: str, b: str) -&gt; float        line 123  embeddings, else lexical
+  sort_similar_workflows(self, goal: str, threshold: float = 0.8, debug: bool = False) -&gt; list[WorkflowInfo]  line 151
+  sort_workflows_by_score(self, workflows_info: list[WorkflowInfo], threshold: float) -&gt; list[WorkflowInfo]  line 191
+  select_best_workflows(self, goal: str, threshold_similarity: float = 0.9, threshold_score: float = 0.1) -&gt; list[WorkflowInfo]  line 209
+  _rehydrate_workflow_info(self, uuid: str) -&gt; WorkflowInfo | None  line 226  rebuild from disk, None if invalid
+  _count_children_on_disk(self) -&gt; dict[str, int]         line 241  parent uuid to child count
+  _select_from_archive(self, selection_pressure: SelectionPressure, n_parents: int, crossover_rate: float) -&gt; tuple[list[WorkflowInfo], bool]  line 258
+  select_parent_workflows(self, goal: str, selection_pressure: SelectionPressure, n_parents: int = 2, crossover_rate: float = 0.1, threshold_similarity: float = 0.8, threshold_score: float = 0.1) -&gt; tuple[list[WorkflowInfo], bool]  line 300</pre>
+<p>Module-level code: <code>sys.path.append(...)</code> at line 6 (makes <code>config</code> importable when the file runs directly), logger at line 14, and the <code>__main__</code> demo at lines 376-396. Imports at lines 1-11: <code>logging</code>, <code>re</code>, <code>sys</code>, <code>Path</code>, <code>Config</code>, <code>PopulationMember</code>, <code>SelectionPressure</code>, <code>WorkflowInfo</code>, <code>scan_all as _scan_lineage</code>. <code>PopulationMember</code> is only used for an <code>isinstance</code> check at line 288.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer</th><th>What it calls</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">sources/core/evolution_engine.py</a></td><td><code>WorkflowSelector(config)</code>, <code>select_parent_workflows()</code></td><td class="sym">lines 42, 90, 299-306</td></tr>
+<tr><td class="sym"><a href="mod_core_planner.html">sources/core/planner.py</a></td><td><code>WorkflowSelector(config)</code>, <code>select_best_workflows()</code></td><td class="sym">lines 34, 82, 751-753</td></tr>
+<tr><td class="sym">sources/core/__init__.py</td><td>re-export</td><td class="sym">lines 26, 65</td></tr>
+<tr><td class="sym">tests/planner_json_extraction_test.py</td><td>stubs the module: <code>WorkflowSelector=object</code></td><td class="sym">line 114</td></tr>
+</tbody>
+</table>
+<p>Tests: no test imports <code>WorkflowSelector</code> or calls it. The dependency it drives, <code>SelectionPressure.select_parents</code> (<code class="path">sources/core/selection.py:240</code>), is exercised by <code class="path">tests/selection_test.py</code> (8 tests, none of which mentions <code>select_parents</code> by name in the grep). <code class="path">tests/variation_engine_test.py</code> covers the consumer of the returned flag, not this file.</p>
+<p>Related pages: <a href="mod_core_selection.html">mod_core_selection.html</a> (the selection module this file drives), <a href="file_core_workflow_info.html">file_core_workflow_info.html</a> (the object it returns), <a href="mod_core_lineage.html">mod_core_lineage.html</a> (writer of the records counted at line 252), <a href="mod_core_variation.html">mod_core_variation.html</a> (consumer of the parents), <a href="flow_evolution_loop.html">flow_evolution_loop.html</a>, <a href="file_index.html">file_index.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/core/workflow_selection.py</code> (396 lines, every def and class), <code class="path">sources/core/selection.py</code> (lines 240-260), <code class="path">sources/core/evolution_engine.py</code> (lines 41-42, 90, 285-310), <code class="path">sources/core/planner.py</code> (lines 34, 82, 740-790), <code class="path">sources/core/workflow_info.py</code> (property line numbers), <code class="path">sources/core/__init__.py</code> (lines 26, 65), <code class="path">config.py</code> (lines 149-154), <code class="path">tests/planner_json_extraction_test.py</code> (line 114), <code class="path">tests/selection_test.py</code>, <code class="path">tests/variation_engine_test.py</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/core/selection.py</code> internals (covered by <a href="mod_core_selection.html">mod_core_selection.html</a>); <code class="path">sources/core/genotype_embedding.py</code> (only <code>load_sentence_transformer</code> is named here); <code class="path">sources/core/lineage.py</code> internals (the <code>scan_all</code> import is named, the file belongs to <a href="mod_core_lineage.html">mod_core_lineage.html</a>); the <code>__main__</code> demo beyond its line numbers; <code class="path">sources/workflows/</code> and <code class="path">run_notes/</code> (runtime data, not read); the model download itself (network, not run). Nothing was modified outside <code>docs/visual_clone/</code>.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. The 53 changed paths did not include the three source files of this batch, so every line number above matches <code>HEAD</code>.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

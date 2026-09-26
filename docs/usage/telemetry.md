@@ -35,8 +35,8 @@ The dashboard renders each run as a hierarchical trace:
 - **Per-iteration spans** — one per generation in `--learn` mode.
 - **Agent steps** — every SmolAgent step inside the sandbox.
 - **Tool calls** — each MCP call, with args, output, and latency.
-- **Judge calls** — verifier soft-claim verdicts and per-claim executable
-  scripts.
+- **Judge calls** — the hybrid verifier's claim-ladder extraction, digest
+  and policy-scorer generation calls (and their repair rounds).
 
 Span attributes include token counts, latency, model id, and cost. You can
 filter by model, by tag, or by user.

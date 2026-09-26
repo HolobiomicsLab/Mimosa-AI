@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e3_run2 - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e3_run2">
+<div class="wrap">
+
+<h1 class="hud">e3_run2 &mdash; compliant rerun of Design A</h1>
+<p class="intro">E3's first judge pair used <code>glm-5.3</code>, which broke the operator rule that judges must be cheap flash models. <code>e3_run2.py</code> rescores the frame with <code>qwen3.7-flash</code> and <code>deepseek-v4.1-flash</code>, reuses the deepseek answers verbatim from the old state, and aborts if the cost projection passes $1. Its report stage never ran, so no metrics file exists; the state file is the only evidence.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 430" role="img" aria-label="e3_run2 design: hypothesis, inputs, stages, artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="b1">
+    <title>Predecessor state: 52 instances with glm and deepseek answers</title>
+    <rect x="16" y="30" width="180" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="106" y="52" text-anchor="middle">E3_designA_state.json</text>
+    <text class="box-sub" x="106" y="70" text-anchor="middle">52 instances, reused</text>
+  </g>
+
+  <g class="box" id="b5">
+    <title>stage_score rescores the 52, expands the frame, checks the budget</title>
+    <rect x="250" y="30" width="170" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="52" text-anchor="middle">stage_score()</text>
+    <text class="box-sub" x="335" y="70" text-anchor="middle">rescore, gate, expand</text>
+  </g>
+
+  <g class="box" id="b4">
+    <title>score_families generates checks then executes them for one family</title>
+    <rect x="470" y="30" width="170" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="555" y="52" text-anchor="middle">score_families()</text>
+    <text class="box-sub" x="555" y="70" text-anchor="middle">2 calls per family</text>
+  </g>
+
+  <g class="box" id="b3">
+    <title>FallbackClient.complete wraps the cache and a model fallback list</title>
+    <rect x="700" y="30" width="220" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="810" y="52" text-anchor="middle">FallbackClient.complete()</text>
+    <text class="box-sub" x="810" y="70" text-anchor="middle">cache first, 2 fallbacks</text>
+  </g>
+
+  <g class="box" id="b2">
+    <title>Frozen workspaces, read for previews; the shared disk cache</title>
+    <rect x="16" y="130" width="180" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="106" y="152" text-anchor="middle">snapshots/ + cache</text>
+    <text class="box-sub" x="106" y="170" text-anchor="middle">via e3_common</text>
+  </g>
+
+  <g class="box" id="b8">
+    <title>corrupt_workspace, imported from e3_run, damages a copy</title>
+    <rect x="250" y="130" width="170" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="152" text-anchor="middle">corrupt_workspace()</text>
+    <text class="box-sub" x="335" y="170" text-anchor="middle">imported from e3_run</text>
+  </g>
+
+  <g class="box" id="b6">
+    <title>aggregate2 reduces the two family scores to mean, min and uwo</title>
+    <rect x="470" y="130" width="170" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="555" y="152" text-anchor="middle">aggregate2()</text>
+    <text class="box-sub" x="555" y="168" text-anchor="middle">mean, min, uwo</text>
+  </g>
+
+  <g class="box" id="b10">
+    <title>Resumable state: 101 instances plus the budget gate</title>
+    <rect x="710" y="130" width="220" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="820" y="152" text-anchor="middle">E3_designA_full_state.json</text>
+    <text class="box-sub" x="820" y="170" text-anchor="middle">101 instances, gate PROCEED</text>
+  </g>
+
+  <g class="box" id="b7">
+    <title>stage_sabotage picks 10 rows with mean >= 0.4 and re-runs their checklists</title>
+    <rect x="250" y="230" width="170" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="252" text-anchor="middle">stage_sabotage()</text>
+    <text class="box-sub" x="335" y="270" text-anchor="middle">floor 0.4, 5 + 5</text>
+  </g>
+
+  <g class="box" id="b9">
+    <title>stage_report recomputes metrics, the glm comparison and the cost log</title>
+    <rect x="470" y="230" width="170" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="555" y="252" text-anchor="middle">stage_report()</text>
+    <text class="box-sub" x="555" y="270" text-anchor="middle">writes one json</text>
+  </g>
+
+  <g class="box" id="b11">
+    <title>Report file the docstring promises; the stage never ran</title>
+    <rect x="710" y="230" width="220" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="820" y="252" text-anchor="middle">E3_designA_full_20260921</text>
+    <text class="box-sub" x="820" y="270" text-anchor="middle">.json &#183; absent</text>
+  </g>
+
+  <g class="box" id="b12">
+    <title>Sabotage copies for the compliant pair; the stage never ran</title>
+    <rect x="710" y="330" width="220" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="820" y="352" text-anchor="middle">_e3_sabotage2/</text>
+    <text class="box-sub" x="820" y="368" text-anchor="middle">absent &#183; sabotage key null</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b5" d="M196,58 H250" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="223" y="50" text-anchor="middle">legacy</text>
+
+  <path class="edge" data-from="b5" data-to="b4" d="M420,58 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="445" y="50" text-anchor="middle">calls</text>
+
+  <path class="edge" data-from="b4" data-to="b3" d="M640,58 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="670" y="50" text-anchor="middle">prompts</text>
+
+  <path class="edge" data-from="b5" data-to="b6" d="M335,86 V112 H470 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="106" text-anchor="middle">family scores</text>
+
+  <path class="edge dashed-edge" data-from="b5" data-to="b10" d="M370,86 V105 H820 V130" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="450" y="99" text-anchor="middle">state save</text>
+
+  <path class="edge" data-from="b6" data-to="b10" d="M640,156 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="675" y="148" text-anchor="middle">stores row</text>
+
+  <path class="edge dashed-edge" data-from="b2" data-to="b8" d="M196,158 H250" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="223" y="150" text-anchor="middle">reads</text>
+
+  <path class="edge" data-from="b8" data-to="b7" d="M335,186 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="343" y="212" text-anchor="start">corrupted copy</text>
+
+  <path class="edge" data-from="b7" data-to="b12" d="M335,286 V320 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="313" text-anchor="middle">sabotage rows</text>
+
+  <path class="edge" data-from="b9" data-to="b11" d="M640,256 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="675" y="248" text-anchor="middle">report</text>
+
+  <text class="box-sub" x="16" y="420">12 boxes &#183; dashed outline = absent</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 12 boxes. Real functions: <code>stage_score()</code> L142, <code>score_families()</code> L124, <code>aggregate2()</code> L106, <code>stage_sabotage()</code> L215 (keeps rows with ensemble-mean at or above 0.4, then 5 SR-true and 5 SR-false, L217&ndash;227), <code>stage_report()</code> L288, <code>build_rows()</code> L267 and the class <code>FallbackClient</code> L57 with <code>complete()</code>. <code>corrupt_workspace()</code> and <code>build_frames()</code> are imported from <a href="exp_e3_run.html">e3_run.py</a> (L99 and L39). <code>stage_report()</code> also reads the frame rows and the state (its edges are not drawn to keep the graph flat).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/e3_run2.py">experiments_verifiers/harness/e3_run2.py</a></h4>
+<p class="role">Rescores the E3 frame with the two cheap flash judges, reuses predecessor answers, gates the spend at $1, and holds the report code.</p>
+<p class="meta">511 lines &#183; entry point <code>main(stage)</code> L487 &#183; 10 module functions + class <code>FallbackClient</code> &#183; judges <code>qwen3.7-flash</code> L42 and <code>deepseek-v4.1-flash</code></p>
+<details><summary>CLI, stages, budget gate</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e3_run2.py &lt;stage&gt;
+
+argparse: one positional "stage", choices = score | sabotage | report      # L510-511</pre>
+<p>Stage dispatch (L496&ndash;501): <code>score</code> &rarr; <code>stage_score()</code>, <code>sabotage</code> &rarr; <code>stage_sabotage()</code>, <code>report</code> &rarr; <code>stage_report()</code>.</p>
+<p>Budget gate (<code>stage_score</code> L181&ndash;206): after the first 10 new workspaces the code projects the whole run from the observed cost per workspace and writes the numbers into <code>state["budget_gate"]</code> (L191&ndash;201). <code>BUDGET_CAP_USD = 1.0</code> L40; the status becomes <code>ABORT</code> and the stage returns when the projection exceeds the cap (L199, L204&ndash;206).</p>
+<p><code>FallbackClient.complete()</code> L64&ndash;77 tries the cache-backed client first, then each model in <code>FALLBACKS</code> L43 (<code>gemini-2.5-flash</code>, then <code>llama-3.1-8b-instruct</code>); every substitution is recorded in <code>substituted</code> L62. <code>EXTRA_PRICING</code> L48 holds the token prices the cost log uses.</p>
+<p>Reuse rule: for the 52 predecessor rows only <code>qwen</code> is called fresh; the <code>dsk</code> result is copied verbatim from <code>legacy[uuid]["designA"]["dsk"]</code> (L162&ndash;165), so those deepseek calls are not billed twice.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Predecessor state (<code>LEGACY_STATE</code> L38, L493)</td><td>nothing</td><td class="sym">experiments_verifiers/results/E3_designA_state.json</td></tr>
+<tr><td>Workspace previews (<code>e3_common.build_evidence</code> L98)</td><td>nothing</td><td class="sym">workspace_artefacts/snapshots/&lt;uuid_long&gt;/</td></tr>
+<tr><td>Cached replies (<code>LLMClient</code> L169)</td><td>new entries (<code>client.save</code> L502)</td><td class="sym">experiments_verifiers/results/E3_llm_cache.json</td></tr>
+<tr><td>Resume state (<code>load_state2</code> L94)</td><td>instances + budget gate (<code>save_state2</code> L100)</td><td class="sym">experiments_verifiers/results/E3_designA_full_state.json</td></tr>
+<tr><td>nothing</td><td>damaged copies (<code>SAB_DIR</code> L39, L233)</td><td class="sym">experiments_verifiers/results/_e3_sabotage2/&lt;uuid_long&gt;_&lt;mode&gt;/</td></tr>
+<tr><td>nothing</td><td>metrics + checklists (<code>out_json</code> L475)</td><td class="sym">experiments_verifiers/results/E3_designA_full_20260921.json &mdash; absent</td></tr>
+<tr><td>API key (<code>C.load_dotenv</code> L488)</td><td>nothing</td><td class="sym">repo-root or experiments_verifiers/.env &mdash; skipped, never opened</td></tr>
+</tbody>
+</table>
+<p class="sub">Citation form: <code>path::Symbol</code>. Line numbers are <code>e3_run2.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; what the state file holds</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="recomputed AUC per variant on the 101 scored rows">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-label" x="20" y="26" text-anchor="start">recomputed AUC, 101 rows</text>
+
+  <path d="M50,140 H800" fill="none" stroke="#FFB547" stroke-width="1" stroke-dasharray="5 4"/>
+  <text class="box-sub" x="806" y="144" text-anchor="start">chance 0.5</text>
+
+  <rect x="80" y="121" width="80" height="119" rx="2" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7"/>
+  <text class="box-label" x="120" y="115" text-anchor="middle">0.593</text>
+  <text class="box-sub" x="120" y="256" text-anchor="middle">qwen-solo</text>
+
+  <rect x="230" y="132" width="80" height="108" rx="2" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7"/>
+  <text class="box-label" x="270" y="126" text-anchor="middle">0.538</text>
+  <text class="box-sub" x="270" y="256" text-anchor="middle">dsk-solo</text>
+
+  <rect x="380" y="124" width="80" height="116" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+  <text class="box-label" x="420" y="118" text-anchor="middle">0.580</text>
+  <text class="box-sub" x="420" y="256" text-anchor="middle">ensemble-mean</text>
+
+  <rect x="530" y="125" width="80" height="115" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+  <text class="box-label" x="570" y="119" text-anchor="middle">0.577</text>
+  <text class="box-sub" x="570" y="256" text-anchor="middle">ensemble-min</text>
+
+  <rect x="680" y="124" width="80" height="116" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+  <text class="box-label" x="720" y="118" text-anchor="middle">0.580</text>
+  <text class="box-sub" x="720" y="256" text-anchor="middle">ensemble-uwo</text>
+
+  <text class="box-sub" x="50" y="286" text-anchor="start">bar height = AUC, 1.0 = 200 px</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; AUC of each variant against the SR label, recomputed by me from <code class="path">experiments_verifiers/results/E3_designA_full_state.json</code> (101 scored rows) with the same Mann-Whitney form as <code>e3_run.metrics_for()</code> L294 (ties count 0.5; no confidence interval is computed here). Mint = single family, cyan = ensemble aggregation. No official metrics file exists for this run, so these bars are not a substitute for the missing report.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Instances in the state file</td><td class="size">101</td><td class="sym">full_state json, <code>instances</code> &mdash; my computation</td></tr>
+<tr><td>Frame size declared by the docstring</td><td class="size">102</td><td class="sym">e3_run2.py L5&ndash;6 (docstring)</td></tr>
+<tr><td>Rows reusing predecessor answers</td><td class="size">52</td><td class="sym">full_state json, <code>legacy_glm_dsk</code> present &mdash; my computation</td></tr>
+<tr><td>SR-true rows</td><td class="size">50</td><td class="sym">full_state json, <code>SR</code> &mdash; my computation</td></tr>
+<tr><td>VER-true rows</td><td class="size">96</td><td class="sym">full_state json, <code>VER</code> &mdash; my computation</td></tr>
+<tr><td>Families dropped for a null score</td><td class="size">0</td><td class="sym"><code>family_dropped</code> empty in all 101 rows</td></tr>
+<tr><td>Mean qwen-solo score</td><td class="size">0.862</td><td class="sym">full_state json &mdash; my computation</td></tr>
+<tr><td>Mean dsk-solo score</td><td class="size">0.714</td><td class="sym">full_state json &mdash; my computation</td></tr>
+<tr><td>Mean ensemble-mean score</td><td class="size">0.788</td><td class="sym">full_state json &mdash; my computation</td></tr>
+<tr><td>Mean ensemble-min score</td><td class="size">0.693</td><td class="sym">full_state json &mdash; my computation</td></tr>
+<tr><td>Mean ensemble-uwo score</td><td class="size">0.741</td><td class="sym">full_state json &mdash; my computation</td></tr>
+<tr><td>Mean |qwen &minus; dsk|</td><td class="size">0.190</td><td class="sym">full_state json, <code>abs_diff</code> &mdash; my computation</td></tr>
+<tr><td>auc_sr qwen-solo / dsk-solo</td><td class="size">0.593 / 0.538</td><td class="sym">diagram 2 &mdash; my computation</td></tr>
+<tr><td>auc_sr ensemble-mean</td><td class="size">0.580</td><td class="sym">diagram 2 &mdash; my computation</td></tr>
+<tr><td>Within-task credit, contrast pairs</td><td class="size">0.455 (8 tasks, 67 pairs)</td><td class="sym">my computation; strict 0.418</td></tr>
+</tbody>
+</table>
+
+<h3>Budget gate recorded in the state file</h3>
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>New workspaces at the check</td><td class="size">12</td><td class="sym">full_state json L35857</td></tr>
+<tr><td>Spent at the check</td><td class="size">$0.1149</td><td class="sym">full_state json L35858</td></tr>
+<tr><td>Cost per new workspace</td><td class="size">$0.00958</td><td class="sym">full_state json L35859</td></tr>
+<tr><td>Projected score phase</td><td class="size">$0.4788</td><td class="sym">full_state json L35860</td></tr>
+<tr><td>Projected sabotage phase</td><td class="size">$0.0862</td><td class="sym">full_state json L35861</td></tr>
+<tr><td>Projected total vs cap</td><td class="size">$0.5649 vs $1.0</td><td class="sym">full_state json L35862&ndash;35863</td></tr>
+<tr><td>Gate status</td><td class="size">PROCEED</td><td class="sym">full_state json L35864</td></tr>
+<tr><td>Cache entries before / after</td><td class="size">265 / 564</td><td class="sym">full_state json L35865&ndash;35866</td></tr>
+<tr><td>Sabotage key</td><td class="size">null</td><td class="sym">full_state json L35868 &mdash; stage never ran</td></tr>
+</tbody>
+</table>
+<p class="note flag">Doc against code: the module docstring says the report stage writes <code>E3_designA_full_&lt;date&gt;.json + .md</code> (L11), but <code>stage_report()</code> writes only the JSON (<code>out_json</code> L475). No markdown writer exists in this file.</p>
+<p class="note flag">Gap: the declared frame is 102 rows (docstring L5) and the state holds 101 instances, so one planned row is unscored. Which row is unknown; the frame is rebuilt at runtime by <code>e3_run.build_frames()</code>.</p>
+<p class="note">Amber: the state file is the only record of this run. <code>E3_designA_full_20260921.json</code>, <code>_e3_sabotage2/</code> and any markdown summary are absent, so the sabotage control of the compliant pair was never measured.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>budget gate lines and the docstring promises (4 quotes)</summary><div class="dbody">
+<blockquote>"budget_gate": {
+  "checked_after_n_new": 12,
+  "spent_usd_at_check": 0.1149,
+  "cost_per_new_workspace_usd": 0.00958,
+  "projected_score_phase_usd": 0.4788,
+  "projected_sabotage_usd": 0.0862,
+  "projected_total_usd": 0.5649,
+  "cap_usd": 1.0,
+  "status": "PROCEED",
+  "cache_entries_before": 265,
+  "cache_entries_after": 564
+ },</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA_full_state.json</code> &mdash; lines 35856&ndash;35867.</p>
+<blockquote>"sabotage": null
+}</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA_full_state.json</code> &mdash; lines 35868&ndash;35869. The file ends here; no sabotage row was ever stored.</p>
+<blockquote>  score     : rescore the 52 with the compliant pair (dsk reused verbatim from state,
+              qwen fresh) + expand to the balanced 102-row frame (all 50 SR-true +
+              52 seeded SR-false incl. forced contrast completions); budget gate after
+              the first 10 NEW instances.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/harness/e3_run2.py</code> &mdash; lines 4&ndash;7, module docstring.</p>
+<blockquote>              checklists; writes results/E3_designA_full_&lt;date&gt;.json + .md.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/harness/e3_run2.py</code> &mdash; line 11, module docstring. The code writes the JSON only (L475); see the red flag above.</p>
+<blockquote>Takes over from the dead glm-5.3 agent (results/E3_designA_state.json, 52 instances):</blockquote>
+<p>Path: <code class="path">experiments_verifiers/harness/e3_run2.py</code> &mdash; line 3, module docstring.</p>
+<blockquote>"MODEL CONSTRAINT VIOLATED: judge A was openrouter/z-ai/glm-5.3 (operator constraint was cheap flash-only: qwen3.7-flash + deepseek-v4.1-flash). Judge B = deepseek-v4.1-flash (compliant). The pilot was already in flight when the constraint landed in the plan",</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E3_designA-salvaged_20260921.json</code> &mdash; line 10, key <code>caveats[2]</code>. This caveat is the reason <code>e3_run2.py</code> exists.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e3_run2.py</code> (all 511 lines), <code class="path">experiments_verifiers/harness/e3_run.py</code> (imported stages, <code>metrics_for</code> L294), <code class="path">experiments_verifiers/harness/e3_common.py</code> (cache and preview helpers), <code class="path">experiments_verifiers/results/E3_designA_full_state.json</code> (101 instances counted, budget gate lines 35856&ndash;35869), <code class="path">results/E3_designA_state.json</code> (52 legacy instances), <code class="path">results/E3_designA-salvaged_20260921.json</code> (line 10), <code class="path">experiments_verifiers/README.md</code> (E3 row: SPOCK, "died mid-run and was salvaged"), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (&sect;2 rule 8 budget, &sect;2 judge constraint, &sect;5 norms), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <a href="exp_e3_run.html">exp_e3_run.html</a> and <a href="exp_index.html">exp_index.html</a>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; secrets, never opened. <code class="path">experiments_verifiers/scorers/llm_judge_ensemble.py</code> &mdash; only the imported names were read. <code class="path">workspace_artefacts/snapshots/*</code> &mdash; not opened; the preview packet is built by <code>e3_common</code>. <code class="path">experiments_verifiers/results/E3_designA_full_20260921.json</code> and <code class="path">_e3_sabotage2/</code> &mdash; do not exist, so neither is linked. <code class="path">experiments_verifiers/EXPERIMENTS.md</code> &mdash; no per-experiment E3 section. Statistical extras such as bootstrap CIs and the secondary glm comparison in <code>stage_report()</code> &mdash; the stage never ran, so they have no numbers on disk. No experiment, application or pytest run, by the build rules.</p>
+<p>experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

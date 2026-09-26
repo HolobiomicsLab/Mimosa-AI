@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e18_bt_eval - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e18_bt_eval">
+<div class="wrap">
+
+<h1 class="hud">e18_bt_eval &mdash; does LLM-written code rank generations better?</h1>
+<p class="intro">In E18 the judge writes deterministic Python comparison code from the two candidates' artifacts, and the script's own output picks the winner. This script is the evaluation half: it fits per-group Bradley&ndash;Terry strengths from the scripted verdicts, then compares them with E15 preference judgments and with the recorded <a href="mod_evaluators_hybrid_verifier.html">verifier reward</a>. It also writes one gradient text per generation; the producer channel is on <a href="exp_e18_scripted_bt.html">exp_e18_scripted_bt.html</a> and the three-way duel on <a href="exp_e18_gradient_duel.html">exp_e18_gradient_duel.html</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="E18 evaluation design: hypothesis, inputs, stages, artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bH">
+    <title>Hypothesis under test</title>
+    <rect x="20" y="20" width="210" height="52" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="42" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="125" y="58" text-anchor="middle">scripts rank better</text>
+  </g>
+
+  <a class="box" id="bI1" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>Frozen arena: 19 groups, 667 pairs</title>
+    <rect x="20" y="110" width="210" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="130" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="125" y="146" text-anchor="middle">19 groups &#183; 667 pairs</text>
+    <text class="box-sub" x="125" y="160" text-anchor="middle">judging order, snapshots</text>
+  </a>
+
+  <a class="box" id="bI2" href="../../experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl">
+    <title>Per-pair verdicts written by the scripted comparison run</title>
+    <rect x="20" y="210" width="210" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="230" text-anchor="middle">E18_bt_judgments</text>
+    <text class="box-sub" x="125" y="246" text-anchor="middle">726 records</text>
+    <text class="box-sub" x="125" y="260" text-anchor="middle">667 main + 59 swap</text>
+  </a>
+
+  <a class="box" id="bI3" href="../../experiments_verifiers/results/E15_bt_pilot_2026-09-23.json">
+    <title>E15 preference BT rewards, the baseline channel</title>
+    <rect x="20" y="310" width="210" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="125" y="332" text-anchor="middle">E15_bt_pilot.json</text>
+    <text class="box-sub" x="125" y="348" text-anchor="middle">e15_bt rewards</text>
+  </a>
+
+  <g class="box" id="bS1">
+    <title>load_all() reads plan, judging ledger, labels and the E15 table</title>
+    <rect x="270" y="20" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="42" text-anchor="middle">load_all()</text>
+    <text class="box-sub" x="375" y="58" text-anchor="middle">plan + judgments</text>
+  </g>
+
+  <g class="box" id="bS2">
+    <title>bt_fit_weighted() fits one BT model per group</title>
+    <rect x="270" y="110" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="132" text-anchor="middle">bt_fit_weighted()</text>
+    <text class="box-sub" x="375" y="148" text-anchor="middle">E15E &#183; ridge 1.0</text>
+  </g>
+
+  <g class="box" id="bS3">
+    <title>write_gradients() renders one transcript per generation</title>
+    <rect x="270" y="200" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="222" text-anchor="middle">write_gradients()</text>
+    <text class="box-sub" x="375" y="238" text-anchor="middle">148 files</text>
+  </g>
+
+  <g class="box" id="bS4">
+    <title>pairs_correct() and argmax_ship() produce readouts a and b</title>
+    <rect x="270" y="290" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="312" text-anchor="middle">pairs_correct()</text>
+    <text class="box-sub" x="375" y="328" text-anchor="middle">+ argmax_ship()</text>
+  </g>
+
+  <g class="box" id="bS5">
+    <title>cluster_boot() and paired_boot_diff() give the intervals</title>
+    <rect x="270" y="380" width="210" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="402" text-anchor="middle">cluster_boot()</text>
+    <text class="box-sub" x="375" y="418" text-anchor="middle">10 000 resamples</text>
+  </g>
+
+  <g class="box" id="bM">
+    <title>Readouts a, b, c and d of the results JSON</title>
+    <rect x="530" y="290" width="170" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="615" y="310" text-anchor="middle">readouts</text>
+    <text class="box-sub" x="615" y="326" text-anchor="middle">pairs-correct, SR shipped</text>
+    <text class="box-sub" x="615" y="340" text-anchor="middle">Spearman, diagnostics</text>
+  </g>
+
+  <a class="box" id="bA1" href="../../experiments_verifiers/results/E18_scripted_bt_2026-09-23.md">
+    <title>Results of record for this script</title>
+    <rect x="730" y="110" width="160" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="130" text-anchor="middle">E18_scripted_bt</text>
+    <text class="box-sub" x="810" y="146" text-anchor="middle">*.json + *.md</text>
+    <text class="box-sub" x="810" y="160" text-anchor="middle">readouts a&ndash;d</text>
+  </a>
+
+  <a class="box" id="bA2" href="../../experiments_verifiers/results/E18_bt_gradients/">
+    <title>One gradient transcript per generation</title>
+    <rect x="730" y="240" width="160" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="260" text-anchor="middle">E18_bt_gradients/</text>
+    <text class="box-sub" x="810" y="276" text-anchor="middle">&lt;campaign&gt;__&lt;task&gt;/</text>
+    <text class="box-sub" x="810" y="290" text-anchor="middle">&lt;uuid&gt;.txt</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="bI1" data-to="bS1" d="M230,138 H246 V46 H270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="252" y="100" text-anchor="start">pair plan</text>
+  <path class="edge dashed-edge" data-from="bI2" data-to="bS1" d="M230,243 H258 V60 H270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="266" y="200" text-anchor="start">verdict ledger</text>
+  <path class="edge dashed-edge" data-from="bI3" data-to="bS4" d="M230,338 H250 V316 H270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="252" y="356" text-anchor="start">E15 rewards</text>
+
+  <path class="edge" data-from="bS1" data-to="bS2" d="M375,72 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="94" text-anchor="start">per-group verdicts</text>
+  <path class="edge" data-from="bS2" data-to="bS3" d="M375,162 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="184" text-anchor="start">beta per generation</text>
+  <path class="edge" data-from="bS2" data-to="bS4" d="M375,162 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="240" text-anchor="start">BT rewards</text>
+  <path class="edge" data-from="bS4" data-to="bS5" d="M375,342 V380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="384" y="364" text-anchor="start">paired scores</text>
+  <path class="edge" data-from="bS4" data-to="bM" d="M480,316 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="505" y="308" text-anchor="middle">readout table</text>
+  <path class="edge" data-from="bS5" data-to="bA1" d="M480,406 H710 V143 H730" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="595" y="398" text-anchor="middle">json + md</text>
+  <path class="edge dashed-edge" data-from="bS3" data-to="bA2" d="M480,226 H605 V273 H730" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="672" y="218" text-anchor="middle">gradient texts</text>
+</svg>
+</div>
+<p class="figcap">12 boxes. Mint = functions of this script (or of <code>e15_bt_eval.py</code>, imported as <code>E15E</code>), steel = data files. Solid = call, dashed = reads/writes. No gold path and no SR label enters the code-writing step; the labels are read only in this evaluation stage, as the protocol string says (<code>e18_bt_eval.py</code> L432&ndash;433 <code>gold_hygiene</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/e18_bt_eval.py">experiments_verifiers/harness/e18_bt_eval.py</a></h4>
+<p class="role">Fits per-group Bradley&ndash;Terry strengths from the scripted verdicts, writes one execution-grounded gradient per generation, then reads SR to score four readouts.</p>
+<p class="meta">629 lines &#183; entry point <code>main()</code> (L195) &#183; 6 module-level functions, no classes &#183; imports <code>e15_bt_eval as E15E</code> (L36) &#183; <code>N_BOOT = 10_000</code> (L48), <code>BOOT_SEED = 20260923</code> (L49)</p>
+<details><summary>CLI, constants and the BT recipe</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e18_bt_eval.py     # docstring L21
+
+No argparse: the script takes no command-line arguments.
+Entry point main() L195. assert len(plan["groups"]) == 19 (L197).
+</pre>
+<p>Constants: <code>PLAN_PATH</code> (L39), <code>JUDGMENTS</code> (L40), <code>DETS</code> (L41), <code>PILOT_JSON</code> (L42), <code>E15_JSON</code> (L43), <code>OUT_JSON</code> (L44), <code>OUT_MD</code> (L45), <code>GRAD_ROOT</code> (L46), <code>SCORE_MAP = {"pass": 1.0, "fail": 0.0, "unsure": 0.5}</code> (L50).</p>
+<p>BT recipe (L212&ndash;223): a tie becomes two half-weight matches; a decisive verdict becomes one match of weight 1.0; <code>E15E.bt_fit_weighted(wx, lx, wt, n_gens)</code> fits it; the reward is <code>expit(beta - mean beta)</code> per generation. Pairs that are <code>error</code> or <code>skip</code> never enter the fit and are counted instead.</p>
+<p>Readout (a) runs on contrast groups only, with identical pairs for all four scorers (L283&ndash;297); readout (b) replays argmax per group (L304&ndash;309); readout (c) takes per-group Spearman (L248); readout (d) counts outcomes, repairs, swap flips and the determinism ledger.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Frozen pair plan (<code>load_all</code> L57)</td><td>nothing</td><td class="sym">experiments_verifiers/results/E14_bt_population.json</td></tr>
+<tr><td>Scripted verdicts, phase <code>main</code> (<code>load_all</code> L59&ndash;63)</td><td>nothing</td><td class="sym">experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl</td></tr>
+<tr><td>Claim statuses for the uniform scorer (<code>load_all</code> L64&ndash;69)</td><td>nothing</td><td class="sym">experiments_verifiers/data/verifier_claims_sane.jsonl</td></tr>
+<tr><td>E15 BT rewards, the baseline (<code>load_all</code> L70&ndash;74)</td><td>nothing</td><td class="sym">experiments_verifiers/results/E15_bt_pilot_2026-09-23.json</td></tr>
+<tr><td>Cost ledger for the totals (<code>main</code> L385&ndash;388)</td><td>nothing</td><td class="sym">experiments_verifiers/results/E18_bt_cost_ledger_2026-09-23.jsonl</td></tr>
+<tr><td>Pilot gate and determinism ledger (<code>main</code> L374&ndash;383, L405)</td><td>nothing</td><td class="sym">experiments_verifiers/results/_e18_pilot_2026-09-23.json, _e18_determinism_2026-09-23.jsonl</td></tr>
+<tr><td>Swapped-order records (<code>main</code> L348&ndash;356)</td><td>nothing</td><td class="sym">experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl (phase <code>swap</code>)</td></tr>
+<tr><td>nothing</td><td>148 gradient transcripts (<code>write_gradients</code> L135, write L187)</td><td class="sym">experiments_verifiers/results/E18_bt_gradients/&lt;campaign&gt;__&lt;task&gt;/&lt;uuid&gt;.txt</td></tr>
+<tr><td>nothing</td><td>Readouts, BT table, cost (<code>OUT_JSON</code> L44, written L517)</td><td class="sym">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</td></tr>
+<tr><td>The JSON just written</td><td>Report (<code>main</code> L621)</td><td class="sym">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</td></tr>
+</tbody>
+</table>
+<p class="sub">Citations: <code>path::Symbol</code>. Line numbers are <code>e18_bt_eval.py</code> unless a symbol names E15E. Note the output names: this script writes <code>E18_scripted_bt_*</code>, not <code>E18_bt_eval_*</code>.</p>
+<p class="note">Amber: the judgment ledger holds 726 records: 667 <code>main</code> plus 59 <code>swap</code>; only 667 enter the BT fit (md L50, json <code>coverage.judged_pairs</code>).</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; pairs-correct on the 9 contrast groups</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 350" role="img" aria-label="Bar chart of pairs-correct on contrast groups for four scorers">
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <line x1="250" y1="30" x2="250" y2="300" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="250" y="318" text-anchor="middle">0.00</text>
+  <line x1="390" y1="30" x2="390" y2="300" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="390" y="318" text-anchor="middle">0.25</text>
+  <line x1="530" y1="30" x2="530" y2="300" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="530" y="318" text-anchor="middle">0.50</text>
+  <line x1="670" y1="30" x2="670" y2="300" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="670" y="318" text-anchor="middle">0.75</text>
+  <line x1="810" y1="30" x2="810" y2="300" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="810" y="318" text-anchor="middle">1.00</text>
+  <text class="box-sub" x="14" y="56" text-anchor="start" font-size="12">E18-scripted</text>
+  <text class="box-sub" x="14" y="74" text-anchor="start">csv+py comparisons · n=147</text>
+  <rect x="250" y="50" width="268.6" height="20" fill="rgba(125,249,199,0.18)" stroke="#7DF9C7"/>
+  <line x1="485.9" y1="60" x2="555.0" y2="60" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="485.9" y1="53" x2="485.9" y2="67" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="555.0" y1="53" x2="555.0" y2="67" stroke="#E6FBFF" stroke-width="1.25"/>
+  <text class="box-sub" x="563.0" y="64" text-anchor="start">0.480 [0.421, 0.545]</text>
+  <text class="box-sub" x="14" y="126" text-anchor="start" font-size="12">E15-preference</text>
+  <text class="box-sub" x="14" y="144" text-anchor="start">peer preference judge · n=147</text>
+  <rect x="250" y="120" width="360.0" height="20" fill="rgba(125,249,199,0.18)" stroke="#7DF9C7"/>
+  <line x1="522.7" y1="130" x2="708.8" y2="130" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="522.7" y1="123" x2="522.7" y2="137" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="708.8" y1="123" x2="708.8" y2="137" stroke="#E6FBFF" stroke-width="1.25"/>
+  <text class="box-sub" x="716.8" y="134" text-anchor="start">0.643 [0.487, 0.819]</text>
+  <text class="box-sub" x="14" y="196" text-anchor="start" font-size="12">recorded reward</text>
+  <text class="box-sub" x="14" y="214" text-anchor="start">claims verifier reward · n=147</text>
+  <rect x="250" y="190" width="312.4" height="20" fill="rgba(125,249,199,0.18)" stroke="#7DF9C7"/>
+  <line x1="429.6" y1="200" x2="712.0" y2="200" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="429.6" y1="193" x2="429.6" y2="207" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="712.0" y1="193" x2="712.0" y2="207" stroke="#E6FBFF" stroke-width="1.25"/>
+  <text class="box-sub" x="720.0" y="204" text-anchor="start">0.558 [0.321, 0.825]</text>
+  <text class="box-sub" x="14" y="266" text-anchor="start" font-size="12">uniform pass-rate</text>
+  <text class="box-sub" x="14" y="284" text-anchor="start">claim status mean · n=80</text>
+  <rect x="250" y="260" width="357.0" height="20" fill="rgba(125,249,199,0.18)" stroke="#7DF9C7"/>
+  <line x1="453.0" y1="270" x2="704.2" y2="270" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="453.0" y1="263" x2="453.0" y2="277" stroke="#E6FBFF" stroke-width="1.25"/>
+  <line x1="704.2" y1="263" x2="704.2" y2="277" stroke="#E6FBFF" stroke-width="1.25"/>
+  <text class="box-sub" x="712.2" y="274" text-anchor="start">0.637 [0.362, 0.811]</text>
+  <text class="box-sub" x="250" y="30" text-anchor="start">pairs-correct, 95% CI</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; all four values and intervals are read from <code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> L8; the same numbers sit in the JSON under <code>readout_a_pairs_correct_contrast</code>. Nothing is recomputed. The uniform bar has 80 pairs, the others 147; ties in the score count 0.5 credit.</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Planned / judged pairs</td><td class="size">667 / 667, complete</td><td class="sym">md L65; json coverage</td></tr>
+<tr><td>Groups / contrast groups</td><td class="size">19 / 9</td><td class="sym">md L9 and L61; json readout_a</td></tr>
+<tr><td>Contrast gen-pairs scored</td><td class="size">147</td><td class="sym">md L8</td></tr>
+<tr><td>Pairs-correct, E18-scripted</td><td class="size">0.480 [0.421, 0.545]</td><td class="sym">md L8; json readout_a.e18</td></tr>
+<tr><td>Pairs-correct, E15-preference</td><td class="size">0.643 [0.487, 0.819]</td><td class="sym">md L8; json readout_a.e15</td></tr>
+<tr><td>Pairs-correct, recorded reward</td><td class="size">0.558 [0.321, 0.825]</td><td class="sym">md L8; json readout_a.recorded_reward</td></tr>
+<tr><td>Pairs-correct, uniform pass-rate</td><td class="size">0.637 [0.362, 0.811], 80 pairs</td><td class="sym">md L8; json readout_a.uniform</td></tr>
+<tr><td>Paired E18 &minus; E15</td><td class="size">-0.167 [-0.361, +0.018]</td><td class="sym">md L8; json paired_diffs_boot_ci95</td></tr>
+<tr><td>Paired E18 &minus; reward</td><td class="size">-0.086 [-0.346, +0.185]</td><td class="sym">md L8; json paired_diffs_boot_ci95</td></tr>
+<tr><td>M2 SR shipped, E18 / E15 / reward / uniform / oracle</td><td class="size">8 / 8 / 8 / 9 / 12</td><td class="sym">md L9; json readout_b_m2_replay.sr_shipped</td></tr>
+<tr><td>Mean Spearman(E18, recorded reward)</td><td class="size">-0.0428, n=17</td><td class="sym">md L10; json readout_c</td></tr>
+<tr><td>Mean Spearman(E18, E15 BT)</td><td class="size">0.2168, n=18</td><td class="sym">md L10; json readout_c</td></tr>
+<tr><td>Outcome mix</td><td class="size">script 599, skip 36, error 32</td><td class="sym">md L11; json readout_d</td></tr>
+<tr><td>Pair tie rate / A-first order bias</td><td class="size">0.4423 / +0.0099</td><td class="sym">md L45</td></tr>
+<tr><td>Repair attempts per code pair</td><td class="size">{0: 32, 1: 564, 2: 32, 3: 3}</td><td class="sym">md L11 and L46</td></tr>
+<tr><td>Label-swap flip rate</td><td class="size">0.409 on 22 both-decisive pairs</td><td class="sym">md L11 and L50</td></tr>
+<tr><td>Determinism</td><td class="size">30 / 30 exact and semantic</td><td class="sym">md L11 and L51</td></tr>
+<tr><td>Pilot gate</td><td class="size">PASS, code success 0.963</td><td class="sym">md L7; json pilot_gate.all_pass</td></tr>
+<tr><td>Cost</td><td class="size">$6.03 of a $25 cap</td><td class="sym">md L55; json cost.total_usd</td></tr>
+<tr><td>Gradient files written</td><td class="size">148</td><td class="sym">md L57; json coverage.gradient_files</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the scripted channel loses to the preference channel on pairs-correct, and it loses to the recorded reward as well (md L8 and L13). The intervals span zero, so the loss is directional, not established; the file labels itself underpowered at 9 contrast groups (md L61).</p>
+<p class="note say">Why the numbers matter: a channel that orders generations less well than the reward already in production cannot replace it as the evolution signal, however faithful its gradient text is.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim lines from the results file</h2>
+<details><summary>8 quoted lines &mdash; gate, four readouts, the three questions</summary><div class="dbody">
+<blockquote>- Pilot gate: **PASS** (code success 0.9629629629629629, parse 1.0, mutations [], $0.5973).</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> line 7</p>
+<blockquote>- **Within-task pairs-correct (contrast, 147 gen-pairs):** E18-scripted 0.480 [0.421,0.545] vs E15-preference 0.643 [0.487,0.819] vs recorded reward 0.558 [0.321,0.825] vs uniform 0.637 [0.362,0.811]; paired E18&minus;E15 -0.167 [-0.361,+0.018], E18&minus;reward -0.086 [-0.346,+0.185].</blockquote>
+<p class="sub">Same file, line 8</p>
+<blockquote>- **M2 SR shipped (19 groups):** E18 8 vs E15 8 vs reward 8 vs uniform 9 (of 19 pickable) vs oracle 12.</blockquote>
+<p class="sub">Same file, line 9</p>
+<blockquote>- **Independence:** mean Spearman(E18, reward) = -0.0428; mean Spearman(E18, E15-BT) = 0.2168.</blockquote>
+<p class="sub">Same file, line 10</p>
+<blockquote>- **Execution diagnostics:** outcome mix {'script': 599, 'skip': 36, 'error': 32}; label-swap flip rate 0.4090909090909091 on 22 both-decisive pairs; determinism 30/30 exact, 30/30 semantic; repair distribution {0: 32, 1: 564, 2: 32, 3: 3}; total cost $6.03.</blockquote>
+<p class="sub">Same file, line 11</p>
+<blockquote>**Q1 &mdash; does scripted comparison beat preference judging / recorded reward within-task?** NO: E18 0.480 vs E15 0.643 vs reward 0.558 (paired &Delta; CIs span 0: [-0.361,+0.018] vs E15).</blockquote>
+<p class="sub">Same file, line 13</p>
+<blockquote>**Q2 &mdash; is it a third independent channel?** Spearman(E18, E15-BT) mean 0.2168, Spearman(E18, reward) mean -0.0428 &mdash; a genuinely different ranking channel.</blockquote>
+<p class="sub">Same file, line 15</p>
+<blockquote>**Q3 &mdash; does its gradient point at gold best of the three channels?** NO on relevance (E18 0.526 vs verifier 0.568, paired &Delta; &minus;0.042 [&minus;0.180,+0.083]; E18 beats E15 0.415 by +0.110 [+0.049,+0.160]) &mdash; but YES on faithfulness: hallucination rate 0.146 vs verifier 0.585 (&Delta; &minus;0.439 [&minus;0.581,&minus;0.308]) and E15 0.434 (&Delta; &minus;0.287 [&minus;0.461,&minus;0.115]). Full three-way table: <code>E18_gradient_duel_2026-09-23.md</code> (E16v2 instrument, n=123).</blockquote>
+<p class="sub">Same file, line 17. The three-way table itself lives in <code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.md</code>, which belongs to <a href="exp_e18_gradient_duel.html">exp_e18_gradient_duel.html</a>; this page quotes only the numbers the quoted line carries.</p>
+<p class="note say">These files are read-only evidence. Nothing under <code>experiments_verifiers/</code> was modified by this page; E18 was not re-run.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What the files do not say</h2>
+<table>
+<thead><tr><th>Question</th><th>State of the evidence</th></tr></thead>
+<tbody>
+<tr><td>Why 36 pairs were skipped</td><td>Skip reason text is free-form from the code path (md L49)</td></tr>
+<tr><td>Error cause for the 32 errors</td><td>No artifact kind picked (32 of 32; md L47)</td></tr>
+<tr><td>kimi vision fallback</td><td>Zero pairs used it (<code>rate: 0.0</code>, md L48)</td></tr>
+<tr><td>Effect on evolution</td><td>Scores frozen artifacts only; never runs Mimosa-AI</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e18_bt_eval.py</code> (full); <code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> (full) and <code class="path">.json</code> (keys <code>protocol</code>, <code>pilot_gate</code>, <code>coverage</code>, <code>readout_a&hellip;d</code>, <code>cost</code>, <code>per_group</code>, <code>symmetric_reaggregation</code>); <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> (function list and line numbers only: <code>bt_fit_weighted</code>, <code>pairs_correct</code>, <code>cluster_boot</code>, <code>paired_boot_diff</code>, <code>argmax_ship</code>); <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (constitution, reproduction target "E18 0.480"); <code class="path">experiments_verifiers/README.md</code> (codename table); <code class="path">docs/visual_clone/_reference.html</code> and <code class="path">docs/visual_clone/_clone.css</code>. Line counts from <code>wc -l</code>; ledger line counts from <code>wc -l</code>; the 148 gradient files counted with <code>find</code>.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> (&mdash; never opened, rule). The 148 gradient transcript texts (read-only evidence, read by the script, not opened by me). <code class="path">E18_bt_judgments_2026-09-23.jsonl</code> (5.9 MB; line count and phase counts only) and <code class="path">E18_bt_cost_ledger_2026-09-23.jsonl</code> (533 KB; line count only) &mdash; the script reads them, I did not. <code class="path">E18_gradient_duel_2026-09-23.{md,json}</code>, <code class="path">_e18_symmetric_2026-09-23.jsonl</code> and <code class="path">E18_scripted_bt</code> internals of the symmetric section &mdash; other pages (<a href="exp_e18_gradient_duel.html">exp_e18_gradient_duel.html</a>, <a href="exp_e18_symmetric.html">exp_e18_symmetric.html</a>). <code class="path">harness/e18_scripted_bt.py</code>, <code class="path">e18_gradient_duel.py</code>, <code class="path">e18_symmetric.py</code> and the other harness files &mdash; the producer side of this ledger, on <a href="exp_e18_scripted_bt.html">exp_e18_scripted_bt.html</a>. <code class="path">E14_bt_population.json</code> (pair plan; key names only, read through the script's constants). <code class="path">datasets/ScienceAgentBench/*</code> gold files &mdash; not part of this script at all. <code class="path">run_notes/</code>, <code class="path">sources/workflows/</code>, <code class="path">workspace_artefacts/</code>, <code class="path">audits/</code>, <code class="path">webui/</code> &mdash; outside scope. No experiment, application or test run.</p>
+<p class="skips">Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02. <code>git ls-files experiments_verifiers</code> returns no files, so the line numbers above describe the working tree.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

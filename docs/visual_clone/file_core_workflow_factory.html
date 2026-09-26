@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>workflow_factory.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/core > workflow_factory.py">
+<div class="wrap">
+
+<h1 class="hud">workflow_factory.py</h1>
+<p class="intro">This file asks an LLM for a LangGraph workflow body, checks its shape, and splices it with the state schema, the SmolAgent factory and the MCP client code into one runnable script. It is the multi-agent path, called by <code class="sym">WorkflowOrchestrator._generate_workflow_code</code>; <code class="sym">single_agent_factory.py</code> is its one-agent twin. It writes the script and its metadata; the runner executes them later.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; the job: templates plus one LLM body, validated and spliced</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 460" role="img" aria-label="WorkflowFactory stage graph">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="i1">
+    <title>Inputs of craft_workflow</title>
+    <rect x="20" y="60" width="170" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="84" text-anchor="middle">inputs</text>
+    <text class="box-sub" x="105" y="104" text-anchor="middle">goal</text>
+    <text class="box-sub" x="105" y="120" text-anchor="middle">craft_instructions</text>
+    <text class="box-sub" x="105" y="136" text-anchor="middle">original_task</text>
+    <text class="box-sub" x="105" y="152" text-anchor="middle">config</text>
+  </g>
+
+  <a class="box" id="bInit" href="#inv">
+    <title>__init__ copies five paths out of config</title>
+    <rect x="230" y="40" width="200" height="60" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="330" y="64" text-anchor="middle">__init__(config)</text>
+    <text class="box-sub" x="330" y="82" text-anchor="middle">5 paths, lines 38-45</text>
+  </a>
+
+  <a class="box" id="bCraft" href="#inv">
+    <title>craft_workflow is the only public entry point</title>
+    <rect x="230" y="140" width="200" height="90" rx="12" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="164" text-anchor="middle">craft_workflow(...)</text>
+    <text class="box-sub" x="330" y="182" text-anchor="middle">entry point, line 412</text>
+    <text class="box-sub" x="330" y="198" text-anchor="middle">async, returns 3 values</text>
+    <text class="box-sub" x="330" y="214" text-anchor="middle">uuid: timestamp_8hex</text>
+  </a>
+
+  <a class="box" id="bTools" href="#inv">
+    <title>MCP clients, inherited from Factory</title>
+    <rect x="480" y="20" width="220" height="60" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590" y="44" text-anchor="middle">load_tools_code()</text>
+    <text class="box-sub" x="590" y="62" text-anchor="middle">Factory, line 447</text>
+  </a>
+
+  <a class="box" id="bFolder" href="#inv">
+    <title>Directory creation is skipped when save_workflow is False</title>
+    <rect x="480" y="100" width="220" height="60" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590" y="124" text-anchor="middle">create_folder_structure()</text>
+    <text class="box-sub" x="590" y="142" text-anchor="middle">only when save_workflow</text>
+  </a>
+
+  <a class="box" id="bReads" href="#inv">
+    <title>Two template files read from disk</title>
+    <rect x="480" y="180" width="220" height="60" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590" y="204" text-anchor="middle">opens two templates</text>
+    <text class="box-sub" x="590" y="222" text-anchor="middle">schema and smolagent factory</text>
+  </a>
+
+  <a class="box" id="bGeno" href="#inv">
+    <title>The LLM step and its two cleaning helpers</title>
+    <rect x="480" y="260" width="220" height="66" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590" y="284" text-anchor="middle">create_workflow_genotype_code()</text>
+    <text class="box-sub" x="590" y="302" text-anchor="middle">llm_make_workflow(), extract_python_code()</text>
+    <text class="box-sub" x="590" y="318" text-anchor="middle">remove_imports(), compile() check</text>
+  </a>
+
+  <a class="box" id="bSave" href="#inv">
+    <title>Metadata written before validation runs</title>
+    <rect x="760" y="20" width="200" height="60" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="860" y="44" text-anchor="middle">save_workflow_files()</text>
+    <text class="box-sub" x="860" y="62" text-anchor="middle">Factory, line 482</text>
+  </a>
+
+  <a class="box" id="bVal" href="#inv">
+    <title>Structural regex validation</title>
+    <rect x="760" y="110" width="200" height="66" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="860" y="134" text-anchor="middle">validate_workflow_structure()</text>
+    <text class="box-sub" x="860" y="152" text-anchor="middle">8 regex patterns, line 210</text>
+    <text class="box-sub" x="860" y="168" text-anchor="middle">raises ValueError on a miss</text>
+  </a>
+
+  <a class="box" id="bAsm" href="#inv">
+    <title>Splice and final syntax check</title>
+    <rect x="760" y="200" width="200" height="66" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="860" y="224" text-anchor="middle">assemble_workflow()</text>
+    <text class="box-sub" x="860" y="242" text-anchor="middle">tools, state, factory, genotype</text>
+    <text class="box-sub" x="860" y="258" text-anchor="middle">then compile() at line 505</text>
+  </a>
+
+  <g class="box" id="bOut">
+    <title>Return value and the files on disk</title>
+    <rect x="760" y="300" width="200" height="140" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="860" y="324" text-anchor="middle">outputs</text>
+    <text class="box-sub" x="860" y="344" text-anchor="middle">complete_code</text>
+    <text class="box-sub" x="860" y="360" text-anchor="middle">workflow_genotype_code</text>
+    <text class="box-sub" x="860" y="376" text-anchor="middle">uuid_str</text>
+    <text class="box-sub" x="860" y="396" text-anchor="middle">genotype .py and</text>
+    <text class="box-sub" x="860" y="412" text-anchor="middle">3 metadata files</text>
+  </g>
+
+  <path class="edge" data-from="i1" data-to="bInit" d="M190,80 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="210" y="72" text-anchor="middle">config</text>
+
+  <path class="edge" data-from="bInit" data-to="bCraft" d="M330,100 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="340" y="124" text-anchor="start">self.config</text>
+
+  <path class="edge" data-from="bCraft" data-to="bTools" d="M430,155 H455 V50 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="450" y="120" text-anchor="end">calls</text>
+
+  <path class="edge" data-from="bCraft" data-to="bFolder" d="M430,175 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="445" y="170" text-anchor="start">calls</text>
+
+  <path class="edge" data-from="bCraft" data-to="bReads" d="M430,195 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="445" y="190" text-anchor="start">reads</text>
+
+  <path class="edge" data-from="bCraft" data-to="bGeno" d="M430,215 H455 V293 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="455" y="250" text-anchor="end">calls</text>
+
+  <path class="edge" data-from="bGeno" data-to="bSave" d="M700,275 H730 V50 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="95" text-anchor="end">saves genotype</text>
+
+  <path class="edge" data-from="bSave" data-to="bVal" d="M860,80 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="870" y="102" text-anchor="start">then</text>
+
+  <path class="edge" data-from="bVal" data-to="bAsm" d="M860,176 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="870" y="192" text-anchor="start">passes</text>
+
+  <path class="edge" data-from="bAsm" data-to="bOut" d="M860,266 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="870" y="286" text-anchor="start">compile ok</text>
+
+  <path class="edge" data-from="bCraft" data-to="bOut" d="M330,230 V445 H970 V370 H960" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="437" text-anchor="middle">returns code, uuid</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - 11 boxes. The chain is: read config, load MCP tools, make the two folders, read the two templates, ask the LLM for the body, save it, validate its shape, splice and compile, return. Solid arrows are the real calls inside <code class="sym">craft_workflow</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: templates in, one script and four files out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 400" role="img" aria-label="WorkflowFactory data flow">
+  <defs>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+  </defs>
+
+  <g class="box" id="d1">
+    <title>Config fields read</title>
+    <rect x="20" y="20" width="260" height="160" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="150" y="44" text-anchor="middle">config fields</text>
+    <text class="box-sub" x="150" y="64" text-anchor="middle">prompt_workflow_creator (45)</text>
+    <text class="box-sub" x="150" y="80" text-anchor="middle">schema_code_path (43)</text>
+    <text class="box-sub" x="150" y="96" text-anchor="middle">smolagent_factory_code_path (44)</text>
+    <text class="box-sub" x="150" y="112" text-anchor="middle">workflow_llm_model, reasoning_effort</text>
+    <text class="box-sub" x="150" y="128" text-anchor="middle">openrouter_provider_for() (338)</text>
+    <text class="box-sub" x="150" y="144" text-anchor="middle">smolagent_model_id[0], engine_name</text>
+    <text class="box-sub" x="150" y="160" text-anchor="middle">agent_execution_timeout (359)</text>
+    <text class="box-sub" x="150" y="176" text-anchor="middle">save_logprobs (360)</text>
+  </g>
+
+  <g class="box" id="d2">
+    <title>Files read from disk</title>
+    <rect x="20" y="210" width="260" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="150" y="234" text-anchor="middle">read from disk</text>
+    <text class="box-sub" x="150" y="254" text-anchor="middle">prompt_workflow_creator (line 59)</text>
+    <text class="box-sub" x="150" y="270" text-anchor="middle">schema_code_path (line 466)</text>
+    <text class="box-sub" x="150" y="286" text-anchor="middle">smolagent_factory_code_path (468)</text>
+    <text class="box-sub" x="150" y="302" text-anchor="middle">all three paths come from the Config</text>
+    <text class="box-sub" x="150" y="318" text-anchor="middle">no other file is read</text>
+  </g>
+
+  <a class="box" id="d3" href="#inv">
+    <title>The factory builds text only</title>
+    <rect x="330" y="80" width="240" height="90" rx="12" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="104" text-anchor="middle">WorkflowFactory</text>
+    <text class="box-sub" x="450" y="124" text-anchor="middle">assembles three strings</text>
+    <text class="box-sub" x="450" y="140" text-anchor="middle">never runs the workflow</text>
+    <text class="box-sub" x="450" y="156" text-anchor="middle">LLM use is inside LLMProvider</text>
+  </a>
+
+  <g class="box" id="d4">
+    <title>Files written by the factory</title>
+    <rect x="620" y="30" width="300" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="770" y="54" text-anchor="middle">written by save_workflow_files()</text>
+    <text class="box-sub" x="770" y="74" text-anchor="middle">workflow_genotype_uuid.py (line 482)</text>
+    <text class="box-sub" x="770" y="90" text-anchor="middle">system_prompt_uuid.md</text>
+    <text class="box-sub" x="770" y="106" text-anchor="middle">goal_uuid.txt</text>
+    <text class="box-sub" x="770" y="122" text-anchor="middle">original_task_uuid.txt</text>
+    <text class="box-sub" x="770" y="142" text-anchor="middle">factory.py:157 writes each one</text>
+    <text class="box-sub" x="770" y="158" text-anchor="middle">in its own try block</text>
+  </g>
+
+  <g class="box" id="d5">
+    <title>Files written later by the emitted script</title>
+    <rect x="620" y="210" width="300" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="770" y="234" text-anchor="middle">written by the emitted script</text>
+    <text class="box-sub" x="770" y="254" text-anchor="middle">workflow_uuid.png (line 383)</text>
+    <text class="box-sub" x="770" y="270" text-anchor="middle">state_result.json (line 407)</text>
+    <text class="box-sub" x="770" y="290" text-anchor="middle">uuid is timestamp_8hex (line 445)</text>
+    <text class="box-sub" x="770" y="306" text-anchor="middle">the png write is inside try/except</text>
+    <text class="box-sub" x="770" y="322" text-anchor="middle">and its failure is ignored</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d3" d="M280,80 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="300" y="72" text-anchor="middle">fields</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d3" d="M280,225 H305 V140 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="310" y="265" text-anchor="middle">templates</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="d4" d="M570,110 H595 V85 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="592" y="102" text-anchor="middle">saves</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="d5" d="M570,140 H595 V265 H620" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="592" y="190" text-anchor="middle">emitted code</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - the factory reads three files and several config fields, and returns text. The two write boxes are split on purpose: one happens in this file, the other happens only when the generated script runs.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; logic: the cache rule and the validation ladder</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 350" role="img" aria-label="cache rule and workflow validation ladder">
+  <defs>
+    <marker id="arw5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+  </defs>
+
+  <text class="box-sub" x="115" y="42" text-anchor="middle">cache rule (473)</text>
+  <g class="box" id="q1">
+    <title>Equality test between the two task strings</title>
+    <rect x="20" y="60" width="180" height="70" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="110" y="85" text-anchor="middle">goal == craft_instructions</text>
+    <text class="box-sub" x="110" y="103" text-anchor="middle">true means the last run did not fail</text>
+    <text class="box-sub" x="110" y="119" text-anchor="middle">line 473</text>
+  </g>
+
+  <g class="box" id="q2">
+    <title>Cache reused</title>
+    <rect x="230" y="20" width="200" height="60" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="44" text-anchor="middle">use_cache=True</text>
+    <text class="box-sub" x="330" y="62" text-anchor="middle">LLMProvider reuses a cached answer</text>
+  </g>
+
+  <g class="box" id="q3">
+    <title>Cache bypassed</title>
+    <rect x="230" y="110" width="200" height="60" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="330" y="134" text-anchor="middle">use_cache=False</text>
+    <text class="box-sub" x="330" y="152" text-anchor="middle">fresh LLM call, line 476</text>
+  </g>
+
+  <text class="box-sub" x="585" y="42" text-anchor="middle">validation ladder (210)</text>
+  <g class="box" id="v1">
+    <title>Four required patterns</title>
+    <rect x="480" y="20" width="200" height="60" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="580" y="44" text-anchor="middle">required_checks, line 240</text>
+    <text class="box-sub" x="580" y="62" text-anchor="middle">StateGraph, conditionals, factories</text>
+  </g>
+
+  <g class="box" id="v2">
+    <title>First missing pattern wins</title>
+    <rect x="480" y="100" width="200" height="60" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="580" y="124" text-anchor="middle">pattern not found</text>
+    <text class="box-sub" x="580" y="142" text-anchor="middle">raise ValueError with its message</text>
+  </g>
+
+  <g class="box" id="v3">
+    <title>Entry edge must point at a real node</title>
+    <rect x="480" y="180" width="200" height="60" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="580" y="204" text-anchor="middle">entry node in nodes?</text>
+    <text class="box-sub" x="580" y="222" text-anchor="middle">else raise "non-existent node"</text>
+  </g>
+
+  <g class="box" id="v4">
+    <title>Node names must be valid identifiers</title>
+    <rect x="480" y="260" width="200" height="60" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="580" y="284" text-anchor="middle">keyword or not identifier</text>
+    <text class="box-sub" x="580" y="302" text-anchor="middle">raise, line 268-272</text>
+  </g>
+
+  <g class="box" id="c1">
+    <title>Syntax check of the LLM body</title>
+    <rect x="730" y="120" width="190" height="60" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="825" y="144" text-anchor="middle">compile(body), line 202</text>
+    <text class="box-sub" x="825" y="162" text-anchor="middle">SyntaxError: raise ValueError</text>
+  </g>
+
+  <g class="box" id="c2">
+    <title>Syntax check of the whole script</title>
+    <rect x="730" y="240" width="190" height="60" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="825" y="264" text-anchor="middle">compile(script), line 505</text>
+    <text class="box-sub" x="825" y="282" text-anchor="middle">raise with UUID prefix</text>
+  </g>
+
+  <path class="edge" data-from="q1" data-to="q2" d="M200,75 H215 V50 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="212" y="42" text-anchor="end">equals</text>
+  <path class="edge dashed-edge" data-from="q1" data-to="q3" d="M200,110 H230" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw6)"/>
+  <text class="edge-label" x="205" y="145" text-anchor="end">differs</text>
+
+  <path class="edge" data-from="v1" data-to="v2" d="M580,80 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="590" y="96" text-anchor="start">miss</text>
+  <path class="edge" data-from="v2" data-to="v3" d="M580,160 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="590" y="176" text-anchor="start">pass</text>
+  <path class="edge" data-from="v3" data-to="v4" d="M580,240 V260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="590" y="256" text-anchor="start">pass</text>
+  <path class="edge" data-from="v4" data-to="c1" d="M680,290 H705 V150 H730" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="710" y="225" text-anchor="end">pass</text>
+  <path class="edge" data-from="c1" data-to="c2" d="M825,180 V240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="835" y="214" text-anchor="start">then</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - left: the cache rule, decided by one string comparison. Middle and right: the four required patterns, then three more checks, then two <code>compile()</code> calls. Each failure raises <code>ValueError</code>; the last one prefixes the UUID.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>config field</td><td class="sym">prompt_workflow_creator</td><td>copied line 45, read line 59</td><td>system prompt for the workflow LLM</td></tr>
+<tr><td>config field</td><td class="sym">schema_code_path</td><td>line 43, read line 466</td><td>the WorkflowState schema text</td></tr>
+<tr><td>config field</td><td class="sym">smolagent_factory_code_path</td><td>line 44, read line 468</td><td>the agent factory text</td></tr>
+<tr><td>config field</td><td class="sym">workflow_llm_model</td><td>line 143, via extract_model_pattern</td><td>provider and model of the crafting call</td></tr>
+<tr><td>config field</td><td class="sym">reasoning_effort, max_tokens</td><td>lines 152-153, max_tokens fixed at 32000</td><td>LLMConfig of the crafting call</td></tr>
+<tr><td>config field</td><td class="sym">smolagent_model_id, engine_name, openrouter_provider_for(), orchestrator_choose_model</td><td>lines 322, 338-339</td><td>values written into the emitted script</td></tr>
+<tr><td>config field</td><td class="sym">agent_execution_timeout, save_logprobs</td><td>lines 359-360</td><td>globals of the emitted script</td></tr>
+<tr><td>config field</td><td class="sym">workflow_dir, memory_dir</td><td>lines 38-39, via create_folder_structure</td><td>roots of the two uuid folders</td></tr>
+<tr><td>file read</td><td class="sym">prompt_workflow_creator (sources/prompts/workflow_v*.md)</td><td>line 59</td><td>system prompt of the crafting LLM</td></tr>
+<tr><td>file read</td><td class="sym">state_schema.py, smolagent_factory.py</td><td>lines 466, 468</td><td>templates spliced into the script</td></tr>
+<tr><td>file written</td><td class="sym">workflow_genotype_&lt;uuid&gt;.py</td><td>line 482 through factory.py:175</td><td>the LLM body alone, saved before validation</td></tr>
+<tr><td>file written</td><td class="sym">system_prompt_&lt;uuid&gt;.md, goal_&lt;uuid&gt;.txt, original_task_&lt;uuid&gt;.txt</td><td>factory.py:184, 193, 204</td><td>metadata for selection and similarity</td></tr>
+<tr><td>file written</td><td class="sym">workflow_&lt;uuid&gt;.png</td><td>emitted script, line 383</td><td>graph image, failure ignored</td></tr>
+<tr><td>file written</td><td class="sym">state_result.json</td><td>emitted script, line 407</td><td>state written through a tmp file then os.replace</td></tr>
+<tr><td>return value</td><td class="sym">(complete_code, workflow_genotype_code, uuid_str)</td><td>line 514</td><td>handed to the sandbox runner</td></tr>
+</tbody>
+</table>
+<p class="note">The genotype is written to disk at line 482, before <code class="sym">validate_workflow_structure</code> runs at line 485. The comment there says this is deliberate, so the learning layer can still read it when validation fails.</p>
+<p class="note">Tool temperature is randomised per call: <code>random.uniform(0.7, 1.3)</code> at line 144, capped at 1.0 for anthropic and claude models (line 145-146).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="inv">Full symbol inventory</h2>
+<details><summary>every class, method and top-level function (514 lines)</summary><div class="dbody">
+<pre>class WorkflowFactory(Factory)                                     # line 27  - LangGraph workflow script builder
+
+  __init__(self, config: "Config") -&gt; None                         # line 35  - stores 5 config paths
+  get_system_prompt(self) -&gt; str                                   # line 49  - reads prompt_workflow_creator
+  @staticmethod
+  extract_python_code(code: str) -&gt; str                            # line 65  - joins python fences only
+  remove_imports(self, code: str) -&gt; str                           # line 90  - strips import lines
+  llm_make_workflow(self, system_prompt: str,
+      craft_instructions: str, existing_tool_prompt: str,
+      path: str, allow_cache: bool) -&gt; str                         # line 109 - one LLMProvider call, temperature randomised
+  create_workflow_genotype_code(self, craft_instructions: str,
+      existing_tool_prompt: str, path: str,
+      allow_cache: bool) -&gt; str                                    # line 158 - generate, clean, compile-check
+  validate_workflow_structure(self,
+      workflow_genotype_code: str) -&gt; None                         # line 210 - 8 regex checks, raises ValueError
+  assemble_workflow(self, tools_code: str, state_code: str,
+      smolagent_factory_code: str, workflow_genotype_code: str,
+      workflow_path: str, memory_path: str, uuid_str: str,
+      goal: str, smolagent_system_prompt: str | None = None) -&gt; str# line 283 - splice templates into one script
+  async craft_workflow(self, goal: str, craft_instructions: str,
+      save_workflow: bool = True,
+      original_task: str | None = None) -&gt; tuple[str, str, str]    # line 412 - the public entry point
+
+no module-level function and no second class in the file</pre>
+<p>Imports (lines 5-25): <code>logging</code>, <code>os</code>, <code>random</code>, <code>re</code>, <code>time</code>, <code>uuid</code>, <code>state_schema</code> from <code>sources.modules</code>, <code>Factory</code>, <code>LLMConfig</code>, <code>LLMProvider</code> and <code>extract_model_pattern</code> from <code>.llm_provider</code>, <code>ToolManager</code> from <code>.tools_manager</code> (imported, never used), and the print helpers from <code>sources.cli.pretty_print</code>.</p>
+<p>The two long f-strings are inside methods: the prompt template at lines 137-154 and the executable script at lines 341-410. Code inside them runs only in the generated file.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<h3>Who imports this file</h3>
+<table>
+<thead><tr><th>Importer</th><th>What it does</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a></td><td>imports the class and builds it in <code>__init__</code></td><td class="size">18, 39</td></tr>
+<tr><td class="sym"><a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a></td><td>awaits <code>craft_workflow</code> in <code>_generate_workflow_code</code></td><td class="size">200</td></tr>
+<tr><td class="sym"><a href="../../sources/core/__init__.py">sources/core/__init__.py</a></td><td>re-exports the class</td><td class="size">23, 57</td></tr>
+<tr><td class="sym"><a href="../../sources/utils/logging.py">sources/utils/logging.py</a></td><td>lists this module as a noisy logger</td><td class="size">58</td></tr>
+<tr><td class="sym"><a href="../../webui/backend/app/launcher.py">webui/backend/app/launcher.py</a></td><td>matches its error strings to report crafting failures</td><td class="size">30</td></tr>
+</tbody>
+</table>
+<h3>Tests that exercise it</h3>
+<table>
+<thead><tr><th>Test file</th><th>What it checks</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/smolagent_factory_logprobs_test.py">tests/smolagent_factory_logprobs_test.py</a></td><td>reads this file as text and asserts SAVE_LOGPROBS is injected</td><td class="size">213-217</td></tr>
+<tr><td class="sym"><a href="../../tests/csv_mode_ablation_index_test.py">tests/csv_mode_ablation_index_test.py</a></td><td>relies on the uuid format defined here</td><td class="size">7</td></tr>
+<tr><td class="sym"><a href="../../webui/backend/tests/test_launcher.py">webui/backend/tests/test_launcher.py</a></td><td>uses the two crafting error strings as fixtures</td><td class="size">20, 24</td></tr>
+</tbody>
+</table>
+<p class="note say">Read this page with <a href="file_core_single_agent_factory.html">file_core_single_agent_factory.html</a> and <a href="file_core_tools_manager.html">file_core_tools_manager.html</a>: the first shares the <code>Factory</code> plumbing and returns the same triple, the second supplies the <code>tools_code</code> string spliced in at line 365.</p>
+<p class="note flag">No test calls <code class="sym">craft_workflow</code> or <code class="sym">validate_workflow_structure</code> directly. The factory's own behaviour is checked only through string matching on the file and through the WebUI launcher's error-text parsing.</p>
+</div>
+<footer>
+<p>Digest hub: <a href="file_index.html">file_index.html</a> &#183; area page: <a href="area_sources_core.html">area_sources_core.html</a> &#183; module page: <a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a>.</p>
+<p>Sources: <code class="path">sources/core/workflow_factory.py</code> (all 514 lines), <code class="path">sources/core/factory.py</code> (inherited methods), <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/modules/state_schema.py</code> and <code class="path">sources/modules/smolagent_factory.py</code> (named, not parsed), <code class="path">config.py</code>, <code class="path">tests/smolagent_factory_logprobs_test.py</code>, <code class="path">tests/csv_mode_ablation_index_test.py</code>, <code class="path">webui/backend/app/launcher.py</code>.</p>
+<p class="skips">Skipped: no LLM call and no run (hard rule: do not run the application); the two template files are named but their content is not quoted; <code class="path">LLMProvider</code> is described only as the caller (its page is <a href="file_core_llm_provider.html">file_core_llm_provider.html</a>); the unused <code class="path">ToolManager</code> import (line 16) is stated, not explained; whether <code>draw_mermaid_png</code> needs a network service is <code>unknown</code> here.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

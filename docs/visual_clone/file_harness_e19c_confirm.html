@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19c_confirm.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; experiments_verifiers/harness &gt; e19c_confirm.py">
+<div class="wrap">
+
+<h1 class="hud">e19c_confirm.py</h1>
+<p class="intro">One-shot confirmatory readout for the E19c "ratchet" experiment: it joins the frozen label-free ledger with the E19/E19b/E24 baseline tables and scores every arm on the 147 contrast generation pairs. It is the only stage of the E19c chain that reads SR labels, and it reads them once; it makes zero LLM calls (docstring L1-17). It writes <code>results/E19c_ratchet_2026-09-25.json</code> and <code>.md</code> (L40-41).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; inputs, entry point, readout stages, outputs</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 430" role="img" aria-label="e19c_confirm: two input boxes, load_baselines and main, six readout stages, write_md and the two output files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="i1" href="../../experiments_verifiers/results/_e19c_label_free_2026-09-25.json">
+    <title>Label-free ledger plus the three persisted baseline tables</title>
+    <rect x="20" y="40" width="190" height="64" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="115" y="66" text-anchor="middle">frozen inputs</text>
+    <text class="box-sub" x="115" y="84" text-anchor="middle">label-free ledger (L35)</text>
+  </a>
+  <a class="box" id="i2" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>E14 plan reached through e19c_ratchet.load_plan_groups</title>
+    <rect x="20" y="150" width="190" height="64" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="115" y="176" text-anchor="middle">plan + SR labels</text>
+    <text class="box-sub" x="115" y="194" text-anchor="middle">via e19c_ratchet (L30-32)</text>
+  </a>
+
+  <a class="box" id="bl" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>load_baselines merges the three persisted per-generation tables</title>
+    <rect x="270" y="40" width="170" height="64" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="355" y="66" text-anchor="middle">load_baselines()</text>
+    <text class="box-sub" x="355" y="84" text-anchor="middle">L66 &#183; gid + uuid8 maps</text>
+  </a>
+  <a class="box" id="mn" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>main builds groups_data, runs all readouts, writes the JSON, calls write_md</title>
+    <rect x="270" y="150" width="170" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="355" y="178" text-anchor="middle">main()</text>
+    <text class="box-sub" x="355" y="196" text-anchor="middle">L80 &#183; 19 group rows</text>
+    <text class="box-sub" x="355" y="212" text-anchor="middle">reads labels once (L90)</text>
+  </a>
+
+  <a class="box" id="s2" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>Baseline reproduction assert: every arm must match its published value</title>
+    <rect x="500" y="40" width="190" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="595" y="66" text-anchor="middle">wiring check</text>
+    <text class="box-sub" x="595" y="84" text-anchor="middle">assert 0.011 (L122)</text>
+  </a>
+  <a class="box" id="s3" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>Readout A: pairs-correct, cluster bootstrap CIs, paired diffs, tie rates</title>
+    <rect x="500" y="130" width="190" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="595" y="156" text-anchor="middle">readout A + diffs</text>
+    <text class="box-sub" x="595" y="174" text-anchor="middle">pairfn, pairs_correct</text>
+  </a>
+  <a class="box" id="s4" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>Raw pair-level hits, M2 argmax replay over 19 groups, bootstrap diffs</title>
+    <rect x="500" y="230" width="190" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="595" y="256" text-anchor="middle">raw + M2 replay</text>
+    <text class="box-sub" x="595" y="274" text-anchor="middle">argmax_ship (L190)</text>
+  </a>
+
+  <a class="box" id="s5" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>Per-group Spearman independence, optional gradient-duel block</title>
+    <rect x="750" y="130" width="190" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="845" y="156" text-anchor="middle">independence + duel</text>
+    <text class="box-sub" x="845" y="174" text-anchor="middle">spearmanr (L233)</text>
+  </a>
+  <a class="box" id="s6" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>The out dict with 12 top-level keys, then the JSON file write</title>
+    <rect x="750" y="230" width="190" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="845" y="256" text-anchor="middle">assemble out dict</text>
+    <text class="box-sub" x="845" y="274" text-anchor="middle">12 keys (L260-334)</text>
+  </a>
+
+  <a class="box" id="wm" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>write_md renders the markdown report and writes it</title>
+    <rect x="1000" y="110" width="190" height="64" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1095" y="136" text-anchor="middle">write_md()</text>
+    <text class="box-sub" x="1095" y="154" text-anchor="middle">L348 &#183; 14 arguments</text>
+  </a>
+  <a class="box" id="o1" href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.md">
+    <title>The two written reports</title>
+    <rect x="1000" y="230" width="190" height="76" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="1095" y="256" text-anchor="middle">E19c_ratchet 2026-09-25</text>
+    <text class="box-sub" x="1095" y="274" text-anchor="middle">json written L335</text>
+    <text class="box-sub" x="1095" y="290" text-anchor="middle">md written L564</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="i1" data-to="bl" d="M210,72 H270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="240" y="62" text-anchor="middle">reads 3 tables</text>
+  <path class="edge" data-from="i2" data-to="mn" d="M210,182 H270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="240" y="172" text-anchor="middle">19 groups + labels</text>
+  <path class="edge" data-from="bl" data-to="mn" d="M355,104 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="363" y="132" text-anchor="start">returns tables</text>
+
+  <path class="edge" data-from="mn" data-to="s2" d="M440,168 H470 V70 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="118" text-anchor="middle">assert check</text>
+  <path class="edge" data-from="mn" data-to="s3" d="M440,190 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="208" text-anchor="middle">contrast list</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M595,100 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="603" y="120" text-anchor="start">wiring ok</text>
+  <path class="edge" data-from="s3" data-to="s4" d="M595,194 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="603" y="216" text-anchor="start">pair hits</text>
+  <path class="edge" data-from="s4" data-to="s5" d="M690,240 H720 V162 H750" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="208" text-anchor="middle">M2 shipped</text>
+  <path class="edge" data-from="s5" data-to="s6" d="M845,194 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="853" y="216" text-anchor="start">duel stats</text>
+  <path class="edge" data-from="s6" data-to="wm" d="M940,240 H970 V142 H1000" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="973" y="186" text-anchor="start">write_md() L336</text>
+  <path class="edge dashed-edge" data-from="s6" data-to="o1" d="M940,268 H1000" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="970" y="258" text-anchor="middle">writes json</text>
+  <path class="edge dashed-edge" data-from="wm" data-to="o1" d="M1095,174 V230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="1103" y="206" text-anchor="start">writes md</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. Pill = function, rectangle = data or step, blue = file, mint = function. Solid = call or control flow, dashed = file read or write. Every edge follows the real order of work inside <code>main()</code> (L80-345); <code>load_baselines()</code> (L83) and <code>write_md()</code> (L336) are the only two functions <code>main()</code> calls from this file. The six stage boxes are sequential blocks of <code>main()</code>, not separate functions.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: reads, return values, writes</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 360" role="img" aria-label="e19c_confirm data flow: no config field, four file reads, both functions return None, three outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="cf" href="../../config.py">
+    <title>config.py is not imported by this file</title>
+    <rect x="20" y="10" width="250" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="32" text-anchor="middle">config.py</text>
+    <text class="box-sub" x="145" y="50" text-anchor="middle">no field read (imports L18-26)</text>
+  </a>
+
+  <a class="box" id="r1" href="../../experiments_verifiers/results/_e19c_label_free_2026-09-25.json">
+    <title>Label-free ledger, read once at the top of main</title>
+    <rect x="20" y="95" width="250" height="64" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="145" y="120" text-anchor="middle">_e19c_label_free_2026-09-25.json</text>
+    <text class="box-sub" x="145" y="138" text-anchor="middle">LABEL_FREE (L35), read L81</text>
+  </a>
+  <a class="box" id="r2" href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json">
+    <title>E19, E19b and E24 per-generation tables</title>
+    <rect x="20" y="175" width="250" height="64" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="145" y="200" text-anchor="middle">E19 / E19b / E24 tables</text>
+    <text class="box-sub" x="145" y="218" text-anchor="middle">L36-38, read L67-69</text>
+  </a>
+  <a class="box" id="r3" href="../../experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json">
+    <title>Optional gradient-duel summary, guarded by exists</title>
+    <rect x="20" y="255" width="250" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="280" text-anchor="middle">E19c_gradient_duel json</text>
+    <text class="box-sub" x="145" y="298" text-anchor="middle">L39, if exists L256</text>
+  </a>
+
+  <a class="box" id="m" href="../../experiments_verifiers/harness/e19c_confirm.py">
+    <title>main and write_md, both returning None</title>
+    <rect x="370" y="150" width="230" height="90" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="485" y="176" text-anchor="middle">main() then write_md()</text>
+    <text class="box-sub" x="485" y="194" text-anchor="middle">return None (L80, L348)</text>
+    <text class="box-sub" x="485" y="210" text-anchor="middle">json L335 &#183; md L564</text>
+    <text class="box-sub" x="485" y="226" text-anchor="middle">prints 6 arm lines (L339)</text>
+  </a>
+
+  <a class="box" id="o1" href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.json">
+    <title>Confirmatory JSON, 12 keys written by this file</title>
+    <rect x="700" y="80" width="250" height="64" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="825" y="105" text-anchor="middle">E19c_ratchet json</text>
+    <text class="box-sub" x="825" y="123" text-anchor="middle">OUT_JSON (L40) &#183; 12 keys (L260)</text>
+  </a>
+  <a class="box" id="o2" href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.md">
+    <title>Markdown report built as a list of lines</title>
+    <rect x="700" y="170" width="250" height="64" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="825" y="195" text-anchor="middle">E19c_ratchet md</text>
+    <text class="box-sub" x="825" y="213" text-anchor="middle">OUT_MD (L41) &#183; join at L564</text>
+  </a>
+  <a class="box" id="o3">
+    <title>Printed summary on stdout</title>
+    <rect x="700" y="260" width="250" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="825" y="285" text-anchor="middle">stdout</text>
+    <text class="box-sub" x="825" y="303" text-anchor="middle">arm scores + M2 (L338-345)</text>
+  </a>
+
+  <g class="box" id="st">
+    <title>No shared state object is read or written</title>
+    <rect x="1000" y="150" width="180" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1090" y="176" text-anchor="middle">no state</text>
+    <text class="box-sub" x="1090" y="194" text-anchor="middle">no state key read</text>
+    <text class="box-sub" x="1090" y="210" text-anchor="middle">values pass as</text>
+    <text class="box-sub" x="1090" y="226" text-anchor="middle">arguments (L336)</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="r1" data-to="m" d="M270,127 H340 V170 H370" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="320" y="119" text-anchor="middle">ledger dict</text>
+  <path class="edge dashed-edge" data-from="r2" data-to="m" d="M270,207 H370" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="320" y="199" text-anchor="middle">three tables</text>
+  <path class="edge dashed-edge" data-from="r3" data-to="m" d="M270,287 H340 V240 H370" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="320" y="279" text-anchor="middle">duel stats</text>
+
+  <path class="edge dashed-edge" data-from="m" data-to="o1" d="M600,180 H660 V112 H700" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="660" y="152" text-anchor="middle">write_text L335</text>
+  <path class="edge dashed-edge" data-from="m" data-to="o2" d="M600,210 H700" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="655" y="204" text-anchor="middle">write_text L564</text>
+  <path class="edge dashed-edge" data-from="m" data-to="o3" d="M600,230 V292 H700" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="660" y="284" text-anchor="middle">print</text>
+  <path class="edge dashed-edge" data-from="m" data-to="st" d="M600,240 V330 H1090 V240" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="840" y="344" text-anchor="middle">nothing</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>9 boxes</code>. Dashed boxes are sources or sinks this file only touches by path; dashed arrows are reads and writes. <code>config.py</code> is drawn only to state that no field of it is read: the imports at L18-26 are <code>json</code>, <code>sys</code>, <code>Counter</code>, <code>Path</code>, <code>numpy</code>, <code>scipy.stats.spearmanr</code> plus the two sibling harness modules. Both functions return <code>None</code>; every value reaches <code>write_md()</code> through its argument list (L336-337).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the decision rules and the two loops</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 540" role="img" aria-label="e19c_confirm logic: group join, wiring assert, pair score rule, duel guard">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-label" x="20" y="32" text-anchor="start">loop 1 &#8212; one pass per planned group (19 of them)</text>
+  <g class="box" id="q1">
+    <title>Group lookup by gid, no default value</title>
+    <rect x="20" y="42" width="320" height="54" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="180" y="74" text-anchor="middle">gid found in ledger? (L88)</text>
+  </g>
+  <g class="box" id="q1y">
+    <title>Row built and appended</title>
+    <rect x="450" y="42" width="300" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="600" y="74" text-anchor="middle">yes: build one group row</text>
+  </g>
+  <g class="box" id="q1n">
+    <title>next without default raises</title>
+    <rect x="820" y="42" width="340" height="54" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="990" y="74" text-anchor="middle">no: StopIteration, run stops</text>
+  </g>
+  <path class="edge" data-from="q1" data-to="q1y" d="M340,69 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="395" y="61" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q1" data-to="q1n" d="M340,84 H395 V130 H990 V96" fill="none" stroke="#FF4D6A" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="420" y="122" text-anchor="start">no</text>
+
+  <text class="box-label" x="20" y="156" text-anchor="start">wiring assert &#8212; runs before any readout (L117-123)</text>
+  <g class="box" id="q2">
+    <title>Every baseline must reproduce its published value</title>
+    <rect x="20" y="166" width="320" height="54" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="180" y="198" text-anchor="middle">arm matches published? (L122)</text>
+  </g>
+  <g class="box" id="q2y">
+    <title>All 8 baselines match</title>
+    <rect x="450" y="166" width="300" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="600" y="198" text-anchor="middle">yes: run the readouts</text>
+  </g>
+  <g class="box" id="q2n">
+    <title>AssertionError stops the experiment</title>
+    <rect x="820" y="166" width="340" height="54" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="990" y="198" text-anchor="middle">no: AssertionError, hard fail</text>
+  </g>
+  <path class="edge" data-from="q2" data-to="q2y" d="M340,193 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="395" y="185" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q2" data-to="q2n" d="M340,208 H395 V254 H990 V220" fill="none" stroke="#FF4D6A" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="420" y="246" text-anchor="start">no</text>
+
+  <text class="box-label" x="20" y="280" text-anchor="start">loop 2 &#8212; SR-true against SR-false pairs, inside each group (147 pairs)</text>
+  <g class="box" id="q3">
+    <title>Missing score, missing pair</title>
+    <rect x="20" y="290" width="320" height="54" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="180" y="322" text-anchor="middle">either score is None? (L142)</text>
+  </g>
+  <g class="box" id="q3y">
+    <title>Pair left out of the count</title>
+    <rect x="450" y="290" width="300" height="54" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="600" y="322" text-anchor="middle">yes: pair skipped</text>
+  </g>
+  <g class="box" id="q3n">
+    <title>Pair result: win, tie or loss</title>
+    <rect x="820" y="290" width="340" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="990" y="322" text-anchor="middle">no: 1.0 / 0.5 / 0.0 (L182)</text>
+  </g>
+  <path class="edge" data-from="q3" data-to="q3y" d="M340,317 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="395" y="309" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q3" data-to="q3n" d="M340,332 H395 V378 H990 V344" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="420" y="370" text-anchor="start">no</text>
+
+  <text class="box-label" x="20" y="404" text-anchor="start">optional duel block &#8212; written by another experiment, guarded by exists</text>
+  <g class="box" id="q4">
+    <title>DUEL_JSON.exists() gates the seventh readout</title>
+    <rect x="20" y="414" width="320" height="54" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="180" y="446" text-anchor="middle">duel json exists? (L256)</text>
+  </g>
+  <g class="box" id="q4y">
+    <title>Seven-channel block added to JSON and markdown</title>
+    <rect x="450" y="414" width="300" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="600" y="446" text-anchor="middle">yes: embed duel stats</text>
+  </g>
+  <g class="box" id="q4n">
+    <title>Null block and a one-line note in the markdown</title>
+    <rect x="820" y="414" width="340" height="54" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="990" y="446" text-anchor="middle">no: gradient_duel = None (L312)</text>
+  </g>
+  <path class="edge" data-from="q4" data-to="q4y" d="M340,441 H450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="395" y="433" text-anchor="middle">yes</text>
+  <path class="edge" data-from="q4" data-to="q4n" d="M340,456 H395 V502 H990 V468" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="420" y="494" text-anchor="start">no</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>12 boxes</code>. Two loops shape the file: the 19-group join (L86-112) and the pair loop over SR-true and SR-false generations (L136-150 for readout A, L171-183 for the raw pair-level numbers). Three smaller rules are not drawn as boxes: the raw pair-level path swaps <code>i</code> and <code>j</code> and negates <code>w</code> when the SR-true generation sits second (L176-181); <code>spearmanr</code> is skipped and stored as <code>None</code> when a group has fewer than 3 generations (L228-230) or when the rho is NaN (L234); the M2 bootstrap draws 10 000 cluster samples from a fixed seed <code>20260925</code> (L210-221).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>kind</th><th>name</th><th>where</th><th>used for</th><th class="size">lines</th></tr></thead>
+<tbody>
+<tr><td>config</td><td>no field</td><td class="sym"><a href="../../config.py">config.py</a> not imported</td><td>imports are stdlib, numpy, scipy only</td><td class="size">18-32</td></tr>
+<tr><td>read</td><td>label-free ledger</td><td class="sym"><a href="../../experiments_verifiers/results/_e19c_label_free_2026-09-25.json">results/_e19c_label_free_2026-09-25.json</a> (LABEL_FREE)</td><td>arm_scores, mean_claim, online, pairs, deciding_stage</td><td class="size">81, 88-111</td></tr>
+<tr><td>read</td><td>summary and cost block</td><td class="sym">same file, keys <code>summary</code> and <code>cost</code></td><td>diagnostics table and the cost section</td><td class="size">259, 518-547</td></tr>
+<tr><td>read</td><td>E19 table</td><td class="sym"><a href="../../experiments_verifiers/results/E19_hybrid_bt_2026-09-23.json">results/E19_hybrid_bt_2026-09-23.json</a> (L36)</td><td>keys <code>e19_mean_claim</code>, <code>e19_bt_reward</code></td><td class="size">67, 70-71, 95-96</td></tr>
+<tr><td>read</td><td>E19b table</td><td class="sym"><a href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.json">results/E19b_hybrid_bt_v2_2026-09-24.json</a> (L37)</td><td>section <code>eval_v2r2</code>, key <code>e19b_md</code></td><td class="size">68, 72-73, 97</td></tr>
+<tr><td>read</td><td>E24 rows</td><td class="sym"><a href="../../experiments_verifiers/results/E24_reexec_holdout_2026-09-24.json">results/E24_reexec_holdout_2026-09-24.json</a> (L38)</td><td>keys e15, uniform, e24, reward, e18</td><td class="size">69, 74-76, 98-102</td></tr>
+<tr><td>read</td><td>plan and SR labels</td><td class="sym">E14 plan via <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> load_plan_groups</td><td>19 groups, gens, sr, contrast, campaign</td><td class="size">82, 86-90</td></tr>
+<tr><td>read</td><td>duel json (optional)</td><td class="sym"><a href="../../experiments_verifiers/results/E19c_gradient_duel_2026-09-25.json">results/E19c_gradient_duel_2026-09-25.json</a> (L39)</td><td>stats, population, calls.new_call_cost_usd</td><td class="size">256, 312-325</td></tr>
+<tr><td>write</td><td>confirmatory json</td><td class="sym"><a href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.json">results/E19c_ratchet_2026-09-25.json</a> (OUT_JSON, L40)</td><td>out dict with 12 top-level keys</td><td class="size">260-334, 335</td></tr>
+<tr><td>write</td><td>markdown report</td><td class="sym"><a href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.md">results/E19c_ratchet_2026-09-25.md</a> (OUT_MD, L41)</td><td>TL;DR, readouts, tables, gaps, cost</td><td class="size">350-564</td></tr>
+<tr><td>write</td><td>stdout summary</td><td class="sym">sys.stdout</td><td>one score line per E19c arm, one M2 line</td><td class="size">338-345</td></tr>
+<tr><td>state</td><td>none</td><td class="sym">no shared state object</td><td>all values pass as function arguments</td><td class="size">336-337</td></tr>
+</tbody>
+</table>
+<p class="note say">The output files are shared with a later script: <a href="../../experiments_verifiers/harness/e19c_online_bt.py">e19c_online_bt.py</a> re-opens the same two paths (L38-39) and appends an <code>online_bt_view</code> key and a matching markdown section (L146-148, L150+). So the file on disk has 13 keys, one more than the 12 the <code>out</code> dict builds here.</p>
+<p class="note">Line 29 defines <code>REPO = EV.parents[0]</code> and no later line uses it; the five input paths are all built from <code>EV</code> (L35-41).</p>
+<p class="note">Amber: <code>write_md</code> takes <code>ships</code> as its ninth argument (L336, L348) and never reads it; the shipped counts it needs already arrive inside <code>m2</code> and <code>ship_rows</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>5 top-level defs, 1 closure, no classes</summary><div class="dbody">
+<pre>pairfn(scorer) -> Callable[[dict, str, str], float | None]          L57
+  f(gd, a, b) -> float | None                                       L58   closure returned by pairfn
+load_baselines() -> tuple[dict, dict, dict]                         L66
+main() -> None                                                      L80
+write_md(out, lf, groups_data, contrast, readout_a, diffs, raw,
+         m2, ships, m2_diffs, independence, duel, sumry,
+         ship_rows) -> None                                         L348
+mode_pairs_keys(diffs) -> list[str]                                 L567
+if __name__ == "__main__": main()                                   L572-573</pre>
+<p>Roles, in file order:</p>
+<pre>pairfn     build the 1 / 0.5 / 0 pair scorer                       L57
+f          compare two generation scores                          L58
+load_baselines  load the three baseline tables                    L66
+main       run every readout and write both files                 L80
+write_md   render the markdown report                             L348
+mode_pairs_keys  select mode-vs-mode diff keys                    L567</pre>
+<p>Two closures sit inside <code>main()</code> and are not top-level defs: the per-baseline scorer lambda with a bound name, <code>lambda gd, u, n=name: gd["arm_values"][n].get(u)</code> (L119-120), and <code>arm_getter(name)</code> returning <code>lambda gd, u: gd["arm_values"][name].get(u)</code> (L126-127). <code>all_arms</code> merges the 6 E19c arms and the 8 baselines into one 14-entry dict (L129-130).</p>
+<p>Constants and path values: <code>EV</code> L28, <code>REPO</code> L29 (unused), <code>TODAY = "2026-09-25"</code> L34, <code>LABEL_FREE</code> L35, <code>E19_JSON</code> L36, <code>E19B_JSON</code> L37, <code>E24_JSON</code> L38, <code>DUEL_JSON</code> L39, <code>OUT_JSON</code> L40, <code>OUT_MD</code> L41, <code>MODES</code> L43 (4 modes), <code>E19C_ARMS</code> L44-45 (6 arms), <code>BASELINES</code> L46-47 (8 names), <code>PUB_NOTE</code> L48, <code>EXTRA_GAPS</code> L49, <code>ONLINE_TLDR</code> L50, <code>EXTRA_TLDR</code> L51, <code>PUBLISHED</code> L52-54 (8 values).</p>
+<p>Local data shapes inside <code>main()</code>: <code>groups_data</code> (L85-112, one dict per group: gid, campaign, task, contrast, gens, uuid, sr, arm_values, vectors, pairs, surviving_ids, claims, order_u8, tie_rate, n_claims), <code>contrast</code> (L114, the <code>contrast</code> flag filter), <code>repro</code> (L117-123), <code>readout_a</code> (L131-150), <code>diffs</code> (L153-165, 6x8 + 5 keys), <code>raw</code> (L168-184), <code>ships</code>/<code>ship_rows</code>/<code>m2</code> (L187-207), <code>m2_diffs</code> (L210-221), <code>independence</code> (L224-254), <code>out</code> (L260-334).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Relation</th><th>Who</th><th>Where</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>importer</td><td>none</td><td class="sym">repo-wide grep</td><td>no Python file imports e19c_confirm</td></tr>
+<tr><td>runs as script</td><td>the file itself</td><td class="sym">L572-573</td><td><code>if __name__ == "__main__": main()</code>; no argv parsing</td></tr>
+<tr><td>calls out</td><td><a href="../../experiments_verifiers/harness/e15_bt_eval.py">e15_bt_eval.py</a></td><td class="sym">L119, 133-134, 156, 164, 190</td><td>pairs_correct, cluster_boot, paired_boot_diff, argmax_ship</td></tr>
+<tr><td>calls out</td><td><a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a></td><td class="sym">L82, L87</td><td>load_plan_groups, gid_of</td></tr>
+<tr><td>calls out</td><td>scipy.stats</td><td class="sym">L26, 233, 249</td><td>spearmanr per group</td></tr>
+<tr><td>reads its output</td><td><a href="../../experiments_verifiers/harness/e19c_online_bt.py">e19c_online_bt.py</a></td><td class="sym">L38-39, L146-148</td><td>re-opens both files, appends online_bt_view</td></tr>
+<tr><td>mentions</td><td><a href="../../experiments_verifiers/README.md">experiments_verifiers/README.md</a></td><td class="sym">line 49</td><td>experiment row E19c RATCHET, in flight</td></tr>
+<tr><td>test</td><td>none found</td><td class="sym">tests/</td><td>no test in tests/ names the file</td></tr>
+</tbody>
+</table>
+<p class="note flag">No importer found. The only other files naming <code>e19c_confirm</code> on disk are the clone pages themselves (<code>docs/visual_clone/_manifest.json</code> and the E19c pages); the harness README names the experiment, not the file.</p>
+<p class="note">Related pages: <a href="exp_e19c_confirm.html">exp_e19c_confirm.html</a> (the experiment readout), <a href="exp_e19c_ratchet.html">exp_e19c_ratchet.html</a> (the label-free producer of the ledger), <a href="exp_e19c_eval.html">exp_e19c_eval.html</a>, <a href="exp_e19c_online_bt.html">exp_e19c_online_bt.html</a>, <a href="exp_e19c_gradient_duel.html">exp_e19c_gradient_duel.html</a>, and the file pages <a href="file_harness_e19c_ratchet.html">file_harness_e19c_ratchet.html</a>, <a href="file_harness_e19c_online_bt.html">file_harness_e19c_online_bt.html</a>; hub <a href="file_index.html">file_index.html</a> and <a href="data_experiments.html">data_experiments.html</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19c_confirm.py</code> (full, 573 lines, <code>wc -l</code>); symbol signatures only in <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> (L234, L258, L284, L311, seeds L42-43) and <code class="path">experiments_verifiers/harness/e19c_ratchet.py</code> (L233, L253, L54); <code class="path">experiments_verifiers/harness/e19c_online_bt.py</code> (L16-17, L38-39, L136, L146-150); JSON keys only in <code class="path">experiments_verifiers/results/_e19c_label_free_2026-09-25.json</code>, <code class="path">E19c_ratchet_2026-09-25.json</code>, <code class="path">E19c_gradient_duel_2026-09-25.json</code>, <code class="path">E19c_ratchet_2026-09-25.md</code> (heading list); <code class="path">experiments_verifiers/README.md</code> line 49; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>; hub <a href="file_index.html">file_index.html</a>. Line counts and key counts are my computation on the files as found on disk.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> and every secrets file (never opened); the numeric results of the experiment, read by <a href="exp_e19c_confirm.html">exp_e19c_confirm.html</a>; the internals of <code class="path">e15_bt_eval.py</code> and <code class="path">e19c_ratchet.py</code> beyond the four called functions and the plan loader (owned by their own file pages); <code class="path">experiments_verifiers/REPORT_cycle2_E12-E19.html</code> (not cited here); <code class="path">experiments_verifiers/results/_e24_venv/</code> (third-party environment, not source). No pytest run and no script run, by the build rules, so every statement about behaviour comes from reading the source.</p>
+<p class="skips">Volatility: <code class="path">experiments_verifiers/</code> is untracked by git and its results change between runs; the two output names carry the date 2026-09-25 and both were present on disk when this page was written.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

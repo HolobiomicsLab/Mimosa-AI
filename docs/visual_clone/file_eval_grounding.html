@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>grounding.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators &gt; grounding.py">
+<div class="wrap">
+
+<h1 class="hud">grounding.py</h1>
+<p class="intro">This 55-line file holds one function, <code>get_perspicacite_grounding(goal)</code>, which builds a long literature-grounding prompt and sends it to the local Perspicacite retriever. It runs when an evaluator asks for the literature's expectations about a task goal. It reads no config key and writes no file itself.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does: format a prompt, send it, return text</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 300" role="img" aria-label="grounding.py: the goal argument is formatted into a five-part prompt, sent to query_perspicacite, and returned as a string; an exception returns a fixed fallback string">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="g1">
+    <title>Input: the goal text, argument of get_perspicacite_grounding</title>
+    <rect x="20" y="60" width="170" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="86" text-anchor="middle">goal: str</text>
+    <text class="box-sub" x="105" y="104" text-anchor="middle">argument &#183; L9</text>
+  </g>
+
+  <a class="box" id="g2" href="../../sources/evaluators/grounding.py">
+    <title>One f-string literal builds the prompt: task, goal, five numbered instructions, rules</title>
+    <rect x="235" y="50" width="200" height="82" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="335" y="76" text-anchor="middle">prompt f-string</text>
+    <text class="box-sub" x="335" y="94" text-anchor="middle">5 instructions &#183; L19&#8211;L50</text>
+    <text class="box-sub" x="335" y="112" text-anchor="middle">sub-search dimensions</text>
+  </a>
+
+  <a class="box" id="g3" href="../../sources/utils/perspicacite_client.py">
+    <title>Imported at L6 and called at L52; it does the HTTP call and the disk cache</title>
+    <rect x="480" y="55" width="200" height="72" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="580" y="81" text-anchor="middle">query_perspicacite</text>
+    <text class="box-sub" x="580" y="99" text-anchor="middle">imported &#183; L6</text>
+    <text class="box-sub" x="580" y="117" text-anchor="middle">called &#183; L52</text>
+  </a>
+
+  <g class="box" id="g4">
+    <title>except Exception at L54 returns one fixed string</title>
+    <rect x="480" y="190" width="200" height="66" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="580" y="216" text-anchor="middle">except Exception</text>
+    <text class="box-sub" x="580" y="234" text-anchor="middle">fixed text &#183; L54&#8211;L55</text>
+  </g>
+
+  <g class="box" id="g5">
+    <title>Return value: the service answer, or the fallback string. Always a str</title>
+    <rect x="775" y="110" width="225" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="887" y="136" text-anchor="middle">returns grounding text</text>
+    <text class="box-sub" x="887" y="154" text-anchor="middle">str &#183; L53 &#183; L55</text>
+  </g>
+
+  <path class="edge" data-from="g1" data-to="g2" d="M190,91 H235" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="212" y="82" text-anchor="middle">goal text</text>
+  <path class="edge" data-from="g2" data-to="g3" d="M435,91 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="457" y="82" text-anchor="middle">sends prompt</text>
+  <path class="edge" data-from="g3" data-to="g5" d="M680,91 C720,91 730,130 775,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="730" y="112" text-anchor="middle">response</text>
+  <path class="edge" data-from="g3" data-to="g4" d="M580,127 V190" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="600" y="158" text-anchor="start">raises</text>
+  <path class="edge" data-from="g4" data-to="g5" d="M680,223 C730,223 720,165 775,152" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="726" y="205" text-anchor="middle">fallback</text>
+
+  <text class="box-sub" x="20" y="285">solid cyan = call and return  |  dashed grey = caller input  |  red = the failing branch  |  line numbers are in the sub-labels</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the whole file. The prompt literal <code>grounding.py::L19&#8211;L50</code> is one f-string; it names five sub-search dimensions (dataset, hyperparameters, preprocessing, model family, evaluation, pitfalls) at <code>L29&#8211;L34</code>. The single call site is <code>grounding.py::get_perspicacite_grounding</code> L52.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: goal text in, one string out, nothing written here</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1020 290" role="img" aria-label="grounding.py data flow: the generic evaluator and the legacy verifier pass a goal string in and get a string back; the callee reads PERSPICACITE_API_URL and writes a cache file under sources/memory">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="d1" href="../../sources/evaluators/generic.py">
+    <title>generic.py imports the function at L30 and calls it at L353</title>
+    <rect x="20" y="30" width="200" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="56" text-anchor="middle">generic.py</text>
+    <text class="box-sub" x="120" y="74" text-anchor="middle">call &#183; L353</text>
+  </a>
+
+  <a class="box" id="d2" href="../../sources/evaluators/verifier.py">
+    <title>verifier.py imports the function at L36 and calls it at L258, one call per uuid, cached</title>
+    <rect x="20" y="176" width="200" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="202" text-anchor="middle">verifier.py</text>
+    <text class="box-sub" x="120" y="220" text-anchor="middle">call &#183; L258</text>
+    <text class="box-sub" x="120" y="238" text-anchor="middle">gated by use_grounding</text>
+  </a>
+
+  <a class="box" id="d3" href="../../sources/evaluators/grounding.py">
+    <title>The function itself: prompt literal plus one call, no config lookup, no open()</title>
+    <rect x="330" y="80" width="230" height="118" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="445" y="110" text-anchor="middle">get_perspicacite_grounding</text>
+    <text class="box-sub" x="445" y="130" text-anchor="middle">no config key read</text>
+    <text class="box-sub" x="445" y="148" text-anchor="middle">no open(), no state</text>
+    <text class="box-sub" x="445" y="166" text-anchor="middle">try / except &#183; L51&#8211;L55</text>
+    <text class="box-sub" x="445" y="184" text-anchor="middle">55 lines total</text>
+  </a>
+
+  <a class="box" id="d4" href="../../sources/utils/perspicacite_client.py">
+    <title>Env var PERSPICACITE_API_URL, default http://localhost:5468, read by the callee at L74</title>
+    <rect x="680" y="20" width="320" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="840" y="46" text-anchor="middle">PERSPICACITE_API_URL</text>
+    <text class="box-sub" x="840" y="64" text-anchor="middle">default localhost:5468 &#183; callee L74</text>
+  </a>
+
+  <a class="box" id="d5" href="../../sources/utils/perspicacite_client.py">
+    <title>The callee posts to /api/chat at L170 and caches answers as JSON</title>
+    <rect x="680" y="110" width="320" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="840" y="136" text-anchor="middle">POST /api/chat</text>
+    <text class="box-sub" x="840" y="154" text-anchor="middle">callee L170 &#183; cache L57</text>
+  </a>
+
+  <g class="box" id="d6">
+    <title>Written by the callee, not by this file</title>
+    <rect x="680" y="200" width="320" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="840" y="226" text-anchor="middle">sources/memory/perspicacite_requests</text>
+    <text class="box-sub" x="840" y="244" text-anchor="middle">&lt;sha256&gt;.json &#183; callee L27 L38</text>
+  </g>
+
+  <g class="box" id="d7">
+    <title>Returned value: a string with the grounding text</title>
+    <rect x="330" y="228" width="230" height="52" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="445" y="252" text-anchor="middle">returns str</text>
+    <text class="box-sub" x="445" y="270" text-anchor="middle">L53 or fixed fallback L55</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="d1" data-to="d3" d="M220,63 C280,63 290,120 330,130" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="272" y="60" text-anchor="middle">goal</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d3" d="M220,212 C280,212 290,168 330,160" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="272" y="205" text-anchor="middle">goal</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="d4" d="M560,110 C620,110 620,53 680,53" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="620" y="90" text-anchor="middle">callee reads</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="d5" d="M560,150 H680" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="620" y="141" text-anchor="middle">callee calls</text>
+  <path class="edge dashed-edge" data-from="d5" data-to="d6" d="M840,176 V200" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="862" y="194" text-anchor="start">callee writes</text>
+  <path class="edge" data-from="d3" data-to="d7" d="M445,198 V228" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="467" y="220" text-anchor="start">returns</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the two blue dashed edges into <code class="path">sources/utils/perspicacite_client.py</code> are owned by the callee: the env var read at callee L74, the POST at callee L170, the cache write at callee L27/L38/L57. This file opens nothing.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the decision rule: success returns the answer, any exception returns one fixed line</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 220" role="img" aria-label="grounding.py decision: the single try block either returns the service response at L53 or, on exception, returns the fixed fallback sentence at L55">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="c1">
+    <title>The one try block wraps the single query call</title>
+    <rect x="20" y="80" width="210" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="125" y="106" text-anchor="middle">query raises?</text>
+    <text class="box-sub" x="125" y="124" text-anchor="middle">try &#183; L51&#8211;L53</text>
+  </g>
+  <g class="box" id="c2">
+    <title>Success path</title>
+    <rect x="330" y="20" width="250" height="58" rx="2" fill="none" stroke="#00E5FF"/>
+    <text class="box-label" x="455" y="46" text-anchor="middle">return response</text>
+    <text class="box-sub" x="455" y="64" text-anchor="middle">L53 &#183; no wrapping</text>
+  </g>
+  <g class="box" id="c3">
+    <title>Failure path: one fixed sentence, no marker of the cause</title>
+    <rect x="330" y="140" width="250" height="62" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="455" y="166" text-anchor="middle">return fixed fallback</text>
+    <text class="box-sub" x="455" y="184" text-anchor="middle">L54&#8211;L55 &#183; cause not logged</text>
+  </g>
+  <g class="box" id="c4">
+    <title>verifier.py only ever receives a string back; its own except branch needs an exception, and this file raises none</title>
+    <rect x="640" y="80" width="330" height="62" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="805" y="106" text-anchor="middle">verifier.py takes the text</text>
+    <text class="box-sub" x="805" y="124" text-anchor="middle">marker branch L259&#8211;L261 idle</text>
+  </g>
+
+  <path class="edge" data-from="c1" data-to="c2" d="M230,100 C280,100 290,49 330,49" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="284" y="72" text-anchor="middle">no</text>
+  <path class="edge" data-from="c1" data-to="c3" d="M230,118 C280,118 290,171 330,171" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="284" y="150" text-anchor="middle">yes</text>
+  <path class="edge dashed-edge" data-from="c3" data-to="c4" d="M580,171 C620,171 620,120 640,112" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="612" y="163" text-anchor="middle">text</text>
+
+  <text class="box-sub" x="20" y="210">red = failing branch; the exception object is discarded at L54, so no traceback reaches the caller</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the only branch in the file. Because <code>except Exception</code> at L54 keeps no message, a caller that sees the fallback text cannot tell a timeout from a missing service. The legacy verifier keeps a failure marker of its own (<code>verifier.py::_GROUNDING_FAILED_MARKER</code> L239, used at L261), but it needs the callee to raise, and this file swallows the exception first.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">goal</td><td>function argument</td><td>embedded in the prompt under "SCIENCE GOAL"</td><td class="size">L9 L23</td></tr>
+<tr><td>reads</td><td class="sym">config</td><td>none &mdash; no config import in this file</td><td>nothing; the caller owns the opt-in flag</td><td class="size">&#8212;</td></tr>
+<tr><td>reads</td><td class="sym">query_perspicacite</td><td>import from sources.utils.perspicacite_client</td><td>one HTTPS/HTTP round trip per call</td><td class="size">L6 L52</td></tr>
+<tr><td>reads</td><td class="sym">PERSPICACITE_API_URL</td><td>env var read by the callee, default localhost:5468</td><td>chooses the service address</td><td class="size">callee L74</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td>no open(), no state, no print in this file</td><td>the callee writes its own cache file</td><td class="size">&#8212;</td></tr>
+<tr><td>returns</td><td class="sym">grounding text</td><td>return statement</td><td>documented literature expectations for the goal</td><td class="size">L53</td></tr>
+<tr><td>returns</td><td class="sym">fixed fallback sentence</td><td>except branch</td><td>lets the caller proceed without grounding</td><td class="size">L55</td></tr>
+</tbody>
+</table>
+<p class="note">Amber note: <code>config.literrature_grounding</code> (config.py:103) does not gate this file. It gates a separate generation-time path, <code>Orchestrator._ground_with_perspicacite</code> (orchestrator.py:327), which reaches Perspicacite through <code>perspicacite_grounding_task</code>. The evaluator call here has no config switch of its own; the legacy verifier has a constructor flag instead (<code>verifier.py::VerifierEvaluator</code> <code>use_grounding</code> L116).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>1 top-level function, no class &mdash; signature, module parts and every literal block</summary><div class="dbody">
+<pre>get_perspicacite_grounding(goal: str) -&gt; str                          L9    goal in, grounding text out</pre>
+<p>Module parts, in file order:</p>
+<table>
+<thead><tr><th>Part</th><th>Symbol</th><th>Role</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>docstring</td><td class="sym">module docstring</td><td>names the file's one job</td><td class="size">L2&#8211;L4</td></tr>
+<tr><td>import</td><td class="sym">query_perspicacite</td><td>the only import in the file</td><td class="size">L6</td></tr>
+<tr><td>function</td><td class="sym">get_perspicacite_grounding</td><td>public entry; no other symbol is defined</td><td class="size">L9</td></tr>
+<tr><td>docstring</td><td class="sym">function docstring</td><td>states the six search dimensions</td><td class="size">L10&#8211;L18</td></tr>
+<tr><td>literal</td><td class="sym">prompt f-string</td><td>task, goal slot, instructions, rules</td><td class="size">L19&#8211;L50</td></tr>
+<tr><td>literal</td><td class="sym">TASK / SCIENCE GOAL</td><td>opens the prompt, inserts the goal</td><td class="size">L20 L22&#8211;L23</td></tr>
+<tr><td>literal</td><td class="sym">INSTRUCTION 1</td><td>asks for 15&#8211;35 checkable claims</td><td class="size">L26</td></tr>
+<tr><td>literal</td><td class="sym">INSTRUCTION 2</td><td>demands many sub-searches; lists dimensions</td><td class="size">L28&#8211;L35</td></tr>
+<tr><td>literal</td><td class="sym">INSTRUCTION 3&#8211;5</td><td>evidence, summary, vague-goal fallback</td><td class="size">L37&#8211;L41</td></tr>
+<tr><td>literal</td><td class="sym">RULES block</td><td>six output constraints, no invented values</td><td class="size">L43&#8211;L49</td></tr>
+<tr><td>call</td><td class="sym">query_perspicacite(prompt)</td><td>the file's single side-effecting call</td><td class="size">L52</td></tr>
+<tr><td>branch</td><td class="sym">except Exception</td><td>returns the fixed fallback sentence</td><td class="size">L54&#8211;L55</td></tr>
+</tbody>
+</table>
+<p>No class, no module-level constant, no decorator, no <code>__main__</code> block. The file is 55 lines including the trailing newline.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/generic.py">sources/evaluators/generic.py</a></td><td><code>from .grounding import get_perspicacite_grounding</code>; called when the run succeeded</td><td class="sym">L30 L353</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/verifier.py">sources/evaluators/verifier.py</a></td><td>called inside <code>_get_grounding</code>, one call per uuid, cached, gated by <code>use_grounding</code></td><td class="sym">L36 L258</td></tr>
+<tr><td class="sym"><a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a></td><td>does NOT import this file; it has its own Perspicacite path</td><td class="sym">L157 L327</td></tr>
+</tbody>
+</table>
+<p>Tests: <code>no test found</code>. A grep of <code>tests/</code> for <code>get_perspicacite_grounding</code> and <code>grounding</code> returns only <code class="path">tests/config_roundtrip_test.py:33</code>, which lists the unrelated config key <code>literrature_grounding</code>, and <code class="path">tests/planner_json_extraction_test.py:100&#8211;L101</code>, which stubs <code>sources.utils.perspicacite_client</code> (the callee, not this file). No test imports <code class="path">sources/evaluators/grounding.py</code>.</p>
+<p>See also: the <a href="area_evaluators.html">evaluators area</a>, the <a href="area_evaluators_legacy.html">legacy verifier area</a>, <a href="file_eval_scenario.html">file_eval_scenario.html</a>, <a href="file_hybrid_init.html">file_hybrid_init.html</a> and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/grounding.py</code> (55 lines, whole file), <code class="path">sources/evaluators/generic.py</code> (import and call sites), <code class="path">sources/evaluators/verifier.py</code> (import, call, marker lines), <code class="path">sources/utils/perspicacite_client.py</code> (env var, POST path, cache path &mdash; header and named lines only), <code class="path">sources/core/orchestrator.py</code> (L141&#8211;L167, L327), <code class="path">config.py</code> (L103), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
+<p class="skips">Skipped, with reason: <code class="path">.env</code> and <code class="path">experiments_verifiers/.env</code> (never opened, secrets); the body of <code class="path">sources/utils/perspicacite_client.py</code> after L305 (streaming and non-streaming HTTP detail; the page needs only the env var, the URL and the cache path); <code class="path">sources/memory/perspicacite_requests/</code> contents (runtime cache, not needed to describe the code); every other evaluator file (grep shows no importer); no pytest run and no script executed, as instructed.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

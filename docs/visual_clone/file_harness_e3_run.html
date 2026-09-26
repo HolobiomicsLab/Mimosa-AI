@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e3_run.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e3_run.py">
+<div class="wrap">
+<h1 class="hud">e3_run.py</h1>
+<p class="intro">This is the E3 runner: one command-line stage at a time, it scores frozen workspaces with a cross-family judge ensemble, corrupts copies for a sabotage control, and computes the metrics JSON. The markdown summary for the pilot run lives in <a href="file_harness_e3_md.html">e3_md.py</a>, not here. Every judge call is cached on disk, so a stage can be re-run and resumes where it stopped L74&#8211;L75.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; stage dispatch, the five stages and what they touch</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 470" role="img" aria-label="e3_run.py: main dispatches one of five stages; stages call the judge, corrupt workspaces, save state and write one results JSON">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="rIn">
+    <rect x="20" y="25" width="250" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="49" text-anchor="middle">frozen inputs</text>
+    <text class="box-sub" x="145" y="64" text-anchor="middle">manifest.json L40</text>
+    <text class="box-sub" x="145" y="79" text-anchor="middle">snapshots L48</text>
+  </g>
+  <g class="box" id="rMain">
+    <rect x="20" y="130" width="250" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="154" text-anchor="middle">main L424</text>
+    <text class="box-sub" x="145" y="169" text-anchor="middle">stage dispatch L431</text>
+    <text class="box-sub" x="145" y="184" text-anchor="middle">build_frames L429</text>
+  </g>
+  <g class="box" id="rOut">
+    <rect x="860" y="130" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="980" y="154" text-anchor="middle">results JSON</text>
+    <text class="box-sub" x="980" y="169" text-anchor="middle">E3_designA&lt;suffix&gt;_20260921.json</text>
+    <text class="box-sub" x="980" y="184" text-anchor="middle">write L473</text>
+  </g>
+  <g class="box" id="rFrames">
+    <rect x="20" y="240" width="200" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="267" text-anchor="middle">build_frames</text>
+    <text class="box-sub" x="120" y="282" text-anchor="middle">L39 · seeded SEED 20260921</text>
+    <text class="box-sub" x="120" y="297" text-anchor="middle">contrast fill L52</text>
+  </g>
+  <g class="box" id="rInst">
+    <rect x="250" y="240" width="200" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="267" text-anchor="middle">run_instances</text>
+    <text class="box-sub" x="350" y="282" text-anchor="middle">L74 · chunk 8</text>
+    <text class="box-sub" x="350" y="297" text-anchor="middle">aggregate L89</text>
+  </g>
+  <g class="box" id="rSab">
+    <rect x="480" y="240" width="200" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="580" y="267" text-anchor="middle">run_sabotage</text>
+    <text class="box-sub" x="580" y="282" text-anchor="middle">L147 · 10 picks</text>
+    <text class="box-sub" x="580" y="297" text-anchor="middle">checklists reused L172</text>
+  </g>
+  <g class="box" id="rB">
+    <rect x="710" y="240" width="180" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="800" y="274" text-anchor="middle">run_designb</text>
+    <text class="box-sub" x="800" y="290" text-anchor="middle">L198 · dsk veto L223</text>
+  </g>
+  <g class="box" id="rReport">
+    <rect x="920" y="240" width="180" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1010" y="274" text-anchor="middle">build_report</text>
+    <text class="box-sub" x="1010" y="290" text-anchor="middle">L350 · variants L365</text>
+  </g>
+  <g class="box" id="rState">
+    <rect x="20" y="350" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="384" text-anchor="middle">E3_designA_state.json</text>
+    <text class="box-sub" x="120" y="400" text-anchor="middle">read L63 · written L70</text>
+  </g>
+  <g class="box" id="rJudge">
+    <rect x="250" y="350" width="230" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="365" y="377" text-anchor="middle">DesignAJudge</text>
+    <text class="box-sub" x="365" y="392" text-anchor="middle">score_instance L80 · exec L176</text>
+    <text class="box-sub" x="365" y="407" text-anchor="middle">llm_judge_ensemble L27</text>
+  </g>
+  <g class="box" id="rCorrupt">
+    <rect x="510" y="350" width="200" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="610" y="384" text-anchor="middle">corrupt_workspace</text>
+    <text class="box-sub" x="610" y="400" text-anchor="middle">L99 · five modes L167</text>
+  </g>
+  <g class="box" id="rMetrics">
+    <rect x="740" y="350" width="200" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="840" y="384" text-anchor="middle">metrics_for</text>
+    <text class="box-sub" x="840" y="400" text-anchor="middle">L294 · kendall_tau_top L278</text>
+  </g>
+  <path class="edge dashed-edge" data-from="rIn" data-to="rMain" d="M135,95 V130" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="145" y="114" text-anchor="start">rows L40</text>
+  <path class="edge" data-from="rMain" data-to="rFrames" d="M60,200 V240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="68" y="224" text-anchor="start">build_frames L429</text>
+  <path class="edge" data-from="rMain" data-to="rInst" d="M270,165 C330,175 340,205 350,240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="192" text-anchor="middle">stage pilot L431</text>
+  <path class="edge" data-from="rMain" data-to="rSab" d="M250,170 C380,180 480,200 580,240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="430" y="200" text-anchor="middle">stage sabotage L433</text>
+  <path class="edge" data-from="rMain" data-to="rB" d="M240,200 C400,225 700,215 800,240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="224" text-anchor="middle">stage designb L439</text>
+  <path class="edge" data-from="rMain" data-to="rReport" d="M265,180 C500,190 900,200 1010,240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="880" y="200" text-anchor="middle">stage report L441</text>
+  <path class="edge" data-from="rFrames" data-to="rInst" d="M220,278 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="235" y="270" text-anchor="middle">rows</text>
+  <path class="edge" data-from="rInst" data-to="rJudge" d="M350,316 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="360" y="338" text-anchor="start">score L80</text>
+  <path class="edge" data-from="rInst" data-to="rState" d="M330,316 V340 H120 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="334" text-anchor="middle">save L90</text>
+  <path class="edge" data-from="rSab" data-to="rJudge" d="M520,316 C500,332 480,340 470,350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="338" text-anchor="end">exec L176</text>
+  <path class="edge" data-from="rSab" data-to="rCorrupt" d="M600,316 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="608" y="338" text-anchor="start">corrupt L170</text>
+  <path class="edge" data-from="rB" data-to="rJudge" d="M780,316 V328 H265 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="324" text-anchor="middle">veto L223</text>
+  <path class="edge" data-from="rReport" data-to="rMetrics" d="M960,316 C950,332 945,340 938,350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="880" y="334" text-anchor="end">metrics L368</text>
+  <path class="edge dashed-edge" data-from="rReport" data-to="rOut" d="M1010,316 C1010,270 990,225 980,200" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="1020" y="270" text-anchor="start">write L473</text>
+  <path class="edge dashed-edge" data-from="rState" data-to="rReport" d="M120,426 V448 H1010 V320" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="444" text-anchor="middle">instances L355</text>
+
+  <text class="box-sub" x="20" y="464">solid = call  |  dashed = reads / writes  |  12 boxes. Both run_instances L90 and run_sabotage L190 call save_state.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>main</code> L424 is a dispatcher: one stage name selects one function. <code>build_frames</code> L39 is always called first L429, so every stage works on the same 102-row frame.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: frozen rows in, state plus one results JSON out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 380" role="img" aria-label="e3_run.py data flow: population and state in, state, LLM cache, sabotage copies and one results JSON out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="d1">
+    <rect x="20" y="30" width="250" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="56" text-anchor="middle">frozen population</text>
+    <text class="box-sub" x="145" y="71" text-anchor="middle">manifest.json L40</text>
+    <text class="box-sub" x="145" y="86" text-anchor="middle">snapshots L48</text>
+  </g>
+  <g class="box" id="d2">
+    <rect x="20" y="180" width="250" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="145" y="206" text-anchor="middle">E3_designA_state.json</text>
+    <text class="box-sub" x="145" y="221" text-anchor="middle">read L63</text>
+    <text class="box-sub" x="145" y="236" text-anchor="middle">written L70 via tmp</text>
+  </g>
+  <g class="box" id="d3">
+    <rect x="310" y="180" width="250" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="435" y="206" text-anchor="middle">E3_llm_cache.json</text>
+    <text class="box-sub" x="435" y="221" text-anchor="middle">handed to LLMClient L426</text>
+    <text class="box-sub" x="435" y="236" text-anchor="middle">saved L91</text>
+  </g>
+  <g class="box" id="dMid">
+    <rect x="310" y="30" width="290" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="455" y="66" text-anchor="middle">stage functions</text>
+    <text class="box-sub" x="455" y="82" text-anchor="middle">run_instances L74 · run_sabotage L147</text>
+    <text class="box-sub" x="455" y="96" text-anchor="middle">run_designb L198 · build_report L350</text>
+    <text class="box-sub" x="455" y="112" text-anchor="middle">returns: rows dicts and metrics</text>
+  </g>
+  <g class="box" id="d4">
+    <rect x="660" y="30" width="360" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="840" y="56" text-anchor="middle">results/E3_designA&lt;suffix&gt;_20260921.json</text>
+    <text class="box-sub" x="840" y="71" text-anchor="middle">json.dumps indent 1 L474</text>
+    <text class="box-sub" x="840" y="86" text-anchor="middle">pilot suffix L472</text>
+  </g>
+  <g class="box" id="d5">
+    <rect x="660" y="180" width="360" height="74" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="840" y="206" text-anchor="middle">results/_e3_sabotage/&lt;uuid&gt;_&lt;mode&gt;</text>
+    <text class="box-sub" x="840" y="221" text-anchor="middle">copytree L102</text>
+    <text class="box-sub" x="840" y="236" text-anchor="middle">corrupted copies L169</text>
+  </g>
+  <g class="box" id="d6">
+    <rect x="310" y="290" width="710" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="665" y="316" text-anchor="middle">stdout</text>
+    <text class="box-sub" x="665" y="332" text-anchor="middle">one line per instance and per chunk L93 · result print L475</text>
+  </g>
+  <path class="edge dashed-edge" data-from="d1" data-to="dMid" d="M270,67 H310" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="290" y="59" text-anchor="middle">rows L40</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="dMid" d="M270,217 C290,217 295,170 320,140" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="180" y="160" text-anchor="middle">instances L355</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="dMid" d="M435,180 V140" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="445" y="164" text-anchor="start">cached replies</text>
+  <path class="edge dashed-edge" data-from="dMid" data-to="d4" d="M600,67 H660" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="630" y="59" text-anchor="middle">json L474</text>
+  <path class="edge dashed-edge" data-from="dMid" data-to="d5" d="M600,120 C630,160 630,190 660,217" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="160" text-anchor="middle">copy L102</text>
+  <path class="edge dashed-edge" data-from="dMid" data-to="d6" d="M480,140 C480,220 620,270 700,290" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="262" text-anchor="middle">prints</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d6" d="M300,254 C300,290 305,300 310,318" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; config fields read: none; <code>load_dotenv</code> L425 fills <code>os.environ</code> from the repo env file. The state file is the resume point: a stage skips every uuid already in <code>state["instances"]</code> L75.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; logic: dispatch, the corruption cycle, the frame rule</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 580" role="img" aria-label="e3_run.py logic: stage dispatch, corruption mode cycle with fallbacks, contrast-coverage rule and metric guards">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <defs>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+  </defs>
+  <g class="box" id="g1">
+    <rect x="20" y="36" width="250" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="62" text-anchor="middle">stage argument</text>
+    <text class="box-sub" x="145" y="78" text-anchor="middle">choices list L501</text>
+  </g>
+  <g class="box" id="g1r">
+    <rect x="300" y="36" width="340" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470" y="48" text-anchor="middle">one stage function runs</text>
+    <text class="box-sub" x="470" y="62" text-anchor="middle">pilot, full L431 · sabotage L433</text>
+    <text class="box-sub" x="470" y="78" text-anchor="middle">sabotage2 L435 · designb L439</text>
+    <text class="box-sub" x="470" y="92" text-anchor="middle">report L441 · export-checklists L479</text>
+  </g>
+  <g class="box" id="g2">
+    <rect x="20" y="150" width="250" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="169" text-anchor="middle">mode = modes[i mod 5]</text>
+    <text class="box-sub" x="145" y="184" text-anchor="middle">modes list L167</text>
+    <text class="box-sub" x="145" y="199" text-anchor="middle">corrupt_workspace L170</text>
+  </g>
+  <g class="box" id="g2a">
+    <rect x="300" y="130" width="230" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="415" y="152" text-anchor="middle">delete_pred_results</text>
+    <text class="box-sub" x="415" y="168" text-anchor="middle">rmtree pred_results L105</text>
+  </g>
+  <g class="box" id="g2b">
+    <rect x="300" y="192" width="230" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="415" y="214" text-anchor="middle">empty_goal_outputs</text>
+    <text class="box-sub" x="415" y="230" text-anchor="middle">no hits fall back L110</text>
+  </g>
+  <g class="box" id="g2c">
+    <rect x="300" y="254" width="230" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="415" y="276" text-anchor="middle">truncate_main</text>
+    <text class="box-sub" x="415" y="292" text-anchor="middle">cut to 10 bytes L114</text>
+  </g>
+  <g class="box" id="g2d">
+    <rect x="300" y="316" width="230" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="415" y="338" text-anchor="middle">header_only</text>
+    <text class="box-sub" x="415" y="354" text-anchor="middle">largest csv header L122</text>
+  </g>
+  <g class="box" id="g2e">
+    <rect x="300" y="378" width="230" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="415" y="400" text-anchor="middle">garbage</text>
+    <text class="box-sub" x="415" y="416" text-anchor="middle">up to 4096 random bytes L130</text>
+  </g>
+  <g class="box" id="g2f">
+    <rect x="580" y="192" width="250" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="705" y="234" text-anchor="middle">fallback rules</text>
+    <text class="box-sub" x="705" y="248" text-anchor="middle">no goal-file hit: delete pred_results L110</text>
+    <text class="box-sub" x="705" y="264" text-anchor="middle">no csv for header_only: delete L124</text>
+    <text class="box-sub" x="705" y="278" text-anchor="middle">no file for garbage: delete L133</text>
+  </g>
+  <g class="box" id="g3">
+    <rect x="20" y="500" width="330" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="185" y="526" text-anchor="middle">task with no seeded negative?</text>
+    <text class="box-sub" x="185" y="542" text-anchor="middle">build_frames L55</text>
+  </g>
+  <g class="box" id="g3y">
+    <rect x="380" y="500" width="240" height="60" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="500" y="526" text-anchor="middle">append a seeded pick</text>
+    <text class="box-sub" x="500" y="542" text-anchor="middle">one SR-false row L56</text>
+  </g>
+  <g class="box" id="g3g">
+    <rect x="660" y="500" width="440" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="880" y="519" text-anchor="middle">metric guards</text>
+    <text class="box-sub" x="880" y="534" text-anchor="middle">kendall_tau_top needs n >= 4 L280</text>
+    <text class="box-sub" x="880" y="549" text-anchor="middle">within-task pairs need both labels L336</text>
+  </g>
+  <path class="edge" data-from="g1" data-to="g1r" d="M270,66 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="285" y="58" text-anchor="middle">dispatch</text>
+  <path class="edge" data-from="g2" data-to="g2a" d="M270,180 H285" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="287" y="150" text-anchor="start">i mod 5 L169</text>
+  <path class="edge" data-from="g2a" data-to="g2e" d="M285,156 V404" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="g2e" data-to="g2a" d="M285,156 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="g2e" data-to="g2b" d="M285,218 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="g2e" data-to="g2c" d="M285,280 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="g2e" data-to="g2d" d="M285,342 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge dashed-edge" data-from="g2b" data-to="g2f" d="M530,218 C555,218 560,225 580,235" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="540" y="208" text-anchor="middle">no hit</text>
+  <path class="edge dashed-edge" data-from="g2e" data-to="g2f" d="M530,404 C555,404 565,320 580,290" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="585" y="370" text-anchor="middle">no hit</text>
+  <path class="edge" data-from="g3" data-to="g3y" d="M350,530 H380" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="365" y="522" text-anchor="middle">yes L58</text>
+  <path class="edge dashed-edge" data-from="g3y" data-to="g3g" d="M620,530 H660" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="640" y="522" text-anchor="middle">metrics</text>
+
+  <text class="box-sub" x="20" y="22">lane 1: stage dispatch L431&#8211;L495</text>
+  <text class="box-sub" x="20" y="126">lane 2: corruption modes L167&#8211;L133</text>
+  <text class="box-sub" x="20" y="486">lane 3: frame rule and metric guards</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the mode is picked by position in the pick list L169, so ten picks cover the five modes twice. Three fallbacks replace a mode that has nothing to corrupt. The frame rule L52&#8211;L60 forces one SR-false row into every task that would otherwise have no contrast pair.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">population rows</td><td><code>C.load_population()</code>, a call, not a file open</td><td>the frame: SR, VER, goal, workspace path</td><td class="size">L40</td></tr>
+<tr><td>reads</td><td class="sym">E3_designA_state.json</td><td>file, <code>experiments_verifiers/results/</code></td><td>resume point: scored uuids and sabotage rows</td><td class="size">L31 L63 L355</td></tr>
+<tr><td>reads</td><td class="sym">E3_llm_cache.json</td><td>file, same folder, passed to <code>LLMClient</code></td><td>cached judge calls, so stages resume</td><td class="size">L32 L426</td></tr>
+<tr><td>reads</td><td class="sym">repo .env</td><td>file, via <code>C.load_dotenv()</code></td><td>API keys for litellm, not printed</td><td class="size">L425</td></tr>
+<tr><td>reads</td><td class="sym">snapshot workspaces</td><td>dir, paths held in the population rows</td><td>file listing and previews for the judge</td><td class="size">L48 L220</td></tr>
+<tr><td>writes</td><td class="sym">E3_designA_state.json</td><td>file, tmp file then replace</td><td>every instance row, sabotage rows, designB rows</td><td class="size">L68&#8211;L71</td></tr>
+<tr><td>writes</td><td class="sym">E3_llm_cache.json</td><td>file, through <code>judge.client.save()</code></td><td>new judge replies</td><td class="size">L91 L191 L271</td></tr>
+<tr><td>writes</td><td class="sym">E3_designA&lt;suffix&gt;_20260921.json</td><td><code>experiments_verifiers/results/</code></td><td>metrics, disagreement, sabotage, per-example</td><td class="size">L472&#8211;L474</td></tr>
+<tr><td>writes</td><td class="sym">_e3_sabotage/&lt;uuid&gt;_&lt;mode&gt;</td><td>dir under <code>results/</code></td><td>corrupted workspace copies for the sabotage test</td><td class="size">L33 L169</td></tr>
+<tr><td>writes</td><td class="sym">E3_checklists_cache_20260921.json</td><td><code>experiments_verifiers/results/</code></td><td>checklists plus answers exported per uuid</td><td class="size">L479&#8211;L493</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no Config object</td><td><code>SEED = 20260921</code> L29 and <code>DATE</code> L30 instead</td><td class="size">L29&#8211;L30</td></tr>
+</tbody>
+</table>
+<p class="note flag">Mismatch: the docstring says the <code>report</code> stage writes "results JSON + markdown" L7. <code>main</code> writes the JSON only L473&#8211;L474; the matching markdown for the pilot run came from <a href="file_harness_e3_md.html">e3_md.py</a>.</p>
+<p class="note">Disk gap at this commit: <code class="path">results/E3_designA_20260921.json</code>, <code class="path">results/E3_designA_full_20260921.json</code> and <code class="path">results/E3_checklists_cache_20260921.json</code> are absent. Present: <code class="path">E3_designA-pilot_20260921.json</code> (20 scored rows), <code class="path">E3_designA-salvaged_20260921.json</code>, <code class="path">E3_designA_state.json</code> (52 instance rows, 10 sabotage rows &#8212; my count) and <code class="path">E3_llm_cache.json</code>. No writer for the <code>salvaged</code> file exists in the package (grep), so its author is unknown.</p>
+<p class="note">State check: <code class="path">E3_designA_state.json</code> holds the keys <code>instances</code> and <code>sabotage</code> only, so the <code>designb</code> stage left no row here (my read of the file, L203 sets that key when the stage runs).</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>11 functions (4 async), no class &mdash; signatures and roles</summary><div class="dbody">
+<pre>build_frames() -&gt; tuple[list[dict], list[dict], list[dict]]        L39   pilot and full frames, seeded
+load_state() -&gt; dict                                               L62   read state or empty skeleton
+save_state(state: dict) -&gt; None                                    L68   write state via tmp then replace
+async run_instances(rows, judge, state, chunk=8)                   L74   score rows in chunks of 8
+corrupt_workspace(src, dst, goal, mode) -&gt; str                     L99   copy workspace, break one output
+async run_sabotage(rows, judge, state, floor=None, tag="sabotage") L147  re-execute checks on corrupt copies
+async run_designb(rows, judge, state, chunk=8)                     L198  dsk vetoes glm checks, both answer
+kendall_tau_top(scores, labels) -&gt; tuple[float | None, int]        L278  tau inside the top quartile
+metrics_for(name, scores, labels_sr, labels_ver, per_example_rows) L294  AUC, CI, tau, within-task rate
+build_report(pop_rows, state) -&gt; tuple                            L350   variants, disagreement, sabotage
+async main(stage: str) -&gt; None                                     L424  load, dispatch, write, print</pre>
+<p>Nested: <code>one(r)</code> L208 inside <code>run_designb</code> scores one instance of the veto arm. Module constants: <code>SEED = 20260921</code> L29, <code>DATE</code> L30, <code>STATE</code> L31, <code>CACHE</code> L32, <code>SAB_DIR</code> L33. Imports: <code>argparse</code>, <code>asyncio</code>, <code>json</code>, <code>random</code>, <code>shutil</code>, <code>sys</code>, <code>defaultdict</code>, <code>UTC</code>, <code>datetime</code>, <code>Path</code> L12&#8211;L20; <code>e3_common as C</code> L26; <code>DesignAJudge, aggregate</code> L27; <code>VETO_PROMPT, VETO_SYSTEM, _fmt_checks</code> inside <code>run_designb</code> L202; <code>numpy</code>, <code>scipy.stats</code>, <code>sklearn.metrics</code> inside the metric functions L289&#8211;L297 and L351&#8211;L353.</p>
+<p>Command line: one positional <code>stage</code> L501 with the choices <code>pilot</code>, <code>sabotage</code>, <code>sabotage2</code>, <code>full</code>, <code>designb</code>, <code>report</code>, <code>report-pilot</code>, <code>export-checklists</code>; <code>asyncio.run(main(...))</code> L503.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e3_run2.py">harness/e3_run2.py</a></td><td><code>import e3_run as R</code> L31</td><td class="sym">build_frames L494 · corrupt_workspace L234 · metrics_for L300 and L304</td></tr>
+<tr><td class="sym">command line</td><td><code>uv run python experiments_verifiers/harness/e3_run.py &lt;stage&gt;</code> L4</td><td class="sym">reaches main L503</td></tr>
+<tr><td class="sym">tests/</td><td>no test found</td><td class="sym">grep of <code>tests/</code> for <code>e3_run</code> returns nothing</td></tr>
+<tr><td class="sym">nothing else</td><td>no other importer found</td><td class="sym">grep over <code>*.py</code>, <code>*.md</code> and the manifest</td></tr>
+</tbody>
+</table>
+<p>Internal call order inside <code>main</code> L424: <code>C.load_dotenv</code> L425, <code>C.LLMClient</code> L426, <code>DesignAJudge</code> L427, <code>load_state</code> L428, <code>build_frames</code> L429, then one stage function, then <code>client.save()</code> L496 and a usage print L497&#8211;L499. The stage page is <a href="exp_e3_run.html">exp_e3_run.html</a>.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e3_run.html">exp_e3_run.html</a>, <a href="file_harness_e3_common.html">e3_common.py</a>, <a href="file_harness_e3_run2.html">e3_run2.py</a>, <a href="file_harness_e3_md.html">e3_md.py</a>, <a href="exp_index.html">exp_index.html</a>, <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e3_run.py</code> (503 lines, whole file), import and call sites in <code class="path">harness/e3_run2.py</code> and <code class="path">scorers/llm_judge_ensemble.py</code> (signatures), key names and counts of <code class="path">results/E3_designA_state.json</code> and <code class="path">results/E3_designA-pilot_20260921.json</code>, directory listing of <code class="path">results/</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>, plus greps over the repo and <code class="path">tests/</code>.</p>
+<p class="skips">Skipped, with reason: the env files (never opened, secrets); <code class="path">results/E3_llm_cache.json</code> contents (a cache of replies, and it holds model output); the recorded score values inside the pilot JSON beyond the two keys named above (the E3 experiment page owns the numbers); <code class="path">workspace_artefacts/snapshots/**</code> (per-instance evidence for the E3 page, 52 scored rows only); <code class="path">scorers/llm_judge_ensemble.py</code> bodies (a different file); compiled <code class="path">__pycache__</code>. Nothing was executed; no pytest ran.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19_gradient_duel - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e19_gradient_duel">
+<div class="wrap">
+
+<h1 class="hud">e19_gradient_duel &mdash; four-way feedback comparison</h1>
+<p class="intro">This experiment asks which gradient text points a judge at the gold more often: the E19 transcript, the E18 scripted feedback, the E15 preference text, or the verifier rubric. It reuses the validated E16 instrument and changes only the gradient text, so the judge prompt is identical across all four sides. It writes a 123-row paired table and a verdict; the E15, E18 and verifier sides are cache hits.</p>
+
+<div id="legend" data-auto></div>
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; four gradient texts, one judge instrument</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 480" role="img" aria-label="gradient duel stages">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="g19" href="../../experiments_verifiers/results/E19_bt_gradients">
+    <rect x="40" y="30" width="210" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="54" text-anchor="middle">E19 gradient texts</text>
+    <text class="box-sub" x="145" y="70" text-anchor="middle">148 files, 19 dirs</text>
+  </a>
+  <a class="box" id="g15" href="../../experiments_verifiers/results/E15_bt_gradients">
+    <rect x="290" y="30" width="210" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="395" y="54" text-anchor="middle">E15 + E18 texts</text>
+    <text class="box-sub" x="395" y="70" text-anchor="middle">cached rival gradients</text>
+  </a>
+  <a class="box" id="pop" href="../../experiments_verifiers/results/_e16_population.json">
+    <title>Joined by (campaign, task, uuid8)</title>
+    <rect x="560" y="30" width="280" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="700" y="54" text-anchor="middle">E16 population keys</text>
+    <text class="box-sub" x="700" y="70" text-anchor="middle">campaign, task, uuid8</text>
+  </a>
+  <g class="box" id="bq">
+    <rect x="250" y="120" width="210" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="355" y="144" text-anchor="middle">build_quads()</text>
+    <text class="box-sub" x="355" y="160" text-anchor="middle">all four sides present</text>
+  </g>
+  <g class="box" id="jm">
+    <rect x="40" y="210" width="210" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="145" y="234" text-anchor="middle">judge_messages()</text>
+    <text class="box-sub" x="145" y="250" text-anchor="middle">E16 instrument prompt</text>
+  </g>
+  <g class="box" id="jwt">
+    <rect x="290" y="210" width="210" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="395" y="234" text-anchor="middle">judge_with_text()</text>
+    <text class="box-sub" x="395" y="250" text-anchor="middle">gradient text swapped</text>
+  </g>
+  <g class="box" id="llm">
+    <rect x="560" y="210" width="280" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700" y="234" text-anchor="middle">E16._llm (shared cache)</text>
+    <text class="box-sub" x="700" y="250" text-anchor="middle">one new side per row</text>
+  </g>
+  <g class="box" id="pj">
+    <rect x="560" y="300" width="280" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700" y="324" text-anchor="middle">parse_judgment()</text>
+    <text class="box-sub" x="700" y="340" text-anchor="middle">relevance, direction, flag</text>
+  </g>
+  <g class="box" id="pb">
+    <rect x="290" y="300" width="210" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="395" y="324" text-anchor="middle">paired() bootstrap</text>
+    <text class="box-sub" x="395" y="340" text-anchor="middle">cluster over task groups</text>
+  </g>
+  <a class="box" id="oj" href="../../experiments_verifiers/results/E19_gradient_duel_2026-09-23.json">
+    <rect x="290" y="390" width="210" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="395" y="414" text-anchor="middle">E19_gradient_duel json</text>
+    <text class="box-sub" x="395" y="430" text-anchor="middle">123 rows</text>
+  </a>
+  <a class="box" id="om" href="../../experiments_verifiers/results/E19_gradient_duel_2026-09-23.md">
+    <rect x="560" y="390" width="280" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="700" y="414" text-anchor="middle">E19_gradient_duel md</text>
+    <text class="box-sub" x="700" y="430" text-anchor="middle">sides, deltas, verdict</text>
+  </a>
+  <path class="edge" d="M145,86 L250,120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="160" y="108" text-anchor="start">gradient texts</text>
+  <path class="edge" d="M395,86 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="405" y="108" text-anchor="start">rival texts</text>
+  <path class="edge" d="M560,86 L470,120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="108" text-anchor="start">join keys</text>
+  <path class="edge" d="M255,176 L155,210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="196" text-anchor="start">joined quads</text>
+  <path class="edge" d="M250,238 H290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="270" y="230" text-anchor="middle">prompt</text>
+  <path class="edge" d="M500,238 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="530" y="230" text-anchor="middle">swapped text</text>
+  <path class="edge" d="M700,266 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="710" y="286" text-anchor="start">judge reply</text>
+  <path class="edge" d="M560,328 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="530" y="320" text-anchor="middle">judgments</text>
+  <path class="edge" d="M395,356 V390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="405" y="376" text-anchor="start">paired rows</text>
+  <path class="edge" d="M480,356 L600,390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="368" text-anchor="start">verdict, cost</text>
+  <text class="box-sub" x="40" y="472">solid = call &#183; E15, E18 and verifier sides are cache hits &#183; 11 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 4 &mdash; 11 boxes. <code>build_quads</code> (L37) keeps only generation triples where all four gradient texts exist; <code>judge_with_text</code> (L71) replaces the gradient text inside the E16 prompt and sends it through the shared cache (<code>E16._llm</code>, L75); <code>paired</code> (L112) computes the cluster bootstrap over task groups. The captures at L141&ndash;150 build the side means; the verdict logic is at L182&ndash;203.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e19_gradient_duel.py">experiments_verifiers/harness/e19_gradient_duel.py</a></h4>
+<p class="role">Judges the same generation four times with the E16 instrument, swapping only which gradient text the judge reads.</p>
+<p class="meta">251 lines &#183; entry point <code>main()</code> L85 &#183; no CLI arguments: <code>uv run python experiments_verifiers/harness/e19_gradient_duel.py</code> (docstring L9)</p>
+<details><summary>signatures, constants, cache behaviour</summary><div class="dbody">
+<pre>build_quads() -&gt; (quads, drops, pop)          # joins four gradient sides, L37
+judge_with_text(item, grad_text, role) -&gt; dict  # one judge call, L71
+main() -&gt; None                                 # 10 threads, writes json + md, L85
+one(k) -&gt; dict                                 # three judged sides + verifier side, L92
+paired(side_x, side_y, field, boot=999, seed=0) -&gt; dict | None   # L112
+_write_md(out) -&gt; None                         # L214</pre>
+<p>Constants: <code>TODAY</code> L26, <code>E15_DIR</code> / <code>E18_DIR</code> / <code>E19_DIR</code> L27&ndash;29, <code>OUT_JSON</code> / <code>OUT_MD</code> L30&ndash;31, <code>CAP_USD = 3.0</code> L32, <code>SIDES = ("e19", "e18", "e15", "ver")</code> L34. The judge model comes from <code>E16.MODEL</code> (L4 of the results json).</p>
+<p>Cache reuse: <code>judge_with_text</code> calls <code>E16._llm</code> L75, the shared E16 cache ledger, so only the E19 side is a new call. Thread pool of 10 (L101). The verifier side reuses <code>E16.judge_item</code> L98.</p>
+</div></details>
+</div>
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>E19 gradient texts, 148 files</td><td>&mdash;</td><td class="sym"><a href="../../experiments_verifiers/results/E19_bt_gradients">results/E19_bt_gradients/</a> (L29)</td></tr>
+<tr><td>E15 and E18 gradient texts</td><td>&mdash;</td><td class="sym">results/E15_bt_gradients/, results/E18_bt_gradients/ (L27&ndash;28)</td></tr>
+<tr><td>Population join keys</td><td>&mdash;</td><td class="sym">results/_e16_population.json (E16.POP_JSON, L39)</td></tr>
+<tr><td>Instrument prompt and cache</td><td>&mdash;</td><td class="sym">harness/e16_gradient_audit.py (E16.judge_messages, E16._llm)</td></tr>
+<tr><td>&mdash;</td><td>Paired rows, side means, verdict</td><td class="sym"><a href="../../experiments_verifiers/results/E19_gradient_duel_2026-09-23.json">results/E19_gradient_duel_2026-09-23.json</a> (L204)</td></tr>
+<tr><td>&mdash;</td><td>Sides, deltas, verdict tables</td><td class="sym"><a href="../../experiments_verifiers/results/E19_gradient_duel_2026-09-23.md">results/E19_gradient_duel_2026-09-23.md</a> (L205 &rarr; _write_md L214)</td></tr>
+</tbody></table>
+<p class="note flag">Red: the population is 123 of the 148 E19 gradient files. The json records <code>drops: {"no_population_join": 25}</code> (L10&ndash;12), so 25 generations are silently absent from the duel. A missing join is reported, not re-judged.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; gold relevance and hallucination per gradient side</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 780 270" role="img" aria-label="relevance and hallucination per side">
+  <line x1="20" y1="200" x2="760" y2="200" stroke="#1B4B6B" stroke-width="1.5"/>
+  <rect x="40" y="36.0" width="55" height="164.0" fill="#00E5FF22" stroke="#00E5FF"/>
+  <text class="box-label" x="68" y="30.0" text-anchor="middle">0.627</text>
+  <rect x="105" y="134.1" width="55" height="65.9" fill="#FFB54722" stroke="#FFB547"/>
+  <text class="box-label" x="132" y="128.1" text-anchor="middle">0.252</text>
+  <text class="box-sub" x="100" y="218" text-anchor="middle">e19</text>
+  <rect x="210" y="51.4" width="55" height="148.6" fill="#00E5FF22" stroke="#00E5FF"/>
+  <text class="box-label" x="238" y="45.4" text-anchor="middle">0.568</text>
+  <rect x="275" y="47.0" width="55" height="153.0" fill="#FFB54722" stroke="#FFB547"/>
+  <text class="box-label" x="302" y="41.0" text-anchor="middle">0.585</text>
+  <text class="box-sub" x="270" y="218" text-anchor="middle">ver</text>
+  <rect x="380" y="62.4" width="55" height="137.6" fill="#00E5FF22" stroke="#00E5FF"/>
+  <text class="box-label" x="408" y="56.4" text-anchor="middle">0.526</text>
+  <rect x="445" y="161.8" width="55" height="38.2" fill="#FFB54722" stroke="#FFB547"/>
+  <text class="box-label" x="472" y="155.8" text-anchor="middle">0.146</text>
+  <text class="box-sub" x="440" y="218" text-anchor="middle">e18</text>
+  <rect x="550" y="91.5" width="55" height="108.5" fill="#00E5FF22" stroke="#00E5FF"/>
+  <text class="box-label" x="578" y="85.5" text-anchor="middle">0.415</text>
+  <rect x="615" y="86.5" width="55" height="113.5" fill="#FFB54722" stroke="#FFB547"/>
+  <text class="box-label" x="642" y="80.5" text-anchor="middle">0.434</text>
+  <text class="box-sub" x="610" y="218" text-anchor="middle">e15</text>
+  <text class="box-sub" x="20" y="240">cyan = mean gold relevance &#183; amber = hallucination rate &#183; axis 0 to 0.65</text>
+</svg>
+</div>
+<p class="figcap">Chart 4 &mdash; two judge axes per side, read from <code class="path">experiments_verifiers/results/E19_gradient_duel_2026-09-23.md</code> L9&ndash;12 and the same values in the json at L237&ndash;259. The judge sees gold as an input; higher relevance is better, lower hallucination is better.</p>
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Population of the duel</td><td class="size">123 rows, 19 groups</td><td class="sym">json L7&ndash;19 (all tier A)</td></tr>
+<tr><td>Mean gold relevance, E19</td><td class="size">0.627</td><td class="sym">md L9; json L237</td></tr>
+<tr><td>Hallucination rate, E19</td><td class="size">0.252</td><td class="sym">md L9; json L238</td></tr>
+<tr><td>Mean gold relevance / hallucination, verifier</td><td class="size">0.568 / 0.585</td><td class="sym">md L12; json L258&ndash;259</td></tr>
+<tr><td>Mean gold relevance / hallucination, E18</td><td class="size">0.526 / 0.146</td><td class="sym">md L10; json L244&ndash;245</td></tr>
+<tr><td>Mean gold relevance / hallucination, E15</td><td class="size">0.415 / 0.434</td><td class="sym">md L11; json L251&ndash;252</td></tr>
+<tr><td>Direction count, E19</td><td class="size">81 toward, 24 away</td><td class="sym">md L9; json L232</td></tr>
+<tr><td>Paired E19 &minus; ver, gold relevance</td><td class="size">+0.059</td><td class="sym">md L18; CI [-0.134, +0.206]</td></tr>
+<tr><td>Paired E19 &minus; ver, hallucination flag</td><td class="size">-0.333</td><td class="sym">md L20; CI [-0.522, -0.155]</td></tr>
+<tr><td>Paired E19 &minus; E15, gold relevance</td><td class="size">+0.211</td><td class="sym">md L21; CI [+0.081, +0.337]</td></tr>
+<tr><td>Paired E19 &minus; E18, gold relevance</td><td class="size">+0.101</td><td class="sym">md L24; CI [-0.009, +0.210]</td></tr>
+<tr><td>New judge calls / cost</td><td class="size">123 / $0.1665</td><td class="sym">json L11094, L11098; md L39</td></tr>
+<tr><td>Declared cap, within cap</td><td class="size">$3.00, true</td><td class="sym">json L11100&ndash;11101</td></tr>
+<tr><td>Verdict on the pre-registered question</td><td class="size">MIXED</td><td class="sym">md L37; json L11105</td></tr>
+</tbody></table>
+<p class="note">Amber: the verdict is MIXED because the relevance interval against the verifier spans 0 while the interval against E15 excludes it. The one clear win is the hallucination drop against the verifier (CI [-0.522, -0.155]).</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>7 lines from the duel results</summary><div class="dbody">
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_gradient_duel_2026-09-23.md</code> &#183; line 3 &#183; population and instrument</p>
+<blockquote>All numbers `my computation`; E16 v2 instrument, identical judge prompt for all four gradient types (only the gradient text differs); n=123 paired generations.</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_gradient_duel_2026-09-23.md</code> &#183; line 9 &#183; the E19 side</p>
+<blockquote>| e19 | 0.627 | 0.252 | {'toward': 81, 'unsure': 18, 'away': 24} |</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_gradient_duel_2026-09-23.md</code> &#183; line 12 &#183; the verifier side</p>
+<blockquote>| ver | 0.568 | 0.585 | {'toward': 72, 'away': 37, 'unsure': 14} |</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_gradient_duel_2026-09-23.md</code> &#183; line 20 &#183; the only interval that excludes 0</p>
+<blockquote>| e19 − ver | hallucination_flag | -0.333 | [-0.522,-0.155] | 123 | 7/48/68 |</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_gradient_duel_2026-09-23.md</code> &#183; line 37 &#183; the verdict</p>
+<blockquote>**Verdict:** MIXED — E19 significantly beats E15 but not all channels (a CI spans 0).</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_gradient_duel_2026-09-23.md</code> &#183; line 39 &#183; cost and cache reuse</p>
+<blockquote>Cost: $0.1665 new calls this run (e19_side_new: 123, e18_side_new: 0, e15_side_new: 0, ver_side_new: 0); E15/E18/verifier sides are cache hits from E16/E17/E18.</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E19_gradient_duel_2026-09-23.json</code> &#183; line 11105 &#183; the same verdict in the json</p>
+<blockquote>  "answer": "MIXED \u2014 E19 significantly beats E15 but not all channels (a CI spans 0).",</blockquote>
+</div></details>
+</div>
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19_gradient_duel.py</code> (251 lines), <code class="path">harness/e16_gradient_audit.py</code> (<code>POP_JSON</code> L51, <code>MODEL</code> L55, <code>_llm</code> L365, <code>judge_messages</code> L498, <code>parse_judgment</code> L440), <code class="path">results/E19_gradient_duel_2026-09-23.md</code>, <code class="path">results/E19_gradient_duel_2026-09-23.json</code>, <code class="path">results/E19_bt_gradients/</code> (19 dirs, 148 files), <code class="path">results/_e16_population.json</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (&sect;2 rule 2 on gold, &sect;1 metric M4), <code class="path">experiments_verifiers/README.md</code> (&sect;0 codenames). Line counts from <code>wc -l</code>. The gradients under test are written by <a href="exp_e19_bt_eval.html">exp_e19_bt_eval.html</a>; the E15 and E18 sides have their own pages (<a href="exp_e15_bt_eval.html">exp_e15_bt_eval.html</a>, <a href="exp_e18_gradient_duel.html">exp_e18_gradient_duel.html</a>).</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> &mdash; never opened (build rule). The 148 gradient texts themselves &mdash; counted and listed by directory only; one sample was read to confirm the header, and no gradient line is quoted on this page (the duel quotes are from its own results). <code class="path">results/_e16_judge_cache.jsonl</code> &mdash; the shared cache is named in the json (<code>cache_total_calls</code> 1054) but was not opened. <code class="path">harness/e17_gradient_duel.py</code>, <code class="path">e18_gradient_duel.py</code> and the E15/E18 gradient directories &mdash; other pages. 25 unjoined generations &mdash; recorded in the json as <code>no_population_join</code>; not investigated further here. <code class="path">results/E19b_*</code>, <code class="path">E19c_*</code>, <code class="path">E24_*</code> &mdash; later experiments, out of scope. No script was run, no pytest, no application start.</p>
+<p><code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

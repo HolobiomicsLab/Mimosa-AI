@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E18 scripted BT - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e18_scripted_bt">
+<div class="wrap">
+
+<h1 class="hud">e18_scripted_bt &mdash; execution-grounded Bradley&ndash;Terry</h1>
+<p class="intro">This experiment replaced E15 preference judging with generated comparison code: an LLM wrote a deterministic script per artifact pair, and the script output picked the winner. The question was whether that execution-grounded ranking beats preference judging and the recorded reward within a task.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; protocol steps to artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 520" role="img" aria-label="e18_scripted_bt pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="bHyp">
+    <title>the question this experiment answered</title>
+    <rect x="20" y="12" width="230" height="46" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="30" text-anchor="middle">Hypothesis: code beats preference</text>
+    <text class="box-sub" x="135" y="46" text-anchor="middle">same 667 pairs as E15</text>
+  </g>
+  <a class="box" id="b1" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>E14 pair plan and per-task goals</title>
+    <rect x="20" y="96" width="200" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="119" text-anchor="middle">plan + goals</text>
+    <text class="box-sub" x="120" y="135" text-anchor="middle">E14 json, run_notes</text>
+  </a>
+  <g class="box" id="b2">
+    <title>workspace_artefacts/snapshots, sha256 guarded</title>
+    <rect x="20" y="190" width="200" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="213" text-anchor="middle">snapshot trees</text>
+    <text class="box-sub" x="120" y="229" text-anchor="middle">read-only artifacts</text>
+  </g>
+  <g class="box" id="b4">
+    <title>e18_scripted_bt.py::load_plan line 119</title>
+    <rect x="260" y="96" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="355" y="117" text-anchor="middle">load_plan()</text>
+    <text class="box-sub" x="355" y="133" text-anchor="middle">asserts 667 pairs</text>
+  </g>
+  <g class="box" id="b5">
+    <title>e18_scripted_bt.py::run_spec line 681</title>
+    <rect x="260" y="180" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="355" y="201" text-anchor="middle">run_spec()</text>
+    <text class="box-sub" x="355" y="217" text-anchor="middle">picks files, metric</text>
+  </g>
+  <g class="box" id="b6">
+    <title>e18_scripted_bt.py::code_messages line 478</title>
+    <rect x="260" y="264" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="355" y="285" text-anchor="middle">code_messages()</text>
+    <text class="box-sub" x="355" y="301" text-anchor="middle">one script prompt</text>
+  </g>
+  <g class="box" id="b7">
+    <title>e18_scripted_bt.py::execute_script line 596</title>
+    <rect x="260" y="348" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="355" y="369" text-anchor="middle">execute_script()</text>
+    <text class="box-sub" x="355" y="385" text-anchor="middle">60 s subprocess</text>
+  </g>
+  <g class="box" id="b8">
+    <title>e18_scripted_bt.py::repair_messages line 511</title>
+    <rect x="260" y="432" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="355" y="453" text-anchor="middle">repair_messages()</text>
+    <text class="box-sub" x="355" y="469" text-anchor="middle">3 attempts total</text>
+  </g>
+  <g class="box" id="b9">
+    <title>e18_scripted_bt.py::SnapshotGuard.verify_paths line 215</title>
+    <rect x="510" y="264" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="605" y="285" text-anchor="middle">verify_paths()</text>
+    <text class="box-sub" x="605" y="301" text-anchor="middle">sha256 after run</text>
+  </g>
+  <g class="box" id="b10">
+    <title>e18_scripted_bt.py::append_judgment line 925</title>
+    <rect x="510" y="348" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="605" y="369" text-anchor="middle">append_judgment()</text>
+    <text class="box-sub" x="605" y="385" text-anchor="middle">one JSONL record</text>
+  </g>
+  <a class="box" id="b11" href="../../experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl">
+    <rect x="510" y="96" width="190" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="605" y="119" text-anchor="middle">E18_bt_judgments.jsonl</text>
+    <text class="box-sub" x="605" y="135" text-anchor="middle">667 main-pass records</text>
+  </a>
+  <a class="box" id="b12" href="../../experiments_verifiers/results/E18_bt_cost_ledger_2026-09-23.jsonl">
+    <rect x="510" y="180" width="190" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="605" y="203" text-anchor="middle">E18_bt_cost_ledger.jsonl</text>
+    <text class="box-sub" x="605" y="219" text-anchor="middle">per-call cost</text>
+  </a>
+  <path class="edge dashed-edge" data-from="bHyp" data-to="b1" d="M135,58 V96" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="143" y="80" text-anchor="start">tested on</text>
+  <path class="edge" data-from="b1" data-to="b4" d="M220,124 H260" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="240" y="118" text-anchor="middle">plan</text>
+  <path class="edge dashed-edge" data-from="b2" data-to="b4" d="M220,218 L260,132" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="228" y="180" text-anchor="start">asserts</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M355,148 V180" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="362" y="170" text-anchor="start">667 pairs</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M355,232 V264" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="362" y="254" text-anchor="start">spec</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M355,316 V348" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="362" y="338" text-anchor="start">prompt</text>
+  <path class="edge" data-from="b7" data-to="b8" d="M355,400 V432" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="362" y="422" text-anchor="start">failure</text>
+  <path class="edge" data-from="b8" data-to="b6" d="M450,458 H490 V290 H450" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="380" text-anchor="start">retry code</text>
+  <path class="edge" data-from="b7" data-to="b9" d="M450,374 L510,292" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="462" y="330" text-anchor="start">checks</text>
+  <path class="edge" data-from="b6" data-to="b12" d="M450,290 L510,210" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="240" text-anchor="start">per call</text>
+  <path class="edge" data-from="b7" data-to="b10" d="M450,374 H510" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="462" y="368" text-anchor="start">result</text>
+  <path class="edge" data-from="b10" data-to="b11" d="M605,400 V420 H730 V124 H700" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="736" y="300" text-anchor="start">writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>12 boxes</code>. Steel = experiment harness code. Solid = call, dashed = reads/writes. Steps 1+2 are merged into one call (<code>run_spec</code>, protocol key <code>steps_merged</code>), step 3 writes the script (<code>code_messages</code>), step 4 executes it, step 4bis repairs it (<code>repair_messages</code>). <code>ab_assignment()</code> (line 161) sets the seeded A/B order per pair; <code>execute_queue</code> (line 990) runs the 6 workers. Related pages: <a href="exp_e18_bt_eval.html">exp_e18_bt_eval.html</a>, <a href="exp_e15_bt_pilot.html">exp_e15_bt_pilot.html</a>, <a href="exp_e14_bt_enabler.html">exp_e14_bt_enabler.html</a>, <a href="exp_harness_import.html">exp_harness_import.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card steel">
+<h4><a href="../../experiments_verifiers/harness/e18_scripted_bt.py">experiments_verifiers/harness/e18_scripted_bt.py</a></h4>
+<p class="role">Runs the five-step code-comparison protocol over 667 pairs, guards snapshot trees, and writes judgments, a cost ledger and diagnostics.</p>
+<p class="meta">1 223 lines &#183; entry: <code>main()</code> line 1208 under <code>__main__</code> line 1222 &#183; imports <code>e14_bt_enabler as E14</code> line 60</p>
+<details><summary>CLI arguments and key functions</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e18_scripted_bt.py &lt;cmd&gt; [--workers N]
+commands (line 1210-1213): status | pilot | run | swap | det
+--workers   int, default 6   (passed to execute_queue)</pre>
+<pre>load_plan() line 119        load_goals() line 131        enrich_inventories() line 139
+all_pairs() line 151        ab_assignment() line 161       SnapshotGuard line 173
+_call_llm() line 291        run_spec() line 681            run_pair() line 704
+execute_script() line 596   parse_script_output() line 563  static_violations() line 549
+resolve_pick() line 636     run_pair_safe() line 891        append_judgment() line 925
+execute_queue() line 990    eval_pilot_gate() line 1038     pilot_pairs() line 943
+cmd_pilot line 1069  cmd_run line 1098  cmd_swap line 1130  cmd_det line 1154  cmd_status line 1195</pre>
+<p>Constants: <code>N_MAIN_PAIRS = 667</code> line 75, <code>SWAP_FRAC = 0.10</code> line 76, <code>DET_FRAC = 0.05</code> line 77, <code>MAX_CODE_ATTEMPTS = 3</code> line 78, <code>SUBPROC_TIMEOUT = 60</code> line 80, <code>HARD_CAP_USD = 25.0</code> line 81, <code>E18_SEED = 20260918</code> line 74.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>E14 pair plan, 19 groups</td><td>&mdash;</td><td class="sym"><code class="path">results/E14_bt_population.json</code> &#183; <code>PLAN_PATH</code> line 63</td></tr>
+<tr><td>Task goals from run notes</td><td>&mdash;</td><td class="sym"><code class="path">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</code> &#183; <code>load_goals</code> line 131</td></tr>
+<tr><td>Frozen snapshot trees</td><td>&mdash;</td><td class="sym"><code class="path">workspace_artefacts/snapshots/</code> &#183; <code>SNAP_ROOT</code> line 69</td></tr>
+<tr><td>&mdash;</td><td>One record per pair</td><td class="sym"><code class="path">results/E18_bt_judgments_2026-09-23.jsonl</code> &#183; line 64</td></tr>
+<tr><td>&mdash;</td><td>Cost per LLM call</td><td class="sym"><code class="path">results/E18_bt_cost_ledger_2026-09-23.jsonl</code> &#183; line 65</td></tr>
+<tr><td>&mdash;</td><td>Determinism re-runs</td><td class="sym"><code class="path">results/_e18_determinism_2026-09-23.jsonl</code> &#183; line 66</td></tr>
+<tr><td>&mdash;</td><td>Pilot gate JSON</td><td class="sym"><code class="path">results/_e18_pilot_2026-09-23.json</code> &#183; line 67</td></tr>
+<tr><td>&mdash;</td><td>148 gradient texts</td><td class="sym"><code class="path">results/E18_bt_gradients/</code> &#183; json key <code>gradient_files</code> line 51</td></tr>
+</tbody>
+</table>
+<p class="note flag">The subprocess environment drops the API key and sets <code>PYTHONHASHSEED=0</code> (lines 603&ndash;605), but no OS-level network sandbox is applied. The results file states this limit (md line 64).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 860 300" role="img" aria-label="bar chart of pairs-correct and M2 SR shipped">
+  <text class="box-sub" x="262" y="24" text-anchor="middle" style="font-size:11px">within-task pairs-correct (147 pairs)</text>
+  <path d="M70,40 V240" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M70,240 H445" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M70,240.0 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="243.0" text-anchor="end">0</text>
+  <path d="M70,190.0 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="193.0" text-anchor="end">0.2</text>
+  <path d="M70,140.0 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="143.0" text-anchor="end">0.4</text>
+  <path d="M70,90.0 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="93.0" text-anchor="end">0.6</text>
+  <path d="M70,40.0 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="43.0" text-anchor="end">0.8</text>
+  <rect x="109.0" y="120.0" width="63.2" height="120.0" fill="#00E5FF" fill-opacity="0.18" stroke="#00E5FF"/>
+  <text class="box-label" x="140.6" y="115.0" text-anchor="middle" style="font-size:11px">0.480</text>
+  <text class="box-sub" x="140.6" y="256.0" text-anchor="middle">E18</text>
+  <rect x="190.2" y="79.2" width="63.2" height="160.8" fill="#4D9FFF" fill-opacity="0.18" stroke="#4D9FFF"/>
+  <text class="box-label" x="221.9" y="74.2" text-anchor="middle" style="font-size:11px">0.643</text>
+  <text class="box-sub" x="221.9" y="256.0" text-anchor="middle">E15</text>
+  <rect x="271.5" y="100.5" width="63.2" height="139.5" fill="#B79CFF" fill-opacity="0.18" stroke="#B79CFF"/>
+  <text class="box-label" x="303.1" y="95.5" text-anchor="middle" style="font-size:11px">0.558</text>
+  <text class="box-sub" x="303.1" y="256.0" text-anchor="middle">reward</text>
+  <rect x="352.8" y="80.8" width="63.2" height="159.2" fill="#8FB8C9" fill-opacity="0.18" stroke="#8FB8C9"/>
+  <text class="box-label" x="384.4" y="75.8" text-anchor="middle" style="font-size:11px">0.637</text>
+  <text class="box-sub" x="384.4" y="256.0" text-anchor="middle">uniform</text>
+  <text class="box-sub" x="648" y="24" text-anchor="middle" style="font-size:11px">M2 SR shipped (of 19 groups)</text>
+  <path d="M455,40 V240" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M455,240 H830" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M455,240.0 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="243.0" text-anchor="end">0</text>
+  <path d="M455,190.0 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="193.0" text-anchor="end">5</text>
+  <path d="M455,140.0 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="143.0" text-anchor="end">10</text>
+  <path d="M455,90.0 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="93.0" text-anchor="end">15</text>
+  <path d="M455,40.0 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="43.0" text-anchor="end">20</text>
+  <rect x="494.0" y="160.0" width="47.0" height="80.0" fill="#00E5FF" fill-opacity="0.18" stroke="#00E5FF"/>
+  <text class="box-label" x="517.5" y="155.0" text-anchor="middle" style="font-size:11px">8</text>
+  <text class="box-sub" x="517.5" y="256.0" text-anchor="middle">E18</text>
+  <rect x="559.0" y="160.0" width="47.0" height="80.0" fill="#4D9FFF" fill-opacity="0.18" stroke="#4D9FFF"/>
+  <text class="box-label" x="582.5" y="155.0" text-anchor="middle" style="font-size:11px">8</text>
+  <text class="box-sub" x="582.5" y="256.0" text-anchor="middle">E15</text>
+  <rect x="624.0" y="160.0" width="47.0" height="80.0" fill="#B79CFF" fill-opacity="0.18" stroke="#B79CFF"/>
+  <text class="box-label" x="647.5" y="155.0" text-anchor="middle" style="font-size:11px">8</text>
+  <text class="box-sub" x="647.5" y="256.0" text-anchor="middle">reward</text>
+  <rect x="689.0" y="150.0" width="47.0" height="90.0" fill="#8FB8C9" fill-opacity="0.18" stroke="#8FB8C9"/>
+  <text class="box-label" x="712.5" y="145.0" text-anchor="middle" style="font-size:11px">9</text>
+  <text class="box-sub" x="712.5" y="256.0" text-anchor="middle">uniform</text>
+  <rect x="754.0" y="120.0" width="47.0" height="120.0" fill="#39FF88" fill-opacity="0.18" stroke="#39FF88"/>
+  <text class="box-label" x="777.5" y="115.0" text-anchor="middle" style="font-size:11px">12</text>
+  <text class="box-sub" x="777.5" y="256.0" text-anchor="middle">oracle</text>
+  <text class="box-sub" x="70" y="288">left: pooled over 147 contrast gen-pairs; right: count of groups whose picked generation passed SR</text>
+</svg>
+</div>
+<p class="figcap">Chart 2 &mdash; left panel reads <code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> lines 59, 79, 99, 108; right panel reads lines 143&ndash;147 (<code>oracle</code> = 12 is the ceiling, not a policy).</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Coverage</td><td>667 of 667 pairs judged</td><td class="sym">...scripted_bt_2026-09-23.json lines 43&ndash;45</td></tr>
+<tr><td>Outcome mix</td><td>script 599, skip 36, error 32</td><td class="sym">...scripted_bt_2026-09-23.json lines 47&ndash;49</td></tr>
+<tr><td>Pairs-correct, E18</td><td>0.480, CI [0.421, 0.545]</td><td class="sym">...scripted_bt_2026-09-23.json lines 59&ndash;64</td></tr>
+<tr><td>Pairs-correct, E15</td><td>0.643</td><td class="sym">...scripted_bt_2026-09-23.json line 79</td></tr>
+<tr><td>Pairs-correct, recorded reward</td><td>0.558</td><td class="sym">...scripted_bt_2026-09-23.json line 99</td></tr>
+<tr><td>Pairs-correct, uniform</td><td>0.637</td><td class="sym">...scripted_bt_2026-09-23.json line 108</td></tr>
+<tr><td>Paired delta E18 minus E15</td><td>-0.167, CI [-0.361, +0.018]</td><td class="sym">...scripted_bt_2026-09-23.md line 8</td></tr>
+<tr><td>M2 SR shipped</td><td>E18 8, E15 8, reward 8, uniform 9, oracle 12</td><td class="sym">...scripted_bt_2026-09-23.json lines 143&ndash;147</td></tr>
+<tr><td>Spearman E18 vs reward (mean)</td><td>-0.0428 over 17 groups</td><td class="sym">...scripted_bt_2026-09-23.json lines 429&ndash;431</td></tr>
+<tr><td>Spearman E18 vs E15-BT (mean)</td><td>0.2168 over 18 groups</td><td class="sym">...scripted_bt_2026-09-23.json lines 455&ndash;457</td></tr>
+<tr><td>Pair tie rate, order bias</td><td>0.4423, +0.0099</td><td class="sym">...scripted_bt_2026-09-23.json lines 502&ndash;503</td></tr>
+<tr><td>Label-swap winner flips</td><td>0.409 on 22 decisive pairs</td><td class="sym">...scripted_bt_2026-09-23.json lines 549&ndash;551</td></tr>
+<tr><td>Verbatim determinism</td><td>30 of 30 exact, 30 semantic</td><td class="sym">...scripted_bt_2026-09-23.json lines 555&ndash;558</td></tr>
+<tr><td>Pilot gate</td><td>PASS, code success 0.963, $0.5973</td><td class="sym">...scripted_bt_2026-09-23.json lines 21, 28, 34</td></tr>
+<tr><td>Total cost</td><td>$6.0294, 2 744 calls, cap $25</td><td class="sym">...scripted_bt_2026-09-23.json lines 562&ndash;565</td></tr>
+</tbody>
+</table>
+<p class="note">The pilot gate was pre-registered and passed before the full run: code success 0.963 &ge; 0.80, JSON parse 1.0 &ge; 0.95, zero snapshot mutations, spend $0.5973 &le; $1.50 (json lines 30&ndash;34).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>8 lines from the results files (click to expand)</summary><div class="dbody">
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> line 7</p>
+<blockquote>- Pilot gate: **PASS** (code success 0.9629629629629629, parse 1.0, mutations [], $0.5973).</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> line 8</p>
+<blockquote>- **Within-task pairs-correct (contrast, 147 gen-pairs):** E18-scripted 0.480 [0.421,0.545] vs E15-preference 0.643 [0.487,0.819] vs recorded reward 0.558 [0.321,0.825] vs uniform 0.637 [0.362,0.811]; paired E18−E15 -0.167 [-0.361,+0.018], E18−reward -0.086 [-0.346,+0.185].</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> line 9</p>
+<blockquote>- **M2 SR shipped (19 groups):** E18 8 vs E15 8 vs reward 8 vs uniform 9 (of 19 pickable) vs oracle 12.</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> line 10</p>
+<blockquote>- **Independence:** mean Spearman(E18, reward) = -0.0428; mean Spearman(E18, E15-BT) = 0.2168.</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> line 11</p>
+<blockquote>- **Execution diagnostics:** outcome mix {'script': 599, 'skip': 36, 'error': 32}; label-swap flip rate 0.4090909090909091 on 22 both-decisive pairs; determinism 30/30 exact, 30/30 semantic; repair distribution {0: 32, 1: 564, 2: 32, 3: 3}; total cost $6.03.</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.md</code> line 55</p>
+<blockquote>- BT phases total $6.03 (2,744 deepseek calls) + gradient duel $0.20 (123 new judge calls via the shared E16 cache ledger) ≈ $6.25 of the $25.00 cap; by model deepseek-v4.1-flash 2744 calls $6.03.</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 34</p>
+<blockquote>  "all_pass": true,</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> line 551</p>
+<blockquote>   "winner_flip_rate": 0.4090909090909091,</blockquote>
+</div></details>
+</div>
+<footer>
+<p><b>Sources read:</b> <code class="path">experiments_verifiers/harness/e18_scripted_bt.py</code> (1 223 lines), <code class="path">experiments_verifiers/harness/e14_bt_enabler.py</code> and <code class="path">e15_bt_eval.py</code> (import checks only).</p>
+<p>Results read: <code class="path">experiments_verifiers/results/E18_scripted_bt_2026-09-23.json</code> and <code>.md</code>, <code class="path">results/_e18_pilot_2026-09-23.json</code>, <code class="path">results/_e18_determinism_2026-09-23.jsonl</code> (line count and all-true checks).</p>
+<p>Design intent: <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (constitution &sect;2 rules 1, 2, 7, 8, 9; data map &sect;3 line 72; reproduction target &sect;3 line 86) and <code class="path">experiments_verifiers/README.md</code> (E18 codename and the within-task finding).</p>
+<p class="skips"><b>Skipped:</b></p>
+<p><code class="path">experiments_verifiers/results/E18_bt_judgments_2026-09-23.jsonl</code> (726 rows: 667 main-phase + 59 swap; 599 hold an embedded script) &mdash; not opened line by line: the aggregates in the JSON are the reported numbers.</p>
+<p><code class="path">experiments_verifiers/results/E18_bt_gradients/</code> (148 text gradients) &mdash; not opened: the E18 gradient duel page covers gradient text.</p>
+<p><code class="path">experiments_verifiers/results/E18_bt_cost_ledger_2026-09-23.jsonl</code> &mdash; not opened: the JSON <code>cost</code> block reports the same totals.</p>
+<p><code class="path">experiments_verifiers/results/E15_bt_gradients/</code> and E15 judgment ledgers &mdash; not opened: E15 numbers are quoted from the E18 results files.</p>
+<p><code class="path">experiments_verifiers/.env</code>, <code class="path">.env</code>, <code>token.json</code>, <code>credentials.json</code> &mdash; never opened (key material).</p>
+<p>The experiment was not re-run; no pytest and no application run.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

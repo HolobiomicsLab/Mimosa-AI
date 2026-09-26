@@ -20,7 +20,7 @@ field with defaults and types, see the [Configuration reference](../reference/co
 | `discovery_addresses` | IP + port ranges scanned for MCP servers. |
 | `workflow_llm_model` | LLM that synthesizes multi-agent workflows. |
 | `smolagent_model_id` | LLM used by execution agents inside each workflow. |
-| `judge_model` | LLM that scores soft claims in the verifier. |
+| `judge_model` | LLM behind the verifier: claim-ladder extraction, format digests, and policy-scorer code. |
 | `planner_llm_model` | LLM that decomposes goals into tasks (`--goal` mode only). |
 | `learned_score_threshold` | Score that triggers early stop in `--learn` mode (default `0.92`). |
 | `max_learning_evolve_iterations` | Hard cap on evolve iterations (default `25`). |
@@ -49,7 +49,9 @@ LLM choice is the biggest lever you have. Some practical guidance:
 
 === "Judge"
 
-    The judge model scores the soft claims in the verifier. During an
+    The judge model drives the verifier's LLM calls — extracting the
+    task's claim ladder, writing format digests, and writing the
+    deterministic Python policy scorers. During an
     evaluation run the verifier is one of the places where the most tokens get
     spent, so the model you choose here has a real effect on how much a run
     costs in the end.
@@ -87,14 +89,14 @@ LLM choice is the biggest lever you have. Some practical guidance:
 
     You might be tempted to go one step further and add a second, even cheaper
     model just for the small mechanical steps inside the verifier — for
-    example dropping duplicate claims, or checking which Python packages a
-    claim needs. In practice this is not worth doing. Those mechanical steps
+    example validating the extracted claims, or re-running a failed scorer
+    repair. In practice this is not worth doing. Those mechanical steps
     are only a small fraction of all the tokens the verifier uses, so moving
     them onto a separate cheap model saves almost nothing while making the
     configuration harder to follow. The calls that actually cost tokens, and
-    that actually need good judgement — rating how important a claim is,
-    choosing which files to look at, writing the small verifier script, and
-    giving the final verdict — are better left on the one `judge_model` you
+    that actually need good judgement — designing the decisive claim
+    ladder, and writing correct scorer code against real file formats —
+    are better left on the one `judge_model` you
     already picked. Choosing a sensible `judge_model` is where essentially all
     of the saving comes from.
 

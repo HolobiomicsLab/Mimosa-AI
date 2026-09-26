@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e15_bt_eval - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e15_bt_eval">
+<div class="wrap">
+
+<h1 class="hud">e15_bt_eval &mdash; does the preference ranking carry the within-task axis?</h1>
+<p class="intro">E15 asked whether pairwise preference judgments rank generations by benchmark success better than the recorded reward. This script fits one Bradley-Terry model per task group from the 667 frozen verdicts, writes a preference gradient per generation, and only then reads the SR labels. Its one-sentence answer was NO DECISIVE GAIN at this power.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 360" role="img" aria-label="e15_bt_eval stages and artifacts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="h">
+    <title>Hypothesis: a BT ranking of artifacts matches the benchmark SR better than the recorded reward</title>
+    <rect x="30" y="20" width="170" height="54" rx="14" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="115" y="44" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="115" y="60" text-anchor="middle">BT tracks SR</text>
+  </g>
+
+  <a class="box" id="bLoad" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>load_all() reads the plan, the judgments, the labels and the cost ledger</title>
+    <rect x="290" y="20" width="180" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="380" y="44" text-anchor="middle">load_all()</text>
+    <text class="box-sub" x="380" y="60" text-anchor="middle">line 60</text>
+  </a>
+
+  <a class="box" id="bBt" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>bt_fit_weighted() fits one BT model per group with a ridge of 1.0</title>
+    <rect x="550" y="20" width="180" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="640" y="44" text-anchor="middle">bt_fit_weighted()</text>
+    <text class="box-sub" x="640" y="60" text-anchor="middle">line 90, ridge 1.0</text>
+  </a>
+
+  <a class="box" id="bGrad" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>write_gradients() writes one preference gradient text per generation</title>
+    <rect x="790" y="20" width="150" height="54" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="865" y="44" text-anchor="middle">write_gradients()</text>
+    <text class="box-sub" x="865" y="60" text-anchor="middle">line 178</text>
+  </a>
+
+  <a class="box" id="iPlan" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>results/E14_bt_population.json - the pair plan</title>
+    <rect x="30" y="110" width="180" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="134" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="120" y="150" text-anchor="middle">19 groups, 667 pairs</text>
+  </a>
+
+  <a class="box" id="iJud" href="../../experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl">
+    <title>results/E15_bt_pilot_judgments_2026-09-23.jsonl - 667 pair records</title>
+    <rect x="30" y="190" width="180" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="214" text-anchor="middle">judgments jsonl</text>
+    <text class="box-sub" x="120" y="230" text-anchor="middle">667 pair records</text>
+  </a>
+
+  <a class="box" id="iLab" href="../../experiments_verifiers/data/verifier_claims_sane.jsonl">
+    <title>data/verifier_claims_sane.jsonl - the uniform arm and the SR labels</title>
+    <rect x="30" y="270" width="180" height="54" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="294" text-anchor="middle">verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="120" y="310" text-anchor="middle">uniform arm, SR</text>
+  </a>
+
+  <a class="box" id="bMet" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>pairs_correct(), cluster_boot(), paired_boot_diff() and argmax_ship() compute the readouts</title>
+    <rect x="550" y="150" width="240" height="60" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="670" y="174" text-anchor="middle">pairs_correct()</text>
+    <text class="box-sub" x="670" y="190" text-anchor="middle">cluster_boot, argmax_ship</text>
+  </a>
+
+  <a class="box" id="oGrad" href="../../experiments_verifiers/results/E15_bt_gradients">
+    <title>results/E15_bt_gradients/&lt;group&gt;/&lt;uuid&gt;.txt - 148 gradient files</title>
+    <rect x="810" y="150" width="130" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="875" y="174" text-anchor="middle">E15_bt_gradients/</text>
+    <text class="box-sub" x="875" y="190" text-anchor="middle">148 txt files</text>
+  </a>
+
+  <a class="box" id="oJson" href="../../experiments_verifiers/results/E15_bt_pilot_2026-09-23.json">
+    <title>results/E15_bt_pilot_2026-09-23.json and .md - the readouts</title>
+    <rect x="550" y="270" width="240" height="54" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="670" y="294" text-anchor="middle">E15_bt_pilot JSON + MD</text>
+    <text class="box-sub" x="670" y="310" text-anchor="middle">readouts a, b, c</text>
+  </a>
+
+  <path class="edge" data-from="h" data-to="bLoad" d="M200,47 L290,32" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="245" y="38" text-anchor="middle">drives</text>
+  <path class="edge dashed-edge" data-from="iPlan" data-to="bLoad" d="M210,137 L290,50" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="214" y="106" text-anchor="start">reads plan</text>
+  <path class="edge dashed-edge" data-from="iJud" data-to="bLoad" d="M210,217 L290,58" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="214" y="186" text-anchor="start">reads verdicts</text>
+  <path class="edge dashed-edge" data-from="iLab" data-to="bLoad" d="M210,297 L290,66" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="214" y="266" text-anchor="start">reads labels</text>
+
+  <path class="edge" data-from="bLoad" data-to="bBt" d="M470,47 H550" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="40" text-anchor="middle">plan, verdicts</text>
+  <path class="edge" data-from="bBt" data-to="bGrad" d="M730,47 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="40" text-anchor="middle">BT reward</text>
+  <path class="edge" data-from="bBt" data-to="bMet" d="M640,74 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="650" y="116" text-anchor="start">group betas</text>
+  <path class="edge dashed-edge" data-from="bGrad" data-to="oGrad" d="M865,74 V150" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="872" y="116" text-anchor="start">txt files</text>
+  <path class="edge dashed-edge" data-from="bMet" data-to="oJson" d="M670,210 V270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="680" y="246" text-anchor="start">readouts</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. Purple = hypothesis, mint pills = functions, dashed grey = inputs on disk, cyan = written artifacts. Labels never enter the gradient step: <code>write_gradients()</code> runs before the SR readouts, and the JSON records the rule at <code>protocol.gold_hygiene</code> (line 14). Three inputs converge on <code>load_all()</code>; the fitted betas fan out to the gradient writer and to the metric functions.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e15_bt_eval.py">experiments_verifiers/harness/e15_bt_eval.py</a></h4>
+<p class="role">Fits per-group Bradley-Terry strengths from the frozen verdicts, writes preference gradients, then reads SR labels to score BT against reward and uniform.</p>
+<p class="meta">731 lines &#183; entry: <code>main()</code> (line 328) &#183; no CLI arguments &#183; writes 150 files</p>
+<details><summary>stages, line numbers, constants, entry point</summary><div class="dbody">
+<pre>load_all()                 line 60   plan + judgments + claims + ledger
+bt_fit_weighted(...)       line 90   weighted MMLE, 25 iterations, ridge 1.0
+pair_matches(rec, idx)     line 122  one BT match per judging call
+theme_tokens(reasons)      line 167  token counts in lost verdicts
+write_gradients(...)       line 178  writes 148 gradient files (line 226)
+pairs_correct(groups, sc)  line 234  pooled (SR-true, SR-false) ordering
+cluster_boot(...)          line 258  10 000 group resamples
+paired_boot_diff(...)      line 284  same pairs for both scorers
+argmax_ship(gd, scorer)    line 311  M2 replay, latest-uuid tie-break
+main()                     line 328  fits, writes gradients, then readouts</pre>
+<p>Constants: <code>RIDGE = 1.0</code> (line 41), <code>N_BOOT = 10_000</code> (line 42), <code>BOOT_SEED = 20260923</code> (line 43), <code>SCORE_MAP = {"pass": 1.0, "fail": 0.0, "unsure": 0.5}</code> (line 44).</p>
+<p>Run command, from the module docstring (line 16): <code>uv run python experiments_verifiers/harness/e15_bt_eval.py</code>. There is no argparse; <code>main()</code> takes no arguments.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path (with code cite)</th></tr></thead>
+<tbody>
+<tr><td>Suggested designs and judging order</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/results/E14_bt_population.json</code> :: PLAN_PATH, line 33</td></tr>
+<tr><td>667 pair records with per-call verdicts</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl</code> :: line 34</td></tr>
+<tr><td>Per-call cost and token rows</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl</code> :: line 35</td></tr>
+<tr><td>Uniform pass-rate and SR labels</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/data/verifier_claims_sane.jsonl</code> :: CLAIMS, line 39</td></tr>
+<tr><td>&mdash;</td><td>Readouts, 2 066 lines</td><td class="sym"><code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.json</code> :: line 619</td></tr>
+<tr><td>&mdash;</td><td>Report, 61 lines</td><td class="sym"><code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md</code> :: line 724</td></tr>
+<tr><td>&mdash;</td><td>148 gradient texts, 19 group folders</td><td class="sym"><code class="path">experiments_verifiers/results/E15_bt_gradients/</code> :: line 226</td></tr>
+</tbody>
+</table>
+<p class="note flag">The verdict sentence in the markdown is chosen by code, not by a human (lines 642-657): a CI that excludes 0 on the paired BT-minus-reward diff is required for the &quot;YES&quot; branch. That branch did not fire, so the report prints NO DECISIVE GAIN.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; pairs-correct on the 9 contrast groups</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="pairs-correct by scorer">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <path class="edge" d="M56,250 H390" fill="none" stroke="#1B4B6B" stroke-width="1.25"/>
+  <path class="edge dashed-edge" d="M56,250.0 H390" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="253.0" text-anchor="end">0</text>
+  <path class="edge dashed-edge" d="M56,202.5 H390" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="205.5" text-anchor="end">0.25</text>
+  <path class="edge dashed-edge" d="M56,155.0 H390" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="158.0" text-anchor="end">0.5</text>
+  <path class="edge dashed-edge" d="M56,107.5 H390" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="50" y="110.5" text-anchor="end">0.75</text>
+  <rect x="70" y="127.8" width="60" height="122.2" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="100" y="121.8" text-anchor="middle">0.643</text>
+  <text class="box-sub" x="100" y="266" text-anchor="middle">BT 147</text>
+  <rect x="150" y="122.9" width="60" height="127.1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="180" y="116.9" text-anchor="middle">0.669</text>
+  <text class="box-sub" x="180" y="266" text-anchor="middle">BT 80</text>
+  <rect x="230" y="128.9" width="60" height="121.1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="260" y="122.9" text-anchor="middle">0.637</text>
+  <text class="box-sub" x="260" y="266" text-anchor="middle">uniform 80</text>
+  <rect x="310" y="144.0" width="60" height="106.0" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-label" x="340" y="138.0" text-anchor="middle">0.558</text>
+  <text class="box-sub" x="340" y="266" text-anchor="middle">reward 147</text>
+  <text class="box-sub" x="56" y="284" text-anchor="start">pairs-correct on the 9 contrast groups: BT over all pairs, BT on the 80-pair common set, uniform on that set, recorded reward</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; pooled pairs-correct over (SR-true, SR-false) generation pairs, ties in score counted 0.5. Every value is labeled. BT leads the recorded reward by 0.081 on the paired difference, but the paired cluster-bootstrap interval spans zero, and uniform pass-rate sits within 0.006 of BT. Bars: BT over all 147 pairs (0.643), BT on the 80-pair common set (0.669), uniform on that set (0.637), recorded reward (0.558).</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>BT pairs-correct, 147 pairs</td><td class="size">0.6429</td><td class="sym">E15_bt_pilot_2026-09-23.json line 29, <code>readout_a...bt.pooled</code></td></tr>
+<tr><td>BT 95% cluster-bootstrap CI</td><td class="size">0.487 to 0.8192</td><td class="sym">same file lines 30-34, key <code>bt.boot_ci95</code></td></tr>
+<tr><td>Recorded reward pairs-correct</td><td class="size">0.5578</td><td class="sym">same file line 49, <code>recorded_reward.pooled</code></td></tr>
+<tr><td>Uniform pairs-correct, 80 pairs</td><td class="size">0.6375</td><td class="sym">same file line 69, <code>uniform.pooled</code></td></tr>
+<tr><td>BT on the 80-pair common set</td><td class="size">0.6687</td><td class="sym">same file line 88, <code>bt_on_common_set_with_uniform.pooled</code></td></tr>
+<tr><td>Strict ties-as-zero variant</td><td class="size">BT 0.4218, uniform 0.5875</td><td class="sym">same file lines 92-94, <code>strict_ties_zero</code></td></tr>
+<tr><td>Paired diff BT minus reward</td><td class="size">+0.0808, CI -0.0991 to +0.2533</td><td class="sym">same file lines 98-100, <code>paired_diffs_boot_ci95.bt_minus_reward</code></td></tr>
+<tr><td>M2 SR shipped, 19 groups</td><td class="size">BT 8, reward 8, uniform 9, oracle 12</td><td class="sym">same file lines 118-121, <code>readout_b_m2_replay.sr_shipped</code></td></tr>
+<tr><td>M2 diff BT minus reward</td><td class="size">0.0, CI 0.0 to 0.0</td><td class="sym">same file lines 129-133</td></tr>
+<tr><td>Both-order agreement</td><td class="size">0.8426</td><td class="sym">same file line 372, <code>both_order_agreement_rate</code></td></tr>
+<tr><td>Third-vote rate</td><td class="size">0.1574</td><td class="sym">same file line 373, <code>third_vote_rate</code></td></tr>
+<tr><td>Mean Spearman(BT, recorded reward)</td><td class="size">0.3721 (median 0.471, n=18)</td><td class="sym">same file lines 399-400</td></tr>
+<tr><td>Pairs judged</td><td class="size">667 of 667</td><td class="sym">same file lines 18-20, <code>coverage</code></td></tr>
+<tr><td>Gradient files written</td><td class="size">148</td><td class="sym">same file line 21, <code>coverage.gradient_files</code></td></tr>
+<tr><td>Protocol cost, 1 439 calls</td><td class="size">$25.9875</td><td class="sym">same file lines 406-407, <code>cost</code></td></tr>
+<tr><td>Total spend against a $40 cap</td><td class="size">$44.8898, cap breach true</td><td class="sym">same file lines 405 and 425</td></tr>
+<tr><td>Median prompt tokens per kept call</td><td class="size">12 436</td><td class="sym">my computation, json load over <code class="path">E15_bt_pilot_judgments_2026-09-23.jsonl</code> (1 439 calls)</td></tr>
+</tbody>
+</table>
+<p class="note">The 9 contrast groups cap every interval in this table. The JSON states the limitation at line 113: &quot;9 contrast groups &mdash; cluster bootstrap CIs are wide; treat point estimates as underpowered (declared limitation)&quot;.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>8 quotes from E15_bt_pilot_2026-09-23.md and .json</summary><div class="dbody">
+<blockquote>All numbers <code>my computation</code>. Live judging per the E14 pair plan; judges saw ONLY task goal + artifact inventories/previews/images (zero gold/labels in prompts).</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md line 3</p>
+
+<blockquote>- **Within-task pairs-correct (contrast, identical pairs):** BT 0.643 [0.487,0.819] vs recorded reward 0.558 [0.321,0.825] vs uniform 0.637 [0.362,0.811] (uniform on 80 of 147 pairs; BT on that common set 0.669); paired BT&minus;reward +0.081 [-0.099,+0.253].</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md line 7</p>
+
+<blockquote>- **M2 SR shipped (19 groups):** BT 8 vs reward 8 vs uniform 9 (of 19 pickable) vs oracle 12.</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md line 8</p>
+
+<blockquote>**One-sentence answer:** NO DECISIVE GAIN &mdash; BT does not significantly beat reward or uniform on any within-task readout at this power; it carries plausible independent signal (Spearman with reward ~0.37) but the within-task axis is not carried decisively.</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md line 11</p>
+
+<blockquote>- order bias P(first-listed wins)&minus;0.5 (decisive calls): -0.0153 (all calls, ties=0.5: -0.0131); per model {'deepseek-v4.1-flash': -0.0143, 'kimi-k3': -0.0176}</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md line 44</p>
+
+<blockquote>- **protocol (667 pairs, 1439 calls): $25.99** &mdash; projection was $22.07; within the $40 cap.</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md line 50</p>
+
+<blockquote>- **CAP BREACH &mdash; total actual spend $44.89 &gt; $40.00.** Root cause (documented in JSON cost.overhead_cause): the first judge process was mistakenly believed dead and a second instance launched; both ran concurrently and double-judged 321 pairs (+$18.90 incl. 4 pre-fix smoke calls). Every call is in the per-call ledger; the judgments file was deduplicated (first record kept) before any analysis. No further live calls were made after detection.</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md line 51</p>
+
+<blockquote>- image-bearing pairs (213/667) consumed $24.77 of the $25.99 protocol budget via kimi-k3 &mdash; vision judging is ~20x the text-pair cost; a scaled-up design should budget accordingly.</blockquote>
+<p class="sub">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md line 60</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> (731 lines), <code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.json</code>, <code class="path">experiments_verifiers/results/E15_bt_pilot_2026-09-23.md</code>, <code class="path">experiments_verifiers/results/E15_bt_pilot_judgments_2026-09-23.jsonl</code>, <code class="path">experiments_verifiers/results/E14_bt_population.json</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>, <code class="path">docs/visual_clone/_reference.html</code>.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> (never opened, per instruction). <code class="path">experiments_verifiers/results/E15_bt_gradients/</code> - one file was read to check the format; the other 147 were counted, not read. <code class="path">experiments_verifiers/results/E15_bt_cost_ledger_2026-09-23.jsonl</code> was not read on this page (it belongs to <a href="exp_e15_bt_pilot.html">exp_e15_bt_pilot.html</a>); only the JSON cost block is quoted here. The 19 per-group rows of <code>bt_table</code> were not reproduced individually.</p>
+<p>Volatility: experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

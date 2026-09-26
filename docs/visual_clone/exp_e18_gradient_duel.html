@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E18 gradient duel - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e18_gradient_duel">
+<div class="wrap">
+
+<h1 class="hud">e18_gradient_duel &mdash; three-way gradient duel</h1>
+<p class="intro">This experiment asked which feedback text points a mutation at the benchmark gold most often. It judged three gradients with one instrument: the verifier rubric, the E15 preference transcript, and the E18 scripted transcript. Only the gradient text differed between the three judging calls.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis to artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 340" role="img" aria-label="e18_gradient_duel pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="bHyp">
+    <title>the question this experiment answered</title>
+    <rect x="20" y="14" width="420" height="42" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+    <text class="box-label" x="230" y="30" text-anchor="middle">Hypothesis: E18 points at gold</text>
+    <text class="box-sub" x="230" y="46" text-anchor="middle">measured against E15 and verifier</text>
+  </g>
+  <a class="box" id="b1" href="../../experiments_verifiers/results/_e16_population.json">
+    <title>E16 population items, read by build_triples</title>
+    <rect x="20" y="90" width="200" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="112" text-anchor="middle">_e16_population.json</text>
+    <text class="box-sub" x="120" y="128" text-anchor="middle">123 tier-A items</text>
+  </a>
+  <g class="box" id="b2">
+    <title>E15 preference gradient texts</title>
+    <rect x="20" y="160" width="200" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="182" text-anchor="middle">E15_bt_gradients/*.txt</text>
+    <text class="box-sub" x="120" y="198" text-anchor="middle">preference gradients</text>
+  </g>
+  <g class="box" id="b3">
+    <title>E18 scripted gradient texts, 148 files</title>
+    <rect x="20" y="230" width="200" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="252" text-anchor="middle">E18_bt_gradients/*.txt</text>
+    <text class="box-sub" x="120" y="268" text-anchor="middle">scripted gradients</text>
+  </g>
+  <g class="box" id="b4">
+    <title>e18_gradient_duel.py::build_triples line 41</title>
+    <rect x="280" y="150" width="170" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="365" y="173" text-anchor="middle">build_triples()</text>
+    <text class="box-sub" x="365" y="189" text-anchor="middle">joins by uuid8</text>
+  </g>
+  <g class="box" id="b5">
+    <title>e18_gradient_duel.py::judge_with_text line 69</title>
+    <rect x="280" y="250" width="170" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="365" y="273" text-anchor="middle">judge_with_text()</text>
+    <text class="box-sub" x="365" y="289" text-anchor="middle">swaps gradient text</text>
+  </g>
+  <g class="box" id="b6">
+    <title>e18_gradient_duel.py::main.paired line 109</title>
+    <rect x="500" y="250" width="170" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="585" y="273" text-anchor="middle">paired()</text>
+    <text class="box-sub" x="585" y="289" text-anchor="middle">cluster bootstrap CIs</text>
+  </g>
+  <a class="box" id="b7" href="../../experiments_verifiers/results/E18_gradient_duel_2026-09-23.json">
+    <rect x="720" y="80" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="103" text-anchor="middle">E18_gradient_duel.json</text>
+    <text class="box-sub" x="810" y="119" text-anchor="middle">stats, pairs, calls</text>
+  </a>
+  <a class="box" id="b8" href="../../experiments_verifiers/results/E18_gradient_duel_2026-09-23.md">
+    <rect x="720" y="170" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="193" text-anchor="middle">E18_gradient_duel.md</text>
+    <text class="box-sub" x="810" y="209" text-anchor="middle">TL;DR and verdict</text>
+  </a>
+  <path class="edge dashed-edge" data-from="bHyp" data-to="b1" d="M125,56 V90" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="133" y="78" text-anchor="start">tested on</text>
+  <path class="edge" data-from="b1" data-to="b4" d="M220,117 L280,168" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="248" y="140" text-anchor="middle">population</text>
+  <path class="edge" data-from="b2" data-to="b4" d="M220,187 H280" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="250" y="180" text-anchor="middle">E15 text</text>
+  <path class="edge" data-from="b3" data-to="b4" d="M220,257 L280,188" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="248" y="240" text-anchor="middle">E18 text</text>
+  <path class="edge" data-from="b4" data-to="b5" d="M365,206 V250" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="372" y="232" text-anchor="start">gradient text</text>
+  <path class="edge" data-from="b5" data-to="b6" d="M450,278 H500" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="475" y="270" text-anchor="middle">deltas</text>
+  <path class="edge" data-from="b6" data-to="b7" d="M670,278 L720,120" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="150" text-anchor="start">writes</text>
+  <path class="edge" data-from="b6" data-to="b8" d="M670,278 L720,200" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="700" y="250" text-anchor="start">writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. Steel = experiment harness code (not shipped). Solid = call, dashed = reads/writes. Arrows carry data names or file paths. <code>build_triples</code> keeps only items that have all three gradient files; <code>judge_with_text</code> replaces the gradient block of the E16 judge prompt and nothing else (lines 69&ndash;77); <code>paired</code> boots over <code>(campaign, task)</code> groups. Related pages: <a href="exp_e17_gradient_duel.html">exp_e17_gradient_duel.html</a>, <a href="exp_e16_gradient_audit.html">exp_e16_gradient_audit.html</a>, <a href="exp_e18_bt_eval.html">exp_e18_bt_eval.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card steel">
+<h4><a href="../../experiments_verifiers/harness/e18_gradient_duel.py">experiments_verifiers/harness/e18_gradient_duel.py</a></h4>
+<p class="role">Judges three gradient texts with the E16 v2 instrument and writes paired cluster-bootstrap statistics and a verdict.</p>
+<p class="meta">285 lines &#183; entry: <code>main()</code> line 81, called under <code>__main__</code> line 284 &#183; CLI arguments: none found &mdash; no argparse in the file &#183; cap: <code>CAP_USD = 6.0</code> line 38</p>
+<details><summary>functions and module constants</summary><div class="dbody">
+<pre>build_triples() -&gt; tuple[dict, Counter, dict]     # line 41
+judge_with_text(item, grad_text, role) -&gt; dict     # line 69
+main() -&gt; None                                     # line 81
+  one(k)                 # nested judge helper      # line 89
+  paired(side_x, side_y, field, boot=999, seed=0)  # line 109
+_fmt(x, nd=3)                                      # line 218
+_write_md(out)                                     # line 222</pre>
+<p>Constants: <code>TODAY = "2026-09-23"</code> line 33, <code>OUT_JSON</code> line 36, <code>OUT_MD</code> line 37, <code>E15_DIR</code> line 34, <code>E18_DIR</code> line 35. The script imports <code>e16_gradient_audit as E16</code> (line 31) and reuses <code>E16.POP_JSON</code>, <code>E16.judge_messages</code>, <code>E16.gradient_text</code>, <code>E16._llm</code> and <code>E16.parse_judgment</code>.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>E16 tier-A population items</td><td>&mdash;</td><td class="sym"><code class="path">experiments_verifiers/results/_e16_population.json</code> &#183; <code>e18_gradient_duel.py::build_triples</code> line 41</td></tr>
+<tr><td>Both gradient texts per item</td><td>&mdash;</td><td class="sym"><code class="path">results/E15_bt_gradients/</code>, <code class="path">results/E18_bt_gradients/</code> &#183; lines 34&ndash;35, 60&ndash;65, 91&ndash;92</td></tr>
+<tr><td>Cached E16 judge calls</td><td>&mdash;</td><td class="sym"><code class="path">results/_e16_judge_cache.jsonl</code> &#183; <code>E16._llm</code> via line 73</td></tr>
+<tr><td>&mdash;</td><td>Paired stats, rows, verdict</td><td class="sym"><code class="path">results/E18_gradient_duel_2026-09-23.json</code> &#183; <code>OUT_JSON</code> line 36</td></tr>
+<tr><td>&mdash;</td><td>Markdown report</td><td class="sym"><code class="path">results/E18_gradient_duel_2026-09-23.md</code> &#183; <code>_write_md</code> line 222</td></tr>
+<tr><td>&mdash;</td><td>123 new judge calls, $0.2024</td><td class="sym"><code>E18_gradient_duel_2026-09-23.json</code> key <code>calls</code> line 7079</td></tr>
+</tbody>
+</table>
+<p class="note">The script performs no snapshot writes: <code>main</code> only reads population items and gradient files, then writes the two result files.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 860 300" role="img" aria-label="bar chart of mean gold relevance and hallucination rate per gradient channel">
+  <text class="box-sub" x="262" y="24" text-anchor="middle" style="font-size:11px">mean gold_relevance (0-1)</text>
+  <path d="M70,40 V240" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M70,240 H445" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M70,240.0 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="243.0" text-anchor="end">0</text>
+  <path d="M70,182.9 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="185.9" text-anchor="end">0.2</text>
+  <path d="M70,125.7 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="128.7" text-anchor="end">0.4</text>
+  <path d="M70,68.6 H445" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="62" y="71.6" text-anchor="end">0.6</text>
+  <rect x="114.2" y="77.7" width="80.0" height="162.3" fill="#7DF9C7" fill-opacity="0.18" stroke="#7DF9C7"/>
+  <text class="box-label" x="154.2" y="72.7" text-anchor="middle" style="font-size:11px">0.568</text>
+  <text class="box-sub" x="154.2" y="256.0" text-anchor="middle">verifier</text>
+  <rect x="222.5" y="89.7" width="80.0" height="150.3" fill="#00E5FF" fill-opacity="0.18" stroke="#00E5FF"/>
+  <text class="box-label" x="262.5" y="84.7" text-anchor="middle" style="font-size:11px">0.526</text>
+  <text class="box-sub" x="262.5" y="256.0" text-anchor="middle">E18</text>
+  <rect x="330.8" y="121.4" width="80.0" height="118.6" fill="#4D9FFF" fill-opacity="0.18" stroke="#4D9FFF"/>
+  <text class="box-label" x="370.8" y="116.4" text-anchor="middle" style="font-size:11px">0.415</text>
+  <text class="box-sub" x="370.8" y="256.0" text-anchor="middle">E15</text>
+  <text class="box-sub" x="648" y="24" text-anchor="middle" style="font-size:11px">hallucination_flag rate (0-1)</text>
+  <path d="M455,40 V240" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M455,240 H830" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M455,240.0 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="243.0" text-anchor="end">0</text>
+  <path d="M455,182.9 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="185.9" text-anchor="end">0.2</text>
+  <path d="M455,125.7 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="128.7" text-anchor="end">0.4</text>
+  <path d="M455,68.6 H830" fill="none" stroke="#0E2A3F" stroke-width="1"/>
+  <text class="box-sub" x="447" y="71.6" text-anchor="end">0.6</text>
+  <rect x="499.2" y="72.9" width="80.0" height="167.1" fill="#7DF9C7" fill-opacity="0.18" stroke="#7DF9C7"/>
+  <text class="box-label" x="539.2" y="67.9" text-anchor="middle" style="font-size:11px">0.585</text>
+  <text class="box-sub" x="539.2" y="256.0" text-anchor="middle">verifier</text>
+  <rect x="607.5" y="198.3" width="80.0" height="41.7" fill="#00E5FF" fill-opacity="0.18" stroke="#00E5FF"/>
+  <text class="box-label" x="647.5" y="193.3" text-anchor="middle" style="font-size:11px">0.146</text>
+  <text class="box-sub" x="647.5" y="256.0" text-anchor="middle">E18</text>
+  <rect x="715.8" y="116.0" width="80.0" height="124.0" fill="#4D9FFF" fill-opacity="0.18" stroke="#4D9FFF"/>
+  <text class="box-label" x="755.8" y="111.0" text-anchor="middle" style="font-size:11px">0.434</text>
+  <text class="box-sub" x="755.8" y="256.0" text-anchor="middle">E15</text>
+  <text class="box-sub" x="70" y="288">bars = 123 generations, 19 task groups; values labelled on each bar</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; the two axes of the E16 v2 instrument, per gradient channel. Numbers read from <code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.md</code> line 8 (relevance) and <code>E18_gradient_duel_2026-09-23.json</code> lines 133/140/147 (hallucination).</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Population judged</td><td>123 generations, 19 groups</td><td class="sym">...duel_2026-09-23.json line 8; md line 7</td></tr>
+<tr><td>Mean gold_relevance, verifier</td><td>0.568</td><td class="sym">...duel_2026-09-23.json line 146</td></tr>
+<tr><td>Mean gold_relevance, E18</td><td>0.526</td><td class="sym">...duel_2026-09-23.json line 132</td></tr>
+<tr><td>Mean gold_relevance, E15</td><td>0.415</td><td class="sym">...duel_2026-09-23.json line 139</td></tr>
+<tr><td>Hallucination rate, verifier</td><td>0.585</td><td class="sym">...duel_2026-09-23.json line 147</td></tr>
+<tr><td>Hallucination rate, E18</td><td>0.146</td><td class="sym">...duel_2026-09-23.json line 133</td></tr>
+<tr><td>Hallucination rate, E15</td><td>0.434</td><td class="sym">...duel_2026-09-23.json line 140</td></tr>
+<tr><td>Delta E18 minus E15, relevance</td><td>+0.110, CI [+0.049, +0.160]</td><td class="sym">...duel_2026-09-23.json line 60; md line 21</td></tr>
+<tr><td>Delta E18 minus verifier, relevance</td><td>-0.042, CI [-0.180, +0.083]</td><td class="sym">...duel_2026-09-23.json line 25</td></tr>
+<tr><td>Delta E18 minus verifier, hallucination</td><td>-0.439, CI [-0.581, -0.308]</td><td class="sym">...duel_2026-09-23.md line 20</td></tr>
+<tr><td>Direction toward gold</td><td>E18 81, verifier 72, E15 46</td><td class="sym">...duel_2026-09-23.json lines 128/142/136</td></tr>
+<tr><td>New judge calls and cost</td><td>E18-side 123, $0.2024</td><td class="sym">...duel_2026-09-23.json lines 7079/7082</td></tr>
+<tr><td>Cached calls reused</td><td>931 calls, $1.6160 total</td><td class="sym">...duel_2026-09-23.json lines 7083/7084</td></tr>
+<tr><td>Verdict answer</td><td>MIXED &mdash; beats E15, not verifier</td><td class="sym">...duel_2026-09-23.json line 7090</td></tr>
+</tbody>
+</table>
+<p class="note say">Only the E18 side paid: the verifier and E15 judgments are cache hits from E16 and E17 (json lines 7080&ndash;7081). The 25 population drops are items with no verifier-gradient join (json lines 10&ndash;11).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>8 lines from the results files (click to expand)</summary><div class="dbody">
+<p class="sub"><code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.md</code> line 7</p>
+<blockquote>- Population: **123 generations** (19 task groups) with all three gradients.</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.md</code> line 8</p>
+<blockquote>- Mean gold-relevance: E18-scripted 0.526 vs E15-preference 0.415 vs verifier 0.568.</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.md</code> line 10</p>
+<blockquote>- Direction toward: E18 81 / E15 46 / verifier 72 of 123.</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.md</code> line 12</p>
+<blockquote>**Answer:** MIXED — E18 significantly beats E15 but not the other channel.</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.md</code> line 35</p>
+<blockquote>- new calls this experiment: E18-side 123 ($0.2024); E15-side new 0; verifier-side new 0 (expected 0 — cache hits).</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.json</code> line 132</p>
+<blockquote>  "mean_relevance_e18": 0.5260162601626016,</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.json</code> line 147</p>
+<blockquote>  "hallucination_rate_ver": 0.5853658536585366,</blockquote>
+<p class="sub"><code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.json</code> line 7090</p>
+<blockquote>  "answer": "MIXED \u2014 E18 significantly beats E15 but not the other channel.",</blockquote>
+</div></details>
+</div>
+<footer>
+<p><b>Sources read:</b> <code class="path">experiments_verifiers/harness/e18_gradient_duel.py</code> (285 lines), <code class="path">experiments_verifiers/harness/e16_gradient_audit.py</code> (lines 44&ndash;73, 330&ndash;570, 1127&ndash;1136), <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> (line numbers only, import check).</p>
+<p>Results read: <code class="path">experiments_verifiers/results/E18_gradient_duel_2026-09-23.json</code> and <code>.md</code>; <code class="path">_e16_population.json</code> (existence check).</p>
+<p>Design intent: <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (constitution &sect;2, data map &sect;3 line 72 and reproduction target line 86 &mdash; the file has no per-experiment E18 section) and <code class="path">experiments_verifiers/README.md</code> (E18 codename row).</p>
+<p class="skips"><b>Skipped:</b></p>
+<p><code class="path">experiments_verifiers/results/E15_bt_gradients/</code> and <code class="path">E18_bt_gradients/</code> (148 .txt gradient files) &mdash; not opened: the gradient text is the experiment input, not a number the page reports.</p>
+<p><code class="path">experiments_verifiers/results/_e16_judge_cache.jsonl</code> (931 cached judgments) &mdash; not opened: only the aggregate cost and call counts are reported.</p>
+<p><code class="path">experiments_verifiers/results/E18_bt_cost_ledger_2026-09-23.jsonl</code> &mdash; not opened: the script notes that these calls bill through the E16 cache ledger instead (json line 7087).</p>
+<p><code class="path">experiments_verifiers/.env</code>, <code class="path">.env</code>, <code>token.json</code>, <code>credentials.json</code> &mdash; never opened (key material).</p>
+<p>The experiment was not re-run; no pytest and no application run.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

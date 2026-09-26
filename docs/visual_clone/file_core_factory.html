@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>factory.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/core > factory.py">
+<div class="wrap">
+
+<h1 class="hud">factory.py</h1>
+<p class="intro">Base class <code>Factory</code> (line 16) holds the plumbing that both code generators share: tool discovery, the single-agent prompt, folder creation and file writes. It runs while a workflow is being crafted, before the sandbox executes anything. <code>SingleAgentFactory</code> and <code>WorkflowFactory</code> inherit it and call its methods from their own craft routines.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what this file does: config in, tools and files out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 420" role="img" aria-label="Factory methods and their outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="fIn">
+    <title>the config object handed to the constructor</title>
+    <rect x="20" y="40" width="180" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="64" text-anchor="middle">config</text>
+    <text class="box-sub" x="110" y="82" text-anchor="middle">workflow_dir L30</text>
+    <text class="box-sub" x="110" y="98" text-anchor="middle">memory_dir L31</text>
+    <text class="box-sub" x="110" y="112" text-anchor="middle">prompt_smolagent L109</text>
+  </g>
+
+  <a class="box" id="fCls" href="../../sources/core/factory.py">
+    <title>class Factory and its constructor</title>
+    <rect x="230" y="180" width="200" height="70" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="204" text-anchor="middle">Factory (L16)</text>
+    <text class="box-sub" x="330" y="222" text-anchor="middle">__init__ L24 stores both paths</text>
+    <text class="box-sub" x="330" y="238" text-anchor="middle">self.config, self.logger L32-33</text>
+  </a>
+
+  <g class="box" id="fSub">
+    <title>the two subclasses that call these methods</title>
+    <rect x="20" y="280" width="180" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="304" text-anchor="middle">subclasses call on self</text>
+    <text class="box-sub" x="110" y="322" text-anchor="middle">SingleAgentFactory L62-73</text>
+    <text class="box-sub" x="110" y="338" text-anchor="middle">WorkflowFactory L447-490</text>
+    <text class="box-sub" x="110" y="352" text-anchor="middle">save_workflow_files calls</text>
+  </g>
+
+  <a class="box" id="fMCP" href="../../sources/core/factory.py">
+    <title>async tool discovery with retry</title>
+    <rect x="470" y="20" width="262" height="66" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="44" text-anchor="middle">load_tools_code (L35)</text>
+    <text class="box-sub" x="585" y="62" text-anchor="middle">ToolManager.discover_mcp_servers L64</text>
+    <text class="box-sub" x="585" y="78" text-anchor="middle">client code and prompt, L93-94</text>
+  </a>
+
+  <a class="box" id="fPrompt" href="../../sources/core/factory.py">
+    <title>prompt loader, async but no await inside</title>
+    <rect x="470" y="100" width="230" height="66" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="124" text-anchor="middle">load_single_agent_system_prompt</text>
+    <text class="box-sub" x="585" y="142" text-anchor="middle">L99, open(prompt_smolagent) L109</text>
+    <text class="box-sub" x="585" y="158" text-anchor="middle">raises ValueError L112</text>
+  </a>
+
+  <a class="box" id="fDirs" href="../../sources/core/factory.py">
+    <title>folder creation</title>
+    <rect x="470" y="180" width="230" height="66" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="204" text-anchor="middle">create_folder_structure (L114)</text>
+    <text class="box-sub" x="585" y="222" text-anchor="middle">makedirs workflow_dir/uuid L125</text>
+    <text class="box-sub" x="585" y="238" text-anchor="middle">makedirs memory_dir/uuid L127</text>
+  </a>
+
+  <a class="box" id="fSave" href="../../sources/core/factory.py">
+    <title>the four guarded writes</title>
+    <rect x="470" y="260" width="230" height="80" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="585" y="284" text-anchor="middle">save_workflow_files (L157)</text>
+    <text class="box-sub" x="585" y="302" text-anchor="middle">genotype, system prompt, goal</text>
+    <text class="box-sub" x="585" y="318" text-anchor="middle">plus original_task L201</text>
+    <text class="box-sub" x="585" y="334" text-anchor="middle">_extract_original_from_goal L131</text>
+  </a>
+
+  <g class="box" id="fOut1">
+    <title>return of the tool loader</title>
+    <rect x="770" y="20" width="250" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="895" y="44" text-anchor="middle">returns (tools_code, prompt)</text>
+    <text class="box-sub" x="895" y="62" text-anchor="middle">L97, one client block per MCP</text>
+    <text class="box-sub" x="895" y="78" text-anchor="middle">prompt text for tool awareness</text>
+  </g>
+
+  <g class="box" id="fOut2">
+    <title>return of the prompt loader</title>
+    <rect x="770" y="100" width="250" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="895" y="124" text-anchor="middle">returns str</text>
+    <text class="box-sub" x="895" y="142" text-anchor="middle">content of the prompt file</text>
+    <text class="box-sub" x="895" y="158" text-anchor="middle">L110</text>
+  </g>
+
+  <g class="box" id="fOut3">
+    <title>return of the folder helper</title>
+    <rect x="770" y="180" width="250" height="66" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="895" y="204" text-anchor="middle">returns two paths</text>
+    <text class="box-sub" x="895" y="222" text-anchor="middle">workflow_path, memory_path L129</text>
+    <text class="box-sub" x="895" y="238" text-anchor="middle">exist_ok=True, no error if present</text>
+  </g>
+
+  <g class="box" id="fOut4">
+    <title>side effect of the writer</title>
+    <rect x="770" y="260" width="250" height="80" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="895" y="284" text-anchor="middle">4 files under path</text>
+    <text class="box-sub" x="895" y="302" text-anchor="middle">workflow_genotype_&lt;uuid&gt;.py L175</text>
+    <text class="box-sub" x="895" y="318" text-anchor="middle">system_prompt_&lt;uuid&gt;.md, goal_&lt;uuid&gt;.txt</text>
+    <text class="box-sub" x="895" y="334" text-anchor="middle">original_task_&lt;uuid&gt;.txt L204</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="fIn" data-to="fCls" d="M200,78 H215 V215 H230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="216" y="150" text-anchor="middle">paths</text>
+  <path class="edge dotted-edge" data-from="fSub" data-to="fCls" d="M200,318 H215 V240 H230" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="216" y="270" text-anchor="middle">extends</text>
+  <path class="edge" data-from="fCls" data-to="fMCP" d="M430,200 H450 V53 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fCls" data-to="fPrompt" d="M430,215 H450 V133 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fCls" data-to="fDirs" d="M430,230 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fCls" data-to="fSave" d="M430,245 H450 V300 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="452" y="240" text-anchor="start">subclass makes 4 calls</text>
+  <path class="edge" data-from="fMCP" data-to="fOut1" d="M700,53 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fPrompt" data-to="fOut2" d="M700,133 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fDirs" data-to="fOut3" d="M700,213 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="fSave" data-to="fOut4" d="M700,300 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="735" y="93" text-anchor="middle">returns</text>
+  <text class="edge-label" x="735" y="285" text-anchor="middle">writes</text>
+
+  <text class="box-sub" x="20" y="150">no try/except around the config read at L30-31: a config without those two fields fails at construction.</text>
+  <text class="box-sub" x="20" y="392">every write in save_workflow_files sits in its own try block; a failure is logged and the next write still runs.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. Solid = call, dotted = inheritance, dashed = data handed in. The four method pills are called on <code>self</code> from the subclasses: <code class="path">sources/core/single_agent_factory.py:62</code>, <code>:67</code>, <code>:73</code>, <code>:307</code> and <code class="path">sources/core/workflow_factory.py:447</code>, <code>:454</code>, <code>:482</code>, <code>:490</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: what goes in, what comes back</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 330" role="img" aria-label="data flow of factory.py">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="gIn">
+    <title>config fields only; no other input</title>
+    <rect x="20" y="40" width="230" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="64" text-anchor="middle">config fields read</text>
+    <text class="box-sub" x="135" y="84" text-anchor="middle">workflow_dir L30</text>
+    <text class="box-sub" x="135" y="100" text-anchor="middle">memory_dir L31</text>
+    <text class="box-sub" x="135" y="116" text-anchor="middle">prompt_smolagent L109</text>
+  </g>
+
+  <g class="box" id="gArgs">
+    <title>the method arguments</title>
+    <rect x="20" y="170" width="230" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="194" text-anchor="middle">arguments</text>
+    <text class="box-sub" x="135" y="214" text-anchor="middle">uuid_str L114</text>
+    <text class="box-sub" x="135" y="230" text-anchor="middle">path, code, goal (L157)</text>
+    <text class="box-sub" x="135" y="246" text-anchor="middle">original_task L158, optional</text>
+  </g>
+
+  <a class="box" id="gCls" href="../../sources/core/factory.py">
+    <title>the base class body</title>
+    <rect x="320" y="100" width="200" height="90" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="420" y="126" text-anchor="middle">Factory methods</text>
+    <text class="box-sub" x="420" y="144" text-anchor="middle">calls ToolManager for MCP code</text>
+    <text class="box-sub" x="420" y="160" text-anchor="middle">opens the prompt file</text>
+    <text class="box-sub" x="420" y="176" text-anchor="middle">writes 4 files, logs failures</text>
+  </a>
+
+  <g class="box" id="gOut">
+    <title>returned values</title>
+    <rect x="590" y="40" width="245" height="90" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="700" y="64" text-anchor="middle">three return values</text>
+    <text class="box-sub" x="700" y="84" text-anchor="middle">(tools_code, tool_prompt) L97</text>
+    <text class="box-sub" x="700" y="100" text-anchor="middle">prompt text L110</text>
+    <text class="box-sub" x="700" y="116" text-anchor="middle">(workflow_path, memory_path) L129</text>
+  </g>
+
+  <g class="box" id="gWr">
+    <title>files written into the run folder</title>
+    <rect x="590" y="170" width="430" height="90" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="805" y="194" text-anchor="middle">files written under path</text>
+    <text class="box-sub" x="805" y="214" text-anchor="middle">workflow_genotype_&lt;uuid&gt;.py L175 &#183; goal_&lt;uuid&gt;.txt L193</text>
+    <text class="box-sub" x="805" y="230" text-anchor="middle">system_prompt_&lt;uuid&gt;.md L184 &#183; original_task_&lt;uuid&gt;.txt L204</text>
+    <text class="box-sub" x="805" y="246" text-anchor="middle">directories first: workflow_dir/uuid L125, memory_dir/uuid L127</text>
+  </g>
+
+  <g class="box" id="gSvc">
+    <title>the external service the loader waits for</title>
+    <rect x="320" y="230" width="200" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="420" y="254" text-anchor="middle">MCP servers on Toolomics</text>
+    <text class="box-sub" x="420" y="272" text-anchor="middle">discovery scans the configured</text>
+    <text class="box-sub" x="420" y="288" text-anchor="middle">address ranges</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="gIn" data-to="gCls" d="M250,85 H285 V130 H320" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="286" y="110" text-anchor="middle">fields</text>
+  <path class="edge dashed-edge" data-from="gArgs" data-to="gCls" d="M250,215 H285 V165 H320" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="286" y="195" text-anchor="middle">arguments</text>
+  <path class="edge" data-from="gCls" data-to="gOut" d="M520,130 H555 V85 H590" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="556" y="110" text-anchor="middle">returns</text>
+  <path class="edge dashed-edge" data-from="gCls" data-to="gWr" d="M520,170 H555 V215 H590" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="556" y="196" text-anchor="middle">writes</text>
+  <path class="edge dashed-edge" data-from="gSvc" data-to="gCls" d="M420,230 V190" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="430" y="212" text-anchor="start">client code</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. Dashed = reads, writes or a network dependency. Config fields read: <b>3</b> (<code>workflow_dir</code>, <code>memory_dir</code>, <code>prompt_smolagent</code>). Files read: the single-agent prompt file only. Files written: 4. State keys: <b>none</b>, this class never reads <code>state_result.json</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control logic: the retry loop and the guarded writes</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1040 470" role="img" aria-label="MCP retry loop and per-write guards">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="l0">
+    <title>loop setup</title>
+    <rect x="20" y="30" width="170" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="105" y="54" text-anchor="middle">deadline now + 300 s</text>
+    <text class="box-sub" x="105" y="70" text-anchor="middle">L56-L58, backoff 1.0 s</text>
+  </g>
+
+  <g class="box" id="l1">
+    <title>one discovery attempt</title>
+    <rect x="230" y="30" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="54" text-anchor="middle">discover + verify tools</text>
+    <text class="box-sub" x="330" y="70" text-anchor="middle">L64-L65, exceptions caught L69</text>
+  </g>
+
+  <g class="box" id="l2">
+    <title>break condition</title>
+    <rect x="470" y="30" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="570" y="54" text-anchor="middle">tool_setup and mcps ?</text>
+    <text class="box-sub" x="570" y="70" text-anchor="middle">L66-L67, the only exit</text>
+  </g>
+
+  <g class="box" id="l3">
+    <title>deadline check</title>
+    <rect x="470" y="130" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="570" y="154" text-anchor="middle">now &gt;= deadline ?</text>
+    <text class="box-sub" x="570" y="170" text-anchor="middle">L71</text>
+  </g>
+
+  <g class="box" id="l4">
+    <title>the hard failure</title>
+    <rect x="730" y="130" width="200" height="56" rx="2" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="830" y="154" text-anchor="middle">raise RuntimeError</text>
+    <text class="box-sub" x="830" y="170" text-anchor="middle">L76-L78, names the reason</text>
+  </g>
+
+  <g class="box" id="l5">
+    <title>wait and grow the backoff</title>
+    <rect x="230" y="130" width="200" height="56" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="330" y="154" text-anchor="middle">sleep(backoff)</text>
+    <text class="box-sub" x="330" y="170" text-anchor="middle">L82, backoff = min(x2, 30) L83</text>
+  </g>
+
+  <g class="box" id="l6">
+    <title>success path after the loop</title>
+    <rect x="730" y="30" width="200" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="830" y="54" text-anchor="middle">build client blocks</text>
+    <text class="box-sub" x="830" y="70" text-anchor="middle">L92-L96, one per MCP</text>
+  </g>
+
+  <g class="box" id="w0">
+    <title>the four write attempts</title>
+    <rect x="20" y="250" width="230" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="274" text-anchor="middle">four try blocks in order</text>
+    <text class="box-sub" x="135" y="292" text-anchor="middle">genotype L174, prompt L183</text>
+    <text class="box-sub" x="135" y="308" text-anchor="middle">goal L192, original_task L199</text>
+    <text class="box-sub" x="135" y="322" text-anchor="middle">each has its own except</text>
+  </g>
+
+  <g class="box" id="w1">
+    <title>write failure handling</title>
+    <rect x="290" y="250" width="230" height="80" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="405" y="274" text-anchor="middle">except Exception</text>
+    <text class="box-sub" x="405" y="292" text-anchor="middle">logger.error(name of the write)</text>
+    <text class="box-sub" x="405" y="308" text-anchor="middle">L181, L190, L197, L208</text>
+    <text class="box-sub" x="405" y="322" text-anchor="middle">no raise, next write still runs</text>
+  </g>
+
+  <g class="box" id="w2">
+    <title>the original-task decision</title>
+    <rect x="560" y="250" width="230" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="675" y="274" text-anchor="middle">original_task given ?</text>
+    <text class="box-sub" x="675" y="292" text-anchor="middle">no: regex on the goal L150</text>
+    <text class="box-sub" x="675" y="308" text-anchor="middle">marker "Now, use this knowledge</text>
+    <text class="box-sub" x="675" y="322" text-anchor="middle">to complete:" L150, DOTALL</text>
+  </g>
+
+  <g class="box" id="w3">
+    <title>empty inputs</title>
+    <rect x="830" y="250" width="190" height="80" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="925" y="274" text-anchor="middle">two early returns</text>
+    <text class="box-sub" x="925" y="292" text-anchor="middle">falsy goal gives "" L145-146</text>
+    <text class="box-sub" x="925" y="308" text-anchor="middle">no marker gives goal as-is L155</text>
+    <text class="box-sub" x="925" y="322" text-anchor="middle">empty task not written L202</text>
+  </g>
+
+  <g class="box" id="l7">
+    <title>the unreachable no-server branch</title>
+    <rect x="20" y="370" width="540" height="70" rx="2" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="290" y="394" text-anchor="middle">if not mcps (L84)</text>
+    <text class="box-sub" x="290" y="412" text-anchor="middle">the loop only exits through the break at L66-L67, which needs a non-empty mcps,</text>
+    <text class="box-sub" x="290" y="428" text-anchor="middle">so this banner never prints in the current control flow</text>
+  </g>
+
+  <path class="edge" data-from="l0" data-to="l1" d="M190,58 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="l1" data-to="l2" d="M430,58 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="450" y="50" text-anchor="middle">result</text>
+  <path class="edge" data-from="l2" data-to="l6" d="M670,58 H730" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="700" y="50" text-anchor="middle">yes, break</text>
+  <path class="edge" data-from="l2" data-to="l3" d="M570,86 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="580" y="112" text-anchor="start">no</text>
+  <path class="edge" data-from="l3" data-to="l4" d="M670,158 H730" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="700" y="150" text-anchor="middle">yes</text>
+  <path class="edge" data-from="l3" data-to="l5" d="M470,158 H430" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="450" y="150" text-anchor="middle">no</text>
+  <path class="edge" data-from="l5" data-to="l1" d="M330,130 V86" fill="none" stroke="#FFB547" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="340" y="112" text-anchor="start">retry, capped backoff</text>
+  <path class="edge dashed-edge" data-from="l7" data-to="l2" d="M290,370 V300 H570 V86" fill="none" stroke="#FF4D6A" stroke-width="1.25" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="580" y="250" text-anchor="start">needs empty mcps</text>
+  <path class="edge" data-from="w0" data-to="w1" d="M250,290 H290" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="270" y="282" text-anchor="middle">failure</text>
+  <path class="edge" data-from="w2" data-to="w0" d="M600,250 V220 H135 V250" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="360" y="214" text-anchor="middle">task_to_save L201</text>
+  <path class="edge" data-from="w3" data-to="w0" d="M925,250 V200 H135 V250" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="194" text-anchor="middle">skip empty writes</text>
+
+  <text class="box-sub" x="20" y="462">left half = load_tools_code (L61-L91) &#183; right half = save_workflow_files (L174-L208) and _extract_original_from_goal (L131-L155).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>12 boxes</code>. One retry loop with a 300 s deadline and a doubling backoff capped at 30 s, then four independent guarded writes. The red box at the bottom is a branch that the break condition at L66-L67 cannot reach.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">config</td><td class="sym">workflow_dir</td><td class="sym">L30</td><td>base folder for run directories</td></tr>
+<tr><td class="sym">config</td><td class="sym">memory_dir</td><td class="sym">L31</td><td>base folder for memory directories</td></tr>
+<tr><td class="sym">config</td><td class="sym">prompt_smolagent</td><td class="sym">L109</td><td>path of the single-agent prompt file</td></tr>
+<tr><td class="sym">constant</td><td class="sym">max_wait_seconds = 300.0</td><td class="sym">L56</td><td>total wait budget for MCP discovery</td></tr>
+<tr><td class="sym">constant</td><td class="sym">backoff cap 30.0</td><td class="sym">L83</td><td>longest single retry wait</td></tr>
+<tr><td class="sym">file read</td><td class="sym">config.prompt_smolagent</td><td class="sym">L109</td><td>default path <code class="path">sources/prompts/smolagent_sys_prompt.md</code></td></tr>
+<tr><td class="sym">file write</td><td class="sym">workflow_genotype_&lt;uuid&gt;.py</td><td class="sym">L175</td><td>the crafted workflow source</td></tr>
+<tr><td class="sym">file write</td><td class="sym">system_prompt_&lt;uuid&gt;.md</td><td class="sym">L184</td><td>copy of the generator system prompt</td></tr>
+<tr><td class="sym">file write</td><td class="sym">goal_&lt;uuid&gt;.txt</td><td class="sym">L193</td><td>goal text, possibly knowledge-wrapped</td></tr>
+<tr><td class="sym">file write</td><td class="sym">original_task_&lt;uuid&gt;.txt</td><td class="sym">L204</td><td>unwrapped task for similarity matching</td></tr>
+<tr><td class="sym">directory</td><td class="sym">workflow_dir/&lt;uuid&gt;</td><td class="sym">L123-L125</td><td>run folder, <code>exist_ok=True</code></td></tr>
+<tr><td class="sym">directory</td><td class="sym">memory_dir/&lt;uuid&gt;</td><td class="sym">L126-L127</td><td>memory folder, <code>exist_ok=True</code></td></tr>
+<tr><td class="sym">returns</td><td class="sym">(tools_code, existing_tool_prompt)</td><td class="sym">L97</td><td>client code and tool list for the generator</td></tr>
+<tr><td class="sym">returns</td><td class="sym">str</td><td class="sym">L110</td><td>single-agent system prompt</td></tr>
+<tr><td class="sym">returns</td><td class="sym">(workflow_path, memory_path)</td><td class="sym">L129</td><td>both created directories</td></tr>
+<tr><td class="sym">raises</td><td class="sym">RuntimeError</td><td class="sym">L76-L78</td><td>MCP servers not ready within 300 s</td></tr>
+<tr><td class="sym">raises</td><td class="sym">ValueError</td><td class="sym">L112</td><td>prompt file unreadable</td></tr>
+<tr><td class="sym">state key</td><td class="sym">none</td><td class="sym">&mdash;</td><td>this class never reads a workflow state</td></tr>
+</tbody>
+</table>
+<p class="note flag">Unreachable branch: <code class="path">sources/core/factory.py:84-91</code> raises the "No MCP Servers Found" <code>ValueError</code> when <code>mcps</code> is empty, but the loop above only exits through the <code>break</code> at L66-L67, which requires <code>tool_setup and mcps</code>. An empty <code>mcps</code> therefore always ends at the <code>RuntimeError</code> on L76 instead.</p>
+<p class="note flag">Missing method: <code>save_workflow_files</code> writes the system prompt with <code>self.get_system_prompt()</code> (L185), but that method is not defined in this file; it exists only in <code class="path">sources/core/workflow_factory.py:49</code>. <code>SingleAgentFactory</code> inherits this writer (<code class="path">sources/core/single_agent_factory.py:307</code>) without defining <code>get_system_prompt</code>, so in single-agent mode the <code>AttributeError</code> is caught at L189-L190 and logged, and <code>system_prompt_&lt;uuid&gt;.md</code> is not written.</p>
+<p class="note say">Why it matters: this file is the only place that turns a crafted workflow into files on disk, so the file names it writes are the names the rest of the pipeline looks for.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<p class="sub">1 class, 6 methods, no module-level function (my computation with <code>ast.parse</code>): 7 symbols in 208 lines.</p>
+<details><summary>every def in sources/core/factory.py, with signature and line</summary><div class="dbody">
+<pre>class Factory                                                        # L16  - shared crafting plumbing
+
+Factory.__init__(self, config: "Config") -&gt; None                     # L24  - store workflow_dir, memory_dir
+Factory.load_tools_code(self) -&gt; tuple[str, str]                     # L35  - async; discover MCPs, retry to 300 s
+Factory.load_single_agent_system_prompt(self) -&gt; str                 # L99  - async; read the prompt file
+Factory.create_folder_structure(self, uuid_str: str)                 # L114 - make the two run folders
+    -&gt; tuple[str, str]
+Factory._extract_original_from_goal(self, goal: str) -&gt; str          # L131 - strip the knowledge wrapper
+Factory.save_workflow_files(self, path: str, uuid_str: str,
+    workflow_genotype_code: str, goal: str,
+    original_task: str | None = None) -&gt; None                         # L157 - write 4 files, log failures
+
+# imports at the top
+import os, logging, re                                              # L9-L11
+from .tools_manager import ToolManager                              # L13
+
+# docstring L2-L7 names the two subclasses: SingleAgentFactory, WorkflowFactory
+# ast.parse over the 208 lines: ClassDef 1, FunctionDef 6, AsyncFunctionDef 2
+# (load_tools_code L35 and load_single_agent_system_prompt L99 are the async ones)</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/core/single_agent_factory.py">sources/core/single_agent_factory.py</a></td><td><code>class SingleAgentFactory(Factory)</code>; calls <code>load_tools_code</code>, <code>load_single_agent_system_prompt</code>, <code>create_folder_structure</code>, <code>save_workflow_files</code></td><td class="sym">import L12, subclass L14, calls L62, L67, L73, L307</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_factory.py">sources/core/workflow_factory.py</a></td><td>subclass; calls the tool loader, folder helper and file writer</td><td class="sym">import L14, subclass L27, calls L447, L454, L482, L490, method L49</td></tr>
+<tr><td class="sym"><a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a></td><td>builds one of each subclass; never uses <code>Factory</code> directly</td><td class="sym">imports L18-L19, builds L38-L39</td></tr>
+<tr><td class="sym"><a href="../../sources/core/__init__.py">sources/core/__init__.py</a></td><td>re-exports the class</td><td class="sym">L22, L56</td></tr>
+<tr><td class="sym"><a href="../../tests/single_agent_factory_logprobs_test.py">tests/single_agent_factory_logprobs_test.py</a></td><td>the only test touching these methods; replaces all four with stubs</td><td class="sym">L80-L86</td></tr>
+<tr><td class="sym">no test found for factory.py itself</td><td>no direct test of this file found in <code>tests/</code></td><td class="sym">grep -rn (2026-10-02)</td></tr>
+<tr><td class="sym"><a href="../../sources/core/tools_manager.py">sources/core/tools_manager.py</a></td><td>the only import: <code>ToolManager</code>; four methods used, lines in Evidence</td><td class="sym">import L13, calls L52, L64-L65, L93-L94</td></tr>
+</tbody>
+</table>
+</div>
+
+<footer>
+<p>Sources: <a href="../../sources/core/factory.py">sources/core/factory.py</a> (all 208 lines, read line by line), <a href="../../sources/core/single_agent_factory.py">single_agent_factory.py</a> (L12-L14, L62-L73, L307; no <code>get_system_prompt</code> anywhere in the file), <a href="../../sources/core/workflow_factory.py">workflow_factory.py</a> (L14, L27, L49, L447-L490), <a href="../../sources/core/orchestrator.py">orchestrator.py</a> (L18-L19, L38-L39), <a href="../../sources/core/tools_manager.py">tools_manager.py</a> (method lines above), <a href="../../config.py">config.py</a> (L209-L211 default prompt path, L222-L223 the two folders), <a href="../../tests/single_agent_factory_logprobs_test.py">tests/single_agent_factory_logprobs_test.py</a>, and greps over the repo for <code>Factory</code>, <code>get_system_prompt</code> and the four method names (virtualenvs and generated workflows excluded). Counts are my computation with <code>ast.parse</code>.</p>
+<p class="skips">Skipped: <code>sources/modules/</code> and <code>sources/prompts/</code> bodies (templates injected into generated workflows, not read by this file beyond the prompt path); the body of <code>ToolManager</code> (its own page in this build); <code>sources/workflows/</code> and <code>sources/memory/</code> contents (runtime output of the paths this file creates); the <code>ValueError</code> banner text beyond its first line (console formatting). No <code>.env</code>, <code>token.json</code> or key file was opened; the Pushover names are not touched by this file at all. No pytest run and no application run, by the build rules.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

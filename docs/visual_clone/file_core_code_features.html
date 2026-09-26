@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>code_features.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > sources/core > code_features.py">
+<div class="wrap">
+
+<h1 class="hud">code_features.py</h1>
+<p class="intro">QD-facing shim: it turns workflow source code into the unit-norm embedding used as the novelty descriptor. The single function <code>genotype_embedding_descriptor</code> (line 10) calls <code>embed_genotype</code> from <code class="path">sources/core/genotype_embedding.py</code> and converts the NumPy array to a plain <code>list[float]</code>. It runs once per candidate inside <code>SelectionPressure</code>; the novelty rule itself lives in <a href="mod_core_selection.html">selection.py</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what this file does: code in, descriptor out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 330" role="img" aria-label="code_features descriptor pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="cIn">
+    <title>the argument of the only function</title>
+    <rect x="20" y="110" width="160" height="62" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="100" y="134" text-anchor="middle">code: str | None</text>
+    <text class="box-sub" x="100" y="152" text-anchor="middle">parent genotype source</text>
+    <text class="box-sub" x="100" y="166" text-anchor="middle">argument, line 10</text>
+  </g>
+
+  <a class="box" id="cDesc" href="../../sources/core/code_features.py">
+    <title>genotype_embedding_descriptor, lines 10-25</title>
+    <rect x="230" y="100" width="235" height="82" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="126" text-anchor="middle">genotype_embedding_descriptor</text>
+    <text class="box-sub" x="330" y="144" text-anchor="middle">line 22 calls the backend</text>
+    <text class="box-sub" x="330" y="158" text-anchor="middle">line 23-24: None pass-through</text>
+    <text class="box-sub" x="330" y="172" text-anchor="middle">line 25: tolist conversion</text>
+  </a>
+
+  <a class="box" id="cEmbed" href="../../sources/core/genotype_embedding.py">
+    <title>embed_genotype wrapper in the callee module</title>
+    <rect x="480" y="100" width="200" height="82" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="580" y="126" text-anchor="middle">embed_genotype</text>
+    <text class="box-sub" x="580" y="144" text-anchor="middle">genotype_embedding.py:297</text>
+    <text class="box-sub" x="580" y="158" text-anchor="middle">default singleton embedder</text>
+    <text class="box-sub" x="580" y="172" text-anchor="middle">returns ndarray or None</text>
+  </a>
+
+  <a class="box" id="cBackend" href="../../sources/core/genotype_embedding.py">
+    <title>backend chosen by environment, then cached per source hash</title>
+    <rect x="480" y="230" width="200" height="82" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="580" y="256" text-anchor="middle">embedder backend</text>
+    <text class="box-sub" x="580" y="274" text-anchor="middle">local MiniLM by default</text>
+    <text class="box-sub" x="580" y="288" text-anchor="middle">cache keyed by sha1 (L256)</text>
+    <text class="box-sub" x="580" y="302" text-anchor="middle">encode -> ndarray (L261)</text>
+  </a>
+
+  <g class="box" id="cOut">
+    <title>success value</title>
+    <rect x="730" y="100" width="190" height="82" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="825" y="126" text-anchor="middle">list[float]</text>
+    <text class="box-sub" x="825" y="144" text-anchor="middle">unit norm, length = model dim</text>
+    <text class="box-sub" x="825" y="158" text-anchor="middle">line 25</text>
+    <text class="box-sub" x="825" y="172" text-anchor="middle">consumed as QD descriptor</text>
+  </g>
+
+  <g class="box" id="cNone">
+    <title>degenerate value, no exception</title>
+    <rect x="730" y="230" width="190" height="62" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="825" y="254" text-anchor="middle">None</text>
+    <text class="box-sub" x="825" y="272" text-anchor="middle">missing code, empty string,</text>
+    <text class="box-sub" x="825" y="286" text-anchor="middle">backend failure</text>
+  </g>
+
+  <path class="edge" data-from="cIn" data-to="cDesc" d="M180,141 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="205" y="133" text-anchor="middle">code str</text>
+  <path class="edge" data-from="cDesc" data-to="cEmbed" d="M430,141 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="455" y="133" text-anchor="middle">line 22</text>
+  <path class="edge" data-from="cEmbed" data-to="cBackend" d="M580,182 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="590" y="210" text-anchor="start">embed(code)</text>
+  <path class="edge" data-from="cBackend" data-to="cEmbed" d="M500,230 V182" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="492" y="212" text-anchor="end">ndarray</text>
+  <path class="edge" data-from="cEmbed" data-to="cOut" d="M680,128 L730,128" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="705" y="120" text-anchor="middle">vec.tolist()</text>
+  <path class="edge" data-from="cEmbed" data-to="cNone" d="M660,182 L700,261 H730" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="700" y="228" text-anchor="middle">vec is None</text>
+
+  <text class="box-sub" x="20" y="290">the file adds no branch of its own beyond line 23: it never catches, never retries, never touches disk.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>6 boxes</code>. Mint = callee module, cyan-pill = functions, steel = plain data. Every arrow is a real call or return: <code>sources/core/code_features.py:22</code> calls <code>embed_genotype</code>, which is <code class="path">sources/core/genotype_embedding.py:297-299</code>, which calls <code>GenotypeEmbedder.embed</code> (line 243).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: what goes in, what comes back</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="data flow of the descriptor shim">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="fCaller" href="../../sources/core/selection.py">
+    <title>SelectionPressure._extract_behaviour_descriptor</title>
+    <rect x="20" y="50" width="235" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="125" y="74" text-anchor="middle">_extract_behaviour_descriptor</text>
+    <text class="box-sub" x="125" y="92" text-anchor="middle">selection.py:468</text>
+    <text class="box-sub" x="125" y="108" text-anchor="middle">run.code, else precomputed vector</text>
+  </a>
+
+  <a class="box" id="fFn" href="../../sources/core/code_features.py">
+    <title>the shim function</title>
+    <rect x="300" y="50" width="225" height="70" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400" y="74" text-anchor="middle">genotype_embedding_descriptor</text>
+    <text class="box-sub" x="400" y="92" text-anchor="middle">reads no config field</text>
+    <text class="box-sub" x="400" y="108" text-anchor="middle">reads no file, writes none</text>
+  </a>
+
+  <g class="box" id="fOut2">
+    <title>the value handed back to the caller</title>
+    <rect x="570" y="50" width="200" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="670" y="74" text-anchor="middle">descriptor</text>
+    <text class="box-sub" x="670" y="92" text-anchor="middle">list[float] unit norm</text>
+    <text class="box-sub" x="670" y="108" text-anchor="middle">or None</text>
+  </g>
+
+  <g class="box" id="fUse">
+    <title>where the value is used next</title>
+    <rect x="570" y="190" width="250" height="70" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="670" y="214" text-anchor="middle">novelty = mean cosine distance</text>
+    <text class="box-sub" x="670" y="232" text-anchor="middle">selection.py:490 _compute_novelty</text>
+    <text class="box-sub" x="670" y="248" text-anchor="middle">None or empty yields 0.0</text>
+  </g>
+
+  <g class="box" id="fEnv">
+    <title>environment read inside the callee, not here</title>
+    <rect x="20" y="190" width="400" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="220" y="214" text-anchor="middle">genotype_embedding backend choice</text>
+    <text class="box-sub" x="220" y="232" text-anchor="middle">env MIMOSA_GENOTYPE_EMBEDDING_BACKEND, default "local"</text>
+    <text class="box-sub" x="220" y="248" text-anchor="middle">genotype_embedding.py:271-283, no argument from this file</text>
+  </g>
+
+  <path class="edge" data-from="fCaller" data-to="fFn" d="M230,85 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="265" y="77" text-anchor="middle">code str</text>
+  <path class="edge" data-from="fFn" data-to="fOut2" d="M500,85 H570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="535" y="77" text-anchor="middle">list[float]</text>
+  <path class="edge" data-from="fOut2" data-to="fUse" d="M670,120 V190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="680" y="160" text-anchor="start">descriptor</text>
+  <path class="edge dashed-edge" data-from="fEnv" data-to="fFn" d="M220,190 V160 H300 V120" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="240" y="152" text-anchor="middle">affects the callee</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>5 boxes</code>. Dashed = reads or writes. Config fields read: <b>none</b>. Files read or written: <b>none</b> in this file (the callee keeps an in-memory cache keyed by <code>sha1</code> of the source, <code class="path">genotype_embedding.py:256</code>). Value returned: <code>list[float]</code> or <code>None</code>; <code>selection.py:488</code> returns it straight to the caller.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control logic: the one branch and the None rule</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 340" role="img" aria-label="None handling decision path">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="q0">
+    <title>entry of the shim</title>
+    <rect x="30" y="140" width="180" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="164" text-anchor="middle">code argument</text>
+    <text class="box-sub" x="120" y="180" text-anchor="middle">line 10</text>
+  </g>
+
+  <g class="box" id="q1">
+    <title>call into the backend module</title>
+    <rect x="250" y="140" width="200" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="340" y="164" text-anchor="middle">vec = embed_genotype(code)</text>
+    <text class="box-sub" x="340" y="180" text-anchor="middle">line 22</text>
+  </g>
+
+  <g class="box" id="q2">
+    <title>the only branch in the file</title>
+    <rect x="470" y="140" width="180" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="560" y="164" text-anchor="middle">vec is None ?</text>
+    <text class="box-sub" x="560" y="180" text-anchor="middle">line 23</text>
+  </g>
+
+  <g class="box" id="q3">
+    <title>degenerate return</title>
+    <rect x="470" y="30" width="180" height="56" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="560" y="54" text-anchor="middle">return None</text>
+    <text class="box-sub" x="560" y="70" text-anchor="middle">line 24, no exception raised</text>
+  </g>
+
+  <g class="box" id="q4">
+    <title>conversion to plain floats</title>
+    <rect x="700" y="140" width="240" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="810" y="164" text-anchor="middle">return floats from vec.tolist()</text>
+    <text class="box-sub" x="810" y="180" text-anchor="middle">line 25, JSON-friendly</text>
+  </g>
+
+  <g class="box" id="q5">
+    <title>the callee conditions that produce None</title>
+    <rect x="30" y="250" width="540" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="300" y="274" text-anchor="middle">inside GenotypeEmbedder.embed (genotype_embedding.py:243)</text>
+    <text class="box-sub" x="300" y="292" text-anchor="middle">not a non-empty str (L254) &#183; backend raised (L262) &#183; empty or non-finite vector (L265)</text>
+    <text class="box-sub" x="300" y="308" text-anchor="middle">all three land on the same None value, so this file sees one case</text>
+  </g>
+
+  <path class="edge" data-from="q0" data-to="q1" d="M210,168 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="230" y="160" text-anchor="middle">code</text>
+  <path class="edge" data-from="q1" data-to="q2" d="M430,168 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="450" y="160" text-anchor="middle">vec</text>
+  <path class="edge" data-from="q2" data-to="q3" d="M560,140 V86" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="570" y="118" text-anchor="start">yes</text>
+  <path class="edge" data-from="q2" data-to="q4" d="M650,168 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="675" y="160" text-anchor="middle">no</text>
+  <path class="edge dashed-edge" data-from="q5" data-to="q2" d="M300,250 V220 H560 V196" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="312" y="228" text-anchor="start">None source</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>6 boxes</code>. One branch (<code>line 23</code>), no loop, no retry, no exception handling in this file. Left-bottom box lists the three callee conditions that collapse into the same <code>None</code>; the caller treats a missing signal as neutral novelty, never as max-novel (<code class="path">selection.py:481-482</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">argument</td><td class="sym">code</td><td class="sym">line 10 signature</td><td>source text to embed, may be None</td></tr>
+<tr><td class="sym">import</td><td class="sym">embed_genotype</td><td class="sym">line 7, from <code>.genotype_embedding</code></td><td>the only call the file makes</td></tr>
+<tr><td class="sym">returns</td><td class="sym">list[float]</td><td class="sym">line 25</td><td>unit-norm QD descriptor</td></tr>
+<tr><td class="sym">returns</td><td class="sym">None</td><td class="sym">lines 23-24</td><td>degenerate signal, caller uses neutral</td></tr>
+<tr><td class="sym">config field</td><td class="sym">none read</td><td class="sym">&mdash;</td><td>the function takes no Config object</td></tr>
+<tr><td class="sym">file read</td><td class="sym">none</td><td class="sym">&mdash;</td><td>no <code>open()</code>; the cache is in memory</td></tr>
+<tr><td class="sym">file written</td><td class="sym">none</td><td class="sym">&mdash;</td><td>no write call in the file</td></tr>
+<tr><td class="sym">state key</td><td class="sym">none</td><td class="sym">&mdash;</td><td>no <code>state_result.json</code> access</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: this is the only place the QD archive reads code semantics, so the descriptor dimension and the unit-norm property come from the embedding backend, not from this file.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<p class="sub">1 top-level function, no class, no module-level constant. 37 lines total.</p>
+<details><summary>every def in sources/core/code_features.py</summary><div class="dbody">
+<pre>genotype_embedding_descriptor(code: str | None) -&gt; list[float] | None    # line 10 - unit-norm QD descriptor or None
+    vec = embed_genotype(code)                                          # line 22 - delegate to the backend module
+    if vec is None: return None                                         # lines 23-24 - degenerate pass-through
+    return floats from vec.tolist()                             # line 25 - ndarray to plain list
+
+if __name__ == "__main__":                                              # line 28 - smoke block, not run at import
+    assert genotype_embedding_descriptor(None) is None                   # line 29
+    assert genotype_embedding_descriptor("") is None                     # line 30
+    out = ...("def workflow(state): return state")                       # line 31
+    assert abs(norm - 1.0) &lt; 1e-4                                        # line 34 - unit-norm check
+    print("smoke OK: unit-norm descriptor of dim ...")                   # line 35
+    print("smoke OK: degenerate path (backend unavailable)")             # line 37
+
+# my computation with ast.parse: FunctionDef 1, AsyncFunctionDef 0, ClassDef 0
+# module docstring L1-L5 names the backend module genotype_embedding</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/core/selection.py">sources/core/selection.py</a></td><td>the only production importer; called when no descriptor is precomputed</td><td class="sym">import line 22, call line 488, docstring 7-11</td></tr>
+<tr><td class="sym"><a href="../../diversity_experiments/code_reference/code_features.py">diversity_experiments/code_reference/code_features.py</a></td><td>byte-identical copy (<code>diff</code> empty, both 37 lines); no importer found</td><td class="sym">line 10, line 22</td></tr>
+<tr><td class="sym"><a href="../../diversity_experiments/scripts/extract_descriptors.py">diversity_experiments/scripts/extract_descriptors.py</a></td><td>calls <code>embed_genotype</code> directly, bypassing this shim</td><td class="sym">line 23, calls at 172, 194, 203, 214</td></tr>
+<tr><td class="sym"><a href="../../tests/selection_test.py">tests/selection_test.py</a></td><td>loads the module with <code>importlib</code>; no test calls the function</td><td class="sym">line 28; descriptors are injected instead (lines 50-63)</td></tr>
+<tr><td class="sym">no other test found</td><td>one test file loads it; the __main__ block is the only exercise</td><td class="sym">grep -rn (2026-10-02)</td></tr>
+</tbody>
+</table>
+<p class="note">The <code>__main__</code> smoke block has no test wrapper, so a backend regression that returns a NumPy array of the wrong shape is caught only by the unit-norm assert in the caller's own checks.</p>
+</div>
+
+<footer>
+<p>Sources: <a href="../../sources/core/code_features.py">sources/core/code_features.py</a> (all 37 lines, read line by line), <a href="../../sources/core/genotype_embedding.py">sources/core/genotype_embedding.py</a> (L35-36 model names, L243-268 embed and cache, L271-283 backend choice, L289-299 singleton and wrapper), <a href="../../sources/core/selection.py">sources/core/selection.py</a> (L7-11 docstring, L22 import, L468-488 caller, L490-500 novelty), <a href="../../tests/selection_test.py">tests/selection_test.py</a>, and greps over the repo for <code>code_features</code> and <code>genotype_embedding_descriptor</code> (virtualenvs excluded). Counts are my computation with <code>ast.parse</code> and <code>diff</code>.</p>
+<p class="skips">Skipped: the body of <code>embed_genotype</code> internals beyond the listed lines (chunking at L92-L180, both backend classes) &mdash; <code class="path">genotype_embedding.py</code> has its own digest page in this set; <code>env</code> files and key material were not opened, only the environment variable name <code>MIMOSA_GENOTYPE_EMBEDDING_BACKEND</code> is quoted from <code class="path">genotype_embedding.py:274</code>; the <code>__main__</code> smoke block is documented in the inventory, not run. No pytest run and no application run, by the build rules.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

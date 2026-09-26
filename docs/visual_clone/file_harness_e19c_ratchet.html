@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e19c_ratchet.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests > experiments_verifiers/harness > e19c_ratchet.py">
+<div class="wrap">
+
+<h1 class="hud">e19c_ratchet.py</h1>
+<p class="intro">Runs the production <a href="mod_evaluators_hybrid_verifier.html">hybrid_verifier</a> package over the frozen E14 arena: one digest and one ladder extraction per group, then one policy scorer per claim re-executed on every generation's workspace. It owns only the LLM transport and the sandboxed subprocess execution; prompts, validators and the registry come from the production modules. It runs offline as a CLI (<code>python e19c_ratchet.py run|rescore|status|verify</code>), not from <code>main.py</code>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 380" role="img" aria-label="e19c_ratchet pipeline: arena inputs, loaders, CLI dispatch, phases A and B, finalize, ledgers">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bIn">
+    <title>External arena data: the E14 battle-test plan and the per-task run_notes</title>
+    <rect x="15" y="40" width="190" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="66" text-anchor="middle">Arena inputs</text>
+    <text class="box-sub" x="110" y="84" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="110" y="98" text-anchor="middle">run_notes/&lt;task&gt;.json</text>
+  </g>
+
+  <a class="box" id="bLoad" href="#sym">
+    <title>Arena helpers: plan, goals, group id, workspace root, most_complete, evolution_order (L233-L284)</title>
+    <rect x="265" y="40" width="210" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="370" y="64" text-anchor="middle">Plan + goal loaders</text>
+    <text class="box-sub" x="370" y="83" text-anchor="middle">load_plan_groups &#183; load_goals</text>
+    <text class="box-sub" x="370" y="97" text-anchor="middle">gid_of &#183; ws_root_of &#183; most_complete</text>
+  </a>
+
+  <a class="box" id="bCli" href="#sym">
+    <title>argparse subcommands dispatched by main() (L782-L792)</title>
+    <rect x="535" y="40" width="185" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="627" y="64" text-anchor="middle">CLI dispatch</text>
+    <text class="box-sub" x="627" y="83" text-anchor="middle">main &#183; cmd_run &#183; cmd_rescore</text>
+    <text class="box-sub" x="627" y="97" text-anchor="middle">cmd_status &#183; cmd_verify</text>
+  </a>
+
+  <a class="box" id="bLlm" href="#sym">
+    <title>Harness-owned LLM transport: env load, litellm call, watchdog, retries, cost ledger, hard cap</title>
+    <rect x="780" y="30" width="250" height="96" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="905" y="56" text-anchor="middle">LLM transport + cost cap</text>
+    <text class="box-sub" x="905" y="74" text-anchor="middle">_load_env &#183; _call_llm &#183; _llm_text</text>
+    <text class="box-sub" x="905" y="88" text-anchor="middle">_completion_with_watchdog</text>
+    <text class="box-sub" x="905" y="102" text-anchor="middle">StopRun &#183; CallFailed &#183; SPENT &#183; STOP</text>
+  </a>
+
+  <a class="box" id="bA" href="#sym">
+    <title>Phase A: workspace inventories, one digest call, one ladder extraction per group (L351-L433)</title>
+    <rect x="15" y="210" width="250" height="88" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="140" y="236" text-anchor="middle">Phase A: digest, claims</text>
+    <text class="box-sub" x="140" y="256" text-anchor="middle">_llm_json &#183; run_group_phase_a</text>
+    <text class="box-sub" x="140" y="270" text-anchor="middle">do_phase_a &#183; registry_for</text>
+    <text class="box-sub" x="140" y="286" text-anchor="middle">INV &#183; DIGEST &#183; CLAIMS (production)</text>
+  </a>
+
+  <a class="box" id="bB" href="#sym">
+    <title>Phase B: scorer prompt, repair loop, execute on every workspace, write score cells (L439-L594)</title>
+    <rect x="310" y="210" width="290" height="88" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="455" y="236" text-anchor="middle">Phase B: scorer execution</text>
+    <text class="box-sub" x="455" y="256" text-anchor="middle">run_claim_scorer &#183; run_claim_scorer_safe</text>
+    <text class="box-sub" x="455" y="270" text-anchor="middle">execute_scorer &#183; do_phase_b</text>
+    <text class="box-sub" x="455" y="286" text-anchor="middle">SCORERS: prompt, screen, launcher</text>
+  </a>
+
+  <a class="box" id="bFin" href="#sym">
+    <title>Fill score cells lost to a crash, then record every generation vector (L597-L671)</title>
+    <rect x="640" y="210" width="185" height="88" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="732" y="238" text-anchor="middle">Fill + finalize</text>
+    <text class="box-sub" x="732" y="258" text-anchor="middle">fill_missing_scores</text>
+    <text class="box-sub" x="732" y="274" text-anchor="middle">finalize_registries</text>
+  </a>
+
+  <g class="box" id="bOut">
+    <title>Resumable ledgers and production-layout registries under experiments_verifiers/results/</title>
+    <rect x="860" y="210" width="230" height="88" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="975" y="238" text-anchor="middle">Ledgers + registries</text>
+    <text class="box-sub" x="975" y="258" text-anchor="middle">results/E19c_digests_*.jsonl</text>
+    <text class="box-sub" x="975" y="272" text-anchor="middle">results/E19c_scores_*.jsonl</text>
+    <text class="box-sub" x="975" y="286" text-anchor="middle">results/E19c_registries/*.json</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="bIn" data-to="bLoad" d="M205,75 H265" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="235" y="66" text-anchor="middle">reads plan</text>
+  <path class="edge" data-from="bLoad" data-to="bCli" d="M475,75 H535" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="505" y="66" text-anchor="middle">groups</text>
+  <path class="edge" data-from="bCli" data-to="bA" d="M600,110 V185 H145 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="380" y="180" text-anchor="middle">cmd_run: phase A</text>
+  <path class="edge" data-from="bA" data-to="bB" d="M265,254 H310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="287" y="245" text-anchor="middle">claims</text>
+  <path class="edge" data-from="bB" data-to="bFin" d="M600,254 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="620" y="245" text-anchor="middle">vectors</text>
+  <path class="edge dashed-edge" data-from="bFin" data-to="bOut" d="M825,254 H860" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="843" y="245" text-anchor="middle">writes</text>
+  <path class="edge" data-from="bA" data-to="bLlm" d="M200,210 V166 H905 V126" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="160" text-anchor="middle">phase A prompts</text>
+  <path class="edge" data-from="bB" data-to="bLlm" d="M455,210 V192 H925 V126" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="187" text-anchor="middle">scorer prompts</text>
+
+  <text class="box-sub" x="15" y="330">External data on the left, harness code in the middle, results under experiments_verifiers/results/ on the right.</text>
+  <text class="box-sub" x="15" y="348">Solid = call | dashed = file read or write | the command order matters: A, then B, then fill, then finalize.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the file's work in order. Boxes name the real functions. Diagram built from <code class="path">experiments_verifiers/harness/e19c_ratchet.py</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data in and data out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 470" role="img" aria-label="data flow: constants and files in, ledgers, registries and return values out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="15" y="26">inputs</text>
+  <text class="box-sub" x="330" y="26">CLI command bodies</text>
+  <text class="box-sub" x="720" y="26">outputs</text>
+
+  <g class="box" id="dConst">
+    <title>Module constants read at run time (L53-L70, L114)</title>
+    <rect x="15" y="40" width="250" height="104" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="64" text-anchor="middle">Constants (L53-L70)</text>
+    <text class="box-sub" x="26" y="84">TODAY, MODEL_TEXT, PRICING</text>
+    <text class="box-sub" x="26" y="100">NUM_CLAIMS 10, WORKERS 6</text>
+    <text class="box-sub" x="26" y="116">HARD_CAP_USD 6.0, SUBPROC_TIMEOUT 60</text>
+    <text class="box-sub" x="26" y="132">CALL_HARD_TIMEOUT 150 (L114)</text>
+  </g>
+
+  <g class="box" id="dFiles">
+    <title>Arena plan, run_notes and snapshot workspaces, read through the helpers</title>
+    <rect x="15" y="164" width="250" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140" y="188" text-anchor="middle">Files read</text>
+    <text class="box-sub" x="26" y="208">results/E14_bt_population.json (L54)</text>
+    <text class="box-sub" x="26" y="224">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</text>
+    <text class="box-sub" x="26" y="240">gen[&quot;snapshot_path&quot;] workspaces (L258)</text>
+  </g>
+
+  <g class="box" id="dResume">
+    <title>Ledger files re-read to rebuild the resume sets claims_done / scorers_done / scores_done</title>
+    <rect x="15" y="284" width="250" height="88" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140" y="306" text-anchor="middle">Ledgers read (resume)</text>
+    <text class="box-sub" x="26" y="326">E19c_claims / scorers / scores (L56-L58)</text>
+    <text class="box-sub" x="26" y="342">E19c_digests, bt_cost_ledger (L55, L59)</text>
+    <text class="box-sub" x="26" y="360">E19c_registries/*.json (L60)</text>
+  </g>
+
+  <g class="box" id="dEnv">
+    <title>_load_env reads .env files for API keys; values are copied into os.environ (L95-L102)</title>
+    <rect x="15" y="392" width="250" height="56" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="140" y="416" text-anchor="middle">Env files (L96)</text>
+    <text class="box-sub" x="140" y="434" text-anchor="middle">REPO/.env, experiments_verifiers/.env</text>
+  </g>
+
+  <a class="box" id="dCmds" href="#sym">
+    <title>cmd_run, cmd_rescore, cmd_status and cmd_verify (L677-L779)</title>
+    <rect x="330" y="90" width="300" height="350" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="480" y="116" text-anchor="middle">cmd_* bodies</text>
+    <text class="box-sub" x="342" y="140">cmd_run:</text>
+    <text class="box-sub" x="342" y="156">&#160;&#160;do_phase_a &#183; do_phase_b</text>
+    <text class="box-sub" x="342" y="172">&#160;&#160;fill_missing_scores &#183; finalize_registries</text>
+    <text class="box-sub" x="342" y="196">cmd_rescore:</text>
+    <text class="box-sub" x="342" y="212">&#160;&#160;re-execute stored scripts (no LLM)</text>
+    <text class="box-sub" x="342" y="228">&#160;&#160;finalize_registries</text>
+    <text class="box-sub" x="342" y="252">cmd_status: ledger counts (L763)</text>
+    <text class="box-sub" x="342" y="268">cmd_verify: snapshot guard (L776)</text>
+    <text class="box-sub" x="342" y="292">every run: _load_env, then _call_llm</text>
+    <text class="box-sub" x="342" y="308">_call_llm appends one cost-ledger line (L165)</text>
+    <text class="box-sub" x="342" y="332">StopRun: message printed, sys.exit(2) (L790)</text>
+    <text class="box-sub" x="342" y="348">final: GUARD.verify_full assert (L693)</text>
+    <text class="box-sub" x="342" y="372">one process per command; no background worker</text>
+    <text class="box-sub" x="342" y="388">resume reads its own ledgers, then skips done work</text>
+  </a>
+
+  <g class="box" id="dLedgerOut">
+    <title>append_line writes one JSON line per record; every ledger is resumable</title>
+    <rect x="720" y="40" width="330" height="104" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="885" y="64" text-anchor="middle">Ledger appends</text>
+    <text class="box-sub" x="731" y="84">E19c_digests_&lt;TODAY&gt;.jsonl (L55, L373)</text>
+    <text class="box-sub" x="731" y="100">E19c_claims_&lt;TODAY&gt;.jsonl (L56, L410)</text>
+    <text class="box-sub" x="731" y="116">E19c_scorers_&lt;TODAY&gt;.jsonl (L57, L525)</text>
+    <text class="box-sub" x="731" y="132">E19c_scores_&lt;TODAY&gt;.jsonl (L58, L528)</text>
+  </g>
+
+  <g class="box" id="dRegOut">
+    <title>Two registry file names: hybrid_registry_&lt;task_key&gt;.json in phase A, e19c_registry_&lt;gid&gt;__&lt;task_key&gt;.json in finalize</title>
+    <rect x="720" y="164" width="330" height="84" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="885" y="188" text-anchor="middle">Registries saved</text>
+    <text class="box-sub" x="731" y="208">hybrid_registry_&lt;task_key&gt;.json (L215, L376)</text>
+    <text class="box-sub" x="731" y="224">e19c_registry_&lt;gid&gt;__&lt;task_key&gt;.json</text>
+    <text class="box-sub" x="731" y="240">(L643, saved L670) &#183; cost ledger L59</text>
+  </g>
+
+  <g class="box" id="dReturns">
+    <title>Return values of the top-level functions</title>
+    <rect x="720" y="268" width="330" height="104" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="885" y="292" text-anchor="middle">Return values</text>
+    <text class="box-sub" x="731" y="312">run_group_phase_a -&gt; dict (L411)</text>
+    <text class="box-sub" x="731" y="328">run_claim_scorer -&gt; dict (L536)</text>
+    <text class="box-sub" x="731" y="344">fill_missing_scores -&gt; int (L623)</text>
+    <text class="box-sub" x="731" y="360">finalize_registries -&gt; int (L671); cmd_* -&gt; None</text>
+  </g>
+
+  <g class="box" id="dStdout">
+    <title>Progress lines on stdout; StopRun ends the process with code 2</title>
+    <rect x="720" y="392" width="330" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="885" y="416" text-anchor="middle">Stdout and exit code</text>
+    <text class="box-sub" x="885" y="434" text-anchor="middle">print progress; sys.exit(2) on StopRun</text>
+  </g>
+
+  <path class="edge" data-from="dConst" data-to="dCmds" d="M265,92 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="297" y="84" text-anchor="middle">constants</text>
+  <path class="edge dashed-edge" data-from="dFiles" data-to="dCmds" d="M265,206 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="297" y="198" text-anchor="middle">arena read</text>
+  <path class="edge dashed-edge" data-from="dResume" data-to="dCmds" d="M265,320 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="297" y="312" text-anchor="middle">resume keys</text>
+  <path class="edge" data-from="dEnv" data-to="dCmds" d="M265,420 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="297" y="412" text-anchor="middle">env keys</text>
+
+  <path class="edge dashed-edge" data-from="dCmds" data-to="dLedgerOut" d="M630,92 H720" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="675" y="84" text-anchor="middle">appends</text>
+  <path class="edge dashed-edge" data-from="dCmds" data-to="dRegOut" d="M630,206 H720" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="675" y="198" text-anchor="middle">saves</text>
+  <path class="edge" data-from="dCmds" data-to="dReturns" d="M630,320 H720" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="675" y="312" text-anchor="middle">returns</text>
+  <path class="edge" data-from="dCmds" data-to="dStdout" d="M630,420 H720" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="675" y="412" text-anchor="middle">prints</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; values and files. Ledger names use the frozen <code>TODAY = "2026-09-25"</code> (L53); the registry paths do not. Paths are relative to <code class="path">experiments_verifiers/</code> unless they start with <code>run_notes/</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the branch and loop logic</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 400" role="img" aria-label="decision tree: cost-cap stop, resume skip, and the scorer repair loop">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="30" y="26">run path: budget stop, resume skip</text>
+  <text class="box-sub" x="640" y="26">scorer build loop (per claim)</text>
+
+  <a class="box" id="cStop" href="#sym">
+    <title>_call_llm checks SPENT["usd"] >= HARD_CAP_USD before every attempt (L140-L144)</title>
+    <rect x="30" y="40" width="250" height="56" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="155" y="64" text-anchor="middle">stop test: SPENT &gt;= HARD_CAP_USD</text>
+    <text class="box-sub" x="155" y="82" text-anchor="middle">checked before each LLM attempt</text>
+  </a>
+
+  <g class="box" id="cStopRun">
+    <title>StopRun sets STOP and ends the process with code 2 (L142-L144, L790-L792)</title>
+    <rect x="340" y="40" width="200" height="56" rx="2" fill="none" stroke="#FF4D6A" stroke-dasharray="5 4"/>
+    <text class="box-label" x="440" y="64" text-anchor="middle">StopRun, exit 2</text>
+    <text class="box-sub" x="440" y="82" text-anchor="middle">STOP[&quot;reason&quot;] set</text>
+  </g>
+
+  <a class="box" id="cResume" href="#sym">
+    <title>Resume test: gid in claims_done() (L415), (group, claim_id) in scorers_done() (L569), cell in scores_done() (L608, L720)</title>
+    <rect x="30" y="150" width="250" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="155" y="174" text-anchor="middle">resume test: already done?</text>
+    <text class="box-sub" x="155" y="192" text-anchor="middle">claims_done / scorers_done / scores_done</text>
+  </a>
+
+  <g class="box" id="cSkip">
+    <title>Skipped work: no LLM call, no subprocess</title>
+    <rect x="340" y="150" width="200" height="56" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="440" y="174" text-anchor="middle">skip: no call</text>
+    <text class="box-sub" x="440" y="192" text-anchor="middle">already in the ledger</text>
+  </g>
+
+  <a class="box" id="cExec" href="#sym">
+    <title>Execute stage: digest, extraction or scorer run over every workspace</title>
+    <rect x="30" y="260" width="250" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="155" y="284" text-anchor="middle">execute stage</text>
+    <text class="box-sub" x="155" y="302" text-anchor="middle">LLM call and/or subprocess</text>
+  </a>
+
+  <path class="edge" data-from="cStop" data-to="cStopRun" d="M280,68 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="310" y="60" text-anchor="middle">yes</text>
+  <path class="edge" data-from="cStop" data-to="cResume" d="M155,96 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="128" text-anchor="middle">no</text>
+  <path class="edge" data-from="cResume" data-to="cSkip" d="M280,178 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="310" y="170" text-anchor="middle">yes</text>
+  <path class="edge" data-from="cResume" data-to="cExec" d="M155,206 V260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="238" text-anchor="middle">no</text>
+  <path class="edge dashed-edge" data-from="cExec" data-to="cStop" d="M30,288 H12 V68 H30" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="box-sub" x="30" y="346">dashed = loop back; each group, claim and score cell repeats the test.</text>
+
+  <a class="box" id="cAttempt" href="#sym">
+    <title>for attempt in 1..SCORERS.MAX_CODE_ATTEMPTS = 3 (L449-L459)</title>
+    <rect x="640" y="40" width="320" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="800" y="62" text-anchor="middle">attempts 1..3: build or repair</text>
+    <text class="box-sub" x="800" y="80" text-anchor="middle">scorer_prompt, then repair_prompt</text>
+  </a>
+
+  <a class="box" id="cParse" href="#sym">
+    <title>_call_llm, then SCORERS.parse_code and SCORERS.static_violations (L460-L487)</title>
+    <rect x="640" y="130" width="320" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="800" y="152" text-anchor="middle">call LLM, parse code, screen</text>
+    <text class="box-sub" x="800" y="170" text-anchor="middle">no code block or violation: feedback</text>
+  </a>
+
+  <a class="box" id="cRun" href="#sym">
+    <title>execute_scorer runs the launcher in a fresh temp dir on every workspace, capped at 60 s (L488-L505)</title>
+    <rect x="640" y="220" width="320" height="52" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="800" y="242" text-anchor="middle">execute on every workspace</text>
+    <text class="box-sub" x="800" y="260" text-anchor="middle">60 s timeout, snapshot re-check</text>
+  </a>
+
+  <a class="box" id="cOk" href="#sym">
+    <title>Break when every workspace produced a score (L509-L510)</title>
+    <rect x="640" y="310" width="320" height="52" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="800" y="332" text-anchor="middle">n_ok == len(ws_roots)?</text>
+    <text class="box-sub" x="800" y="350" text-anchor="middle">yes: keep the best attempt and stop</text>
+  </a>
+
+  <g class="box" id="cFeedback">
+    <title>SCORERS.feedback_lines becomes the next repair prompt (L458, L513-L517)</title>
+    <rect x="1000" y="130" width="170" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1085" y="152" text-anchor="middle">feedback</text>
+    <text class="box-sub" x="1085" y="170" text-anchor="middle">repair prompt</text>
+  </g>
+
+  <path class="edge" data-from="cAttempt" data-to="cParse" d="M800,92 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="808" y="116" text-anchor="start">prompt</text>
+  <path class="edge" data-from="cParse" data-to="cRun" d="M800,182 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="808" y="206" text-anchor="start">code</text>
+  <path class="edge" data-from="cRun" data-to="cOk" d="M800,272 V310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="808" y="296" text-anchor="start">n_ok</text>
+  <path class="edge" data-from="cRun" data-to="cFeedback" d="M960,246 H1085 V182" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1000" y="240" text-anchor="start">failure</text>
+  <path class="edge dashed-edge" data-from="cFeedback" data-to="cAttempt" d="M1085,130 V22 H800 V40" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="930" y="16" text-anchor="middle">next attempt</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the three real decisions in the file: the cost-cap test inside <code>_call_llm</code> (L140), the resume tests around every ledger (L415, L569, L608, L720), and the scorer repair loop bounded by <code>SCORERS.MAX_CODE_ATTEMPTS = 3</code> (L449).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>kind</th><th>name</th><th>where</th><th>used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">constant</td><td class="sym">TODAY = "2026-09-25"</td><td class="sym">module constant, L53</td><td>Builds the five ledger file names. The value is frozen.</td></tr>
+<tr><td class="sym">constant</td><td class="sym">MODEL_TEXT, PRICING</td><td class="sym">L63, L64</td><td>litellm model id and per-token price fallback.</td></tr>
+<tr><td class="sym">constant</td><td class="sym">NUM_CLAIMS = 10</td><td class="sym">L66</td><td>Claim window 8..12 claims per group (L379).</td></tr>
+<tr><td class="sym">constant</td><td class="sym">SUBPROC_TIMEOUT = 60</td><td class="sym">L67</td><td>Kills a scorer subprocess that runs too long (L307).</td></tr>
+<tr><td class="sym">constant</td><td class="sym">HARD_CAP_USD = 6.0</td><td class="sym">L68</td><td>Raises StopRun when spent reaches the cap (L141).</td></tr>
+<tr><td class="sym">constant</td><td class="sym">WORKERS = 6</td><td class="sym">L70</td><td>Thread pool size for phase A and phase B (L420, L576).</td></tr>
+<tr><td class="sym">constant</td><td class="sym">CALL_HARD_TIMEOUT = 150</td><td class="sym">L114</td><td>Wall-clock limit per litellm call (L126).</td></tr>
+<tr><td class="sym">state</td><td class="sym">SPENT, STOP</td><td class="sym">L80, L81</td><td>In-process cost total and stop flag, under locks L74-L78.</td></tr>
+<tr><td class="sym">file read</td><td class="sym">results/E14_bt_population.json</td><td class="sym">EV/results, read L234</td><td>19 arena groups and 667 judging pairs (asserts L235-L241).</td></tr>
+<tr><td class="sym">file read</td><td class="sym">run_notes/&lt;campaign&gt;/&lt;task&gt;.json</td><td class="sym">REPO/run_notes, L248, L275</td><td>Task goal and the evolution order of uuids.</td></tr>
+<tr><td class="sym">file read</td><td class="sym">gen["snapshot_path"]</td><td class="sym">plan field, used L239, L258</td><td>The per-generation workspace that gets scanned and scored.</td></tr>
+<tr><td class="sym">file read/write</td><td class="sym">results/E19c_digests_&lt;TODAY&gt;.jsonl</td><td class="sym">L55; append L373; read L764</td><td>One format-digest record per group.</td></tr>
+<tr><td class="sym">file read/write</td><td class="sym">results/E19c_claims_&lt;TODAY&gt;.jsonl</td><td class="sym">L56; append L410; read L219, L559, L645</td><td>Stage-tagged claims per group; drives the resume set.</td></tr>
+<tr><td class="sym">file read/write</td><td class="sym">results/E19c_scorers_&lt;TODAY&gt;.jsonl</td><td class="sym">L57; append L525, L550; read L223, L600, L712</td><td>Best scorer script, per claim and attempt list.</td></tr>
+<tr><td class="sym">file read/write</td><td class="sym">results/E19c_scores_&lt;TODAY&gt;.jsonl</td><td class="sym">L58; append L528, L615, L733; read L227, L631, L767</td><td>One score cell per claim and generation, with evidence.</td></tr>
+<tr><td class="sym">file read/write</td><td class="sym">results/E19c_bt_cost_ledger_&lt;TODAY&gt;.jsonl</td><td class="sym">L59; append L165; read L106</td><td>One line per LLM call; the source of spend total.</td></tr>
+<tr><td class="sym">file write</td><td class="sym">results/E19c_registries/hybrid_registry_&lt;task_key&gt;.json</td><td class="sym">REG_ROOT L60, path L215, saved L376, L404</td><td>Production TaskRegistry per group during phase A.</td></tr>
+<tr><td class="sym">file write</td><td class="sym">results/E19c_registries/e19c_registry_&lt;gid&gt;__&lt;task_key&gt;.json</td><td class="sym">path L643, saved L670</td><td>Final registry: claims, scorers, score vector per generation.</td></tr>
+<tr><td class="sym">file read</td><td class="sym">REPO/.env, experiments_verifiers/.env</td><td class="sym">L96 (names only; values never printed)</td><td>Copies API keys into <code>os.environ</code> with setdefault.</td></tr>
+<tr><td class="sym">file write</td><td class="sym">tempfile.mkdtemp(prefix="e19c_exec_")</td><td class="sym">L683; per-scorer dir L298</td><td>Scratch cwd for scorer subprocesses; removed L319, L692, L753.</td></tr>
+<tr><td class="sym">constant</td><td class="sym">SNAP_ROOT</td><td class="sym">L61</td><td>Defined but never read again (grep finds only L61).</td></tr>
+<tr><td class="sym">stdout</td><td class="sym">print progress lines</td><td class="sym">L184, L416, L427, L572, L587, L689, L770</td><td>Per-group and per-claim progress, resume counts, spend.</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: every stage writes a ledger line before the next stage starts, so a killed run resumes by reading its own ledgers (<code>claims_done</code> L218, <code>scorers_done</code> L222, <code>scores_done</code> L226).</p>
+<p class="note">Amber: <code>SNAP_ROOT</code> (L61) points at <code>experiments_verifiers/workspace_artefacts/snapshots</code> but is never used; the real workspace path comes from each plan entry's <code>snapshot_path</code> (L239, L258).</p>
+<p class="note flag">Red: <code>RC_goals</code> (L759) is a one-line wrapper around <code>load_goals</code> and no file in the repo calls it (grep finds the definition only).</p>
+<p class="note flag">Red: the two registry writers use different file names in the same directory &mdash; <code>hybrid_registry_&lt;task_key(goal)&gt;.json</code> (L215) and <code>e19c_registry_&lt;gid&gt;__&lt;task_key(goal)&gt;.json</code> (L643). The comment at L639-L641 calls this a declared deviation, because two campaigns can share the same goal text.</p>
+</div>
+
+<div class="panel" id="sym"><span class="br"></span>
+<h2>Full symbol inventory (35 symbols)</h2>
+<details><summary>every class, method and top-level function, in file order</summary><div class="dbody">
+<pre># classes (2) ------------------------------------------------------------
+StopRun(Exception)                                              L84   raised when the cost cap or stop flag fires
+CallFailed(Exception)                                           L88   one LLM call exhausted its retries
+
+# LLM plumbing (L95-L196) -----------------------------------------------
+_load_env() -&gt; None                                             L95   copies .env keys into os.environ
+load_spent() -&gt; float                                           L105  sums cost_usd over the cost ledger
+_completion_with_watchdog(kw: dict)                             L117  litellm call under a 150 s timeout
+_call_llm(model, messages, max_tokens, role, meta,              L132  one retried call; writes a cost line
+          temperature: float = 0.0) -&gt; tuple[str, dict]
+_llm_text(agent, prompt, max_tokens, role, meta) -&gt; str         L190  (agent, prompt) to text transport
+
+# ledgers (L202-L227) ---------------------------------------------------
+append_line(path: Path, lock, rec: dict)                        L202  appends one JSON line under a lock
+load_jsonl(path: Path) -&gt; list[dict]                            L207  reads a ledger; missing file gives []
+registry_for(goal: str) -&gt; REGISTRY.TaskRegistry                L212  phase A registry for one goal
+claims_done() -&gt; set[str]                                       L218  resume set of extracted groups
+scorers_done() -&gt; set[tuple[str, str]]                          L222  resume set of (group, claim_id)
+scores_done() -&gt; set[tuple[str, str, str]]                      L226  resume set of (group, claim, uuid8)
+
+# arena helpers (L233-L284) ---------------------------------------------
+load_plan_groups() -&gt; list[dict]                                L233  reads the plan; asserts 19 and 667
+load_goals(groups: list[dict]) -&gt; dict[str, str]                L245  goal text per group id
+gid_of(group: dict) -&gt; str                                      L253  "campaign__task" key
+ws_root_of(gen: dict) -&gt; Path                                   L257  resolved workspace root of a generation
+most_complete(group: dict) -&gt; dict                              L261  ranks workspaces; best gets the digest
+  rank(gen) -&gt; tuple (inner)                                    L263  pred_results count, script count, size
+evolution_order(group: dict) -&gt; list[str]                       L272  uuids in evolution order, plan-filtered
+
+# scorer execution (L290-L321) ------------------------------------------
+execute_scorer(code, ws_root, claim, tmp_root) -&gt; dict          L290  runs a launcher in a temp cwd; 60 s cap
+
+# phase A (L327-L433) ---------------------------------------------------
+_llm_json(prompt, role, meta, max_tokens)                       L327  one call parsed as JSON, one repair
+          -&gt; tuple[dict | None, str | None]
+run_group_phase_a(group: dict, goal: str) -&gt; dict               L351  inventories, digest call, claims
+do_phase_a(groups: list[dict], goals: dict, workers: int)       L414  thread pool over the missing groups
+
+# phase B (L439-L594) ---------------------------------------------------
+run_claim_scorer(group, goal, claim, union, digests_block,      L439  scorer prompt, repair &lt;= 3, runs on all
+                 tmp_root: Path) -&gt; dict
+run_claim_scorer_safe(group, goal, claim, union,                L539  same, but CallFailed becomes a record
+                      digests_block, tmp_root) -&gt; dict
+do_phase_b(groups, goals, workers: int, tmp_root: Path)         L554  builds the job list, runs the pool
+fill_missing_scores(groups: list[dict], tmp_root: Path) -&gt; int  L597  re-runs stored scripts for lost cells
+
+# finalize (L629-L671) --------------------------------------------------
+finalize_registries(groups: list[dict], goals: dict) -&gt; int     L629  writes score vectors into registries
+
+# commands (L677-L792) --------------------------------------------------
+cmd_run(args) -&gt; None                                           L677  phases A and B, fill, finalize, guard
+cmd_rescore(args) -&gt; None                                       L699  re-executes stored scripts, no LLM
+RC_goals(groups) -&gt; dict[str, str]                              L759  wrapper for load_goals; unused
+cmd_status(args) -&gt; None                                        L763  prints ledger counts and spend
+cmd_verify(args) -&gt; None                                        L776  asserts the snapshot guard is clean
+main() -&gt; None                                                  L782  argparse dispatch; exit 2 on StopRun</pre>
+<p>Module-level names not listed above: <code>EV</code>, <code>REPO</code> (L37, L38), the aliases <code>E18</code>, <code>CLAIMS</code>, <code>DIGEST</code>, <code>INV</code>, <code>REGISTRY</code>, <code>SCORERS</code> and <code>extract_json_payload</code> (L41-L51), the path constants L54-L61, the constants L63-L70 and L114, <code>GUARD</code> (L72), the five locks L74-L78 and the two guard dicts L80-L81.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>file</th><th>line</th><th>what it imports and uses</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_eval.py">e19c_eval.py</a></td><td class="size">L36</td><td><code>import e19c_ratchet as RC</code>; 15 <code>RC.</code> names, plus <code>execute_scorer</code> (L297).</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_online_bt.py">e19c_online_bt.py</a></td><td class="size">L30</td><td><code>import e19c_ratchet as RC</code>; uses <code>RC.load_plan_groups</code> (L53) and <code>RC.gid_of</code> (L57).</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_confirm.py">e19c_confirm.py</a></td><td class="size">L32</td><td><code>import e19c_ratchet as RC</code>; uses <code>RC.load_plan_groups</code> (L82) and <code>RC.gid_of</code> (L87).</td></tr>
+<tr><td class="sym">no other importer found</td><td class="size">-</td><td>A repo-wide grep (excluding <code>.venv</code>, <code>__pycache__</code>, <code>docs/</code>) finds only these three files.</td></tr>
+<tr><td class="sym">tests/</td><td class="size">-</td><td>None. No file under tests/ names <code>e19c_ratchet</code> or <code>E19c</code>.</td></tr>
+<tr><td class="sym">entry point</td><td class="size">L782</td><td><code>main()</code> runs only when the file is executed directly (<code>__main__</code> guard, L795).</td></tr>
+<tr><td class="sym">no runner script found</td><td class="size">-</td><td>No shell script, Makefile or README mentions the file.</td></tr>
+</tbody>
+</table>
+<p class="sub">Related pages: <a href="exp_e19c_ratchet.html">exp_e19c_ratchet.html</a>, <a href="exp_e19c_eval.html">exp_e19c_eval.html</a>, <a href="exp_e19c_confirm.html">exp_e19c_confirm.html</a>, <a href="exp_e19c_online_bt.html">exp_e19c_online_bt.html</a>, <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="data_experiments.html">data_experiments.html</a>.</p>
+</div>
+
+<p class="sub">File digests in this batch: <a href="file_harness_e19c_confirm.html">file_harness_e19c_confirm.html</a> &#183; <a href="file_harness_e19c_eval.html">file_harness_e19c_eval.html</a> &#183; <a href="file_harness_e19c_gradient_duel.html">file_harness_e19c_gradient_duel.html</a> &#183; <a href="file_harness_e19c_online_bt.html">file_harness_e19c_online_bt.html</a> &#183; <a href="file_harness_e19c_ratchet.html">file_harness_e19c_ratchet.html</a> &#183; hub <a href="file_index.html">file_index.html</a>.</p>
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19c_ratchet.py</code> (all 796 lines, read line by line), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style). Checked by grep, not guessed: <code class="path">experiments_verifiers/harness/e19c_eval.py</code> (L36), <code class="path">e19c_online_bt.py</code> (L30), <code class="path">e19c_confirm.py</code> (L32), <code class="path">tests/</code> (no match), <code class="path">experiments_verifiers/harness/e18_scripted_bt.py</code> (<code>SnapshotGuard</code> L173, <code>GUARD</code> L241), and the production modules the file imports: <code class="path">sources/evaluators/hybrid_verifier/registry.py</code> (<code>task_key</code> L31), <code class="path">scorers.py</code> (<code>MAX_CODE_ATTEMPTS = 3</code>, L108), <code class="path">digest.py</code> (<code>MAX_FILES_DEFAULT = 8</code>, L29). Line counts from <code>wc -l</code>. Text budget and colours per UPDATE_VISUAL_CLONE.md sections 6-7.</p>
+<p class="skips">Skipped: every other file in <code class="path">experiments_verifiers/harness/</code> (37 files) - out of scope, they belong to their own pages; the <code class="path">experiments_verifiers/results/</code> ledgers and <code class="path">results/E19c_ratchet_2026-09-25.md</code> were not opened (data, not code); <code>.env</code> files were named but never opened or quoted; <code>run_notes/</code> JSON was not opened. No application run, no experiment run and no pytest run, per the build rules. Unknown: the exact command line used for the 2026-09-25 campaign - no runner script mentions the file.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

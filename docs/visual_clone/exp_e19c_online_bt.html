@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E19c online Bradley-Terry default - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e19c_online_bt">
+<div class="wrap">
+
+<h1 class="hud">E19c RATCHET &mdash; online Bradley-Terry default</h1>
+<p class="intro">The hybrid verifier promoted <code>aggregation.bradley_terry_reward</code> to its default reward, so does that default rank better than the earlier win-rate view on the same arena? <code>e19c_online_bt.py</code> replays the production BT fit over {generation k} plus every earlier generation, in evolution order, on the stored vectors. It appends one section to the E19c results with zero LLM calls.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis to artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="online Bradley-Terry replay stages and outputs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="h4">
+    <title>Hypothesis: the promoted BT default ranks better than the win-rate view</title>
+    <rect x="10" y="180" width="150" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="85" y="206" text-anchor="middle">Hypothesis</text>
+    <text class="box-sub" x="85" y="224" text-anchor="middle">BT default better?</text>
+    <text class="box-sub" x="85" y="238" text-anchor="middle">zero LLM calls</text>
+  </g>
+
+  <a class="box" id="m1" href="../../experiments_verifiers/results/_e19c_label_free_2026-09-25.json">
+    <title>Stored per-generation score vectors and evolution order</title>
+    <rect x="205" y="50" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="300" y="76" text-anchor="middle">_e19c_label_free.json</text>
+    <text class="box-sub" x="300" y="92" text-anchor="middle">vectors, order_u8</text>
+  </a>
+
+  <a class="box" id="m2" href="../../experiments_verifiers/results/E14_bt_population.json">
+    <title>Arena plan: 19 groups, contrast flag, SR labels</title>
+    <rect x="205" y="310" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="300" y="336" text-anchor="middle">E14_bt_population.json</text>
+    <text class="box-sub" x="300" y="352" text-anchor="middle">19 groups, SR labels</text>
+  </a>
+
+  <a class="box" id="v1" href="../../experiments_verifiers/harness/e19c_ratchet.py">
+    <title>RC.load_plan_groups loads the arena (e19c_online_bt line 53)</title>
+    <rect x="460" y="10" width="185" height="52" rx="14" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+    <text class="box-label" x="552" y="32" text-anchor="middle">load_plan_groups()</text>
+    <text class="box-sub" x="552" y="48" text-anchor="middle">shared arena loader</text>
+  </a>
+
+  <a class="box" id="v2" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
+    <title>Production bradley_terry_reward over generation k and all previous (line 70)</title>
+    <rect x="460" y="92" width="185" height="52" rx="14" fill="rgba(125,249,199,0.10)" stroke="#7DF9C7"/>
+    <text class="box-label" x="552" y="114" text-anchor="middle">bradley_terry_reward()</text>
+    <text class="box-sub" x="552" y="130" text-anchor="middle">ridge 1.0, Newton</text>
+  </a>
+
+  <a class="box" id="v3" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>E15E.pairs_correct and cluster_boot score the BT arm (line 89)</title>
+    <rect x="460" y="174" width="185" height="52" rx="14" fill="rgba(60,240,210,0.10)" stroke="#3CF0D2"/>
+    <text class="box-label" x="552" y="196" text-anchor="middle">pairs_correct()</text>
+    <text class="box-sub" x="552" y="212" text-anchor="middle">pooled + CI95</text>
+  </a>
+
+  <a class="box" id="v4" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>E15E.paired_boot_diff compares BT with the win-rate arm (line 105)</title>
+    <rect x="460" y="256" width="185" height="52" rx="14" fill="rgba(60,240,210,0.10)" stroke="#3CF0D2"/>
+    <text class="box-label" x="552" y="278" text-anchor="middle">paired_boot_diff()</text>
+    <text class="box-sub" x="552" y="294" text-anchor="middle">BT minus win-rate</text>
+  </a>
+
+  <a class="box" id="v5" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>E15E.argmax_ship replays M2 for both online arms (line 111)</title>
+    <rect x="460" y="338" width="185" height="52" rx="14" fill="rgba(60,240,210,0.10)" stroke="#3CF0D2"/>
+    <text class="box-label" x="552" y="360" text-anchor="middle">argmax_ship()</text>
+    <text class="box-sub" x="552" y="376" text-anchor="middle">M2 shipped count</text>
+  </a>
+
+  <a class="box" id="w1" href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.json">
+    <title>Appended key online_bt_view in the readout JSON, line 4707</title>
+    <rect x="700" y="50" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="76" text-anchor="middle">online_bt_view key</text>
+    <text class="box-sub" x="795" y="92" text-anchor="middle">json, line 4707</text>
+  </a>
+
+  <a class="box" id="w2" href="../../experiments_verifiers/results/E19c_ratchet_2026-09-25.md">
+    <title>Appended markdown section at the end of the report, line 218</title>
+    <rect x="700" y="310" width="190" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="336" text-anchor="middle">online BT section</text>
+    <text class="box-sub" x="795" y="352" text-anchor="middle">md, line 218</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="h4" data-to="m1" d="M160,200 L205,78" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="h4" data-to="m2" d="M160,232 L205,338" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="172" y="150" text-anchor="start">reads</text>
+
+  <path class="edge" data-from="m1" data-to="v1" d="M395,78 L460,38" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="m2" data-to="v1" d="M395,338 L460,46" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="428" y="180" text-anchor="middle">loads</text>
+
+  <path class="edge" data-from="v1" data-to="v2" d="M552,62 V92" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="82" text-anchor="start">groups</text>
+  <path class="edge" data-from="v2" data-to="v3" d="M552,144 V174" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="164" text-anchor="start">rewards</text>
+  <path class="edge" data-from="v3" data-to="v4" d="M552,226 V256" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="246" text-anchor="start">arm pair fn</text>
+  <path class="edge" data-from="v4" data-to="v5" d="M552,308 V338" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="328" text-anchor="start">delta</text>
+
+  <path class="edge" data-from="v5" data-to="w1" d="M645,360 L700,78" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="v5" data-to="w2" d="M645,376 L700,338" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="672" y="440" text-anchor="middle">appends</text>
+</svg>
+</div>
+<p class="figcap">10 boxes. Cyan = a function of <a href="../../experiments_verifiers/harness/e19c_online_bt.py">experiments_verifiers/harness/e19c_online_bt.py</a> (or the shared arena loader in <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a>), mint = production code, teal = the shared helper <a href="../../experiments_verifiers/harness/e15_bt_eval.py">harness/e15_bt_eval.py</a>, steel = frozen data. Both outputs are append-only edits of the confirmatory files (script docstring L16&ndash;17).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card steel">
+<h4><a href="../../experiments_verifiers/harness/e19c_online_bt.py">experiments_verifiers/harness/e19c_online_bt.py</a></h4>
+<p class="role">Replays the production Bradley-Terry online reward per group and compares it with the online win-rate arm on the same axis.</p>
+<p class="meta">179 lines (<code>wc -l</code>) &#183; entry: <code>main()</code> L51, guard L178 &#183; CLI arguments: none found (no <code>argparse</code> import)</p>
+<details><summary>signatures, production import, output section</summary><div class="dbody">
+<pre>pairfn(scorer) -&gt; callable                # L42
+main()                                    # L51
+sc_bt(gd, u) / sc_wr(gd, u)               # L83 / L86</pre>
+<p>Production import: <code>aggregation</code> (<code>bradley_terry_reward</code> L70, <code>mode="temporal"</code>, <code>ridge=1.0</code>), <code>CLAIMS.sort_claims_temporally</code> for the claim order (L62). M2 uses <code>E15E.argmax_ship</code> (L111). The appended JSON key is <code>online_bt_view</code> (L147) with the sub-keys <code>arm</code>, <code>paired_diff_vs_online_win_rate</code>, <code>m2_replay</code>, <code>ranking_agreement_with_win_rate_online</code>, <code>per_group</code>.</p>
+<p>The script opens with a find/replace-free approach: it re-reads the JSON, sets one new key and rewrites the file, then appends a markdown section to the MD (L148, L170).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What</th><th>Detail</th><th>Path and code cite</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td>label-free vectors and online win-rate</td><td class="sym">results/_e19c_label_free_2026-09-25.json &#183; L37, L52</td></tr>
+<tr><td>reads</td><td>arena plan for order and SR</td><td class="sym"><code>RC.load_plan_groups()</code> L53</td></tr>
+<tr><td>calls</td><td>production BT fit, ridge 1.0</td><td class="sym">aggregation.bradley_terry_reward &#183; L70</td></tr>
+<tr><td>writes</td><td>appended JSON key</td><td class="sym">results/E19c_ratchet_2026-09-25.json &#183; L148, key L4707</td></tr>
+<tr><td>writes</td><td>appended markdown section</td><td class="sym">results/E19c_ratchet_2026-09-25.md &#183; L170, section L218</td></tr>
+</tbody>
+</table>
+<p class="sub">No LLM call is made in this script (docstring L16); the whole run is arithmetic over stored vectors.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; the two online rewards</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 520 320" role="img" aria-label="bar chart of measured values">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <line x1="64" y1="250.0" x2="264" y2="250.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="254.0" text-anchor="end">0</text>
+  <line x1="64" y1="197.5" x2="264" y2="197.5" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="201.5" text-anchor="end">0.2</text>
+  <line x1="64" y1="145.0" x2="264" y2="145.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="149.0" text-anchor="end">0.4</text>
+  <line x1="64" y1="92.5" x2="264" y2="92.5" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="96.5" text-anchor="end">0.6</text>
+  <line x1="64" y1="40.0" x2="264" y2="40.0" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="58" y="44.0" text-anchor="end">0.8</text>
+  <rect x="80" y="81.2" width="64" height="168.8" rx="2" fill="rgba(0,229,255,0.10)" stroke="#00E5FF"/>
+  <text class="box-label" x="112" y="74.2" text-anchor="middle">0.6429</text>
+  <text class="box-sub" x="112" y="267" text-anchor="middle">online BT</text>
+  <rect x="188" y="55.4" width="64" height="194.6" rx="2" fill="rgba(125,249,199,0.10)" stroke="#7DF9C7"/>
+  <text class="box-label" x="220" y="48.4" text-anchor="middle">0.7415</text>
+  <text class="box-sub" x="220" y="267" text-anchor="middle">online win-rate</text>
+  <text class="edge-label" x="260" y="292" text-anchor="middle">147 pairs, chance 0.5</text>
+</svg>
+</div>
+<p class="figcap">Chart &mdash; pooled pairs-correct over the 147 contrast pairs. Source: <code class="path">results/E19c_ratchet_2026-09-25.md</code> L225&ndash;228 and <code class="path">results/E19c_ratchet_2026-09-25.json</code> L4710&ndash;4731.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file and line</th></tr></thead>
+<tbody>
+<tr><td>online BT pairs-correct</td><td>0.6429 [0.5074, 0.7446]</td><td class="sym">_ratchet.json L4710&ndash;4715</td></tr>
+<tr><td>online win-rate pairs-correct</td><td>0.742 [0.620, 0.799]</td><td class="sym">_ratchet.md L228</td></tr>
+<tr><td>paired delta BT minus win-rate</td><td>-0.0967 [-0.1799, -0.0297]</td><td class="sym">_ratchet.json L4729&ndash;4731</td></tr>
+<tr><td>tie rate on contrast pairs</td><td>0.0068</td><td class="sym">_ratchet.json L4727</td></tr>
+<tr><td>M2 shipped, online BT</td><td>7 of 19</td><td class="sym">_ratchet.json L4736</td></tr>
+<tr><td>M2 shipped, online win-rate</td><td>9 of 19</td><td class="sym">_ratchet.json L4739</td></tr>
+<tr><td>M2 shipped, oracle</td><td>12 of 19</td><td class="sym">_ratchet.json L4744</td></tr>
+<tr><td>ranking agreement between them</td><td>607 agree, 60 flip</td><td class="sym">_ratchet.json L4749&ndash;4750</td></tr>
+<tr><td>new LLM calls</td><td>0</td><td class="sym">e19c_online_bt.py L16</td></tr>
+</tbody>
+</table>
+<p class="note flag">Red: the promoted production default scores below the win-rate view on both readouts, and the paired CI excludes zero (MD L230&ndash;231). The two rewards order 60 of 667 within-group pairs differently.</p>
+<p class="note">Amber: the paired delta is measured on 9 contrast groups, and the win-rate arm's own CI spans 0.62 to 0.80, so the gap is a point estimate with wide uncertainty (MD L227&ndash;228).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim excerpt</h2>
+<details><summary>the appended online BT section</summary><div class="dbody">
+<p>Path: <code class="path">experiments_verifiers/results/E19c_ratchet_2026-09-25.md</code> L218&ndash;233.</p>
+<blockquote>## Online BT view &mdash; production `bradley_terry_reward` default (follow-up, zero LLM calls)<br>
+Per generation k in evolution order: production BT fit over {gen k} &cup; all previous generations (temporal mode, ridge 1.0, matches recomputed from the stored vectors) &rarr; online reward; first generation keeps the mean-claim fallback.<br>
+| e19c_online_bt (production default) | 0.643 | [0.507,0.745] | 147 | 0.0068 | 7/19 |<br>
+| e19c_online (win-rate, prior arm) | 0.742 | [0.620,0.799] | 147 | 0.0408 | 9/19 |<br>
+Paired &Delta; (online_bt &minus; online win-rate): -0.0967 [-0.1799,-0.0297] (CI excludes 0).<br>
+Within-task ranking agreement between the two online rewards: 607 agree / 60 flip. Oracle M2: 12/19.</blockquote>
+<p>The table rows are quoted verbatim with pipes kept, together with the lead-in paragraph. Source line wraps are joined onto one line. The file is read-only evidence.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e19c_online_bt.py</code> (all 179 lines), <code class="path">experiments_verifiers/results/E19c_ratchet_2026-09-25.md</code> L218&ndash;233, <code class="path">experiments_verifiers/results/E19c_ratchet_2026-09-25.json</code> (key <code>online_bt_view</code>, L4707&ndash;4750), <code class="path">experiments_verifiers/harness/e19c_ratchet.py</code> (ledger and helper names), <code class="path">experiments_verifiers/harness/e15_bt_eval.py</code> (helper names), <code class="path">experiments_verifiers/README.md</code> (codename line). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> body (function signature and defaults read only, via <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>); <code class="path">results/E19c_bt_gradients/**</code> and <code class="path">results/E19c_registries/*.json</code> (not read here); <code class="path">results/_e19c_scores_archive_2026-09-25.jsonl</code> (not read here); <code class="path">experiments_verifiers/.env</code> (never opened, by rule); <code class="path">datasets/ScienceAgentBench/**</code> (gold is not used by this script); the script was not run, by rule.</p>
+<p class="skips">experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

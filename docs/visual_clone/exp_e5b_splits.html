@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E5b L3 splits - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e5b_splits">
+<div class="wrap">
+
+<h1 class="hud">e5b_splits &mdash; is the LOTO 0.753 a lucky fold?</h1>
+<p class="intro">E5 reported a leave-one-task-out AUC of 0.753 for its winning rung L3 (MiniLM(name+desc) &rarr; logistic). This experiment repeats the split war 40 times per unit, 25 for the campaign holdout, with the same data and seeds, and evaluates three baselines on the identical held-out side. Folder context: <a href="data_experiments.html">data_experiments.html</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 500" role="img" aria-label="E5b split-war pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="hy">
+    <title>Is LOTO 0.753 lucky?</title>
+    <rect x="20" y="16" width="340" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="190.0" y="40.0" text-anchor="middle">Is LOTO 0.753 lucky?</text>
+    <text class="box-sub" x="190.0" y="57.0" text-anchor="middle">hypothesis</text>
+  </g>
+  <a class="box" id="a2" href="../../experiments_verifiers/results/_cache_e5_embeddings.npz">
+    <title>_cache_e5_embeddings.npz</title>
+    <rect x="20" y="116" width="170" height="48" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105.0" y="138.0" text-anchor="middle">_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="105.0" y="155.0" text-anchor="middle">MiniLM name+desc vectors</text>
+  </a>
+  <a class="box" id="a1" href="../../experiments_verifiers/data/verifier_claims.jsonl">
+    <title>verifier_claims.jsonl</title>
+    <rect x="20" y="186" width="170" height="48" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105.0" y="208.0" text-anchor="middle">verifier_claims.jsonl</text>
+    <text class="box-sub" x="105.0" y="225.0" text-anchor="middle">607 rows · 191 SR-true</text>
+  </a>
+  <a class="box" id="c0" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>l3_features()</title>
+    <rect x="230" y="116" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="325.0" y="138.0" text-anchor="middle">l3_features()</text>
+    <text class="box-sub" x="325.0" y="155.0" text-anchor="middle">e5b_splits.py L59</text>
+  </a>
+  <a class="box" id="b1" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>load_all()</title>
+    <rect x="230" y="216" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="325.0" y="238.0" text-anchor="middle">load_all()</text>
+    <text class="box-sub" x="325.0" y="255.0" text-anchor="middle">L45 · e5_common.load_examples</text>
+  </a>
+  <a class="box" id="l1" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>example_split()</title>
+    <rect x="460" y="106" width="190" height="44" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="555.0" y="126.0" text-anchor="middle">example_split()</text>
+    <text class="box-sub" x="555.0" y="143.0" text-anchor="middle">L69 · leaks tasks</text>
+  </a>
+  <a class="box" id="l2" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>group_split() tasks</title>
+    <rect x="460" y="176" width="190" height="44" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="555.0" y="196.0" text-anchor="middle">group_split() tasks</text>
+    <text class="box-sub" x="555.0" y="213.0" text-anchor="middle">L76 · honest unit</text>
+  </a>
+  <a class="box" id="l3" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>group_split() campaigns</title>
+    <rect x="460" y="246" width="190" height="44" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="555.0" y="266.0" text-anchor="middle">group_split() campaigns</text>
+    <text class="box-sub" x="555.0" y="283.0" text-anchor="middle">L76 · 1 of 5</text>
+  </a>
+  <a class="box" id="d1" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>select_C_inner()</title>
+    <rect x="690" y="126" width="180" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780.0" y="148.0" text-anchor="middle">select_C_inner()</text>
+    <text class="box-sub" x="780.0" y="165.0" text-anchor="middle">L101 · task-grouped CV</text>
+  </a>
+  <a class="box" id="d2" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>fit_eval()</title>
+    <rect x="690" y="206" width="180" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780.0" y="228.0" text-anchor="middle">fit_eval()</text>
+    <text class="box-sub" x="780.0" y="245.0" text-anchor="middle">L90 · LogisticRegression</text>
+  </a>
+  <a class="box" id="d3" href="../../experiments_verifiers/harness/e5b_splits.py">
+    <title>summarize() + paired_stats()</title>
+    <rect x="690" y="286" width="180" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780.0" y="312.0" text-anchor="middle">summarize() + paired_stats()</text>
+    <text class="box-sub" x="780.0" y="329.0" text-anchor="middle">L127 / L135</text>
+  </a>
+  <a class="box" id="out" href="../../experiments_verifiers/results/">
+    <title>E5b_L3_splits_&lt;date&gt;</title>
+    <rect x="560" y="406" width="280" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="700.0" y="436.0" text-anchor="middle">E5b_L3_splits_&lt;date&gt;</text>
+    <text class="box-sub" x="700.0" y="453.0" text-anchor="middle">.json L32 · .md L33 · write_md L360</text>
+  </a>
+
+  <path class="edge" data-from="hy" data-to="a2" d="M190,68 L105,116" fill="none" stroke="#B79CFF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="150" y="96" text-anchor="start">drives</text>
+  <path class="edge dashed-edge" data-from="a2" data-to="c0" d="M190,140 H230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="196" y="132" text-anchor="start">loads cache</text>
+  <path class="edge" data-from="c0" data-to="b1" d="M325,164 V216" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="331" y="196" text-anchor="start">mean cell</text>
+  <path class="edge" data-from="a1" data-to="b1" d="M190,210 L230,240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="196" y="236" text-anchor="start">reads rows</text>
+  <path class="edge" data-from="b1" data-to="l1" d="M420,232 L460,128" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="424" y="146" text-anchor="start">examples</text>
+  <path class="edge" data-from="b1" data-to="l2" d="M420,238 L460,198" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="424" y="182" text-anchor="start">tasks</text>
+  <path class="edge" data-from="b1" data-to="l3" d="M420,248 L460,268" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="424" y="246" text-anchor="start">campaigns</text>
+  <path class="edge" data-from="l1" data-to="d1" d="M650,128 L690,142" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="654" y="118" text-anchor="start">per seed</text>
+  <path class="edge" data-from="l2" data-to="d1" d="M650,198 L690,158" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="654" y="186" text-anchor="start">per seed</text>
+  <path class="edge" data-from="l3" data-to="d1" d="M650,268 L690,172" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="654" y="256" text-anchor="start">per seed</text>
+  <path class="edge" data-from="d1" data-to="d2" d="M780,174 V206" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="786" y="196" text-anchor="start">C per fold</text>
+  <path class="edge" data-from="d2" data-to="d3" d="M780,254 V286" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="786" y="276" text-anchor="start">per-seed AUC</text>
+  <path class="edge dashed-edge" data-from="d3" data-to="out" d="M780,342 L800,406" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="806" y="384" text-anchor="start">writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>12 boxes</code>. Mint pills = functions in <code>e5b_splits.py</code>, dashed grey = frozen inputs read, cyan = the written artifacts. Solid = call, dashed = reads/writes. The three lane boxes are the three split units: <code>example_split</code> (L69), <code>group_split</code> on task ids (L76), <code>group_split</code> on campaign names (L76). Every lane runs 25&ndash;40 seeds through <code>select_C_inner</code> (L101) and <code>fit_eval</code> (L90), then <code>summarize</code> (L127) and <code>paired_stats</code> (L135) aggregate the per-seed AUCs. <code>e5_run.loto_eval</code> (e5_run.py L216) is called at L302&ndash;L303 to anchor the LOTO number and is named here, not drawn.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e5b_splits.py">experiments_verifiers/harness/e5b_splits.py</a></h4>
+<p class="role">Repeats the 80/20 split war over three split units, 25&ndash;40 seeds each, and reports per-seed AUC with paired baselines.</p>
+<p class="meta">438 lines &#183; entry <code>main()</code> L154 &#183; CLI arguments: none (module docstring L12: <code>uv run python experiments_verifiers/harness/e5b_splits.py</code>) &#183; 10 functions</p>
+<details><summary>signatures and constants</summary><div class="dbody">
+<pre>load_all() -&gt; (exs, embz, emb_idx, X, y, yver, tid, uni, v0)      # L45
+l3_features(e, embz, emb_idx) -&gt; np.ndarray                        # L59  psi = mean_i s_i * MiniLM(name+desc)_i
+example_split(n, seed) -&gt; (tr, te)                                 # L69  leaky unit
+group_split(groups, frac, seed) -&gt; (tr, te, hold)                  # L76  task / campaign unit
+fit_eval(X, y, tr, te, Cval=C_FIXED) -&gt; (auc, clf)                 # L90  nan if a side is single-class
+select_C_inner(X, y, tr, groups, seed) -&gt; float                    # L101 task-grouped 4-fold inner CV
+summarize(aucs) / paired_stats(deltas)                             # L127 / L135
+write_md(out)                                                      # L360</pre>
+<p>Constants: <code>N_SEEDS = 40</code> (L35), <code>N_SEEDS_CAMP = 25</code> (L36), <code>N_SEEDS_CABLATION = 10</code> (L37), <code>C_GRID = [0.01, 0.03, 0.1, 0.3, 1.0]</code> (L38), <code>C_FIXED = 0.1</code> (L39). <code>TODAY</code> (L31) is the run date, so the output names carry the day of the run.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Example rows with claim verdicts and SR/VER labels</td><td>nothing</td><td class="sym"><code class="path">../../experiments_verifiers/data/verifier_claims.jsonl</code> (via <code>e5_common.load_examples</code>, e5_common.py L34)</td></tr>
+<tr><td>Frozen MiniLM claim embeddings</td><td>nothing</td><td class="sym"><code class="path">../../experiments_verifiers/results/_cache_e5_embeddings.npz</code> (<code>np.load</code>, e5b_splits.py L47)</td></tr>
+<tr><td>E5 LOTO machinery, reused verbatim</td><td>nothing</td><td class="sym"><code>e5_run.loto_eval</code>, imported at L298</td></tr>
+<tr><td>nothing</td><td>Split-war numbers, per-seed AUCs, gaps</td><td class="sym"><code class="path">../../experiments_verifiers/results/E5b_L3_splits_&lt;date&gt;.json</code> L32</td></tr>
+<tr><td>the JSON of record above</td><td>Markdown digest with TL;DR, tables, gaps</td><td class="sym"><code class="path">../../experiments_verifiers/results/E5b_L3_splits_&lt;date&gt;.md</code> L33, rendered by <code>write_md</code> L360</td></tr>
+</tbody>
+</table>
+<p class="sub">Path column shows repository-relative paths; the file cards and diagram link the same targets. Line numbers are from <code>wc -l</code> and <code>grep -n</code> on 2026-10-02.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; the measured numbers</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 828 400" role="img" aria-label="bar chart of the measured metrics">
+  <path d="M268,38 V360" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="268" y="376" text-anchor="middle">0.55</text>
+  <path d="M354,38 V360" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="354" y="376" text-anchor="middle">0.60</text>
+  <path d="M440,38 V360" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="440" y="376" text-anchor="middle">0.65</text>
+  <path d="M526,38 V360" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="526" y="376" text-anchor="middle">0.70</text>
+  <path d="M612,38 V360" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="612" y="376" text-anchor="middle">0.75</text>
+  <path d="M698,38 V360" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="698" y="376" text-anchor="middle">0.80</text>
+  <text class="box-sub" x="258" y="70" text-anchor="end">example-level 80/20 · L3</text>
+  <rect x="268" y="58" width="375" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="651" y="70" text-anchor="start">0.768</text>
+  <text class="box-sub" x="258" y="100" text-anchor="end">task-level 80/20 · L3</text>
+  <rect x="268" y="88" width="318" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="594" y="100" text-anchor="start">0.735</text>
+  <text class="box-sub" x="258" y="130" text-anchor="end">campaign holdout · L3</text>
+  <rect x="268" y="118" width="289" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="565" y="130" text-anchor="start">0.718</text>
+  <text class="box-sub" x="258" y="160" text-anchor="end">LOTO anchor · inner-CV C</text>
+  <rect x="268" y="148" width="349" height="15" fill="#7DF9C7" fill-opacity="0.30" stroke="#7DF9C7"/>
+  <text class="box-label" x="625" y="160" text-anchor="start">0.753</text>
+  <text class="box-sub" x="258" y="190" text-anchor="end">LOTO anchor · fixed C=0.1</text>
+  <rect x="268" y="178" width="198" height="15" fill="#7DF9C7" fill-opacity="0.30" stroke="#7DF9C7"/>
+  <text class="box-label" x="474" y="190" text-anchor="start">0.665</text>
+  <text class="box-sub" x="258" y="220" text-anchor="end">task-level · uniform pass-rate</text>
+  <rect x="268" y="208" width="186" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="462" y="220" text-anchor="start">0.658</text>
+  <text class="box-sub" x="258" y="250" text-anchor="end">task-level · v0 recompute</text>
+  <rect x="268" y="238" width="165" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="441" y="250" text-anchor="start">0.646</text>
+  <text class="box-sub" x="258" y="280" text-anchor="end">example-level · uniform pass-rate</text>
+  <rect x="268" y="268" width="167" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="443" y="280" text-anchor="start">0.647</text>
+  <text class="box-sub" x="258" y="310" text-anchor="end">task-level · ver_bit</text>
+  <rect x="268" y="298" width="93" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="369" y="310" text-anchor="start">0.604</text>
+  <text class="box-sub" x="258" y="340" text-anchor="end">campaign holdout · uniform pass-rate</text>
+  <rect x="268" y="328" width="58" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="334" y="340" text-anchor="start">0.584</text>
+  <text class="box-sub" x="12" y="392" text-anchor="start">mean auc_sr over seeds, held-out side · source: E5b_L3_splits_2026-09-21.md L15-L17, L23-L31, L53</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; mean <code>auc_sr</code> over seeds on the held-out side, drawn by hand from the recorded values. Mint bars are the two LOTO anchors recomputed inside this run; green bars are the baselines scored on the identical test side. <code>e5b_splits.py</code> imports no plotting library, so this experiment writes no figure of its own.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Population</td><td>607 examples, 191 SR-true, 136 tasks, 5 campaigns</td><td class="sym">E5b_L3_splits_2026-09-21.md L9</td></tr>
+<tr><td>Example-level 80/20, L3 mean AUC</td><td>0.768, std 0.043, min 0.668, max 0.885</td><td class="sym">.md L15</td></tr>
+<tr><td>Task-level 80/20, L3 mean AUC</td><td>0.735, std 0.113, min 0.316, max 0.908</td><td class="sym">.md L16</td></tr>
+<tr><td>Campaign holdout, L3 mean AUC</td><td>0.718, std 0.037</td><td class="sym">.md L17</td></tr>
+<tr><td>Task-leakage gap</td><td>+0.033 (example-level minus task-level)</td><td class="sym">.md L40; json key <code>leakage_gap.gap_example_minus_task</code></td></tr>
+<tr><td>Worst task-level seed</td><td>seed 5, L3 0.316, v0 0.675, uniform 0.643</td><td class="sym">.md L35</td></tr>
+<tr><td>LOTO anchor, inner-CV C</td><td>0.753 = 35th percentile of task-level seeds</td><td class="sym">.md L53; json <code>loto_reference.percentile_within_task_level_random_splits</code> = 35.0</td></tr>
+<tr><td>LOTO anchor, fixed C=0.1</td><td>0.665</td><td class="sym">.md L53; json <code>loto_recompute.pooled_auc_fixed_c0.1</code></td></tr>
+<tr><td>Fixed-C vs inner-CV ablation</td><td>0.671 vs 0.713 (delta +0.042, 10 seeds)</td><td class="sym">.md L57</td></tr>
+<tr><td>Baselines, task-level</td><td>uniform 0.658, v0 0.646, ver_bit 0.604</td><td class="sym">.md L26&ndash;L28</td></tr>
+<tr><td>Paired win-rate, task-level L3</td><td>0.78 uniform, 0.80 v0, 0.93 ver_bit</td><td class="sym">.md L26&ndash;L28</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: the campaign-level holdout draws from 5 campaigns only, and <code>asb_full_iterative_1</code> holds 448 of 607 examples, so those seeds mostly measure whether that one campaign was held out. The .md labels it indicative (L62).</p>
+<p class="note">Amber: main protocol fixes <code>C=0.1</code>; E5's 0.753 used inner-CV C. The script states this and recomputes the anchor under both policies rather than comparing blind (.md L70).</p>
+<p class="note say">Why it matters: the example-level number is optimistic by design &mdash; the same task workspaces sit on both sides of a leaky split.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>results markdown, 5 quoted lines</summary><div class="dbody">
+<blockquote>| task-level 80/20 (HONEST) | 40 | 0.735 | 0.113 | 0.316 | 0.556 | 0.897 | 0.908 |</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E5b_L3_splits_2026-09-21.md</code> line 16</p>
+<blockquote>Seed 5: L3 auc 0.316 on 123 held-out examples (28 SR-true), while on the SAME test side v0 recompute gets 0.675, uniform 0.643, ver_bit 0.542.</blockquote>
+<p class="sub">Same file, line 35</p>
+<blockquote>Example-level mean AUC 0.768 minus task-level mean AUC 0.735 = **+0.033**. Same model, same seeds, only the split unit changes &mdash; this is the task-leakage inflation.</blockquote>
+<p class="sub">Same file, line 40</p>
+<blockquote>E5 reported LOTO 0.753. Reproduced with E5's own machinery: inner-CV policy &rarr; 0.753, fixed C=0.1 &rarr; 0.665. Under the matched inner-CV policy, the LOTO point estimate sits at the 35th percentile of the task-level random-split seed AUCs.</blockquote>
+<p class="sub">Same file, line 53</p>
+<blockquote>- task_level_80_20: fixed C=0.1 mean 0.671 vs inner-CV mean 0.713 (mean delta +0.042, 10 seeds); C choices per seed: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]</blockquote>
+<p class="sub">Same file, line 57</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e5b_splits.py</code> (438 lines), <code class="path">experiments_verifiers/results/E5b_L3_splits_2026-09-21.md</code> and <code>.json</code>, <code class="path">experiments_verifiers/harness/e5_common.py</code> (function list only: <code>load_examples</code> L34, <code>_auc</code> L128, <code>v0_reward</code> L211, <code>uniform_score</code> L222), <code class="path">experiments_verifiers/harness/e5_run.py</code> (<code>loto_eval</code> L216), <code class="path">experiments_verifiers/README.md</code>. Link targets checked with <code>os.path.exists</code> on 2026-10-02.</p>
+<p>The follow-up sweep that reuses this machinery is <a href="exp_e5c_curve.html">exp_e5c_curve.html</a>.</p>
+<p class="skips">Skipped: <code>e5_common.py</code>, <code>e5_run.py</code> and <code>metrics.py</code> bodies (named helpers only; they belong to other pages); <code>experiments_verifiers/__pycache__/</code> (bytecode); <code>_cache_e5_embeddings.npz</code> contents (binary, read as a named input only); every other E5*, E8, E9 result pair (outside this page); <code>experiments_verifiers/.env</code> (never opened, by rule). No experiment was run: every number is quoted from the recorded results files. Nothing in this experiment's evidence chain is missing: script, JSON and MD are all present.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

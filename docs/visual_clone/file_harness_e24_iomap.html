@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_iomap.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e24_iomap.py">
+<div class="wrap">
+<h1 class="hud">e24_iomap.py</h1>
+<p class="intro">This file is E24 Phase 0: one LLM call per group maps the workspace I/O — the entry script, the train and test files, the prediction output and the metric kind implied by the goal wording. The same file then evaluates four deterministic gates on the frozen files (entry, data, relative paths, consumable outputs) and declares which groups admit the verifier-owned holdout. Three commands: <code>map</code> L18, <code>gates</code> L19 and <code>pilot-verdict</code> L367.</p>
+
+<div id="legend" data-auto></div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 — the job: one mapping call per group, then four deterministic gates</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 456" role="img" aria-label="e24_iomap.py: arena groups, goals and snapshot previews feed one LLM mapping call per group, then deterministic gates and the pilot verdict write three result files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="iArena">
+    <rect x="20" y="30" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135.0" y="50" text-anchor="middle">19 arena groups</text>
+    <text class="box-sub" x="135.0" y="65" text-anchor="middle">C.load_arena L150</text>
+  </g>
+  <g class="box" id="iGoals">
+    <rect x="20" y="120" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135.0" y="140" text-anchor="middle">task goals</text>
+    <text class="box-sub" x="135.0" y="155" text-anchor="middle">C.load_goals L158</text>
+  </g>
+  <g class="box" id="iSnap">
+    <rect x="20" y="210" width="230" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135.0" y="230" text-anchor="middle">frozen snapshots</text>
+    <text class="box-sub" x="135.0" y="245" text-anchor="middle">inventories and heads L112</text>
+  </g>
+  <g class="box" id="mInv">
+    <rect x="300" y="20" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="425.0" y="40" text-anchor="middle">union_inventory L79</text>
+    <text class="box-sub" x="425.0" y="55" text-anchor="middle">relpath, bytes, signal</text>
+    <text class="box-sub" x="425.0" y="70" text-anchor="middle">300-line cap L88</text>
+  </g>
+  <g class="box" id="mPrev">
+    <rect x="300" y="120" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="425.0" y="140" text-anchor="middle">build_previews L108</text>
+    <text class="box-sub" x="425.0" y="155" text-anchor="middle">_code_head L100, _head L92</text>
+    <text class="box-sub" x="425.0" y="170" text-anchor="middle">16 KiB cap L75</text>
+  </g>
+  <g class="box" id="mCall">
+    <rect x="300" y="220" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="425.0" y="240" text-anchor="middle">C.call_llm L162</text>
+    <text class="box-sub" x="425.0" y="255" text-anchor="middle">MAP_PROMPT L31</text>
+    <text class="box-sub" x="425.0" y="270" text-anchor="middle">one call per group</text>
+  </g>
+  <g class="box" id="mParse">
+    <rect x="300" y="320" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="425.0" y="340" text-anchor="middle">C.parse_json_loose L166</text>
+    <text class="box-sub" x="425.0" y="355" text-anchor="middle">map dict per group</text>
+  </g>
+  <g class="box" id="gGates">
+    <rect x="620" y="110" width="260" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="750.0" y="130" text-anchor="middle">eval_gates L205</text>
+    <text class="box-sub" x="750.0" y="145" text-anchor="middle">G1 L218, G2 L243</text>
+    <text class="box-sub" x="750.0" y="160" text-anchor="middle">G3 L245, G4 L262</text>
+  </g>
+  <g class="box" id="gSpec">
+    <rect x="620" y="230" width="260" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="750.0" y="250" text-anchor="middle">C2 rule and spec check</text>
+    <text class="box-sub" x="750.0" y="265" text-anchor="middle">L273, cross-check L279</text>
+  </g>
+  <g class="box" id="gPilot">
+    <rect x="620" y="350" width="260" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="750.0" y="370" text-anchor="middle">pilot_verdict L318</text>
+    <text class="box-sub" x="750.0" y="385" text-anchor="middle">3 of 5 admits L352</text>
+  </g>
+  <g class="box" id="oFiles">
+    <rect x="920" y="110" width="260" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1050.0" y="130" text-anchor="middle">IOMAP and GATES_JSON</text>
+    <text class="box-sub" x="1050.0" y="145" text-anchor="middle">L175, L309</text>
+  </g>
+  <g class="box" id="oPilot">
+    <rect x="920" y="350" width="260" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1050.0" y="370" text-anchor="middle">PILOT_JSON L355</text>
+    <text class="box-sub" x="1050.0" y="385" text-anchor="middle">PROCEED or STOP verdict</text>
+  </g>
+  <path class="edge dashed-edge" data-from="iArena" data-to="mInv" d="M250,65 H280 V60 H300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="275" y="112" text-anchor="end">groups L150</text>
+  <path class="edge dashed-edge" data-from="iGoals" data-to="mCall" d="M250,155 H280 V260 H300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="275" y="200" text-anchor="end">goal text L158</text>
+  <path class="edge dashed-edge" data-from="iSnap" data-to="mPrev" d="M250,245 H280 V160 H300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="275" y="292" text-anchor="end">snapshot reads L112</text>
+  <path class="edge dashed-edge" data-from="iSnap" data-to="gGates" d="M250,275 H290 V430 H600 V155 H620" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="450" y="422" text-anchor="middle">frozen files L226</text>
+  <path class="edge" data-from="mInv" data-to="mCall" d="M320,100 H290 V208 H345 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="284" y="180" text-anchor="end">inventory L160</text>
+  <path class="edge" data-from="mPrev" data-to="mCall" d="M425,200 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="435" y="214" text-anchor="start">previews L161</text>
+  <path class="edge" data-from="mCall" data-to="mParse" d="M425,300 V320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="435" y="314" text-anchor="start">content L166</text>
+  <path class="edge dashed-edge" data-from="mParse" data-to="oFiles" d="M550,360 H850 V200 H920" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="700" y="192" text-anchor="end">append L175</text>
+  <path class="edge" data-from="gGates" data-to="gSpec" d="M750,200 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="760" y="222" text-anchor="start">flags</text>
+  <path class="edge dashed-edge" data-from="oFiles" data-to="gPilot" d="M920,200 V300 H880 V350" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="890" y="330" text-anchor="end">maps L325</text>
+  <path class="edge dashed-edge" data-from="gPilot" data-to="oPilot" d="M880,395 H920" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="900" y="387" text-anchor="middle">write L355</text>
+  <text class="box-sub" x="20" y="444">solid = call  |  dashed = reads / writes  |  12 boxes. pilot_verdict also reads the reexec and holdout ledgers L323&#8211;L324.</text>
+  <path class="edge dashed-edge" data-from="oFiles" data-to="gGates" d="M920,150 H880" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="900" y="142" text-anchor="middle">maps L207</text>
+  <path class="edge dashed-edge" data-from="gSpec" data-to="oFiles" d="M880,250 H950 V200" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="955" y="194" text-anchor="start">gates json L309</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 — the mapping call sees only the goal, the union inventory and the previews L157&#8211;L161; no gold, SR or VER enters the prompt. The gates then re-read the frozen files themselves L226&#8211;L270, so they do not trust the model.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 — data flow: arena, goals and snapshot files in; three result files out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1110 460" role="img" aria-label="e24_iomap.py data flow: arena groups, goals and snapshot files go in; the iomap jsonl, the gates json, the pilot json and returned dicts come out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="v1">
+    <rect x="20" y="30" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="50" text-anchor="middle">arena groups L150</text>
+    <text class="box-sub" x="140.0" y="65" text-anchor="middle">campaign, task, generations</text>
+  </g>
+  <g class="box" id="v2">
+    <rect x="20" y="120" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="140" text-anchor="middle">task goals L158</text>
+    <text class="box-sub" x="140.0" y="155" text-anchor="middle">cut at 2400 chars L159</text>
+  </g>
+  <g class="box" id="v3">
+    <rect x="20" y="210" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140.0" y="230" text-anchor="middle">snapshot files L112</text>
+    <text class="box-sub" x="140.0" y="245" text-anchor="middle">inventory lines, file heads</text>
+  </g>
+  <g class="box" id="vmid">
+    <rect x="330" y="120" width="300" height="140" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="480.0" y="144" text-anchor="middle">e24_iomap.py</text>
+    <text class="box-sub" x="480.0" y="159" text-anchor="middle">369 lines, no Config field</text>
+    <text class="box-sub" x="480.0" y="174" text-anchor="middle">one LLM call per group</text>
+    <text class="box-sub" x="480.0" y="189" text-anchor="middle">gates need no LLM at all</text>
+  </g>
+  <g class="box" id="o1">
+    <rect x="700" y="20" width="380" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="890.0" y="40" text-anchor="middle">_e24_iomap_2026-09-24.jsonl</text>
+    <text class="box-sub" x="890.0" y="55" text-anchor="middle">19 rows: gid plus map L175</text>
+  </g>
+  <g class="box" id="o2">
+    <rect x="700" y="130" width="380" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="890.0" y="150" text-anchor="middle">_e24_gates_2026-09-24.json</text>
+    <text class="box-sub" x="890.0" y="165" text-anchor="middle">19 rows, 5 admit C2 L309</text>
+  </g>
+  <g class="box" id="o3">
+    <rect x="700" y="240" width="380" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="890.0" y="260" text-anchor="middle">_e24_pilot_2026-09-24.json</text>
+    <text class="box-sub" x="890.0" y="275" text-anchor="middle">per-group gate, verdict L355</text>
+  </g>
+  <g class="box" id="o4">
+    <rect x="700" y="350" width="380" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="890.0" y="370" text-anchor="middle">returned values</text>
+    <text class="box-sub" x="890.0" y="385" text-anchor="middle">previews str L145 · gates dict L315</text>
+    <text class="box-sub" x="890.0" y="400" text-anchor="middle">resolved paths L194 · verdict L357</text>
+  </g>
+  <path class="edge dashed-edge" data-from="v1" data-to="vmid" d="M260,65 H295 V140 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="296" y="132" text-anchor="end">groups L150</text>
+  <path class="edge dashed-edge" data-from="v2" data-to="vmid" d="M260,155 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="295" y="147" text-anchor="middle">goals L158</text>
+  <path class="edge dashed-edge" data-from="v3" data-to="vmid" d="M260,245 H305 V200 H330" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="307" y="196" text-anchor="end">reads L112</text>
+  <path class="edge dashed-edge" data-from="vmid" data-to="o1" d="M630,140 H665 V60 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="668" y="132" text-anchor="end">write L175</text>
+  <path class="edge dashed-edge" data-from="vmid" data-to="o2" d="M630,170 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="665" y="162" text-anchor="middle">write L309</text>
+  <path class="edge dashed-edge" data-from="vmid" data-to="o3" d="M630,200 H665 V280 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="668" y="272" text-anchor="end">write L355</text>
+  <path class="edge dashed-edge" data-from="vmid" data-to="o4" d="M630,230 H680 V390 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="682" y="382" text-anchor="end">return L357</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 — config fields read: none. Constants read: <code>GOAL_CHARS</code> 2400 L76, <code>PREVIEW_CAP</code> 16 KiB L75, <code>PILOT_GROUPS</code> L327. The stream of the store: the map keeps what the model returned, the gates keep only booleans and hit counts L291&#8211;L300.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 — logic: the gate chain, the C2 rule and the pilot threshold</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 676" role="img" aria-label="e24_iomap.py logic: the four deterministic gates, the C2 combination rule and the pilot verdict threshold">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="g1">
+    <rect x="20" y="40" width="240" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140.0" y="60" text-anchor="middle">eval_gates L205</text>
+  </g>
+  <g class="box" id="g2">
+    <rect x="300" y="40" width="340" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="60.0" text-anchor="middle">G1: entry present in half?</text>
+    <text class="box-sub" x="470.0" y="75.0" text-anchor="middle">L218</text>
+  </g>
+  <g class="box" id="g3">
+    <rect x="300" y="130" width="340" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="150.0" text-anchor="middle">G2: data files and labels?</text>
+    <text class="box-sub" x="470.0" y="165.0" text-anchor="middle">L243</text>
+  </g>
+  <g class="box" id="g4">
+    <rect x="300" y="220" width="340" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="240.0" text-anchor="middle">G3: paths named in script?</text>
+    <text class="box-sub" x="470.0" y="255.0" text-anchor="middle">L245</text>
+  </g>
+  <g class="box" id="g5">
+    <rect x="300" y="310" width="340" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="330.0" text-anchor="middle">G4: output columns present?</text>
+    <text class="box-sub" x="470.0" y="345.0" text-anchor="middle">L262</text>
+  </g>
+  <g class="box" id="g6">
+    <rect x="300" y="400" width="340" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="470.0" y="420.0" text-anchor="middle">C2: gates plus a metric?</text>
+    <text class="box-sub" x="470.0" y="435.0" text-anchor="middle">L273</text>
+    <text class="box-sub" x="470.0" y="435.0" text-anchor="middle">L273</text>
+  </g>
+  <g class="box" id="g6y">
+    <rect x="700" y="380" width="320" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="860.0" y="400" text-anchor="middle">group admits the holdout L273</text>
+  </g>
+  <g class="box" id="g6n">
+    <rect x="700" y="450" width="320" height="56" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="860.0" y="470" text-anchor="middle">other 14 groups, status only</text>
+  </g>
+  <g class="box" id="g7">
+    <rect x="300" y="510" width="400" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="500.0" y="530.0" text-anchor="middle">pilot: 3 of 5 admit?</text>
+    <text class="box-sub" x="500.0" y="545.0" text-anchor="middle">L352</text>
+  </g>
+  <path class="edge" data-from="g1" data-to="g2" d="M260,70 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="280" y="62" text-anchor="middle">per group</text>
+  <path class="edge" data-from="g2" data-to="g3" d="M470,100 V130" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="480" y="122" text-anchor="start">pass</text>
+  <path class="edge" data-from="g3" data-to="g4" d="M470,190 V220" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="480" y="212" text-anchor="start">pass</text>
+  <path class="edge" data-from="g4" data-to="g5" d="M470,280 V310" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="480" y="302" text-anchor="start">pass</text>
+  <path class="edge" data-from="g5" data-to="g6" d="M470,370 V400" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="480" y="392" text-anchor="start">pass</text>
+  <path class="edge" data-from="g6" data-to="g6y" d="M640,418 H700" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="670" y="410" text-anchor="middle">yes</text>
+  <path class="edge" data-from="g6" data-to="g6n" d="M640,442 H666 V478 H700" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="668" y="470" text-anchor="end">no</text>
+  <path class="edge dashed-edge" data-from="g6y" data-to="g7" d="M840,436 H860 V540 H700 V540" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="700" y="662" text-anchor="end">scored rows L330</text>
+  <text class="box-sub" x="20" y="596">lane 1: the four gates L218, L243, L245, L262 and the C2 rule L273  |  lane 2: the pilot feasibility gate L343 to L354</text>
+  <g class="box" id="g7y">
+    <rect x="720" y="520" width="300" height="56" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="870.0" y="540" text-anchor="middle">verdict PROCEED L352</text>
+  </g>
+  <g class="box" id="g7n">
+    <rect x="720" y="610" width="300" height="56" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="870.0" y="630" text-anchor="middle">verdict STOP, document L352</text>
+  </g>
+  <path class="edge" data-from="g7" data-to="g7y" d="M700,540 H720" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="860" y="514" text-anchor="middle">at least 3</text>
+  <path class="edge" data-from="g7" data-to="g7n" d="M450,570 V638 H720" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="860" y="602" text-anchor="middle">fewer than 3</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 — each gate needs half the generations (G3 half the generations that resolved an entry script L245), the C2 rule adds the metric test L273, and <code>pilot_verdict</code> needs 3 of the 5 declared pilot groups L343. Both commands print the verdict and write it.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>config</td><td class="sym">nothing</td><td>no <code>Config</code> import L21&#8211;L28</td><td>prompt budgets are literals: 2400 goal chars, 16 KiB previews</td><td class="size">L75</td></tr>
+<tr><td>reads</td><td class="sym">arena groups</td><td><code>C.load_arena()</code> L150 and L206</td><td>campaign, task and per-generation artifact inventories</td><td class="size">L150</td></tr>
+<tr><td>reads</td><td class="sym">task goals</td><td><code>C.load_goals()</code> L158</td><td>goal text for the mapping prompt, cut at 2400 chars</td><td class="size">L159</td></tr>
+<tr><td>reads</td><td class="sym">frozen snapshot files</td><td><code>C.REPO / snapshot_path</code> L112, L186, L226, L250</td><td>inventory lines, entry-script heads, csv headers, outputs</td><td class="size">L112</td></tr>
+<tr><td>reads</td><td class="sym">_e24_iomap_2026-09-24.jsonl</td><td><code>C.IOMAP</code> L151 and L207</td><td>resume set, then the maps the gates test</td><td class="size">L207</td></tr>
+<tr><td>reads</td><td class="sym">_e24_reexec_ledger_2026-09-24.jsonl</td><td><code>C.REEXEC_LEDGER</code> L323</td><td>re-execution status of the pilot groups</td><td class="size">L323</td></tr>
+<tr><td>reads</td><td class="sym">_e24_holdout_ledger_2026-09-24.jsonl</td><td><code>C.HOLDOUT_LEDGER</code> L324</td><td>redacted pilot rows, computability and runtime only</td><td class="size">L324</td></tr>
+<tr><td>writes</td><td class="sym">_e24_iomap_2026-09-24.jsonl</td><td><code>C.IOMAP</code>, append L175</td><td>one row per group: <code>gid</code> plus the map dict</td><td class="size">L175</td></tr>
+<tr><td>writes</td><td class="sym">_e24_gates_2026-09-24.json</td><td><code>C.GATES_JSON</code> L309</td><td>19 gate rows, the C2 verdict and the admitted list</td><td class="size">L309</td></tr>
+<tr><td>writes</td><td class="sym">_e24_pilot_2026-09-24.json</td><td><code>C.PILOT_JSON</code> L355</td><td>per-pilot-group gate plus the PROCEED or STOP verdict</td><td class="size">L355</td></tr>
+<tr><td>writes</td><td class="sym">E24_bt_cost_ledger_2026-09-24.jsonl</td><td>through <code>C.call_llm</code> L162</td><td>one cost row per mapping call</td><td class="size">L192</td></tr>
+<tr><td>state</td><td class="sym">SPENT, the arena assert</td><td><code>C.SPENT</code> via call_llm; <code>assert</code> L208</td><td>spend cap and the complete-iomap precondition</td><td class="size">L208</td></tr>
+</tbody>
+</table>
+<p class="note">Recorded on disk, my computation: <code class="path">results/_e24_iomap_2026-09-24.jsonl</code> holds 19 rows (one per group) and the cost ledger holds 19 mapping calls; <code class="path">results/_e24_gates_2026-09-24.json</code> has 19 gate rows, 7 of them true on all four gates, and <code>n_admit_c2</code> is 5 because a predictive metric kind is also required L273.</p><p class="note say">The pilot gate reads only label-free signals: re-execution status, holdout computability and runtime; metric values are redacted in pilot mode (<code>redacted</code> rows) so the feasibility test cannot fish for a result L319&#8211;L322.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>9 top-level callables and 1 nested function &#8212; signatures and roles</summary><div class="dbody">
+<pre>union_inventory(group: dict) -&gt; str              L79   union of artifact relpaths with signals
+_head(path: Path, n=8) -&gt; str                    L92   first lines of a data or output file
+_code_head(path: Path, n=60) -&gt; str              L100  first 60 lines of a script
+build_previews(group: dict) -&gt; str               L108  script, data and output previews
+run_map(workers: int = 6) -&gt; None                L147  one mapping call per unmapped group
+  one(g) -&gt; dict                                         build prompt, call, parse
+_resolve(group, name) -&gt; dict[str, Path | None]  L182  entry script name to per-gen path
+_csv_header(path: Path) -&gt; list[str]             L196  first csv row, empty on failure
+eval_gates() -&gt; dict                             L205  G1 to G4 plus C2, writes the gates file
+pilot_verdict() -&gt; dict                          L318  pilot feasibility gate, writes the pilot file</pre>
+<p>Module constants: <code>MAP_SYSTEM</code> L30, <code>MAP_PROMPT</code> L31&#8211;L73, <code>PREVIEW_CAP = 16 * 1024</code> L75, <code>GOAL_CHARS = 2400</code> L76.</p>
+<p>Imports: <code>json</code>, <code>sys</code>, <code>Counter</code>, <code>Path</code> L23&#8211;L26; <code>e24_common as C</code> L28. Inside functions:
+<code>ThreadPoolExecutor</code> L148, <code>csv</code> L197. No chemistry or plotting library is imported here: the gates read text and csv headers only.</p>
+<p>Command line L360&#8211;L369: <code>map</code> is the default when no argument is given L361, <code>gates</code> L364, <code>pilot-verdict</code> L366;
+any other word raises <code>SystemExit</code> L369.</p>
+<p>The gates, quoted from the docstring L9&#8211;L13 and the code: G1 entry resolves in at least half the generations L218; G2 train and test exist and the
+mapped label columns sit in the train header L243; G3 the entry script names both data paths L245; G4 the output file exists with the mapped id and prediction
+columns L262, or exists at all for non-csv outputs L270. C2 needs all four plus a predictive metric kind L273.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_common.py">harness/e24_common.py</a></td><td class="sym">imported as <code>C</code> L28</td><td class="sym">call_llm L162 · parse_json_loose L166 · append_jsonl L175 · load_arena L150</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_reexec.py">harness/e24_reexec.py</a></td><td class="sym">reads its output, no import</td><td class="sym"><code class="path">results/_e24_iomap_2026-09-24.jsonl</code>, <code>iomap_for</code> L112</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_holdout.py">harness/e24_holdout.py</a></td><td class="sym">reads its outputs, no import</td><td class="sym"><code>IOMAP</code> L181 and <code>GATES_JSON</code> L178</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e24_eval.py">harness/e24_eval.py</a></td><td class="sym">reads its outputs, no import</td><td class="sym"><code>GATES_JSON</code> L53 · <code>IOMAP</code> L385</td></tr>
+<tr><td class="sym">command line</td><td class="sym"><code>map</code> L18, <code>gates</code> L19, <code>pilot-verdict</code> L367</td><td class="sym">run_map L147 · eval_gates L205 · pilot_verdict L318</td></tr>
+<tr><td class="sym">tests/</td><td class="sym">no test found</td><td class="sym">grep of <code>tests/</code> for <code>e24</code> returns nothing</td></tr>
+<tr><td class="sym">importer of this file</td><td class="sym">no importer found</td><td class="sym">the three other phases consume its files, not its functions</td></tr>
+</tbody>
+</table>
+<p>The experiment page is <a href="exp_e24_iomap.html">exp_e24_iomap.html</a>; its consumers are <a href="file_harness_e24_reexec.html">file_harness_e24_reexec.html</a>, <a href="file_harness_e24_holdout.html">file_harness_e24_holdout.html</a> and <a href="file_harness_e24_eval.html">file_harness_e24_eval.html</a>.</p>
+</div>
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e24_iomap.html">exp_e24_iomap.html</a>, <a href="exp_index.html">exp_index.html</a>, <a href="file_harness_e24_reexec.html">file_harness_e24_reexec.html</a>, <a href="file_harness_e24_holdout.html">file_harness_e24_holdout.html</a>, <a href="file_index.html">file digest index</a></p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_iomap.py</code> (369 lines, whole file); row counts and gate flags of <code class="path">results/_e24_iomap_2026-09-24.jsonl</code> and <code class="path">results/_e24_gates_2026-09-24.json</code> (json.loads, counts only); <code class="path">results/_e24_pilot_2026-09-24.json</code> keys <code>n_admit</code> and <code>verdict</code>; directory listing of <code class="path">results/_e24_splits_2026-09-24/</code>; call sites in <code class="path">e24_reexec.py</code>, <code class="path">e24_holdout.py</code> and <code class="path">e24_eval.py</code> by grep; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p class="skips">Skipped, with reason: <code>.env</code> and <code>experiments_verifiers/.env</code> (never opened); <code class="path">experiments_verifiers/results/E24_bt_gradients/</code> and the later-phase reports (owned by the other four pages); the 148 frozen snapshots beyond the header lines the code itself previews; the bodies of <code class="path">e18_scripted_bt.py</code> (only <code>load_plan</code>, <code>enrich_inventories</code>, <code>load_goals</code> are used, through <code>e24_common</code>); <code class="path">results/_e24_venv/</code> (2.8 GB). No mapping call was made; no script and no pytest was run.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

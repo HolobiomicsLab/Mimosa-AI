@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e25_creed.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e25_creed.py">
+<div class="wrap">
+
+<h1 class="hud">e25_creed.py</h1>
+<p class="intro">This file is the E25 &quot;CREED&quot; harness: phase 1 autopsies the frozen E18 pairwise-comparator run by depth-classifying its 599 comparison scripts, and phase 2 retrials the comparator with four pre-registered depth-contract variants. It runs by hand, one subcommand at a time, from the command line. The judge model is fixed to <code>openrouter/deepseek/deepseek-v4.1-flash</code> L102 with reasoning disabled L225, under a $6 hard cap for all of E25 L104.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; the job: autopsy the frozen E18 comparator, then retry it with a depth contract</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1240 690" role="img" aria-label="e25_creed.py: main dispatches eight subcommands; phase 1 loads the frozen E18 records, depth-classifies the scripts and writes the autopsy; phase 2 builds a variant prompt per pair, generates and sandboxes one script, then gate, eval and reports">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="a1">
+    <title>the CLI spine</title>
+    <rect x="16" y="170" width="230" height="380" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="131.0" y="196" text-anchor="middle">command line</text>
+    <text class="box-sub" x="131.0" y="218" text-anchor="middle">main L2020 &#183; argparse L2021</text>
+    <text class="box-sub" x="131.0" y="234" text-anchor="middle">8 subcommands L2022</text>
+    <text class="box-sub" x="131.0" y="250" text-anchor="middle">--variant L2024</text>
+    <text class="box-sub" x="131.0" y="266" text-anchor="middle">--workers L2025</text>
+    <text class="box-sub" x="131.0" y="282" text-anchor="middle">--validate L2026</text>
+    <text class="box-sub" x="131.0" y="298" text-anchor="middle">--buckets L2027</text>
+    <text class="box-sub" x="131.0" y="314" text-anchor="middle">load_spent L2029</text>
+    <text class="box-sub" x="131.0" y="330" text-anchor="middle">dispatch L2032</text>
+  </g>
+  <g class="box" id="a2">
+    <title>read-only experiment files</title>
+    <rect x="16" y="20" width="230" height="112" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="131.0" y="46" text-anchor="middle">frozen E18 inputs</text>
+    <text class="box-sub" x="131.0" y="68" text-anchor="middle">E18_bt_judgments L90</text>
+    <text class="box-sub" x="131.0" y="84" text-anchor="middle">E14_bt_population L89</text>
+    <text class="box-sub" x="131.0" y="100" text-anchor="middle">E19c_ratchet L92</text>
+  </g>
+  <g class="box" id="b1">
+    <rect x="290" y="20" width="230" height="112" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405.0" y="46" text-anchor="middle">loaders</text>
+    <text class="box-sub" x="405.0" y="68" text-anchor="middle">load_plan L134</text>
+    <text class="box-sub" x="405.0" y="84" text-anchor="middle">load_goals L138</text>
+    <text class="box-sub" x="405.0" y="100" text-anchor="middle">load_e18_judgments L142</text>
+    <text class="box-sub" x="405.0" y="116" text-anchor="middle">pos_neg_pairs L166</text>
+    <text class="box-sub" x="405.0" y="132" text-anchor="middle">rescue_population L182</text>
+  </g>
+  <g class="box" id="c1">
+    <rect x="560" y="20" width="250" height="112" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685.0" y="46" text-anchor="middle">phase 1 autopsy</text>
+    <text class="box-sub" x="685.0" y="68" text-anchor="middle">cmd_autopsy L470</text>
+    <text class="box-sub" x="685.0" y="84" text-anchor="middle">cmd_autopsy_llm L1437</text>
+    <text class="box-sub" x="685.0" y="100" text-anchor="middle">tier stats L525</text>
+    <text class="box-sub" x="685.0" y="116" text-anchor="middle">tie anatomy L578</text>
+  </g>
+  <g class="box" id="o1">
+    <title>written by phase 1</title>
+    <rect x="850" y="20" width="250" height="112" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="975.0" y="46" text-anchor="middle">phase 1 files</text>
+    <text class="box-sub" x="975.0" y="68" text-anchor="middle">autopsy json L94</text>
+    <text class="box-sub" x="975.0" y="84" text-anchor="middle">autopsy md L95</text>
+    <text class="box-sub" x="975.0" y="100" text-anchor="middle">_e25_depth_llm L96</text>
+    <text class="box-sub" x="975.0" y="116" text-anchor="middle">_e25_flip_cases L728</text>
+  </g>
+  <g class="box" id="b2">
+    <title>shared helper, called by both phases</title>
+    <rect x="850" y="170" width="250" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="975.0" y="196" text-anchor="middle">depth classifier</text>
+    <text class="box-sub" x="975.0" y="218" text-anchor="middle">classify_code L308</text>
+    <text class="box-sub" x="975.0" y="234" text-anchor="middle">classify_decision L334</text>
+    <text class="box-sub" x="975.0" y="250" text-anchor="middle">classify_subkind L397</text>
+  </g>
+  <g class="box" id="c2">
+    <rect x="290" y="292" width="230" height="96" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405.0" y="318" text-anchor="middle">prompt builders</text>
+    <text class="box-sub" x="405.0" y="340" text-anchor="middle">GEN_TEMPLATE L743</text>
+    <text class="box-sub" x="405.0" y="356" text-anchor="middle">VARIANT_BLOCKS L858</text>
+    <text class="box-sub" x="405.0" y="372" text-anchor="middle">gen_messages L944</text>
+  </g>
+  <g class="box" id="c3">
+    <rect x="560" y="292" width="250" height="96" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685.0" y="318" text-anchor="middle">run_pair_variant L1097</text>
+    <text class="box-sub" x="685.0" y="340" text-anchor="middle">attempts 1..3 L1117</text>
+    <text class="box-sub" x="685.0" y="356" text-anchor="middle">parse L1133 &#183; violations L1139</text>
+    <text class="box-sub" x="685.0" y="372" text-anchor="middle">execute L1145 &#183; verdict L1164</text>
+  </g>
+  <g class="box" id="s1">
+    <rect x="850" y="292" width="250" height="96" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="975.0" y="318" text-anchor="middle">execute_variant_script</text>
+    <text class="box-sub" x="975.0" y="340" text-anchor="middle">temp compare.py L1045</text>
+    <text class="box-sub" x="975.0" y="356" text-anchor="middle">subprocess -I L1051</text>
+    <text class="box-sub" x="975.0" y="372" text-anchor="middle">90 s timeout L107</text>
+  </g>
+  <g class="box" id="d1">
+    <rect x="290" y="424" width="230" height="96" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405.0" y="450" text-anchor="middle">run_queue L1183</text>
+    <text class="box-sub" x="405.0" y="472" text-anchor="middle">cmd_pilot L1245</text>
+    <text class="box-sub" x="405.0" y="488" text-anchor="middle">cmd_arena L1346</text>
+    <text class="box-sub" x="405.0" y="504" text-anchor="middle">cmd_swap L1366</text>
+  </g>
+  <g class="box" id="d2">
+    <rect x="850" y="424" width="250" height="96" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="975.0" y="450" text-anchor="middle">gate &#183; eval &#183; reports</text>
+    <text class="box-sub" x="975.0" y="472" text-anchor="middle">cmd_gate L1289</text>
+    <text class="box-sub" x="975.0" y="488" text-anchor="middle">fit_e25_scores L1560</text>
+    <text class="box-sub" x="975.0" y="504" text-anchor="middle">cmd_eval L1602 &#183; report L2010</text>
+  </g>
+  <g class="box" id="o2">
+    <title>written by phase 2</title>
+    <rect x="850" y="556" width="250" height="96" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="975.0" y="582" text-anchor="middle">phase 2 files</text>
+    <text class="box-sub" x="975.0" y="604" text-anchor="middle">judgments jsonl L99</text>
+    <text class="box-sub" x="975.0" y="620" text-anchor="middle">cost ledger L100</text>
+    <text class="box-sub" x="975.0" y="636" text-anchor="middle">gate json L1333</text>
+    <text class="box-sub" x="975.0" y="652" text-anchor="middle">retrial json L97 &#183; md L98</text>
+  </g>
+  <path class="edge dashed-edge" data-from="a2" data-to="b1" d="M246,76 H290" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="268" y="68" text-anchor="middle">reads L90</text>
+  <path class="edge" data-from="b1" data-to="c1" d="M520,76 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="68" text-anchor="middle">plan L135</text>
+  <path class="edge dashed-edge" data-from="c1" data-to="o1" d="M810,76 H850" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="830" y="68" text-anchor="middle">write L726</text>
+  <path class="edge" data-from="c1" data-to="b2" d="M810,110 C840,130 900,145 930,170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="866" y="143" text-anchor="start">classify L484</text>
+  <path class="edge" data-from="a1" data-to="c1" d="M246,190 H685 V132" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="182" text-anchor="middle">autopsy L2032</text>
+  <path class="edge" data-from="a1" data-to="d1" d="M246,470 H290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="268" y="462" text-anchor="middle">pilot L1245</text>
+  <path class="edge" data-from="a1" data-to="d2" d="M246,540 H975 V520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="532" text-anchor="middle">gate/eval L1289</text>
+  <path class="edge" data-from="c3" data-to="c2" d="M685,292 C660,268 600,268 575,292" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="628" y="262" text-anchor="middle">gen_messages L1120</text>
+  <path class="edge" data-from="c3" data-to="s1" d="M810,340 H850" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="830" y="332" text-anchor="middle">execute L1145</text>
+  <path class="edge" data-from="d1" data-to="c3" d="M520,440 C540,420 555,405 570,388" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="536" y="430" text-anchor="start">submit L1199</text>
+  <path class="edge dashed-edge" data-from="c3" data-to="o2" d="M685,388 V556" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="695" y="470" text-anchor="start">judgments L1093</text>
+  <path class="edge dashed-edge" data-from="o2" data-to="d2" d="M925,556 V520" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="935" y="540" text-anchor="start">records L1221</text>
+  <text class="box-sub" x="16" y="678">solid = call  |  dashed = reads / writes  |  12 boxes: 8 stage boxes, 4 dashed input/output boxes.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the order of work. <code>main</code> L2020 dispatches eight subcommands L2022 to <code>cmd_*</code> functions L2032&#8211;L2034. Phase 1 loads the frozen E18 records (<code>load_e18_judgments</code> L142), classifies every script by decision depth (<code>classify_decision</code> L334) and writes the autopsy files. Phase 2 builds one merged prompt per pair (<code>gen_messages</code> L944), asks for one comparison script, runs it in a subprocess sandbox and appends one judgment row per (pair, variant, phase). The depth classifier is a shared helper: <code>cmd_autopsy</code> calls it L484, and phase 2 calls it again in <code>label_free_proxies</code> L1266 and <code>cmd_eval</code> L1736. The two exception classes are small: <code>StopRun</code> L123 (cost cap) and <code>CallFailed</code> L127 (LLM call).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: frozen E18 artifacts in, E25 files out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1240 470" role="img" aria-label="e25_creed.py data flow: the E14 plan, E18 judgments, E19c baselines, the snapshot workspaces and the cost ledger go in; autopsy, judgments, ledger, gate and retrial files come out">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="i1">
+    <title>read-only inputs</title>
+    <rect x="16" y="20" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="151.0" y="46" text-anchor="middle">frozen results</text>
+    <text class="box-sub" x="151.0" y="68" text-anchor="middle">E14_bt_population L89</text>
+    <text class="box-sub" x="151.0" y="84" text-anchor="middle">E18_bt_judgments L90</text>
+    <text class="box-sub" x="151.0" y="100" text-anchor="middle">E19c_ratchet L92</text>
+  </g>
+  <g class="box" id="i2">
+    <title>compared by the generated script</title>
+    <rect x="16" y="126" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="151.0" y="152" text-anchor="middle">snapshot workspaces</text>
+    <text class="box-sub" x="151.0" y="174" text-anchor="middle">ga snapshot_path L1105</text>
+    <text class="box-sub" x="151.0" y="190" text-anchor="middle">root_b L1106, read-only</text>
+    <text class="box-sub" x="151.0" y="206" text-anchor="middle">guard verify L1066</text>
+  </g>
+  <g class="box" id="i3">
+    <title>parsed by main L2021</title>
+    <rect x="16" y="232" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="151.0" y="258" text-anchor="middle">argv</text>
+    <text class="box-sub" x="151.0" y="280" text-anchor="middle">cmd L2022 &#183; --variant L2024</text>
+    <text class="box-sub" x="151.0" y="296" text-anchor="middle">--workers L2025 &#183; --validate L2026</text>
+  </g>
+  <g class="box" id="i4">
+    <title>spent budget so far</title>
+    <rect x="16" y="338" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="151.0" y="364" text-anchor="middle">cost ledger on disk</text>
+    <text class="box-sub" x="151.0" y="386" text-anchor="middle">E25_creED_bt_cost_ledger L100</text>
+    <text class="box-sub" x="151.0" y="402" text-anchor="middle">load_spent L199</text>
+    <text class="box-sub" x="151.0" y="418" text-anchor="middle">resume total L2029</text>
+  </g>
+  <g class="box" id="m1">
+    <rect x="340" y="20" width="300" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="490.0" y="46" text-anchor="middle">cmd_autopsy L470</text>
+    <text class="box-sub" x="490.0" y="68" text-anchor="middle">rows L479 &#183; cond L524</text>
+    <text class="box-sub" x="490.0" y="84" text-anchor="middle">tie anatomy L578</text>
+    <text class="box-sub" x="490.0" y="100" text-anchor="middle">returns out dict L681</text>
+  </g>
+  <g class="box" id="m2">
+    <rect x="340" y="126" width="300" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="490.0" y="152" text-anchor="middle">run_pair_variant L1097</text>
+    <text class="box-sub" x="490.0" y="174" text-anchor="middle">attempts L1117 &#183; sandbox L1145</text>
+    <text class="box-sub" x="490.0" y="190" text-anchor="middle">returns rec L1164</text>
+    <text class="box-sub" x="490.0" y="206" text-anchor="middle">or outcome error L1176</text>
+  </g>
+  <g class="box" id="m3">
+    <rect x="340" y="232" width="300" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="490.0" y="258" text-anchor="middle">cmd_gate L1289 &#183; cmd_eval L1602</text>
+    <text class="box-sub" x="490.0" y="280" text-anchor="middle">proxies L1257</text>
+    <text class="box-sub" x="490.0" y="296" text-anchor="middle">BT fit L1591 &#183; arms L1647</text>
+    <text class="box-sub" x="490.0" y="312" text-anchor="middle">returns out dict L1765</text>
+  </g>
+  <g class="box" id="m4">
+    <rect x="340" y="338" width="300" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="490.0" y="364" text-anchor="middle">cmd_report L2010</text>
+    <text class="box-sub" x="490.0" y="386" text-anchor="middle">md from autopsy L1828</text>
+    <text class="box-sub" x="490.0" y="402" text-anchor="middle">md from retrial L1943</text>
+    <text class="box-sub" x="490.0" y="418" text-anchor="middle">main returns None L2034</text>
+  </g>
+  <g class="box" id="f1">
+    <title>phase 1 output</title>
+    <rect x="700" y="20" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="835.0" y="46" text-anchor="middle">autopsy json L94</text>
+    <text class="box-sub" x="835.0" y="68" text-anchor="middle">autopsy md L95</text>
+    <text class="box-sub" x="835.0" y="84" text-anchor="middle">write L726 &#183; L2012</text>
+  </g>
+  <g class="box" id="f2">
+    <title>one row per pair and variant</title>
+    <rect x="700" y="126" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="835.0" y="152" text-anchor="middle">judgments jsonl L99</text>
+    <text class="box-sub" x="835.0" y="174" text-anchor="middle">append L1093</text>
+    <text class="box-sub" x="835.0" y="190" text-anchor="middle">cost ledger L100 &#183; L241</text>
+  </g>
+  <g class="box" id="f3">
+    <title>phase 2 output</title>
+    <rect x="700" y="232" width="270" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="835.0" y="258" text-anchor="middle">gate json L1333</text>
+    <text class="box-sub" x="835.0" y="280" text-anchor="middle">retrial json L97 &#183; L1780</text>
+    <text class="box-sub" x="835.0" y="296" text-anchor="middle">_e25_depth_llm L96</text>
+  </g>
+  <g class="box" id="f4">
+    <title>in process, not files</title>
+    <rect x="700" y="338" width="270" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="835.0" y="364" text-anchor="middle">returned values</text>
+    <text class="box-sub" x="835.0" y="386" text-anchor="middle">out dict L681 &#183; rec L1164</text>
+    <text class="box-sub" x="835.0" y="402" text-anchor="middle">out dict L1765 &#183; md L1828</text>
+    <text class="box-sub" x="835.0" y="418" text-anchor="middle">main returns None L2034</text>
+  </g>
+  <path class="edge dashed-edge" data-from="i1" data-to="m1" d="M286,63 H340" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="313" y="55" text-anchor="middle">plan L135</text>
+  <path class="edge dashed-edge" data-from="i1" data-to="m2" d="M286,80 C310,100 320,140 340,163" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="330" y="118" text-anchor="end">goals L1248</text>
+  <path class="edge dashed-edge" data-from="i2" data-to="m2" d="M286,169 H340" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="313" y="161" text-anchor="middle">roots L1105</text>
+  <path class="edge dashed-edge" data-from="i3" data-to="m3" d="M286,255 H340" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="313" y="247" text-anchor="middle">variant L2024</text>
+  <path class="edge dashed-edge" data-from="i4" data-to="m3" d="M286,381 H310 V295 H340" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="313" y="313" text-anchor="middle">resume L2029</text>
+  <path class="edge dashed-edge" data-from="m1" data-to="f1" d="M640,63 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="670" y="55" text-anchor="middle">write L726</text>
+  <path class="edge dashed-edge" data-from="m2" data-to="f2" d="M640,169 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="670" y="161" text-anchor="middle">append L1093</text>
+  <path class="edge dashed-edge" data-from="f2" data-to="m3" d="M700,200 C660,215 660,230 640,250" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="668" y="216" text-anchor="start">records L1221</text>
+  <path class="edge dashed-edge" data-from="m3" data-to="f3" d="M640,275 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="670" y="267" text-anchor="middle">write L1780</text>
+  <path class="edge dashed-edge" data-from="m4" data-to="f4" d="M640,381 H700" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="670" y="373" text-anchor="middle">returns L1828</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; config fields read: none; every knob is a module constant L104&#8211;L112 (<code>HARD_CAP_USD</code> 6.0 L104, <code>MAX_CODE_ATTEMPTS</code> 3 L105, <code>MAX_LLM_AMBIGUOUS</code> 150 L106, <code>SUBPROC_TIMEOUT</code> 90 L107, <code>E25_SEED</code> 20260925 L108, <code>N_BOOT</code> 10000 L109, <code>PREVIEW_CAP</code> 2048 L110, <code>DIGEST_FILES</code> 2 L111, <code>SLICE_BYTES</code> 1200 L112). Returned values are in-process values, not files: the autopsy <code>out</code> dict L681, the per-pair <code>rec</code> L1164 or L1176, the retrial <code>out</code> dict L1765, the report strings L1828 and L1943, and <code>main</code> returns None L2034. <code>argv</code> is read by <code>cmd_pilot</code> L1252, <code>cmd_arena</code> L1353, <code>cmd_swap</code> L1373 and <code>cmd_eval</code> L1606.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; logic: the three-attempt repair ladder of one pair</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1280 640" role="img" aria-label="e25_creed.py control logic: the repair ladder of run_pair_variant, three code attempts, feedback paths back to the next attempt, and the two terminal outcomes">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="p1">
+    <title>the code-attempt loop</title>
+    <rect x="470" y="20" width="300" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="620.0" y="52.0" text-anchor="middle">attempt = 1..3 L1117</text>
+  </g>
+  <g class="box" id="p2">
+    <rect x="470" y="96" width="300" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="620.0" y="130.0" text-anchor="middle">attempt == 1? L1119</text>
+    <text class="box-sub" x="620.0" y="148.0" text-anchor="middle">yes: gen_messages L1120 &#183; no: repair L1122</text>
+  </g>
+  <g class="box" id="p3">
+    <rect x="470" y="192" width="300" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="620.0" y="221.0" text-anchor="middle">_call_llm L1124</text>
+    <text class="box-sub" x="620.0" y="239.0" text-anchor="middle">6 tries L215 &#183; $6 cap L217</text>
+  </g>
+  <g class="box" id="f1">
+    <rect x="20" y="192" width="380" height="66" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="210.0" y="221.0" text-anchor="middle">CallFailed &#8594; break L1130</text>
+    <text class="box-sub" x="210.0" y="239.0" text-anchor="middle">attempts stop, outcome error L1176</text>
+  </g>
+  <g class="box" id="p4">
+    <rect x="470" y="278" width="300" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="620.0" y="307.0" text-anchor="middle">code parses? L1133</text>
+    <text class="box-sub" x="620.0" y="325.0" text-anchor="middle">static violations? L1139</text>
+  </g>
+  <g class="box" id="f2">
+    <rect x="830" y="278" width="400" height="66" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="1030.0" y="307.0" text-anchor="middle">feedback &#8594; next attempt</text>
+    <text class="box-sub" x="1030.0" y="325.0" text-anchor="middle">L1135 no block &#183; L1141 violations</text>
+  </g>
+  <g class="box" id="p5">
+    <rect x="470" y="364" width="300" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="620.0" y="393.0" text-anchor="middle">execute L1145</text>
+    <text class="box-sub" x="620.0" y="411.0" text-anchor="middle">rc == 0 &#8594; parse L1146</text>
+  </g>
+  <g class="box" id="p6">
+    <rect x="470" y="450" width="300" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="620.0" y="479.0" text-anchor="middle">parsed and not all-null? L1150</text>
+    <text class="box-sub" x="620.0" y="497.0" text-anchor="middle">null_evidence L1037</text>
+  </g>
+  <g class="box" id="f3">
+    <rect x="830" y="450" width="400" height="66" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="1030.0" y="479.0" text-anchor="middle">all-null &#8594; feedback L1156</text>
+    <text class="box-sub" x="1030.0" y="497.0" text-anchor="middle">E18.feedback_lines L1159</text>
+  </g>
+  <g class="box" id="p7">
+    <rect x="470" y="536" width="300" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="620.0" y="565.0" text-anchor="middle">parsed_final set? L1161</text>
+    <text class="box-sub" x="620.0" y="583.0" text-anchor="middle">asked after the 3 attempts</text>
+  </g>
+  <g class="box" id="p8">
+    <rect x="20" y="536" width="380" height="66" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="210.0" y="565.0" text-anchor="middle">outcome script L1164</text>
+    <text class="box-sub" x="210.0" y="583.0" text-anchor="middle">winner_ij L1163 &#183; append L1179</text>
+  </g>
+  <g class="box" id="f4">
+    <rect x="830" y="536" width="400" height="66" rx="2" fill="rgba(255,77,106,0.05)" stroke="#FF4D6A"/>
+    <text class="box-label" x="1030.0" y="565.0" text-anchor="middle">outcome error L1176</text>
+    <text class="box-sub" x="1030.0" y="583.0" text-anchor="middle">script kept as prev_code L1177</text>
+  </g>
+  <path class="edge" data-from="p1" data-to="p2" d="M620,76 V96" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="630" y="90" text-anchor="start">start L1117</text>
+  <path class="edge" data-from="p2" data-to="p3" d="M620,172 V192" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="630" y="186" text-anchor="start">prompt L1124</text>
+  <path class="edge" data-from="p3" data-to="f1" d="M470,225 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="435" y="185" text-anchor="middle">CallFailed L1130</text>
+  <path class="edge" data-from="p3" data-to="p4" d="M620,258 V278" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="630" y="272" text-anchor="start">code text L1133</text>
+  <path class="edge" data-from="p4" data-to="f2" d="M770,311 H830" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="270" text-anchor="middle">no or violations</text>
+  <path class="edge" data-from="p4" data-to="p5" d="M620,344 V364" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="630" y="358" text-anchor="start">clean L1145</text>
+  <path class="edge" data-from="p5" data-to="p6" d="M620,430 V450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="630" y="444" text-anchor="start">stdout L1146</text>
+  <path class="edge" data-from="p6" data-to="f3" d="M770,483 H830" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="442" text-anchor="middle">all-null L1155</text>
+  <path class="edge" data-from="p6" data-to="p7" d="M620,516 V536" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="630" y="530" text-anchor="start">usable L1150</text>
+  <path class="edge" data-from="p7" data-to="p8" d="M470,569 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="435" y="561" text-anchor="middle">yes L1161</text>
+  <path class="edge" data-from="p7" data-to="f4" d="M770,569 H830" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="561" text-anchor="middle">no L1176</text>
+  <path class="edge" data-from="f2" data-to="collector" d="M1230,311 H1256" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1240" y="298" text-anchor="start">retry</text>
+  <path class="edge" data-from="f3" data-to="collector" d="M1230,483 H1256" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1240" y="470" text-anchor="start">retry</text>
+  <path class="edge" data-from="collector" data-to="p1" d="M1256,483 V48 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1250" y="262" text-anchor="end">next attempt L1136</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the branching inside <code>run_pair_variant</code> L1117. At most <code>MAX_CODE_ATTEMPTS</code> 3 code attempts L105: attempt 1 asks for a new script L1120, later attempts send a repair prompt L1122. A failed call breaks the loop L1130&#8211;L1131. A missing fenced block L1134 or a static violation L1140 continues the loop with feedback L1136 and L1142. Only a script whose stdout parses L1146 and whose metrics are not all null L1150 becomes <code>outcome: script</code> L1164; otherwise the pair ends as <code>outcome: error</code> L1176. Inside <code>_call_llm</code> the same shape repeats: six tries L215, a cost-cap check before each call L217, doubled <code>max_tokens</code> on a truncated answer L246&#8211;L247, and a sleep of <code>min(45, 2**attempt*3)</code> seconds L258. <code>StopRun</code> L123 is never swallowed: <code>run_queue</code> re-raises it L1208&#8211;L1209, while other pair failures are counted as errors L1210&#8211;L1212. The <code>STOP</code> flag L120 is tested in the three loops of <code>cmd_autopsy_llm</code> L1462, L1480 and L1524.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<p class="note">The E25 phase 2 pilot was still running while this clone was built, and the V3 arm was still writing rows when this page was last checked (the judgments file held 131 rows at the first read and 219 at the snapshot below), so every phase 2 count here is a dated snapshot; the phase 1 numbers are final.</p>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e25_creed.py">experiments_verifiers/harness/e25_creed.py</a></h4>
+<p class="role">Autopsies the frozen E18 pairwise comparator by decision depth, then retries it with four pre-registered depth-contract variants under a $6 cap.</p>
+<p class="meta">2 038 lines &#183; classes: StopRun, CallFailed &#183; 51 top-level functions &#183; 8 subcommands</p>
+<details><summary>signatures and constants</summary><div class="dbody">
+<pre>run_pair_variant(variant, gid, group, pair, goal, a_is_i, phase, tmp_root) -&gt; dict   L1097
+run_queue(variant, phase, pairs, goals, assignment, workers) -&gt; tuple[int, int]     L1183
+_call_llm(messages, max_tokens, role, meta, temperature=0.0) -&gt; tuple[str, dict]    L208
+classify_decision(code, metrics, spec) -&gt; dict                                      L334
+execute_variant_script(code, root_a, root_b, tmp_root) -&gt; dict                      L1042</pre>
+<p>Config fields read: none. Constants: <code>MODEL_TEXT</code> L102, <code>HARD_CAP_USD</code> 6.0 L104, <code>MAX_CODE_ATTEMPTS</code> 3 L105, <code>MAX_LLM_AMBIGUOUS</code> 150 L106, <code>SUBPROC_TIMEOUT</code> 90 L107, <code>E25_SEED</code> 20260925 L108.</p>
+</div></details>
+</div>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Lines</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">E14_bt_population.json</td><td><code>PLAN_PATH</code> L89, via <code>E18.load_plan</code> L135</td><td>group list, gens, judging order</td><td class="size">L89 L135 L166</td></tr>
+<tr><td>reads</td><td class="sym">E18_bt_judgments_2026-09-23.jsonl</td><td><code>E18_JUDGMENTS</code> L90</td><td>main-phase records L142, swap records L152</td><td class="size">L90 L143 L153</td></tr>
+<tr><td>reads</td><td class="sym">E19c_ratchet_2026-09-25.json</td><td><code>E19C_JSON</code> L92</td><td>baseline channels from its <code>bt_table</code></td><td class="size">L92 L1553</td></tr>
+<tr><td>reads</td><td class="sym">snapshot workspaces</td><td><code>ga["snapshot_path"]</code> L1105</td><td>the two roots the script compares, read-only</td><td class="size">L1105 L1066</td></tr>
+<tr><td>reads</td><td class="sym">E25_creED_bt_cost_ledger jsonl</td><td><code>COST_LEDGER</code> L100</td><td>spent total for the resume</td><td class="size">L199 L2029</td></tr>
+<tr><td>reads</td><td class="sym">provider key</td><td>via <code>E18._load_env</code> L196</td><td>LLM calls; the env file is not opened here</td><td class="size">L47 L195</td></tr>
+<tr><td>writes</td><td class="sym">E25_creED_autopsy_2026-09-25.json</td><td><code>AUTOPSY_JSON</code> L94</td><td>phase 1 statistics dict L681</td><td class="size">L726</td></tr>
+<tr><td>writes</td><td class="sym">E25_creED_autopsy_2026-09-25.md</td><td><code>AUTOPSY_MD</code> L95</td><td>phase 1 report text L1828</td><td class="size">L2012</td></tr>
+<tr><td>writes</td><td class="sym">_e25_flip_cases_2026-09-25.json</td><td><code>EV/results</code> L728</td><td>full flip scripts, both sides</td><td class="size">L729</td></tr>
+<tr><td>writes</td><td class="sym">_e25_depth_llm_2026-09-25.jsonl</td><td><code>AUTOPSY_LLM</code> L96</td><td>LLM tier per pair, append-only</td><td class="size">L1468 L1492</td></tr>
+<tr><td>writes</td><td class="sym">_e25_depth_sample_2026-09-25.jsonl</td><td><code>val_path</code> L1500</td><td>stratified classifier validation rows</td><td class="size">L1532</td></tr>
+<tr><td>writes</td><td class="sym">E25_creED_judgments_2026-09-25.jsonl</td><td><code>JUDGMENTS</code> L99</td><td>one row per pair, variant, phase</td><td class="size">L1093</td></tr>
+<tr><td>writes</td><td class="sym">E25_creED_bt_cost_ledger_2026-09-25.jsonl</td><td><code>COST_LEDGER</code> L100</td><td>role, tokens, cost, latency per call</td><td class="size">L241</td></tr>
+<tr><td>writes</td><td class="sym">_e25_gate_2026-09-25.json</td><td><code>EV/results</code> L1333</td><td>per-variant gate rows</td><td class="size">L1333</td></tr>
+<tr><td>writes</td><td class="sym">E25_creED_retrial_2026-09-25.json</td><td><code>RETRIAL_JSON</code> L97</td><td>arena readouts L1765</td><td class="size">L1780</td></tr>
+<tr><td>writes</td><td class="sym">E25_creED_retrial_2026-09-25.md</td><td><code>RETRIAL_MD</code> L98</td><td>phase 2 report text L1943</td><td class="size">L2016</td></tr>
+<tr><td>writes</td><td class="sym">temp <code>compare.py</code></td><td><code>tempfile.mkdtemp</code> L1044</td><td>the generated script, deleted after the run</td><td class="size">L1045 L1065</td></tr>
+<tr><td>state</td><td class="sym">SPENT, STOP</td><td>module dicts L119&#8211;L120</td><td>cost cap and the stop flag</td><td class="size">L217 L1462</td></tr>
+<tr><td>state</td><td class="sym">_ledger_lock, _judg_lock, _spent_lock</td><td>module locks L116&#8211;L118</td><td>guard the three append paths</td><td class="size">L241 L1093</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no <code>Config</code> object, no app env var</td><td>all knobs are module constants</td><td class="size">L104</td></tr>
+</tbody>
+</table>
+<p class="note say">Phase 1 only reads the frozen E18 run: <code>E18_JUDGMENTS</code> is opened read-only L143 and L153, and every write goes to a new <code>_e25_*</code> or <code>E25_creED_*</code> path L94&#8211;L100. Phase 2 re-uses the E18 helpers for guards, parsing and feedback instead of copying them.</p>
+<p class="note">Disk observation (my computation, snapshot at the ledgers&#8217; 2026-09-25 16:31:49 mtime): <code class="path">experiments_verifiers/results/E25_creED_judgments_2026-09-25.jsonl</code> holds 219 pilot rows and no <code>arena</code>, <code>swap</code> or <code>gate</code> rows &#8212; V1 76 rows (75 <code>script</code> + 1 <code>error</code>, arm stopped), V2 74 rows (65 <code>script</code> + 9 <code>error</code>, arm stopped), V3 69 rows (<code>script</code> only, still writing when this page was checked). <code class="path">_e25_depth_llm_2026-09-25.jsonl</code> has 67 rows, <code class="path">_e25_depth_sample_2026-09-25.jsonl</code> 44, and the cost ledger 394 rows. <code class="path">E25_creED_retrial_2026-09-25.json</code>, <code class="path">E25_creED_retrial_2026-09-25.md</code> and <code class="path">_e25_gate_2026-09-25.json</code> are not present on disk.</p>
+<p class="note flag">Two module constants are assigned and never read again: <code>PLAN_PATH</code> L89 and <code>E18_JSON</code> L91 (one grep hit each in the file). The plan is loaded through <code>E18.load_plan</code> L135 instead.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>2 classes, 51 top-level functions, 10 nested helpers &mdash; signatures and roles</summary><div class="dbody">
+<pre>class StopRun(Exception)                                            L123  cost cap reached, aborts the run
+class CallFailed(Exception)                                        L127  LLM call failed after six tries
+load_plan() -&gt; dict                                                L134  E18 plan, delegated
+load_goals(plan: dict) -&gt; dict[tuple[str, str], str]               L138  task goal per group
+load_e18_judgments() -&gt; dict[tuple[str, str, str], dict]           L142  main-phase E18 records by key
+load_e18_swap() -&gt; dict[tuple[str, str, str], dict]                L152  swap-phase E18 records by key
+groups_index(plan: dict) -&gt; dict[str, dict]                        L162  gid to group map
+pos_neg_pairs(plan: dict) -&gt; list[dict]                            L166  SR-differing contrast pairs
+rescue_population(plan: dict, e18main: dict) -&gt; list[dict]         L182  E18 script ties on those pairs
+_load_env()                                                        L195  loads the provider key via E18
+load_spent() -&gt; float                                              L199  sums the cost ledger
+_call_llm(messages, max_tokens, role, meta, temperature=0.0)       L208  one call, ledger, retries, cap
+_sig_counts(code: str, patterns) -&gt; dict[str, int]                 L299  regex hit counts per signal
+classify_code(code: str) -&gt; tuple[int, dict]                       L308  deepest tier whose signals are present
+metric_windows(code: str, metric_names: list[str]) -&gt; dict[str,str] L320 plus or minus 30 lines per metric
+classify_decision(code: str, metrics: dict, spec: dict) -&gt; dict    L334  decision tier plus ambiguity flag
+_kind_of_name(name: str) -&gt; str                                    L390  sub-kind from a metric name
+classify_subkind(rec: dict) -&gt; str                                 L397  sub-kind of the deciding evidence
+pair_credit(rec: dict | None, p: dict) -&gt; float | None             L435  1.0, 0.0, or 0.5 for a tie
+cluster_boot_pairs(rows, value_key, n_boot=N_BOOT, seed=E25_SEED)  L446  cluster bootstrap CI95
+cmd_autopsy(args)                                                  L470  phase 1 statistics, writes files
+sample_sections_local(path: Path, slice_bytes=SLICE_BYTES) -&gt; str  L861  head, middle, tail slices
+inventory_capped(gen: dict, cap: int = 3400) -&gt; str                L880  budget-capped file inventory
+digest_block(gen: dict, max_files: int = DIGEST_FILES) -&gt; str      L913  digests of richest text files
+gen_messages(variant, goal, gen_a, gen_b) -&gt; list[dict]            L944  one merged generation prompt
+repair_messages(variant: str, feedback: str, prev_code: str)       L990  the repair prompt
+parse_variant_output(variant: str, stdout: str) -&gt; dict | None     L997  strict parse per variant contract
+null_evidence(variant: str, parsed: dict) -&gt; bool                  L1037 true when all metrics are null
+execute_variant_script(code, root_a, root_b, tmp_root) -&gt; dict     L1042 sandboxed run of one script
+ab_assign_e25() -&gt; dict[tuple[str, str, str, str], bool]           L1070 seeded A/B side assignment
+done_keys() -&gt; set[tuple]                                          L1082 keys already in the judgment file
+append_judgment(rec: dict)                                         L1092 appends one row under a lock
+run_pair_variant(variant, gid, group, pair, goal, a_is_i,          L1097 one pair: generate, repair, execute
+                 phase, tmp_root) -&gt; dict
+run_queue(variant, phase, pairs, goals, assignment, workers)       L1183 parallel pending pairs, cached skip
+variant_records(variant: str, phase: str) -&gt; dict                  L1221 records of one arm
+rescue_pairs_with_groups() -&gt; list[tuple[str, dict, dict]]         L1232 rescue pairs with their groups
+cmd_pilot(args)                                                    L1245 pilot arm on the rescue population
+label_free_proxies(variant: str) -&gt; dict                           L1257 label-free selection proxies
+cmd_gate(args)                                                     L1289 proxies plus the declared gate
+all_arena_pairs() -&gt; list[tuple[str, dict, dict]]                  L1337 every planned pair with its group
+cmd_arena(args)                                                    L1346 full-arena arm
+swap_pairs_e25(n: int = 45) -&gt; list[tuple[str, dict, dict]]        L1358 seeded 10 percent subsample
+cmd_swap(args)                                                     L1366 order-swap arm
+_llm_depth_classify(gid: str, i: str, j: str, r: dict) -&gt; dict     L1413 one LLM depth verdict
+cmd_autopsy_llm(args)                                              L1437 re-classify, buckets, validation
+load_baseline_table() -&gt; dict[str, dict[str, dict[str, float]]]    L1549 baseline channels from E19c
+fit_e25_scores(variant: str) -&gt; tuple[dict, dict]                  L1560 per-group BT fit and scores
+cmd_eval(args)                                                     L1602 one-shot confirmatory readout
+_decision_excerpt(code: str, max_lines: int = 8) -&gt; str           L1790 excerpt around the winner line
+cmd_report_autopsy() -&gt; str                                        L1802 phase 1 markdown report
+cmd_report_retrial() -&gt; str                                        L1937 phase 2 markdown report
+cmd_report(args)                                                   L2010 writes both markdown reports
+main()                                                             L2020 argparse and subcommand dispatch</pre>
+<p>Nested helpers: <code>_diff_names</code> L665 in <code>cmd_autopsy</code>; <code>rel</code> L885 and <code>line</code> L888 in <code>inventory_capped</code>; <code>rel</code> L918 in <code>digest_block</code>; <code>val</code> L1629, <code>to_pairfn</code> L1635 with its <code>f</code> L1636, <code>sc</code> L1644 and <code>m2_shipped</code> L1664 in <code>cmd_eval</code>; <code>row</code> L1817 in <code>cmd_report_autopsy</code>.</p>
+<p>Module constants: paths and dates <code>EV</code> L79, <code>REPO</code> L80, <code>TODAY</code> L86, <code>TAG</code> L87, <code>E18_DAY</code> L88, <code>PLAN_PATH</code> L89, <code>E18_JUDGMENTS</code> L90, <code>E18_JSON</code> L91, <code>E19C_JSON</code> L92, <code>AUTOPSY_JSON</code> L94, <code>AUTOPSY_MD</code> L95, <code>AUTOPSY_LLM</code> L96, <code>RETRIAL_JSON</code> L97, <code>RETRIAL_MD</code> L98, <code>JUDGMENTS</code> L99, <code>COST_LEDGER</code> L100. Budget and knobs: <code>MODEL_TEXT</code> L102, <code>PRICING</code> L103, <code>HARD_CAP_USD</code> L104, <code>MAX_CODE_ATTEMPTS</code> L105, <code>MAX_LLM_AMBIGUOUS</code> L106, <code>SUBPROC_TIMEOUT</code> L107, <code>E25_SEED</code> L108, <code>N_BOOT</code> L109, <code>PREVIEW_CAP</code> L110, <code>DIGEST_FILES</code> L111, <code>SLICE_BYTES</code> L112, <code>VARIANTS</code> L114, <code>SPENT</code> L119, <code>STOP</code> L120. Signals and text: <code>T0_PATTERNS</code> L270, <code>T1_PATTERNS</code> L277, <code>T2_PATTERNS</code> L287, <code>TIER_NAMES</code> L296, <code>SUBKIND_NAME_PATTERNS</code> L373, <code>GEN_TEMPLATE</code> L743, <code>V1_BLOCK</code> L788, <code>V2_BLOCK</code> L808, <code>V3_BLOCK</code> L823, <code>V4_BLOCK</code> L835, <code>VARIANT_BLOCKS</code> L858, <code>REPAIR_TEMPLATE_V</code> L955, <code>VARIANT_REMINDERS</code> L976, <code>OUTPUT_SHAPES</code> L982, <code>AMBIG_TEMPLATE</code> L1378, <code>BASELINE_KEYS</code> L1545.</p>
+<p>Imports: <code>argparse</code>, <code>datetime</code>, <code>json</code>, <code>os</code>, <code>random</code>, <code>re</code>, <code>shutil</code>, <code>subprocess</code>, <code>sys</code>, <code>tempfile</code>, <code>threading</code>, <code>time</code> L63&#8211;L74, <code>Counter</code> L75, <code>ThreadPoolExecutor</code>, <code>as_completed</code> L76, <code>Path</code> L77; then <code>e14_bt_enabler</code> as <code>E14</code> L82, <code>e15_bt_eval</code> as <code>E15E</code> L83, <code>e18_scripted_bt</code> as <code>E18</code> L84 after a <code>sys.path</code> insert L81. <code>numpy</code> is imported inside <code>fit_e25_scores</code> L1563 and <code>cmd_eval</code> L1604.</p>
+<p>Command line: positional <code>cmd</code> with eight choices L2022, <code>--variant</code> L2024, <code>--workers</code> default 6 L2025, <code>--validate</code> L2026, <code>--buckets</code> L2027; <code>assert args.variant</code> for the three queue commands L2030&#8211;L2031.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym">command line</td><td><code>uv run python experiments_verifiers/harness/e25_creed.py autopsy</code> L53</td><td class="sym">main L2020 &#8594; cmd_autopsy L470</td></tr>
+<tr><td class="sym">command line</td><td><code>... pilot --variant V1 --workers 8</code> L55</td><td class="sym">cmd_pilot L1245 &#8594; run_queue L1183</td></tr>
+<tr><td class="sym">command line</td><td><code>... gate</code> L56 and <code>... eval</code> L59 (the docstring usage block lists seven commands; <code>report</code> appears only in the argparse choices L2022)</td><td class="sym">cmd_gate L1289 &#183; cmd_eval L1602 &#183; cmd_report L2010</td></tr>
+<tr><td class="sym">no importer found</td><td>grep for <code>e25_creed</code>: this file and clone pages only</td><td class="sym">none</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e14_bt_enabler.py">harness/e14_bt_enabler.py</a></td><td><code>import e14_bt_enabler as E14</code> L82</td><td class="sym">E14.preview_blocks L947</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e15_bt_eval.py">harness/e15_bt_eval.py</a></td><td><code>import e15_bt_eval as E15E</code> L83</td><td class="sym">bt_fit_weighted L1591 &#183; pairs_correct L1649 &#183; cluster_boot L1650 &#183; paired_boot_diff L1660</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e18_scripted_bt.py">harness/e18_scripted_bt.py</a></td><td><code>import e18_scripted_bt as E18</code> L84</td><td class="sym">load_plan L135 &#183; GUARD.verify_paths L1066 &#183; parse_code L1133 &#183; static_violations L1139</td></tr>
+<tr><td class="sym">tests/</td><td>no test found</td><td class="sym">grep of <code>tests/</code> for <code>e25</code> returns nothing</td></tr>
+<tr><td class="sym">internal</td><td><code>main</code> dispatch L2032&#8211;L2034, <code>run_queue</code> submit L1199</td><td class="sym">cmd_report_autopsy L2011 &#183; cmd_report_retrial L2015</td></tr>
+<tr><td class="sym"><a href="file_index.html">file_index.html</a></td><td>hub table row L167</td><td class="sym">links to this digest page</td></tr>
+</tbody>
+</table>
+<p>Other E18 symbols called: <code>E18.load_goals</code> L139, <code>E18._load_env</code> L196, <code>E18.all_pairs</code> L1076 and L1341, <code>E18.enrich_inventories</code> L1247, <code>E18.feedback_lines</code> L1159, <code>E18.all_metrics_null</code> L1039 and L586, <code>E18.parse_json_loose</code> L1428, <code>E18._completion_with_watchdog</code> L226.</p>
+<p>The hub also lists this page: <a href="index.html">index.html</a> L233 and <a href="exp_index.html">exp_index.html</a> L62 and L213. The matching experiment page is <a href="exp_e25_creed.html">exp_e25_creed.html</a>.</p>
+</div>
+
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e25_creed.html">exp_e25_creed.html</a>, <a href="exp_index.html">exp_index.html</a>, <a href="data_experiments.html">data_experiments.html</a>, <a href="exp_e24_reexec.html">exp_e24_reexec.html</a>, <a href="file_harness_e24_reexec.html">e24_reexec.py</a>, <a href="file_harness_e18_scripted_bt.html">e18_scripted_bt.py</a>, <a href="file_harness_e14_bt_enabler.html">e14_bt_enabler.py</a>, <a href="file_harness_e15_bt_eval.html">e15_bt_eval.py</a>, <a href="flow_verification.html">flow_verification.html</a>.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e25_creed.py</code> (2 038 lines, whole file, docstring L1&#8211;L60 and every def and class), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code>, <code class="path">docs/visual_clone/file_harness_e24_reexec.html</code>, plus greps over the repo and <code class="path">tests/</code>. Disk facts come from directory listings and row counts of <code class="path">experiments_verifiers/results/</code> and the key names of <code class="path">E25_creED_autopsy_2026-09-25.json</code>.</p>
+<p class="skips">Skipped, with reason: the <code>.env</code> files (never opened, secrets; the code only calls <code>E18._load_env</code> L196); the bodies of <code class="path">e14_bt_enabler.py</code>, <code class="path">e15_bt_eval.py</code> and <code class="path">e18_scripted_bt.py</code> (other files; only the imported names and call sites are cited); the E18 judgment rows themselves (only record counts are reported); the E18 and E19c result JSON bodies beyond the <code>bt_table</code> key L1553; the long prompt strings L743&#8211;L1378 (quoted nowhere, only their line numbers); <code class="path">__pycache__</code> (compiled bytecode). No experiment, benchmark or pytest run was started; nothing outside <code class="path">docs/visual_clone/</code> was written.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

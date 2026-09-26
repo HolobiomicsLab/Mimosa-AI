@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_iomap - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e24_iomap">
+<div class="wrap">
+
+<h1 class="hud">e24_iomap &mdash; Phase 0, I/O mapping and gates</h1>
+<p class="intro">Can one LLM call per group map each workspace's entry script, train file, test file, output file and metric well enough for the verifier to re-execute it? This script makes that map, then checks four gates by deterministic file reads on the frozen snapshots. Five of nineteen groups admit the verifier-owned holdout (Phase 2).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram &mdash; mapping row and gate row</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 470" role="img" aria-label="e24_iomap mapping and gate stages">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bQ">
+    <title>The question this phase tests: one call maps every workspace I/O</title>
+    <rect x="20" y="10" width="200" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="31" text-anchor="middle">Hypothesis: one call</text>
+    <text class="box-sub" x="120" y="46" text-anchor="middle">maps group I/O</text>
+  </g>
+
+  <a class="box" id="bArena" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>union_inventory builds the union of artifact relpaths per group</title>
+    <rect x="20" y="90" width="170" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="105" y="112" text-anchor="middle">19 groups</text>
+    <text class="box-sub" x="105" y="128" text-anchor="middle">union of inventories</text>
+  </a>
+
+  <a class="box" id="bPrep" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>e24_iomap.union_inventory L79 and build_previews L108</title>
+    <rect x="240" y="90" width="180" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="112" text-anchor="middle">union_inventory &middot; build_previews</text>
+    <text class="box-sub" x="330" y="128" text-anchor="middle">previews capped 16 KB</text>
+  </a>
+
+  <a class="box" id="bMap" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>e24_iomap.run_map L147 sends MAP_PROMPT through call_llm</title>
+    <rect x="470" y="90" width="160" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="550" y="112" text-anchor="middle">run_map &middot; call_llm</text>
+    <text class="box-sub" x="550" y="128" text-anchor="middle">6 workers, 1 call/group</text>
+  </a>
+
+  <a class="box" id="bMapOut" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>The I/O map ledger, keyed by gid</title>
+    <rect x="680" y="90" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="112" text-anchor="middle">_e24_iomap.jsonl</text>
+    <text class="box-sub" x="770" y="128" text-anchor="middle">19 map records</text>
+  </a>
+
+  <a class="box" id="bFiles" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>eval_gates reads the frozen snapshot files directly</title>
+    <rect x="20" y="230" width="170" height="54" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="105" y="252" text-anchor="middle">frozen snapshots</text>
+    <text class="box-sub" x="105" y="268" text-anchor="middle">read-only files</text>
+  </a>
+
+  <a class="box" id="bResolve" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>e24_iomap._resolve L182 finds the entry script; _csv_header L196 reads a header</title>
+    <rect x="240" y="230" width="180" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="252" text-anchor="middle">_resolve &middot; _csv_header</text>
+    <text class="box-sub" x="330" y="268" text-anchor="middle">entry path, header row</text>
+  </a>
+
+  <a class="box" id="bGates" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>e24_iomap.eval_gates L205 checks G1-G4 over every generation of the group</title>
+    <rect x="470" y="230" width="160" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="550" y="252" text-anchor="middle">eval_gates</text>
+    <text class="box-sub" x="550" y="268" text-anchor="middle">G1..G4, 50% of gens</text>
+  </a>
+
+  <a class="box" id="bGatesOut" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>The gate table per group in _e24_gates JSON</title>
+    <rect x="680" y="230" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="252" text-anchor="middle">_e24_gates.json</text>
+    <text class="box-sub" x="770" y="268" text-anchor="middle">19 rows, C2 flag</text>
+  </a>
+
+  <a class="box" id="bPilot" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>e24_iomap.pilot_verdict L318 reads only label-free signals</title>
+    <rect x="470" y="350" width="160" height="54" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="550" y="372" text-anchor="middle">pilot_verdict</text>
+    <text class="box-sub" x="550" y="388" text-anchor="middle">computability only</text>
+  </a>
+
+  <a class="box" id="bPilotOut" href="../../experiments_verifiers/harness/e24_iomap.py">
+    <title>The pilot gate JSON with the PROCEED verdict</title>
+    <rect x="680" y="350" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="372" text-anchor="middle">_e24_pilot.json</text>
+    <text class="box-sub" x="770" y="388" text-anchor="middle">3 of 5, PROCEED</text>
+  </a>
+
+  <path class="edge" data-from="bQ" data-to="bPrep" d="M220,33 H230 V117 H240" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="232" y="30" text-anchor="start">tests</text>
+
+  <path class="edge dashed-edge" data-from="bArena" data-to="bPrep" d="M190,117 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="215" y="110" text-anchor="middle">inventories</text>
+
+  <path class="edge" data-from="bPrep" data-to="bMap" d="M420,117 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="445" y="110" text-anchor="middle">inventory text</text>
+
+  <path class="edge" data-from="bMap" data-to="bMapOut" d="M630,117 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="655" y="110" text-anchor="middle">one map</text>
+
+  <path class="edge dashed-edge" data-from="bFiles" data-to="bResolve" d="M190,257 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="215" y="250" text-anchor="middle">paths, headers</text>
+
+  <path class="edge" data-from="bResolve" data-to="bGates" d="M420,257 H470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="445" y="250" text-anchor="middle">hits per gen</text>
+
+  <path class="edge dashed-edge" data-from="bMapOut" data-to="bGates" d="M770,144 V230" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="778" y="190" text-anchor="start">maps dict</text>
+
+  <path class="edge" data-from="bGates" data-to="bGatesOut" d="M630,257 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="655" y="250" text-anchor="middle">19 gate rows</text>
+
+  <path class="edge" data-from="bGates" data-to="bPilot" d="M550,284 V350" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="558" y="320" text-anchor="start">C2 group list</text>
+
+  <path class="edge" data-from="bPilot" data-to="bPilotOut" d="M630,377 H680" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="655" y="370" text-anchor="middle">verdict</text>
+
+  <text class="box-sub" x="20" y="445">11 boxes | solid = call | dashed = reads/writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. Top row maps I/O with one LLM call per group; bottom row checks the gates on the frozen files with no LLM. Entry script <code class="path">experiments_verifiers/harness/e24_iomap.py</code>; the map prompt is <code>MAP_PROMPT</code> (L31) and the model is <code>e24_common.MODEL_TEXT</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e24_iomap.py">experiments_verifiers/harness/e24_iomap.py</a></h4>
+<p class="role">Phase 0: asks one LLM call per group to name entry script, train/test/output files and metric; then checks four gates on the frozen files.</p>
+<p class="meta">369 lines &middot; 10 functions &middot; entry: <code>if __name__ == "__main__"</code> (L360) &middot; commands: <code>map</code>, <code>gates</code>, <code>pilot-verdict</code></p>
+<details><summary>signatures, prompt constants, CLI behaviour</summary><div class="dbody">
+<pre>union_inventory(group) -&gt; str                    # L79   union of relpaths, 300-line cap
+_head(path, n=8) -&gt; str                          # L92   data file head
+_code_head(path, n=60) -&gt; str                    # L100  entry-script head
+build_previews(group) -&gt; str                     # L108  most complete workspace
+run_map(workers=6)                              # L147  one call per unmapped gid
+_resolve(group, name) -&gt; dict[str, Path | None]  # L182  entry name -&gt; per-gen path
+_csv_header(path) -&gt; list[str]                   # L196
+eval_gates() -&gt; dict                             # L205  writes GATES_JSON
+pilot_verdict() -&gt; dict                          # L318  writes PILOT_JSON</pre>
+<p>CLI: <code>uv run python experiments_verifiers/harness/e24_iomap.py map</code> (default, L362&ndash;363), <code>... gates</code> (L364&ndash;365), <code>... pilot-verdict</code> (L366&ndash;367). Any other command raises <code>SystemExit</code> (L368).</p>
+<p>Prompt caps: <code>PREVIEW_CAP = 16 * 1024</code> (L75), <code>GOAL_CHARS = 2400</code> (L76). <code>MAP_PROMPT</code> (L31&ndash;74) asks for strict JSON with <code>ml_task</code>, <code>entry_script</code>, <code>train_file</code>, <code>test_file</code>, <code>output_file</code>, <code>metric.kind</code>, <code>generated_intermediates</code>, <code>swap_notes</code>. <code>eval_gates</code> asserts <code>set(maps) == {gid_of(g) for g in groups}</code> and fails if the map is incomplete.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th><th>Symbol</th></tr></thead>
+<tbody>
+<tr><td>Group inventories and goals</td><td>Prompt text (in memory)</td><td class="sym">results/E14_bt_population.json</td><td class="sym">e24_iomap.py::union_inventory (L79), ::build_previews (L108)</td></tr>
+<tr><td>Workspace files (heads)</td><td>Preview block, 16 KB cap</td><td class="sym">frozen snapshot dirs</td><td class="sym">::_head (L92), ::_code_head (L100)</td></tr>
+<tr><td>LLM JSON answer</td><td>One map record per group</td><td class="sym">results/_e24_iomap_2026-09-24.jsonl</td><td class="sym">::run_map (L147)</td></tr>
+<tr><td>Map + snapshot files</td><td>Gate table, 19 rows</td><td class="sym">results/_e24_gates_2026-09-24.json</td><td class="sym">::eval_gates (L205)</td></tr>
+<tr><td>Reexec and holdout ledgers</td><td>Pilot verdict JSON</td><td class="sym">results/_e24_pilot_2026-09-24.json</td><td class="sym">::pilot_verdict (L318)</td></tr>
+<tr><td>CSV header rows</td><td>Column name list</td><td class="sym">train/test/output CSV files</td><td class="sym">::_csv_header (L196)</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: <code>eval_gates</code> decides G2 and G3 with an operator-precedence test (<code>if hdr and all(...) or tf.get("format") != "csv"</code>, L230&ndash;231); a non-CSV train file passes G2 without any header check.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; gate pass counts and the pilot verdict</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 740 320" role="img" aria-label="Bar chart of gate pass counts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <line x1="50" y1="260" x2="720" y2="260" stroke="#1B4B6B" stroke-width="1.25"/>
+  <line x1="50" y1="260" x2="50" y2="40" stroke="#1B4B6B" stroke-width="1.25"/>
+  <text class="box-sub" x="50" y="32" text-anchor="start">groups passing, of 19</text>
+
+  <rect x="60" y="60" width="80" height="200" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="100" y="50" text-anchor="middle">19</text>
+  <text class="box-sub" x="100" y="278" text-anchor="middle">G1 entry</text>
+
+  <rect x="200" y="186.3" width="80" height="73.7" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="240" y="176" text-anchor="middle">7</text>
+  <text class="box-sub" x="240" y="278" text-anchor="middle">G2 data</text>
+
+  <rect x="340" y="165.3" width="80" height="94.7" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="380" y="155" text-anchor="middle">9</text>
+  <text class="box-sub" x="380" y="278" text-anchor="middle">G3 relative</text>
+
+  <rect x="480" y="165.3" width="80" height="94.7" fill="rgba(0,229,255,0.15)" stroke="#00E5FF"/>
+  <text class="box-label" x="520" y="155" text-anchor="middle">9</text>
+  <text class="box-sub" x="520" y="278" text-anchor="middle">G4 outputs</text>
+
+  <rect x="620" y="207.4" width="80" height="52.6" fill="rgba(125,249,199,0.18)" stroke="#7DF9C7"/>
+  <text class="box-label" x="660" y="197" text-anchor="middle">5</text>
+  <text class="box-sub" x="660" y="278" text-anchor="middle">C2 admit</text>
+
+  <text class="box-sub" x="60" y="305" text-anchor="start">bar height 200 px at 19 groups; my computation</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; green bar = <code>C2</code> admission (all four gates plus a predictive metric). G1&ndash;G4 pass counts come from <code class="path">experiments_verifiers/results/_e24_gates_2026-09-24.json</code>, key <code>rows[*].G1_entry</code> &hellip; <code>rows[*].G4_outputs</code>; C2 comes from <code>n_admit_c2</code> (L1024).</p>
+
+<table>
+<thead><tr><th>Metric</th><th class="size">Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>G1_entry pass</td><td class="size">19 of 19</td><td class="sym">_e24_gates_2026-09-24.json <code>rows[*].G1_entry</code> (first at L13)</td></tr>
+<tr><td>G2_data pass</td><td class="size">7 of 19</td><td class="sym">same file, <code>rows[*].G2_data</code></td></tr>
+<tr><td>G3_relative pass</td><td class="size">9 of 19</td><td class="sym">same file, <code>rows[*].G3_relative</code></td></tr>
+<tr><td>G4_outputs pass</td><td class="size">9 of 19</td><td class="sym">same file, <code>rows[*].G4_outputs</code></td></tr>
+<tr><td>all four gates</td><td class="size">7 of 19</td><td class="sym">my computation on the same rows</td></tr>
+<tr><td>admits component 2 (C2)</td><td class="size">5</td><td class="sym">_e24_gates_2026-09-24.json <code>n_admit_c2</code> (L1024)</td></tr>
+<tr><td>maps with a predictive metric</td><td class="size">5 of 19</td><td class="sym">my computation: 2 x mean_roc_auc, 1 accuracy, 1 rmse, 1 spearman</td></tr>
+<tr><td>maps with <code>metric.kind = none</code></td><td class="size">14 of 19</td><td class="sym">_e24_iomap_2026-09-24.jsonl, key <code>map.metric.kind</code></td></tr>
+<tr><td>maps with <code>ml_task = true</code></td><td class="size">8 of 19</td><td class="sym">_e24_iomap_2026-09-24.jsonl, key <code>map.ml_task</code></td></tr>
+<tr><td>pilot groups with a computable metric</td><td class="size">3 of 5</td><td class="sym">_e24_pilot_2026-09-24.json <code>n_admit</code> (L181)</td></tr>
+<tr><td>pilot verdict</td><td class="size">PROCEED</td><td class="sym">_e24_pilot_2026-09-24.json <code>verdict</code> (L182)</td></tr>
+<tr><td>LLM calls for the mapping</td><td class="size">19</td><td class="sym">E24_bt_cost_ledger_2026-09-24.jsonl (19 rows, role <code>iomap</code>)</td></tr>
+<tr><td>mapping cost</td><td class="size">$0.015591</td><td class="sym">my computation: <code>sum(cost_usd)</code> over that ledger</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>one map record, two gate rows and the pilot gate (click to expand)</summary><div class="dbody">
+<blockquote>"train_file": {"path": "clintox/clintox_train.csv", "format": "csv", "id_columns": ["smiles"], "label_columns": ["FDA_APPROVED", "CT_TOX"]}, "test_file": {"path": "clintox/clintox_test.csv", "format": "csv", "id_columns": ["smiles"]}, "metric": {"kind": "mean_roc_auc", ...}, "swap_notes": "Replace the train/test CSVs ..."</blockquote>
+<p>Quoted keys from <code class="path">experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl</code>, line 9 (<code>run_1__clintox_multitask_toxicity_fda_prediction_clintox_nn</code>); <code>...</code> marks text I left out, the keys and strings are verbatim.</p>
+<blockquote>"metric": {"kind": "none", "note": "Task is a scientific visualization/analysis deliverable (charge density difference plot), not label prediction."}</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl</code>, line 1 (<code>chemistry_iterative_v4_flash__llm_response_error_charge_density_difference</code>).</p>
+<blockquote>"G1_entry": true, "G2_data": true, "G3_relative": true, "G4_outputs": true, ... "admits_component2": true, "split_spec_matches_map": true</blockquote>
+<p>Quoted keys from <code class="path">experiments_verifiers/results/_e24_gates_2026-09-24.json</code>, first row (starts L6); <code>...</code> marks omitted keys.</p>
+<blockquote>"gate": "PROCEED to full component-2 run if &gt;=3 of 5 pilot groups have a computable holdout metric (labels-free signals only: computability + runtime + re-exec success)"</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/_e24_pilot_2026-09-24.json</code>, line 10.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e24_iomap.py</code> (all 369 lines), <code class="path">experiments_verifiers/harness/e24_common.py</code> (the constants and loader helpers this script calls), <code class="path">experiments_verifiers/results/_e24_iomap_2026-09-24.jsonl</code> (19 lines), <code class="path">results/_e24_gates_2026-09-24.json</code> (1 031 lines), <code class="path">results/_e24_pilot_2026-09-24.json</code> (182 lines), <code class="path">results/E24_bt_cost_ledger_2026-09-24.jsonl</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code> and <code class="path">experiments_verifiers/README.md</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: <code>experiments_verifiers/.env</code> and <code>.env</code> (never opened). Skipped the frozen snapshot directories themselves: gate G2/G3/G4 read them, but the files are the campaign's own evidence and 148 directories are out of scope for this page. Skipped <code>results/_e24_venv/</code> (2.8 GB virtualenv) and <code>results/_e24_runlogs_2026-09-24/</code> (per-phase logs, listed in <a href="exp_e24_holdout.html">exp_e24_holdout.html</a>). Not run: the script (rule: cheap reads only).</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

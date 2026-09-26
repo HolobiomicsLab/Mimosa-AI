@@ -34,12 +34,20 @@ generation in isolation:
 | File / dir | Contents |
 | ---------- | -------- |
 | `workflow_genotype_<uuid>.py` | The Python source of the workflow that was executed. |
-| `state_result.json` | Per-claim scores, agent outputs, status flags. |
+| `state_result.json` | Verifier scores (`evaluation.verifier.*`, incl. the textual gradient), agent outputs, status flags. |
+| `evaluation.txt` | Human-readable verifier report (stage headers, per-claim scores/evidence). |
+| `textual_gradient.txt` | The gradient sidecar fed to the next mutation. |
 | `evolution_prompt_<uuid>.md` | Exact prompt sent to the LLM to produce this workflow. |
 | `lineage_<uuid>.json` | Parent UUIDs + operator (`seed`/`mutation`/`crossover`). |
 | `memory/` | Per-agent thought + tool-call traces (for `memory_explorer`). |
 | `reward_progress.png` | *(only on the best UUID)* score across iterations. |
 | `evolution_tree.png` | *(only on the best UUID)* rendered lineage tree. |
+
+The hybrid verifier's per-task registries
+(`hybrid_registry_<key>.json` — claim ladder, cached scorer scripts,
+format digests, per-generation score vectors) live beside these folders
+under `sources/workflows/_verifier_tmp/` (or the configured
+`temp_dir`).
 
 A "best UUID" is the one selected at termination — its workspace snapshot
 becomes the run's final state and is what gets archived to
@@ -71,22 +79,26 @@ task description — short, human-readable, and prefixed with timestamp.
 
 Cross-run state that doesn't belong to a single generation:
 
-- **LLM call cache** — keyed by prompt hash. Prompt-cache-compatible so the
-  same prompt at the same provider returns instantly on a second call.
-- **Task checklists** — the per-task verifier checklist (`task_hash`),
-  built once on first encounter and reused across `--learn` iterations.
+- **LLM call cache** — per-run memory folders; prompt-cache-compatible so
+  the same prompt at the same provider returns instantly on a second call.
+- **Objective history** (`objective_history.json`) — records of planner
+  objectives. (The legacy verifier's per-task "checklist" cache
+  described here historically is gone; the hybrid verifier's per-task
+  state lives in its registry, see above.)
 
 ## What the verifier consumes
 
-When the verifier scores a generation, it reads:
+When the hybrid verifier scores a generation, it reads:
 
-1. **`state_result.json`** — for the agent's claims.
-2. **Workspace snapshot** — for files to verify executable claims against.
-3. **Perspicacité** — for literature grounding on soft claims.
+1. **The task goal** — the source of every claim in the ladder.
+2. **Workspace snapshot** — the files the policy scorers measure
+   (scripts, logs, deliverable artifacts).
+3. **The per-task registry** — previous generations' score vectors, for
+   the pairwise reward and the variance filter.
 
 It writes back **only** to the evaluation fields in the response — not to
-the workspace. The mutator sees the `abstracted_prompt_gradient`, not the
-raw verifier output.
+the workspace. The mutator sees the `abstracted_textual_gradient`, not
+the raw scorer output.
 
 ## Resetting between benchmarks
 

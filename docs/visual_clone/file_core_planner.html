@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>file_core_planner - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; core &gt; planner.py">
+<div class="wrap">
+
+<h1 class="hud">planner.py</h1>
+<p class="intro">Layer 0 of the <a href="flow_task_run.html">task run flow</a>: it turns one goal string into a multi-step <code>Plan</code>, then runs each step through the <a href="mod_core_evolution_engine.html">evolution engine</a>. It runs only in <code>--goal</code> mode (<a href="../../main.py">main.py:241</a>) and in benchmark CSV mode, never in the <code>--task</code> path. Entry point is <code>Planner.start_planner</code> (L925).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; inputs to outputs, left to right</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 620" role="img" aria-label="planner.py behaviour: config and goal enter, plan is generated, steps run, Task list leaves">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="bIn">
+    <title>Inputs: goal string plus the Config object</title>
+    <rect x="20" y="250" width="150" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="95" y="278" text-anchor="middle">goal: str</text>
+    <text class="box-sub" x="95" y="296" text-anchor="middle">+ Config</text>
+  </g>
+
+  <a class="box" id="bInit" href="#sym-inventory">
+    <title>Planner.__init__ builds every collaborator and stores workspace_path</title>
+    <rect x="230" y="40" width="200" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="330" y="72" text-anchor="middle">Planner.__init__</text>
+    <text class="box-sub" x="330" y="90" text-anchor="middle">EvolutionEngine, WorkflowSelector,</text>
+    <text class="box-sub" x="330" y="104" text-anchor="middle">LLMConfig, PushNotifier, TTS</text>
+  </a>
+
+  <a class="box" id="bEntry" href="#sym-inventory">
+    <title>start_planner is the async entry point called from main.py</title>
+    <rect x="230" y="250" width="200" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="330" y="282" text-anchor="middle">start_planner()</text>
+    <text class="box-sub" x="330" y="300" text-anchor="middle">async entry, L925</text>
+    <text class="box-sub" x="330" y="314" text-anchor="middle">goal, judge, max_task_retry</text>
+  </a>
+
+  <a class="box" id="bGen" href="#sym-inventory">
+    <title>Plan phase: reads the prompt file and asks make_plan for a Plan</title>
+    <rect x="490" y="180" width="210" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="595" y="212" text-anchor="middle">_generate_plan_with</text>
+    <text class="box-sub" x="595" y="230" text-anchor="middle">_human_validation() &#183; while loop</text>
+  </a>
+
+  <a class="box" id="bMake" href="#sym-inventory">
+    <title>make_plan calls the plan_creator LLM, extracts JSON, retries on failure</title>
+    <rect x="490" y="310" width="210" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="595" y="342" text-anchor="middle">make_plan()</text>
+    <text class="box-sub" x="595" y="360" text-anchor="middle">_extract_json_from_code_block()</text>
+  </a>
+
+  <a class="box" id="bHuman" href="#sym-inventory">
+    <title>Optional operator gate: Enter approves, text returns feedback</title>
+    <rect x="490" y="40" width="210" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="595" y="66" text-anchor="middle">_request_human_plan</text>
+    <text class="box-sub" x="595" y="84" text-anchor="middle">_validation() &#183; _display_plan()</text>
+  </a>
+
+  <a class="box" id="bCanExec" href="#sym-inventory">
+    <title>Dependency gate before a step runs</title>
+    <rect x="760" y="40" width="190" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="855" y="72" text-anchor="middle">_can_execute_step()</text>
+    <text class="box-sub" x="855" y="90" text-anchor="middle">depends_on vs task_history</text>
+  </a>
+
+  <a class="box" id="bRun" href="#sym-inventory">
+    <title>run_attempts loops until the step scores high enough or attempts run out</title>
+    <rect x="760" y="250" width="190" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="855" y="276" text-anchor="middle">run_attempts()</text>
+    <text class="box-sub" x="855" y="294" text-anchor="middle">async while loop</text>
+    <text class="box-sub" x="855" y="308" text-anchor="middle">attempt_counts, max_attempts</text>
+  </a>
+
+  <a class="box" id="bEvolve" href="#sym-inventory">
+    <title>evolve_runs reuses a cached workflow or starts a new evolution round</title>
+    <rect x="230" y="440" width="200" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="330" y="472" text-anchor="middle">evolve_runs()</text>
+    <text class="box-sub" x="330" y="490" text-anchor="middle">WorkflowSelector.select_best_workflows</text>
+    <text class="box-sub" x="330" y="504" text-anchor="middle">EvolutionEngine.start_workflow_evolution</text>
+  </a>
+
+  <a class="box" id="bVerify" href="#sym-inventory">
+    <title>File check after a successful attempt</title>
+    <rect x="760" y="430" width="190" height="70" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="855" y="462" text-anchor="middle">_verify_expected_outputs()</text>
+    <text class="box-sub" x="855" y="480" text-anchor="middle">stem-overlap test, 0.7</text>
+  </a>
+
+  <a class="box" id="bOut">
+    <title>Output: the task_history list returned to the caller</title>
+    <rect x="990" y="240" width="170" height="70" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="1075" y="272" text-anchor="middle">list[Task]</text>
+    <text class="box-sub" x="1075" y="290" text-anchor="middle">self.task_history</text>
+  </a>
+
+  <g class="box" id="bNotify">
+    <title>External: Pushover notification service</title>
+    <rect x="990" y="430" width="170" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1075" y="462" text-anchor="middle">PushNotifier</text>
+    <text class="box-sub" x="1075" y="480" text-anchor="middle">send_message()</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="bIn" data-to="bInit" d="M170,275 H205 V78 H230" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="196" y="180" text-anchor="start">reads config</text>
+
+  <path class="edge" data-from="bIn" data-to="bEntry" d="M170,282 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="200" y="274" text-anchor="middle">goal: str</text>
+
+  <path class="edge dotted-edge" data-from="bInit" data-to="bEntry" d="M330,116 V250" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="336" y="180" text-anchor="start">built first</text>
+
+  <path class="edge" data-from="bEntry" data-to="bGen" d="M430,275 H460 V215 H490" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="466" y="245" text-anchor="start">generate plan</text>
+
+  <path class="edge" data-from="bGen" data-to="bMake" d="M595,250 V310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="602" y="282" text-anchor="start">make_plan()</text>
+
+  <path class="edge" data-from="bGen" data-to="bHuman" d="M570,180 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="565" y="148" text-anchor="end">if human_approve</text>
+
+  <path class="edge dashed-edge" data-from="bHuman" data-to="bGen" d="M635,110 V180" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="642" y="148" text-anchor="start">feedback text</text>
+
+  <path class="edge" data-from="bEntry" data-to="bCanExec" d="M400,250 V75 H760" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="68" text-anchor="middle">per step, before run</text>
+
+  <path class="edge" data-from="bEntry" data-to="bRun" d="M400,326 V350 H730 V285 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="560" y="342" text-anchor="middle">await run_attempts</text>
+
+  <path class="edge" data-from="bRun" data-to="bEvolve" d="M810,320 V478 H430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="640" y="470" text-anchor="middle">await evolve_runs</text>
+
+  <path class="edge" data-from="bRun" data-to="bVerify" d="M855,320 V430" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="861" y="378" text-anchor="start">verify outputs</text>
+
+  <path class="edge" data-from="bRun" data-to="bOut" d="M950,275 H990" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="970" y="267" text-anchor="middle">Task appended</text>
+
+  <path class="edge dashed-edge" data-from="bCanExec" data-to="bNotify" d="M950,90 H985 V465 H990" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="992" y="400" text-anchor="start">False: exit request</text>
+
+  <path class="edge dashed-edge" data-from="bEntry" data-to="bNotify" d="M430,320 H455 V560 H985 V465 H990" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="700" y="556" text-anchor="middle">failure and completion alerts</text>
+
+  <text class="box-sub" x="20" y="600">solid = call  |  dashed = reads/writes  |  dotted = import or construction  |  12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 12 boxes, all from <a href="../../sources/core/planner.py">sources/core/planner.py</a> (1 053 lines, <code>wc -l</code>). Row 1 is construction, row 2 is the plan phase, row 3 is the step-execution phase. Named callees outside the file: <a href="../../sources/utils/list_files.py">list_files()</a> (called at L959), <a href="../../sources/utils/perspicacite_client.py">query_perspicacite()</a> (L135), <code>LLMProvider("plan_creator", ...)</code> (L188), <code>EvolutionEngine.start_workflow_evolution</code> (L779), <code>WorkflowSelector.select_best_workflows</code> (L751), <code>PushNotifier.send_message</code> (L703, L1019, L1037, L1051), <a href="../../sources/utils/planner_visualization.py">PlannerVisualizer</a> (L513) and <code>create_tts_service()</code> (L98). Those are named here instead of drawn, to stay at 12 boxes.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; what goes in, what comes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 620" role="img" aria-label="data flow: config fields and files enter planner.py, a Plan and a Task list leave">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="i1">
+    <title>Config fields plus the planner prompt file, read at __init__ and at plan time</title>
+    <rect x="20" y="20" width="240" height="96" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="46" text-anchor="middle">config + prompt file</text>
+    <text class="box-sub" x="140" y="66" text-anchor="middle">workspace_dir L78 &#183; planner_llm_model L84</text>
+    <text class="box-sub" x="140" y="82" text-anchor="middle">reasoning_effort L88 &#183; max_tokens L89</text>
+    <text class="box-sub" x="140" y="98" text-anchor="middle">config.prompt_planner opened L361</text>
+  </g>
+
+  <g class="box" id="i2">
+    <title>Workspace directory listing, used twice</title>
+    <rect x="20" y="160" width="240" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140" y="188" text-anchor="middle">workspace_dir tree</text>
+    <text class="box-sub" x="140" y="206" text-anchor="middle">list_files L959, os.walk L596</text>
+    <text class="box-sub" x="140" y="222" text-anchor="middle">dot dirs and __pycache__ skipped</text>
+  </g>
+
+  <g class="box" id="i3">
+    <title>The goal string from the CLI or the CSV batch</title>
+    <rect x="20" y="290" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="318" text-anchor="middle">goal: str</text>
+    <text class="box-sub" x="140" y="336" text-anchor="middle">argv --goal, or CSV row</text>
+    <text class="box-sub" x="140" y="352" text-anchor="middle">file list prepended at L959</text>
+  </g>
+
+  <g class="box" id="i4">
+    <title>Literature grounding service</title>
+    <rect x="20" y="420" width="240" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140" y="448" text-anchor="middle">Perspicacite-AI</text>
+    <text class="box-sub" x="140" y="466" text-anchor="middle">query_perspicacite L135</text>
+    <text class="box-sub" x="140" y="482" text-anchor="middle">first 2048 chars printed L152</text>
+  </g>
+
+  <a class="box" id="m1" href="#io-table">
+    <title>LLMConfig built from config, then the flat-cache plan_creator call</title>
+    <rect x="400" y="20" width="300" height="96" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="550" y="46" text-anchor="middle">LLMConfig + plan_creator</text>
+    <text class="box-sub" x="550" y="66" text-anchor="middle">config=self.config_llm (L85)</text>
+    <text class="box-sub" x="550" y="82" text-anchor="middle">LLMProvider, use_flat_cache=True L188</text>
+    <text class="box-sub" x="550" y="98" text-anchor="middle">system_msg = prompt file, use_cache=True</text>
+  </a>
+
+  <a class="box" id="m2" href="#io-table">
+    <title>JSON extraction then Plan construction</title>
+    <rect x="400" y="160" width="300" height="86" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="550" y="190" text-anchor="middle">extract + validate (L194, L197)</text>
+    <text class="box-sub" x="550" y="208" text-anchor="middle">_extract_json_from_code_block</text>
+    <text class="box-sub" x="550" y="224" text-anchor="middle">_parse_and_validate_plan</text>
+  </a>
+
+  <a class="box" id="m3" href="#io-table">
+    <title>Plan and PlanStep come from schema.py</title>
+    <rect x="400" y="290" width="300" height="86" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="550" y="320" text-anchor="middle">Plan / PlanStep</text>
+    <text class="box-sub" x="550" y="338" text-anchor="middle">goal, steps, depends_on, complexity</text>
+    <text class="box-sub" x="550" y="354" text-anchor="middle">cost 0.0, score 0.0 at build time</text>
+  </a>
+
+  <a class="box" id="m4" href="#io-table">
+    <title>Task and IndividualRun objects stored on the planner</title>
+    <rect x="400" y="420" width="300" height="86" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="550" y="450" text-anchor="middle">Task / IndividualRun</text>
+    <text class="box-sub" x="550" y="468" text-anchor="middle">Task built at L879, appended L894</text>
+    <text class="box-sub" x="550" y="484" text-anchor="middle">reward, answers, cost, current_uuid</text>
+  </a>
+
+  <g class="box" id="o1">
+    <title>The two things planner.py writes outside itself</title>
+    <rect x="820" y="20" width="340" height="96" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="990" y="46" text-anchor="middle">written outside the file</text>
+    <text class="box-sub" x="990" y="66" text-anchor="middle">&lt;memory_dir&gt;/plan_creator.json (llm_provider.py:260)</text>
+    <text class="box-sub" x="990" y="82" text-anchor="middle">Pushover: plan failed L231, step failed L1019</text>
+    <text class="box-sub" x="990" y="98" text-anchor="middle">Pushover: run complete L1037, error L1051</text>
+  </g>
+
+  <g class="box" id="o2">
+    <title>Returned values of the two public async methods</title>
+    <rect x="820" y="160" width="340" height="86" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="990" y="190" text-anchor="middle">returns</text>
+    <text class="box-sub" x="990" y="208" text-anchor="middle">start_planner -&gt; list[Task] (L1047)</text>
+    <text class="box-sub" x="990" y="224" text-anchor="middle">evolve_runs -&gt; list[IndividualRun] (L772)</text>
+  </g>
+
+  <g class="box" id="o3">
+    <title>In-memory state kept between steps</title>
+    <rect x="820" y="290" width="340" height="86" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="990" y="320" text-anchor="middle">planner state</text>
+    <text class="box-sub" x="990" y="338" text-anchor="middle">task_history L80, current_plan L81</text>
+    <text class="box-sub" x="990" y="354" text-anchor="middle">_workspace_files_before_step L92</text>
+  </g>
+
+  <g class="box" id="o4">
+    <title>Per-attempt score read back from the evolution run</title>
+    <rect x="820" y="420" width="340" height="86" rx="2" fill="rgba(77,159,255,0.10)" stroke="#4D9FFF"/>
+    <text class="box-label" x="990" y="450" text-anchor="middle">score read back</text>
+    <text class="box-sub" x="990" y="468" text-anchor="middle">state_result["success"][-1], L807</text>
+    <text class="box-sub" x="990" y="484" text-anchor="middle">last_run.reward -&gt; attempt_score L878</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="i1" data-to="m1" d="M260,68 H400" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="330" y="60" text-anchor="middle">4 fields + prompt</text>
+
+  <path class="edge dashed-edge" data-from="i2" data-to="m4" d="M260,198 H340 V463 H400" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="346" y="330" text-anchor="start">file list</text>
+
+  <path class="edge" data-from="i3" data-to="m1" d="M260,328 H370 V80 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="376" y="240" text-anchor="start">goal prompt</text>
+
+  <path class="edge dashed-edge" data-from="i4" data-to="m1" d="M260,458 H385 V110 H400" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="391" y="400" text-anchor="start">context text</text>
+
+  <path class="edge" data-from="m1" data-to="m2" d="M550,116 V160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="557" y="140" text-anchor="start">raw_plan: str</text>
+
+  <path class="edge" data-from="m2" data-to="m3" d="M550,246 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="557" y="272" text-anchor="start">plan_dict</text>
+
+  <path class="edge" data-from="m3" data-to="m4" d="M550,376 V420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="557" y="402" text-anchor="start">step.task, step.status</text>
+
+  <path class="edge dashed-edge" data-from="m1" data-to="o1" d="M700,68 H820" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="760" y="60" text-anchor="middle">cache read/write</text>
+
+  <path class="edge dashed-edge" data-from="m4" data-to="o1" d="M700,463 H780 V100 H820" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="786" y="300" text-anchor="start">alerts</text>
+
+  <path class="edge" data-from="m3" data-to="o2" d="M700,333 H790 V203 H820" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="764" y="270" text-anchor="middle">List[Task]</text>
+
+  <path class="edge dashed-edge" data-from="m4" data-to="o3" d="M700,440 H770 V333 H820" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="776" y="420" text-anchor="start">append</text>
+
+  <path class="edge dashed-edge" data-from="m4" data-to="o4" d="M700,484 H805 V463 H820" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="760" y="504" text-anchor="middle">success flag</text>
+
+  <text class="box-sub" x="20" y="600">cyan = value produced inside planner.py  |  blue dashed = read from disk or written outside the file  |  12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; 12 boxes. Inputs, internal values and outputs each hold four boxes; the config fields and the prompt file share one input box, and the LLM cache file and the Pushover messages share one output box, to stay under the 12-box limit. Config-key names and line numbers come from <a href="../../sources/core/planner.py">planner.py</a> and <a href="../../config.py">config.py</a> (<code>planner_llm_model</code> L62, <code>planner_human_approve</code> L112, <code>reasoning_effort</code> L161, <code>max_tokens</code> L163, <code>prompt_planner</code> L203, <code>memory_dir</code> L223). planner.py writes no file of its own: the only disk write on this path is the LLM cache file <code>&lt;memory_dir&gt;/plan_creator.json</code>, written by <a href="../../sources/core/llm_provider.py">llm_provider.py</a>:260 after the flat cache is used at L188. The <code>Plan</code>/<code>PlanStep</code>/<code>Task</code> dataclasses live in <a href="file_core_schema.html">file_core_schema.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control flow: three loops, three hard gates</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 620" role="img" aria-label="control flow: goal and TTY gates, make_plan retry loop, run_attempts score loop">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="20" y="24" text-anchor="start">lane A - start_planner gates</text>
+  <text class="box-sub" x="410" y="24" text-anchor="start">lane B - make_plan retry loop</text>
+  <text class="box-sub" x="800" y="24" text-anchor="start">lane C - run_attempts score loop</text>
+
+  <a class="box" id="a1" href="#sym-inventory">
+    <title>Entry, L925</title>
+    <rect x="20" y="40" width="340" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="190" y="66" text-anchor="middle">start_planner(goal, judge,</text>
+    <text class="box-sub" x="190" y="84" text-anchor="middle">max_task_retry=5, human_approve=False)</text>
+  </a>
+
+  <g class="box" id="a2">
+    <title>Two hard raises before any planning call</title>
+    <rect x="20" y="130" width="340" height="76" rx="14" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="190" y="156" text-anchor="middle">goal empty, or headless approval</text>
+    <text class="box-sub" x="190" y="174" text-anchor="middle">not goal or not str &#8594; ValueError, L948</text>
+    <text class="box-sub" x="190" y="190" text-anchor="middle">human_approve and not isatty() &#8594; L951</text>
+  </g>
+
+  <g class="box" id="a3">
+    <title>Stop sentinel short-circuits the whole run</title>
+    <rect x="20" y="238" width="340" height="62" rx="14" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="190" y="264" text-anchor="middle">_check_stop_condition(plan)</text>
+    <text class="box-sub" x="190" y="282" text-anchor="middle">step.task or step.name == "stop", L974</text>
+  </g>
+
+  <a class="box" id="a4" href="#sym-inventory">
+    <title>Step loop, L987</title>
+    <rect x="20" y="330" width="340" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="190" y="356" text-anchor="middle">for step in current_plan.steps</text>
+    <text class="box-sub" x="190" y="374" text-anchor="middle">max_attempts = max_task_retry</text>
+  </a>
+
+  <g class="box" id="a5">
+    <title>Second hard gate after the step loop</title>
+    <rect x="20" y="422" width="340" height="76" rx="14" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <text class="box-label" x="190" y="448" text-anchor="middle">step.status != COMPLETED</text>
+    <text class="box-sub" x="190" y="466" text-anchor="middle">L1017: notify, then raise Exception</text>
+    <text class="box-sub" x="190" y="482" text-anchor="middle">gives up after max_attempts, L1026</text>
+  </g>
+
+  <a class="box" id="b1" href="#sym-inventory">
+    <title>Retry loop, L183</title>
+    <rect x="410" y="130" width="340" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="580" y="156" text-anchor="middle">for attempt in 1..max_retries</text>
+    <text class="box-sub" x="580" y="174" text-anchor="middle">default max_retries = 3</text>
+  </a>
+
+  <a class="box" id="b2" href="#sym-inventory">
+    <title>The LLM call and the two parsers</title>
+    <rect x="410" y="214" width="340" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="580" y="240" text-anchor="middle">LLMProvider(plan_creator) &#8594; raw_plan</text>
+    <text class="box-sub" x="580" y="258" text-anchor="middle">_extract_json_from_code_block, then validate</text>
+    <text class="box-sub" x="580" y="274" text-anchor="middle">empty or None &#8594; ValueError L191, L196</text>
+  </a>
+
+  <g class="box" id="b3">
+    <title>The caught-exception branch: retry with feedback, or give up</title>
+    <rect x="410" y="312" width="340" height="106" rx="14" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="580" y="338" text-anchor="middle">caught: retry or give up</text>
+    <text class="box-sub" x="580" y="356" text-anchor="middle">ValueError / PlanValidationError / JSONDecodeError, L201</text>
+    <text class="box-sub" x="580" y="372" text-anchor="middle">attempt &lt; max_retries: sleep(2 ** attempt)</text>
+    <text class="box-sub" x="580" y="388" text-anchor="middle">attempt &gt; 1 &#8594; _enhance_prompt_with_error, L218</text>
+    <text class="box-sub" x="580" y="404" text-anchor="middle">else notifier.send_message, raise L238</text>
+  </g>
+
+  <a class="box" id="c1" href="#sym-inventory">
+    <title>Attempt loop, L847</title>
+    <rect x="800" y="130" width="360" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="980" y="156" text-anchor="middle">while attempt &lt; max_attempts</text>
+    <text class="box-sub" x="980" y="174" text-anchor="middle">max_attempts &lt; 1 forced to 1 at L835</text>
+  </a>
+
+  <a class="box" id="c2" href="#sym-inventory">
+    <title>Cache reuse is allowed on the first attempt only</title>
+    <rect x="800" y="214" width="360" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="980" y="238" text-anchor="middle">cached_wf_allow = (attempt &lt;= 1)</text>
+    <text class="box-sub" x="980" y="256" text-anchor="middle">L861</text>
+  </a>
+
+  <g class="box" id="c3">
+    <title>The score gate, L896</title>
+    <rect x="800" y="290" width="360" height="76" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="980" y="316" text-anchor="middle">evolve_success and attempt_score &gt;= 0.7</text>
+    <text class="box-sub" x="980" y="334" text-anchor="middle">attempt_score = last_run.reward (L878)</text>
+    <text class="box-sub" x="980" y="350" text-anchor="middle">evolve_success = state_result["success"][-1]</text>
+  </g>
+
+  <g class="box" id="c4">
+    <title>Two exits, and the output-file check on the success path</title>
+    <rect x="800" y="388" width="360" height="106" rx="14" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="980" y="414" text-anchor="middle">break or continue</text>
+    <text class="box-sub" x="980" y="432" text-anchor="middle">success: sleep(10), verify outputs, break L902</text>
+    <text class="box-sub" x="980" y="448" text-anchor="middle">0.7 token overlap on file stems, L664</text>
+    <text class="box-sub" x="980" y="464" text-anchor="middle">missing files: warn, still break L904</text>
+    <text class="box-sub" x="980" y="480" text-anchor="middle">failure: print_err, continue L910</text>
+  </g>
+
+  <path class="edge" data-from="a1" data-to="a2" d="M190,102 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="a2" data-to="a3" d="M190,206 V238" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="197" y="228" text-anchor="start">else</text>
+  <path class="edge" data-from="a3" data-to="a4" d="M190,300 V330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="197" y="320" text-anchor="start">no stop step</text>
+  <path class="edge dashed-edge" data-from="a3" data-to="a5" d="M360,269 H392 V460 H360" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="398" y="400" text-anchor="start">stop &#8594; return history</text>
+  <path class="edge" data-from="a4" data-to="a5" d="M190,392 V422" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="197" y="414" text-anchor="start">after loop</text>
+
+  <path class="edge" data-from="a4" data-to="b1" d="M360,361 H385 V161 H410" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="372" y="250" text-anchor="start">make_plan</text>
+  <path class="edge" data-from="a4" data-to="c1" d="M360,381 H385 V600 H780 V161 H800" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="600" y="592" text-anchor="middle">run_attempts</text>
+
+  <path class="edge" data-from="b1" data-to="b2" d="M580,192 V214" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="b2" data-to="b3" d="M580,290 V312" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="587" y="308" text-anchor="start">raise caught</text>
+  <path class="edge dotted-edge" data-from="b3" data-to="b1" d="M560,312 V110 H560 V130" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="553" y="112" text-anchor="end">next attempt</text>
+
+  <path class="edge" data-from="c1" data-to="c2" d="M980,192 V214" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="c3" d="M980,270 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c3" data-to="c4" d="M980,366 V388" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge dotted-edge" data-from="c4" data-to="c1" d="M1160,441 H1172 V161 H1160" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1168" y="300" text-anchor="end">next attempt</text>
+
+  <text class="box-sub" x="20" y="600">mint = loop body  |  red = hard raise  |  amber = branch with two exits  |  dotted = back edge to the loop head  |  12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; 12 boxes, all conditions as written in <a href="../../sources/core/planner.py">planner.py</a>. Lane A: <code>start_planner</code> L925&ndash;L1053. Lane B: <code>make_plan</code> L163&ndash;L238, called by <code>_generate_plan_with_human_validation</code> L490 inside a <code>while not plan_approved</code> loop (L486). Lane C: <code>run_attempts</code> L811&ndash;L923. Three pairs share one box to stay under the 12-box limit: the goal check and the headless-approval check (both raise), the caught-exception handling and the retry/give-up decision, and the success exit with the output-file check. Two flags the diagram omits for space: <code>human_approve</code> is also checked by <a href="../../main.py">main.py:243</a> from <a href="../../config.py">config.py</a>:112, and <code>_init_visualization</code> (L500) sets <code>self.use_visualization = False</code> when pygame fails, so every later visualization call returns early (L509, L547).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="io-table">What it reads and writes</h2>
+<table>
+<thead><tr><th>kind</th><th>name</th><th>where</th><th>used for</th></tr></thead>
+<tbody>
+<tr><td>config field</td><td class="sym">workspace_dir</td><td class="sym">planner.py:78, :959</td><td>root for the file scan and the goal preamble</td></tr>
+<tr><td>config field</td><td class="sym">pushover_token, pushover_user</td><td class="sym">planner.py:83</td><td>builds PushNotifier for alerts</td></tr>
+<tr><td>config field</td><td class="sym">planner_llm_model</td><td class="sym">planner.py:84 &#183; config.py:62</td><td>split into provider and model by extract_model_pattern</td></tr>
+<tr><td>config field</td><td class="sym">reasoning_effort</td><td class="sym">planner.py:88 &#183; config.py:161</td><td>passed to LLMConfig, default "medium"</td></tr>
+<tr><td>config field</td><td class="sym">max_tokens</td><td class="sym">planner.py:89 &#183; config.py:163</td><td>LLMConfig limit; getattr fallback is 8192</td></tr>
+<tr><td>config field</td><td class="sym">memory_dir</td><td class="sym">planner.py:187 &#183; config.py:223</td><td>folder of the flat LLM reply cache</td></tr>
+<tr><td>config field</td><td class="sym">prompt_planner</td><td class="sym">planner.py:361 &#183; config.py:203</td><td>system prompt for plan generation</td></tr>
+<tr><td>config field</td><td class="sym">planner_human_approve</td><td class="sym">config.py:112 &#183; main.py:243</td><td>forwarded as the human_approve argument</td></tr>
+<tr><td>file read</td><td class="sym">sources/prompts/planner_*.md</td><td class="sym">planner.py:361</td><td>prompt text; failure raises RuntimeError</td></tr>
+<tr><td>dir read</td><td class="sym">list_files(workspace_dir)</td><td class="sym">planner.py:959</td><td>file list prepended to the goal string</td></tr>
+<tr><td>dir read</td><td class="sym">os.walk(workspace_path)</td><td class="sym">planner.py:596</td><td>relative paths, dot dirs and cache dirs skipped</td></tr>
+<tr><td>state key</td><td class="sym">self.task_history</td><td class="sym">planner.py:80, :894</td><td>task record, knowledge reuse, final summary</td></tr>
+<tr><td>state key</td><td class="sym">self.current_plan</td><td class="sym">planner.py:81, :964</td><td>the approved Plan whose steps run</td></tr>
+<tr><td>state key</td><td class="sym">self._workspace_files_before_step</td><td class="sym">planner.py:92, :621</td><td>before/after diff for produced_outputs</td></tr>
+<tr><td>state key</td><td class="sym">state_result["success"][-1]</td><td class="sym">planner.py:807</td><td>evolve_success flag; missing key gives False</td></tr>
+<tr><td>call out</td><td class="sym">query_perspicacite(prompt)</td><td class="sym">planner.py:135</td><td>literature context; exception gives a fallback string</td></tr>
+<tr><td>call out</td><td class="sym">LLMProvider("plan_creator")</td><td class="sym">planner.py:188</td><td>one flat-cache call per plan attempt</td></tr>
+<tr><td>call out</td><td class="sym">WorkflowSelector.select_best_workflows</td><td class="sym">planner.py:751</td><td>cached workflow reuse, similarity 0.98, score 0.99</td></tr>
+<tr><td>call out</td><td class="sym">EvolutionEngine.start_workflow_evolution</td><td class="sym">planner.py:779</td><td>new evolution round for the task</td></tr>
+<tr><td>return</td><td class="sym">list[Task]</td><td class="sym">planner.py:976, :1047</td><td>task_history, returned by start_planner</td></tr>
+<tr><td>return</td><td class="sym">list[IndividualRun]</td><td class="sym">planner.py:772, :791</td><td>cached run, or the runs of the new round</td></tr>
+<tr><td>write</td><td class="sym">Pushover message</td><td class="sym">planner.py:231, :1019, :1037, :1051</td><td>plan failure, step failure, completion, error</td></tr>
+<tr><td>write</td><td class="sym">&lt;memory_dir&gt;/plan_creator.json</td><td class="sym">llm_provider.py:260</td><td>LLM cache for the plan call, not this file</td></tr>
+<tr><td>no write</td><td class="sym">workspace files</td><td class="sym">planner.py (whole file)</td><td>planner.py never writes result files; MY READING</td></tr>
+</tbody>
+</table>
+<p class="sub">Line numbers are from the working-tree files at commit 7e8463b plus uncommitted edits. The last row is my reading of the file, not an executed check.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="sym-inventory">Full symbol inventory</h2>
+<p class="sub">29 symbols: 3 exception classes, 1 class, 25 methods (3 async). Signatures are copied from the working tree. Roles are 8 words or fewer.</p>
+<details><summary>every class, method and signature (29 rows)</summary><div class="dbody">
+<table>
+<thead><tr><th>symbol</th><th>signature</th><th>line</th><th>role</th></tr></thead>
+<tbody>
+<tr><td class="sym">UserInterventionRequired</td><td class="sym">(Exception)</td><td class="size">37</td><td>raised instead of blocking on input()</td></tr>
+<tr><td class="sym">PlanValidationError</td><td class="sym">(Exception)</td><td class="size">46</td><td>plan validation failed</td></tr>
+<tr><td class="sym">DependencyError</td><td class="sym">(Exception)</td><td class="size">51</td><td>declared, never raised anywhere in repo</td></tr>
+<tr><td class="sym">Planner</td><td class="sym">class Planner</td><td class="size">56</td><td>goal to plan to step execution</td></tr>
+<tr><td class="sym">Planner.__init__</td><td class="sym">(config: "Config", enable_tts: bool = True) -&gt; None</td><td class="size">62</td><td>wires engine, selector, notifier, LLM config</td></tr>
+<tr><td class="sym">Planner.perspicacite_grounding</td><td class="sym">(goal: str) -&gt; str</td><td class="size">100</td><td>asks the literature service for planning guidance</td></tr>
+<tr><td class="sym">Planner.make_scientific_grounded_prompt</td><td class="sym">(goal: str) -&gt; str</td><td class="size">140</td><td>wraps goal with the retrieved context</td></tr>
+<tr><td class="sym">Planner.make_plan</td><td class="sym">(system_prompt: str, goal_prompt: str, max_retries: int = 3) -&gt; Plan</td><td class="size">163</td><td>LLM call plus retry loop plus parsing</td></tr>
+<tr><td class="sym">Planner._parse_and_validate_plan</td><td class="sym">(plan_dict: dict[str, Any], goal: str) -&gt; Plan</td><td class="size">240</td><td>dict to PlanStep list to Plan</td></tr>
+<tr><td class="sym">Planner._extract_json_from_code_block</td><td class="sym">@staticmethod (text: str) -&gt; dict[str, Any] | None</td><td class="size">295</td><td>reads a ```json fence only</td></tr>
+<tr><td class="sym">Planner._enhance_prompt_with_error</td><td class="sym">@staticmethod (original_prompt: str, error_msg: str) -&gt; str</td><td class="size">328</td><td>retry prompt carrying the last error</td></tr>
+<tr><td class="sym">Planner._read_prompt</td><td class="sym">() -&gt; str</td><td class="size">352</td><td>opens config.prompt_planner, else RuntimeError</td></tr>
+<tr><td class="sym">Planner._build_knowledge_aware_task</td><td class="sym">(task_description: str) -&gt; str</td><td class="size">366</td><td>prepends answers of completed tasks</td></tr>
+<tr><td class="sym">Planner._check_stop_condition</td><td class="sym">(plan: Plan) -&gt; bool</td><td class="size">395</td><td>True when a step is named stop</td></tr>
+<tr><td class="sym">Planner._display_plan</td><td class="sym">(plan: Plan) -&gt; None</td><td class="size">411</td><td>prints goal, steps, inputs, outputs</td></tr>
+<tr><td class="sym">Planner._request_human_plan_validation</td><td class="sym">(plan: Plan) -&gt; tuple[bool, str]</td><td class="size">430</td><td>Enter approves, text is feedback; TTY gate</td></tr>
+<tr><td class="sym">Planner._generate_plan_with_human_validation</td><td class="sym">(goal: str, human_approve: bool = False) -&gt; Plan</td><td class="size">466</td><td>loops make_plan until approved</td></tr>
+<tr><td class="sym">Planner._init_visualization</td><td class="sym">(plan: Plan) -&gt; None</td><td class="size">500</td><td>opens pygame window, thread off macOS</td></tr>
+<tr><td class="sym">Planner._update_visualization</td><td class="sym">(total_cost: float = 0.0) -&gt; None</td><td class="size">539</td><td>pushes task states into the window</td></tr>
+<tr><td class="sym">Planner._cleanup_visualization</td><td class="sym">() -&gt; None</td><td class="size">557</td><td>stops the thread and closes the window</td></tr>
+<tr><td class="sym">Planner._get_workspace_files</td><td class="sym">() -&gt; list[str]</td><td class="size">578</td><td>relative paths with forward slashes</td></tr>
+<tr><td class="sym">Planner._capture_workspace_snapshot</td><td class="sym">() -&gt; list[str]</td><td class="size">613</td><td>stores the file list before a step</td></tr>
+<tr><td class="sym">Planner._verify_required_inputs</td><td class="sym">(step: PlanStep) -&gt; tuple[bool, list[str]]</td><td class="size">625</td><td>declared but never called; see the notes</td></tr>
+<tr><td class="sym">Planner._verify_expected_outputs</td><td class="sym">(step: PlanStep) -&gt; tuple[bool, list[str]]</td><td class="size">644</td><td>stem-overlap 0.7 test on produced files</td></tr>
+<tr><td class="sym">Planner._can_execute_step</td><td class="sym">(step: PlanStep) -&gt; tuple[bool, list[str]]</td><td class="size">672</td><td>dependency completion plus its output files</td></tr>
+<tr><td class="sym">Planner.request_user_exit</td><td class="sym">(msg: str) -&gt; None</td><td class="size">696</td><td>notifies, prompts, exit(1) on refusal</td></tr>
+<tr><td class="sym">Planner.evolve_runs</td><td class="sym">async (task: str, judge: bool, cached_wf_allow: bool = True, original_task: str | None = None) -&gt; list[IndividualRun]</td><td class="size">714</td><td>cached run or a new evolution round</td></tr>
+<tr><td class="sym">Planner._get_evolve_success</td><td class="sym">(run: IndividualRun) -&gt; bool</td><td class="size">796</td><td>last item of state_result["success"]</td></tr>
+<tr><td class="sym">Planner.run_attempts</td><td class="sym">async (attempt_counts: dict[str, int], max_attempts: int, step: PlanStep, judge: bool) -&gt; PlanStep</td><td class="size">811</td><td>retry loop for one plan step</td></tr>
+<tr><td class="sym">Planner.start_planner</td><td class="sym">async (goal: str, judge: bool = True, max_task_retry: int = 5, human_approve: bool = False) -&gt; list[Task]</td><td class="size">925</td><td>public entry: plan then run steps</td></tr>
+</tbody>
+</table>
+<p class="note">Nested closure not listed: <code>visualization_loop()</code> at line 519, local to <code>_init_visualization</code>.</p>
+<p>Module imports (L1&ndash;L34): stdlib <code>json</code>, <code>os</code>, <code>re</code>, <code>sys</code>, <code>threading</code>, <code>time</code>, <code>pathlib</code>, <code>typing</code>; local <code>sources.cli.pretty_print</code> (10 print helpers), <code>sources.extensibility.text_to_speech.create_tts_service</code>, <code>sources.utils.list_files</code>, <code>sources.utils.notify.PushNotifier</code>, <code>sources.utils.perspicacite_client.query_perspicacite</code>, <code>sources.utils.planner_visualization.PlannerVisualizer</code>; sibling modules <code>.evolution_engine</code>, <code>.llm_provider</code>, <code>.schema</code>, <code>.workflow_selection</code>. The <code>"Config"</code> annotation at L62 is a string and there is no import for it, so the module loads without config.py.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>caller</th><th>line</th><th>what it does</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../main.py">main.py</a></td><td class="size">36, 223, 241</td><td>imports Planner, builds it, awaits start_planner in <code>--goal</code> mode</td></tr>
+<tr><td class="sym"><a href="../../sources/core/__init__.py">sources/core/__init__.py</a></td><td class="size">21, 51</td><td>re-exports Planner, PlanValidationError, DependencyError</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/csv_mode.py">benchmark_evaluation/csv_mode.py</a></td><td class="size">32, 163, 1146, 1168, 1464</td><td>one planner per CSV task, isolated planner per row</td></tr>
+<tr><td class="sym"><a href="../../sources/cli/onboard_cli.py">cli/onboard_cli.py</a></td><td class="size">1592, 1596</td><td>wizard path: awaits start_planner</td></tr>
+<tr><td class="sym"><a href="../../webui/backend/mimosa_bridge.py">webui/backend/mimosa_bridge.py</a></td><td class="size">185, 187, 189</td><td>Web UI bridge, <code>enable_tts=False</code></td></tr>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">evolution_engine.py</a></td><td class="size">none</td><td>no import: the dependency runs the other way</td></tr>
+<tr><td class="sym">sources/core/orchestrator.py</td><td class="size">none</td><td>separate class, no planner import in either direction</td></tr>
+</tbody>
+</table>
+<p class="sub">Importers found by <code>grep -rn</code> over <code>sources/</code>, <code>main.py</code>, <code>webui/</code> and <code>tests/</code>. No importer exists in <code>experiments_verifiers/</code>; the <code>torch</code> hits in that tree are an unrelated vendored venv.</p>
+
+<h3>Tests</h3>
+<table>
+<thead><tr><th>test file</th><th>lines</th><th>symbols under test</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/planner_test.py">tests/planner_test.py</a></td><td class="size">98</td><td><code>_can_execute_step</code>, <code>_verify_expected_outputs</code>, <code>_get_workspace_files</code></td></tr>
+<tr><td class="sym"><a href="../../tests/planner_human_approve_test.py">tests/planner_human_approve_test.py</a></td><td class="size">119</td><td><code>_generate_plan_with_human_validation</code>, <code>_request_human_plan_validation</code>, <code>start_planner</code>, <code>UserInterventionRequired</code>, the config default</td></tr>
+<tr><td class="sym"><a href="../../tests/planner_json_extraction_test.py">tests/planner_json_extraction_test.py</a></td><td class="size">262</td><td><code>_extract_json_from_code_block</code>, <code>make_plan</code> retry and cache behaviour</td></tr>
+<tr><td class="sym"><a href="../../tests/paths_test.py">tests/paths_test.py</a></td><td class="size">unknown</td><td>only <code>config.prompt_planner</code> resolution; not the module</td></tr>
+</tbody>
+</table>
+<p class="sub">Test files were read, not run (build rule: no pytest). The third row is discussed in the note below.</p>
+
+<p class="note flag">Mismatch, my reading only: <code>_extract_json_from_code_block</code> (L295) accepts a block only after a line starting with <code>```json</code> (L313), and returns <code>None</code> when it finds no such fence (L325). Four tests in <a href="../../tests/planner_json_extraction_test.py">tests/planner_json_extraction_test.py</a> expect more: <code>test_extract_plain_fence</code>, <code>test_extract_raw_json_without_fences</code>, <code>test_extract_prose_wrapped_json</code> and <code>test_extract_skips_broken_block_for_parseable_span</code> (L162&ndash;L181). Following the code text, those four would fail. Not verified by a run.</p>
+<p class="note">Amber, dead code and docstring drift: <code>_verify_required_inputs</code> (L625) has no caller anywhere in the repo; <code>DependencyError</code> (L51) is never raised; <code>_verify_expected_outputs</code> documents a <code>produced_outputs</code> parameter (L649) that its signature (L644) does not have; the cache-reuse branch <code>elif self._get_evolve_success(best_match)</code> is commented out at L759, so any cached match with <code>.is_success</code> is returned without the score check.</p>
+<p class="note say">Why it matters: <code>make_scientific_grounded_prompt</code> prints the first 2048 characters of the retrieved literature straight to stdout (L152) on every attempt, so the grounding text lands in run logs and console output, not only in the prompt. The same call is made in benchmark CSV mode, where it costs one Perspicacite round trip per plan.</p>
+</div>
+
+<footer>
+<p>Sources: <code class="path">sources/core/planner.py</code> (all 1 053 lines, headers, every <code>def</code>, control flow, string literals), <code class="path">config.py</code> (planner_llm_model L62, planner_human_approve L112, reasoning_effort L161, max_tokens L163, prompt_planner L203, memory_dir L223), <code class="path">main.py</code> (L36, L102, L223, L241), <code class="path">sources/core/schema.py</code> (Plan L112, PlanStep L84, Task L143, IndividualRun L43, TaskStatus L9), <code class="path">sources/core/llm_provider.py</code> (LLMProvider L157&ndash;L199, save_call L253, flat cache L286), <code class="path">sources/core/workflow_selection.py</code> (select_best_workflows L209), <code class="path">sources/utils/list_files.py</code>, <code class="path">sources/utils/planner_visualization.py</code> (class and method names only), <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (call sites), <code class="path">sources/cli/onboard_cli.py</code> (call sites), <code class="path">webui/backend/mimosa_bridge.py</code> (call sites), <code class="path">tests/planner_test.py</code>, <code class="path">tests/planner_human_approve_test.py</code>, <code class="path">tests/planner_json_extraction_test.py</code>, <code class="path">docs/DEVELOPER_GUIDE.md</code> (Mode 2, L444&ndash;L452). Line counts from <code>wc -l</code>. Text budget and colours per UPDATE_VISUAL_CLONE.md sections 6&ndash;7.</p>
+<p class="skips">Skipped: <code class="path">sources/prompts/planner_*.md</code> line by line (Tier C; the path is cited, the text is not read). <code class="path">sources/cli/pretty_print.py</code> (only the 10 helper names imported at L10&ndash;L22 are named). <code class="path">sources/core/evolution_engine.py</code> and <code class="path">sources/core/orchestrator.py</code> internals (read only for the import and call sites; they have their own pages). <code class="path">sources/utils/planner_visualization.py</code> pygame internals (one-line role only, same skip as the module page). The <code>torch</code> matches under <code class="path">experiments_verifiers/</code> are a vendored venv and were not inspected. No pytest run and no application run, by the build rules.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git status --porcelain sources/core/ tests/</code> lists no modification under <code>sources/core/</code> plus three untracked test files, so planner.py itself matches the commit while config.py, docs and datasets in the tree do not.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

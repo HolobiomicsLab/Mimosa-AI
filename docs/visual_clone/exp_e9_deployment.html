@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E9 L3 deployment replay - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments > harness > e9_deployment">
+<div class="wrap">
+
+<h1 class="hud">e9_deployment &mdash; does learned importance beat the recorded reward?</h1>
+<p class="intro">With the contamination of <a href="exp_e8_blast_radius.html">exp_e8_blast_radius.html</a> removed, this experiment scores every <code>asb_full_iterative_1</code> generation with L3 and ships the best one per task, checking the recorded SR. L3 weights are trained on the other campaigns only, so the comparison is an honest cross-campaign transfer. Folder context: <a href="data_experiments.html">data_experiments.html</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 400" role="img" aria-label="E9 deployment replay pipeline">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="hy">
+    <title>Does L3 beat reward?</title>
+    <rect x="20" y="16" width="380" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="210.0" y="40.0" text-anchor="middle">Does L3 beat reward?</text>
+    <text class="box-sub" x="210.0" y="57.0" text-anchor="middle">hypothesis</text>
+  </g>
+  <a class="box" id="in1" href="../../experiments_verifiers/data/verifier_claims_sane.jsonl">
+    <title>verifier_claims_sane.jsonl</title>
+    <rect x="20" y="110" width="200" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120.0" y="134.0" text-anchor="middle">verifier_claims_sane.jsonl</text>
+    <text class="box-sub" x="120.0" y="151.0" text-anchor="middle">asb claim rows</text>
+  </a>
+  <a class="box" id="in2" href="../../experiments_verifiers/data/manifest_sane.json">
+    <title>manifest_sane.json</title>
+    <rect x="20" y="180" width="200" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120.0" y="204.0" text-anchor="middle">manifest_sane.json</text>
+    <text class="box-sub" x="120.0" y="221.0" text-anchor="middle">uuid + reward rows</text>
+  </a>
+  <a class="box" id="in3" href="../../experiments_verifiers/results/_cache_e5_embeddings.npz">
+    <title>_cache_e5_embeddings.npz</title>
+    <rect x="20" y="250" width="200" height="52" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120.0" y="274.0" text-anchor="middle">_cache_e5_embeddings.npz</text>
+    <text class="box-sub" x="120.0" y="291.0" text-anchor="middle">MiniLM claim vectors</text>
+  </a>
+  <a class="box" id="s0" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>load_sane()</title>
+    <rect x="250" y="110" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345.0" y="132.0" text-anchor="middle">load_sane()</text>
+    <text class="box-sub" x="345.0" y="149.0" text-anchor="middle">L46 · drops nulled rows</text>
+  </a>
+  <a class="box" id="s2" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>l3_feats() + l3b_feats()</title>
+    <rect x="250" y="180" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345.0" y="202.0" text-anchor="middle">l3_feats() + l3b_feats()</text>
+    <text class="box-sub" x="345.0" y="219.0" text-anchor="middle">L90 / L98</text>
+  </a>
+  <a class="box" id="s3" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>fit_score()</title>
+    <rect x="250" y="250" width="190" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345.0" y="274.0" text-anchor="middle">fit_score()</text>
+    <text class="box-sub" x="345.0" y="291.0" text-anchor="middle">L142 · + select_C_inner L120</text>
+  </a>
+  <a class="box" id="s1" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>manifest_index()</title>
+    <rect x="250" y="330" width="190" height="48" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345.0" y="352.0" text-anchor="middle">manifest_index()</text>
+    <text class="box-sub" x="345.0" y="369.0" text-anchor="middle">L63 · + mrow_cat L72</text>
+  </a>
+  <a class="box" id="s4" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>replay()</title>
+    <rect x="480" y="110" width="220" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590.0" y="134.0" text-anchor="middle">replay()</text>
+    <text class="box-sub" x="590.0" y="151.0" text-anchor="middle">L159 · argmax per task</text>
+  </a>
+  <a class="box" id="s5" href="../../experiments_verifiers/harness/e9_deployment.py">
+    <title>pseudo_scores() + replay()</title>
+    <rect x="480" y="180" width="220" height="52" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="590.0" y="204.0" text-anchor="middle">pseudo_scores() + replay()</text>
+    <text class="box-sub" x="590.0" y="221.0" text-anchor="middle">L302 · recovered rows</text>
+  </a>
+  <a class="box" id="out" href="../../experiments_verifiers/results/">
+    <title>E9_l3_deployment_sane_&lt;date&gt;</title>
+    <rect x="480" y="280" width="250" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="605.0" y="311.0" text-anchor="middle">E9_l3_deployment_sane_&lt;date&gt;</text>
+    <text class="box-sub" x="605.0" y="328.0" text-anchor="middle">.json L36 · .md L37</text>
+  </a>
+
+  <path class="edge" data-from="hy" data-to="in1" d="M200,68 L120,110" fill="none" stroke="#B79CFF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="150" y="92" text-anchor="start">drives</text>
+  <path class="edge dashed-edge" data-from="in1" data-to="s0" d="M220,136 H250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="224" y="128" text-anchor="start">loads rows</text>
+  <path class="edge dashed-edge" data-from="in2" data-to="s1" d="M20,206 H8 V354 H250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="None" y="None" text-anchor="middle">labels</text>
+  <path class="edge dashed-edge" data-from="in3" data-to="s2" d="M220,276 L250,214" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="224" y="268" text-anchor="start">vectors</text>
+  <path class="edge" data-from="s0" data-to="s2" d="M345,158 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="351" y="174" text-anchor="start">rows</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M345,228 V250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="351" y="244" text-anchor="start">features</text>
+  <path class="edge" data-from="s3" data-to="s4" d="M440,274 L480,140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="444" y="214" text-anchor="start">scores</text>
+  <path class="edge" data-from="s3" data-to="s5" d="M440,288 L480,196" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="444" y="258" text-anchor="start">scores</text>
+  <path class="edge dashed-edge" data-from="s5" data-to="out" d="M590,232 V280" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="596" y="264" text-anchor="start">writes</text>
+  <path class="edge dashed-edge" data-from="s4" data-to="out" d="M700,136 H745 V313 H730" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="620" y="132" text-anchor="middle">report</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>11 boxes</code>. Dashed grey = frozen sane inputs, mint pills = functions in <code>e9_deployment.py</code>, cyan = the written artifacts. <code>load_sane</code> (L46) drops rows with <code>SR</code> or <code>claims</code> null and maps claim status through <code>SCORE_MAP</code> (L39); <code>manifest_index</code> (L63) groups manifest rows and <code>mrow_cat</code> (L72) labels them carried, contaminated or recovered. <code>l3_feats</code> (L90) builds the pass-weighted centroid, <code>l3b_feats</code> (L98) adds the fail centroid and counts, <code>fit_score</code> (L142) selects C with <code>select_C_inner</code> (L120) and fits the logistic. <code>replay</code> (L159) ships the argmax per task, breaking ties on the latest <code>uuid_long</code>, which <code>manifest_index</code> supplies (that edge is named here, not drawn). The sensitivity path re-runs only the reward baseline and the task count over the recovered rows (<code>pseudo_scores</code> L302).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l4">
+<h4><a href="../../experiments_verifiers/harness/e9_deployment.py">experiments_verifiers/harness/e9_deployment.py</a></h4>
+<p class="role">Scores every sane asb generation with learned claim-importance and ships the top one per task.</p>
+<p class="meta">557 lines &#183; entry <code>main()</code> L201 &#183; CLI arguments: none (module docstring L17: <code>uv run python experiments_verifiers/harness/e9_deployment.py</code>) &#183; imports <code>e5_common</code> L33</p>
+<details><summary>signatures and constants</summary><div class="dbody">
+<pre>load_sane() -&gt; (rows, n_flagged)                       # L46  drops SR/claims null rows
+manifest_index() -&gt; (manifest, by_key)                 # L63
+mrow_cat(r) -&gt; str                                      # L72  carried / contaminated / recovered
+load_emb() -&gt; (embz, idx)                               # L83
+l3_feats(e, embz, idx) -&gt; np.ndarray                    # L90  psi = mean_i s_i * MiniLM(name+desc)_i
+l3b_feats(e, embz, idx) -&gt; np.ndarray                   # L98  + fail centroid + counts (771 dims)
+select_C_inner(X, y, groups, seed=0) -&gt; float           # L120 4-fold inner CV over C_GRID
+fit_score(train, test, feat, seed=0) -&gt; (scores, C)     # L142
+replay(cands_by_task, scores, order_key) -&gt; (metrics, details)   # L159
+write_md(out, details_all, strict_tasks, oracle_strict) # L455</pre>
+<p>Constants: <code>ASB = "asb_full_iterative_1"</code> (L38), <code>C_GRID = [0.01, 0.03, 0.1, 0.3, 1.0]</code> (L39), <code>SCORE_MAP = {"pass": 1.0, "fail": 0.0, "unsure": 0.5}</code> (L40). Scorers compared: <code>reward_p0</code>, <code>uniform_passrate</code>, <code>ver_bit</code>, <code>v0_recompute</code>, <code>l3_cross_campaign</code>, <code>l3b_cross_campaign</code>, <code>l3_asb_loto</code>, <code>l3b_asb_loto</code> (main L257 and L273&ndash;L276).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Sane claim rows, 42 nulled rows excluded</td><td>nothing</td><td class="sym"><code class="path">experiments_verifiers/data/verifier_claims_sane.jsonl</code> (L48)</td></tr>
+<tr><td>Per-generation rows, flags, recovered rows</td><td>nothing</td><td class="sym"><code class="path">experiments_verifiers/data/manifest_sane.json</code> (L64)</td></tr>
+<tr><td>Frozen MiniLM claim embeddings</td><td>nothing</td><td class="sym"><code class="path">experiments_verifiers/results/_cache_e5_embeddings.npz</code> (L84)</td></tr>
+<tr><td>Replay metrics, ranking context, missed tasks</td><td>Scores, picks, gaps</td><td class="sym"><code class="path">experiments_verifiers/results/E9_l3_deployment_sane_&lt;date&gt;.json</code> (L36)</td></tr>
+<tr><td>the JSON of record above</td><td>Report with TL;DR and named misses</td><td class="sym"><code class="path">experiments_verifiers/results/E9_l3_deployment_sane_&lt;date&gt;.md</code> (L37), rendered by <code>write_md</code> L455</td></tr>
+<tr><td>the capsule yardstick for context</td><td>nothing</td><td class="sym"><code class="path">../../run_notes/evaluations/20260831_deepseek-v4-flash_iterative_1.json</code></td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: this is metric M2 of the experiment plan &mdash; score every generation, argmax, read the recorded SR.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; what each scorer ships</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 808 370" role="img" aria-label="bar chart of the measured metrics">
+  <path d="M248,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="248" y="346" text-anchor="middle">0</text>
+  <path d="M344,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="344" y="346" text-anchor="middle">10</text>
+  <path d="M439,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="439" y="346" text-anchor="middle">20</text>
+  <path d="M535,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="535" y="346" text-anchor="middle">30</text>
+  <path d="M630,38 V330" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <text class="box-sub" x="630" y="346" text-anchor="middle">40</text>
+  <text class="box-sub" x="238" y="70" text-anchor="end">ORACLE · any SR-true gen</text>
+  <rect x="248" y="58" width="382" height="15" fill="#7DF9C7" fill-opacity="0.30" stroke="#7DF9C7"/>
+  <text class="box-label" x="638" y="70" text-anchor="start">40</text>
+  <text class="box-sub" x="238" y="100" text-anchor="end">uniform pass-rate</text>
+  <rect x="248" y="88" width="344" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="600" y="100" text-anchor="start">36</text>
+  <text class="box-sub" x="238" y="130" text-anchor="end">ver_bit</text>
+  <rect x="248" y="118" width="344" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="600" y="130" text-anchor="start">36</text>
+  <text class="box-sub" x="238" y="160" text-anchor="end">v0 recompute</text>
+  <rect x="248" y="148" width="344" height="15" fill="#39FF88" fill-opacity="0.30" stroke="#39FF88"/>
+  <text class="box-label" x="600" y="160" text-anchor="start">36</text>
+  <text class="box-sub" x="238" y="190" text-anchor="end">reward P0 (recorded)</text>
+  <rect x="248" y="178" width="334" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="590" y="190" text-anchor="start">35</text>
+  <text class="box-sub" x="238" y="220" text-anchor="end">L3 cross-campaign</text>
+  <rect x="248" y="208" width="334" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="590" y="220" text-anchor="start">35</text>
+  <text class="box-sub" x="238" y="250" text-anchor="end">L3b cross-campaign</text>
+  <rect x="248" y="238" width="334" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="590" y="250" text-anchor="start">35</text>
+  <text class="box-sub" x="238" y="280" text-anchor="end">L3 within-asb LOTO</text>
+  <rect x="248" y="268" width="334" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="590" y="280" text-anchor="start">35</text>
+  <text class="box-sub" x="238" y="310" text-anchor="end">L3b within-asb LOTO</text>
+  <rect x="248" y="298" width="325" height="15" fill="#00E5FF" fill-opacity="0.30" stroke="#00E5FF"/>
+  <text class="box-label" x="581" y="310" text-anchor="start">34</text>
+  <text class="box-sub" x="12" y="362" text-anchor="start">tasks where the shipped generation is SR-true, of 93 tasks · source: E9_l3_deployment_sane_2026-09-22.md L26-L34</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; SR-true generation shipped per policy, drawn by hand from the recorded table; the oracle bar is the ceiling (any SR-true generation exists) and the four learned L3 variants sit with the recorded reward.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Population</td><td>411 asb generations, 93 tasks, 127 SR-true</td><td class="sym">.md L15</td></tr>
+<tr><td>Cross-campaign training rows</td><td>154 generations, 35 tasks, 53 SR-true</td><td class="sym">.md L16</td></tr>
+<tr><td>Label verification vs manifest</td><td>411 rows joined, 0 mismatches</td><td class="sym">.md L17</td></tr>
+<tr><td>Recovered rows</td><td>30 total, 4 with verdicts, 26 excluded</td><td class="sym">.md L18</td></tr>
+<tr><td>Oracle</td><td>40 of 93 tasks winnable</td><td class="sym">.md L19</td></tr>
+<tr><td>Capsule truth, stricter yardstick</td><td>33 SR of 96 evaluated</td><td class="sym">.md L20</td></tr>
+<tr><td>Recorded reward P0</td><td>35 of 93 shipped SR-true</td><td class="sym">.md L26; json <code>strict_replay.reward_p0.sr_shipped</code></td></tr>
+<tr><td>L3 cross-campaign</td><td>35 of 93, the same headline number</td><td class="sym">.md L30</td></tr>
+<tr><td>L3b cross-campaign</td><td>35 of 93, better ranking metrics</td><td class="sym">.md L31</td></tr>
+<tr><td>L3b within-asb LOTO</td><td>34 of 93, lowest of the learned set</td><td class="sym">.md L33</td></tr>
+<tr><td>Baselines</td><td>uniform 36, ver_bit 36, v0 36 of 93</td><td class="sym">.md L27&ndash;L29</td></tr>
+<tr><td>Between-task AUC, L3 / L3b</td><td>0.686 / 0.716</td><td class="sym">json <code>ranking_context_auc</code>; .md L30&ndash;L31</td></tr>
+<tr><td>Within-task ranking, L3 / L3b</td><td>0.605 / 0.664</td><td class="sym">json <code>ranking_context_auc</code></td></tr>
+<tr><td>Pick agreement L3 versus reward</td><td>same uuid shipped in 55 of 93 tasks</td><td class="sym">.md L63</td></tr>
+<tr><td>Missed by all eight scorers</td><td>2 tasks, both structural</td><td class="sym">.md L65</td></tr>
+<tr><td>Including recovered rows</td><td>reward P0 35 of 98, oracle still 40</td><td class="sym">.md L46</td></tr>
+<tr><td>Runtime</td><td>13.7 s</td><td class="sym">.md L77</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: discrete scorers tie heavily, and the latest-generation tie-break then ships the last generation. The report says <code>ver_bit</code> at 36 of 93 is partly that heuristic, not VER information (.md L42).</p>
+<p class="note">Amber: within-asb LOTO keeps same-campaign tasks in training, so it is an interpolative bracket, not the deployment case (.md L73).</p>
+<p class="note flag">Red: no gain from learned importance on sane data &mdash; the four L3 variants ship 34&ndash;35 of 93, below the three claims baselines and 5&ndash;6 tasks under the oracle (.md L11).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Verbatim evidence</h2>
+<details><summary>results markdown, 5 quoted lines</summary><div class="dbody">
+<blockquote>**No gain from learned importance on sane data.** Every scorer - recorded reward, uniform pass-rate, v0, ver_bit, L3, L3b, in either training regime - ships an SR-true workspace for 34-36 of 93 tasks; the oracle is 40; the capsule truth is 33.</blockquote>
+<p class="sub">Path: <code class="path">experiments_verifiers/results/E9_l3_deployment_sane_2026-09-22.md</code> line 11</p>
+<blockquote>| l3_cross_campaign | **35 / 93** (37.6%) | 81 (87.1%) | 35/40 (87.5%) | 40/40 (100.0%) | 0.686 | 0.605 |</blockquote>
+<p class="sub">Same file, line 30</p>
+<blockquote>| l3b_cross_campaign | **35 / 93** (37.6%) | 82 (88.2%) | 35/40 (87.5%) | 40/40 (100.0%) | 0.716 | 0.664 |</blockquote>
+<p class="sub">Same file, line 31</p>
+<blockquote>L3 (cross-campaign) ships the SAME generation as the recorded reward in 55 of 93 tasks.</blockquote>
+<p class="sub">Same file, line 63</p>
+<blockquote>Tasks missed by ALL 8 scorers (intersection, 2): dkpes_rf_dkpes_model_development_1, sst_leading_eof_north_pacific_winter_sst_visualization &mdash; structural: the verifier rewards an SR-false generation at 0.70-1.00 while every SR-true sibling sits at rank 2+.</blockquote>
+<p class="sub">Same file, line 65</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e9_deployment.py</code> (557 lines), <code class="path">experiments_verifiers/results/E9_l3_deployment_sane_2026-09-22.md</code> and <code>.json</code>, <code class="path">experiments_verifiers/README.md</code> (reproduction target L134: <code>E9 reward/L3 = 35/93</code>), <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (metrics M1&ndash;M4 L23&ndash;L27), <code class="path">experiments_verifiers/harness/e5_common.py</code> (function list only: <code>standard_metrics</code> L154, <code>v0_reward</code> L211, <code>uniform_score</code> L222). Directory presence checked with <code>os.path.exists</code> on 2026-10-02.</p>
+<p class="skips">Skipped: <code>e5_common.py</code> and <code>e5b_splits.py</code> bodies (helpers owned by <a href="exp_e5b_splits.html">exp_e5b_splits.html</a>); <code>experiments_verifiers/.env</code> (never opened, by rule); <code>experiments_verifiers/__pycache__/</code> (bytecode); every other E5*, E5c, E8 result pair (outside this page); <code>data/manifest_sane.json</code> and <code>data/verifier_claims_sane.jsonl</code> bodies beyond the counts quoted (built by <a href="exp_e8_blast_radius.html">exp_e8_blast_radius.html</a>, owned there). Gone and therefore not linked: the asb per-generation run workspaces &mdash; <code>/tmp/mimosa_run_*</code> holds only three 2026-09-25 directories, and <code>EXPERIMENTS.md</code> L88&ndash;L89 records that asb per-generation artifacts are gone; chemistry and run_1 snapshots survive under <code class="path">experiments_verifiers/workspace_artefacts/snapshots/</code>. No experiment was run.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

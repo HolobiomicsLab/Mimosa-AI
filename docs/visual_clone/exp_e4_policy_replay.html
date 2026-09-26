@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e4_policy_replay - E4 policy replay - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e4_policy_replay">
+<div class="wrap">
+
+<h1 class="hud">e4_policy_replay &mdash; E4 policy replay</h1>
+<p class="intro">E4 asked which selection policy over already-graded generations reaches the oracle with the fewest grader queries. <code class="path">e4_policy_replay.py</code> replays 10 policies over 207 tasks and 1 063 shippable generations with zero LLM calls. Re-grading the top-3 by reward reaches 101 tasks against oracle 102 and current pick P0 91, at 1.96 queries per task.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis, inputs, stages, artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 620" role="img" aria-label="E4 replay pipeline: inputs, stages, output">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="e4h">
+    <title>E4 hypothesis: top-3 grading reaches the oracle</title>
+    <rect x="330" y="20" width="240" height="46" rx="2" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="450" y="40" text-anchor="middle">Top-3 grading reaches oracle</text>
+    <text class="box-sub" x="450" y="56" text-anchor="middle">gate: oracle - 1 task</text>
+  </g>
+
+  <a class="box" id="e4i1" href="../../experiments_verifiers/ablations">
+    <title>Ablation notes carry uuid order, rewards and grades</title>
+    <rect x="20" y="100" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="124" text-anchor="middle">ablations/*.json</text>
+    <text class="box-sub" x="145" y="140" text-anchor="middle">462 note copies</text>
+  </a>
+
+  <a class="box" id="e4i2" href="../../experiments_verifiers/manifest.json">
+    <title>Manifest task set, used as a cross-check only</title>
+    <rect x="20" y="200" width="250" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="145" y="224" text-anchor="middle">manifest.json</text>
+    <text class="box-sub" x="145" y="240" text-anchor="middle">207 task cross-check</text>
+  </a>
+
+  <a class="box" id="e4l" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>load_task_sequences joins uuids, rewards and ablation labels</title>
+    <rect x="330" y="100" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="124" text-anchor="middle">load_task_sequences()</text>
+    <text class="box-sub" x="450" y="140" text-anchor="middle">uuids x rewards x labels</text>
+  </a>
+
+  <a class="box" id="e4u" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>replay_universe keeps tasks with at least one evaluated generation</title>
+    <rect x="330" y="200" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="224" text-anchor="middle">replay_universe()</text>
+    <text class="box-sub" x="450" y="240" text-anchor="middle">evaluated gens only</text>
+  </a>
+
+  <a class="box" id="e4r" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>run_policy simulates each policy and counts queries</title>
+    <rect x="250" y="290" width="180" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="340" y="314" text-anchor="middle">run_policy()</text>
+    <text class="box-sub" x="340" y="330" text-anchor="middle">10 policies</text>
+  </a>
+
+  <a class="box" id="e4q" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>sequential_topq builds the SR versus budget curve</title>
+    <rect x="470" y="290" width="180" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="560" y="314" text-anchor="middle">sequential_topq()</text>
+    <text class="box-sub" x="560" y="330" text-anchor="middle">budget 0..16</text>
+  </a>
+
+  <a class="box" id="e4p" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>plateau_fires implements the P6 plateau rule on the last three rewards</title>
+    <rect x="250" y="370" width="180" height="56" rx="14" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="340" y="394" text-anchor="middle">plateau_fires()</text>
+    <text class="box-sub" x="340" y="410" text-anchor="middle">last-3 rewards, variance</text>
+  </a>
+
+  <a class="box" id="e4m" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>wilson and kendall give CIs and tau</title>
+    <rect x="470" y="370" width="180" height="56" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="560" y="394" text-anchor="middle">wilson() + kendall()</text>
+    <text class="box-sub" x="560" y="410" text-anchor="middle">CIs and tau</text>
+  </a>
+
+  <a class="box" id="e4w" href="../../experiments_verifiers/harness/e4_policy_replay.py">
+    <title>main assembles the result dict and prints the digest</title>
+    <rect x="330" y="450" width="240" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="450" y="474" text-anchor="middle">main()</text>
+    <text class="box-sub" x="450" y="490" text-anchor="middle">writes JSON L461</text>
+  </a>
+
+  <a class="box" id="e4o" href="../../experiments_verifiers/results/E4_policy_replay_20260921.json">
+    <title>Result JSON with per-task decisions for every policy</title>
+    <rect x="330" y="530" width="300" height="56" rx="2" fill="rgba(94,140,163,0.12)" stroke="#5E8CA3"/>
+    <text class="box-label" x="480" y="554" text-anchor="middle">results/E4_policy_replay_20260921.json</text>
+    <text class="box-sub" x="480" y="570" text-anchor="middle">per-task decisions for 10 policies</text>
+  </a>
+
+  <path class="edge" data-from="e4h" data-to="e4l" d="M450,66 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="86" text-anchor="start">tests</text>
+
+  <path class="edge dashed-edge" data-from="e4i1" data-to="e4l" d="M270,128 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="300" y="120" text-anchor="middle">notes</text>
+  <path class="edge dashed-edge" data-from="e4i2" data-to="e4u" d="M270,228 H300 V250 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="286" y="266" text-anchor="middle">check</text>
+
+  <path class="edge" data-from="e4l" data-to="e4u" d="M450,156 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="458" y="180" text-anchor="start">task sequences</text>
+
+  <path class="edge" data-from="e4u" data-to="e4r" d="M400,256 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="272" text-anchor="middle">shippable gens</text>
+  <path class="edge" data-from="e4u" data-to="e4q" d="M500,256 V290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="572" y="272" text-anchor="middle">shippable gens</text>
+
+  <path class="edge" data-from="e4r" data-to="e4p" d="M340,346 V370" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="295" y="362" text-anchor="end">P6 calls</text>
+  <path class="edge" data-from="e4q" data-to="e4m" d="M560,346 V370" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="568" y="362" text-anchor="start">curve points</text>
+
+  <path class="edge" data-from="e4p" data-to="e4w" d="M340,426 V450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="330" y="442" text-anchor="end">plateau flags</text>
+  <path class="edge" data-from="e4m" data-to="e4w" d="M560,426 V450" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="570" y="442" text-anchor="start">tau, CIs</text>
+
+  <path class="edge" data-from="e4w" data-to="e4o" d="M480,506 V530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="488" y="522" text-anchor="start">writes</text>
+
+  <text class="box-sub" x="20" y="470" text-anchor="start">solid = call | dashed = reads | max 12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram &mdash; <code>11 boxes</code>; the other experiment pages are listed in <a href="exp_index.html">exp_index.html</a>. Violet = hypothesis, steel = frozen input and result file, mint = function that simulates or loads, cyan = statistics, amber = the plateau rule. Solid = call, dashed = reads. <code>load_task_sequences</code> (L35) joins by uuid suffix, because <code>evolution_index</code> semantics differ per campaign (docstring L38&ndash;40). <code>run_policy</code> (L118) implements P0, P1, P1seq, P2-k, P4, P6 and P6b; <code>PORACLE</code> is the ship-any-SR-true bound. The output box is the result JSON cited in the table below.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l1">
+<h4><a href="../../experiments_verifiers/harness/e4_policy_replay.py">experiments_verifiers/harness/e4_policy_replay.py</a></h4>
+<p class="role">Replays counterfactual selection policies over graded generations, counts the grader queries each one spends, and writes one result JSON plus a console digest.</p>
+<p class="meta">484 lines (<code>wc -l</code>) &#183; entry point: <code>main()</code> L226, guard L483 &#183; CLI argument: optional date string, default <code>20260921</code> (L27)</p>
+<details><summary>entry point, CLI argument, constants</summary><div class="dbody">
+<pre>uv run python experiments_verifiers/harness/e4_policy_replay.py [date]   # docstring L13, date read at L27
+DATE = sys.argv[1] if len(sys.argv) > 1 else '20260921'                 # L27
+PLATEAU_VAR_EPS = 1e-6                                                 # L29
+EVALUATED_MIN_REWARD = 1e-12                                           # L30
+main() -> None                                                          # L226</pre>
+<p><code>sys.argv[1]</code> is the only argument; it becomes the date suffix of the output filename (L461). No <code>argparse</code>. The universe cross-check is an <code>assert</code> against the manifest task set (L235), so a wrong join fails the run instead of printing.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>What it reads</th><th>Citation</th><th>What it writes</th><th>Path</th></tr></thead>
+<tbody>
+<tr><td>Uuid order, rewards, ablation grades</td><td class="sym">e4_policy_replay.py::load_task_sequences L35&ndash;72</td><td>Result JSON, indent 1</td><td class="sym"><a href="../../experiments_verifiers/results/E4_policy_replay_20260921.json">results/E4_policy_replay_20260921.json</a></td></tr>
+<tr><td>Manifest task set (cross-check)</td><td class="sym">e4_policy_replay.py L231&ndash;235</td><td>Console digest of tables</td><td class="sym">stdout L468&ndash;480; summary <a href="../../experiments_verifiers/results/E4_summary.md">.md</a> has no writer</td></tr>
+<tr><td>Rewards from the notes, not the manifest</td><td class="sym">universe notes, JSON L85</td><td>&mdash;</td><td class="sym">&mdash;</td></tr>
+<tr><td>Status labels <code>evaluated</code> or <code>excluded</code></td><td class="sym">replay_universe L79 (evaluated); L395 (excluded)</td><td>&mdash;</td><td class="sym">&mdash;</td></tr>
+</tbody>
+</table>
+<p class="note flag">The docstring lists <code class="path">results/E4_summary.md</code> as an output (L10), but the script writes only the JSON (L461&ndash;463) and prints a digest. <code>grep -r "E4_summary"</code> finds the docstring line only, so the markdown's author is <code>unknown</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; SR tasks won per policy, out of 207</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 860 300" role="img" aria-label="Bar chart of E4 overall SR per selection policy">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <path d="M30,260 H790" fill="none" stroke="#1B4B6B" stroke-width="1"/>
+  <path d="M30,159 H790" fill="none" stroke="#B79CFF" stroke-width="1.25" stroke-dasharray="5 4"/>
+  <text class="box-sub" x="34" y="153" text-anchor="start">oracle upper bound: 102 tasks (PORACLE)</text>
+
+  <g><title>P0 SR 91, JSON L714</title>
+    <rect x="30" y="169.9" width="60" height="90.1" rx="2" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
+    <text class="box-sub" x="60" y="162" text-anchor="middle">91</text>
+    <text class="box-sub" x="60" y="278" text-anchor="middle">P0</text>
+  </g>
+  <g><title>P1 oracle-VER SR 92, JSON L724</title>
+    <rect x="115" y="168.9" width="60" height="91.1" rx="2" fill="rgba(143,184,201,0.18)" stroke="#8FB8C9"/>
+    <text class="box-sub" x="145" y="161" text-anchor="middle">92</text>
+    <text class="box-sub" x="145" y="278" text-anchor="middle">P1</text>
+  </g>
+  <g><title>P1seq SR 92 at 1.33 queries, JSON L734</title>
+    <rect x="200" y="168.9" width="60" height="91.1" rx="2" fill="rgba(143,184,201,0.18)" stroke="#8FB8C9"/>
+    <text class="box-sub" x="230" y="161" text-anchor="middle">92</text>
+    <text class="box-sub" x="230" y="278" text-anchor="middle">P1seq</text>
+  </g>
+  <g><title>P2-1 SR 91, JSON L744</title>
+    <rect x="285" y="169.9" width="60" height="90.1" rx="2" fill="rgba(255,77,106,0.18)" stroke="#FF4D6A"/>
+    <text class="box-sub" x="315" y="162" text-anchor="middle">91</text>
+    <text class="box-sub" x="315" y="278" text-anchor="middle">P2-1</text>
+  </g>
+  <g><title>P2-3 SR 101 at 1.96 queries, JSON L754</title>
+    <rect x="370" y="160" width="60" height="100" rx="2" fill="rgba(57,255,136,0.28)" stroke="#39FF88"/>
+    <text class="box-sub" x="400" y="152" text-anchor="middle">101</text>
+    <text class="box-sub" x="400" y="278" text-anchor="middle">P2-3</text>
+  </g>
+  <g><title>P2-5 SR 101, JSON L764</title>
+    <rect x="455" y="160" width="60" height="100" rx="2" fill="rgba(57,255,136,0.14)" stroke="#39FF88"/>
+    <text class="box-sub" x="485" y="152" text-anchor="middle">101</text>
+    <text class="box-sub" x="485" y="278" text-anchor="middle">P2-5</text>
+  </g>
+  <g><title>P4 earliest tie-break SR 89, JSON L774</title>
+    <rect x="540" y="171.9" width="60" height="88.1" rx="2" fill="rgba(255,77,106,0.18)" stroke="#FF4D6A"/>
+    <text class="box-sub" x="570" y="164" text-anchor="middle">89</text>
+    <text class="box-sub" x="570" y="278" text-anchor="middle">P4</text>
+  </g>
+  <g><title>P6 plateau SR 91, JSON L784</title>
+    <rect x="625" y="169.9" width="60" height="90.1" rx="2" fill="rgba(255,181,71,0.18)" stroke="#FFB547"/>
+    <text class="box-sub" x="655" y="162" text-anchor="middle">91</text>
+    <text class="box-sub" x="655" y="278" text-anchor="middle">P6</text>
+  </g>
+  <g><title>PORACLE SR 102 at 3.198 queries, JSON L804</title>
+    <rect x="710" y="159" width="60" height="101" rx="2" fill="rgba(183,156,255,0.22)" stroke="#B79CFF"/>
+    <text class="box-sub" x="740" y="151" text-anchor="middle">102</text>
+    <text class="box-sub" x="740" y="278" text-anchor="middle">PORACLE</text>
+  </g>
+</svg>
+</div>
+<p class="figcap">Chart &mdash; overall SR-true tasks per policy out of 207; bar height is the count, printed above each bar. Green = the two top-k grading policies that gain tasks, red = the policies that gain nothing or lose tasks, amber = the plateau policy, violet = the oracle bound. Query cost is not drawn: P2-3 spends 1.96 grader queries per task and PORACLE 3.198 (JSON L760, L810).</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + line</th></tr></thead>
+<tbody>
+<tr><td>Tasks replayed</td><td>207</td><td class="sym">E4_policy_replay_20260921.json L7</td></tr>
+<tr><td>Shippable generations</td><td>1 063</td><td class="sym">E4_policy_replay_20260921.json L18</td></tr>
+<tr><td>Campaigns in the universe</td><td>8</td><td class="sym">E4_policy_replay_20260921.json L8&ndash;16</td></tr>
+<tr><td>P0 (current pick) SR</td><td>91, rate 0.440</td><td class="sym">E4_policy_replay_20260921.json L714&ndash;715</td></tr>
+<tr><td>P2-1 SR</td><td>91, 1 query</td><td class="sym">E4_policy_replay_20260921.json L744, L750</td></tr>
+<tr><td>P2-3 SR</td><td>101, rate 0.488 [0.421, 0.556]</td><td class="sym">E4_policy_replay_20260921.json L754&ndash;758</td></tr>
+<tr><td>P2-3 mean queries</td><td>1.961, max 3</td><td class="sym">E4_policy_replay_20260921.json L760&ndash;761</td></tr>
+<tr><td>P6 plateau SR</td><td>91, mean queries 0.039</td><td class="sym">E4_policy_replay_20260921.json L784, L790</td></tr>
+<tr><td>PORACLE SR</td><td>102, rate 0.493</td><td class="sym">E4_policy_replay_20260921.json L804&ndash;805</td></tr>
+<tr><td>Rank of first SR-true gen</td><td>rank 1: 91, rank 2: 6, rank 3: 4, rank 10: 1</td><td class="sym">E4_policy_replay_20260921.json L1516&ndash;1521</td></tr>
+<tr><td>McNemar P0 vs P2-3</td><td>10 wins, 0 losses, p 0.00195</td><td class="sym">E4_policy_replay_20260921.json L1531&ndash;1533</td></tr>
+<tr><td>Pooled tau reward vs SR</td><td>0.3309 (n 1 063)</td><td class="sym">E4_policy_replay_20260921.json L1493&ndash;1496</td></tr>
+<tr><td>Pooled tau, top quartile</td><td>0.0543, p 0.2839, n 265</td><td class="sym">E4_policy_replay_20260921.json L1498&ndash;1503</td></tr>
+<tr><td>Reward as scorer, auc_sr</td><td>0.7515</td><td class="sym">E4_policy_replay_20260921.json L1506</td></tr>
+<tr><td>Plateau rule fires</td><td>8 tasks, 2 median hits</td><td class="sym">E4_policy_replay_20260921.json L1610&ndash;1611</td></tr>
+<tr><td>Strict gate met by P2-3</td><td>true (only P2-3 and P2-5)</td><td class="sym">E4_policy_replay_20260921.json L938&ndash;939</td></tr>
+</tbody>
+</table>
+
+<details><summary>verbatim evidence lines (result JSON and markdown)</summary><div class="dbody">
+<blockquote> "tasks": 207,
+ "campaigns": [
+  "asb_full_iterative_1",</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E4_policy_replay_20260921.json</code> lines 7&ndash;9 (<code>universe</code>).</p>
+
+<blockquote>  "P2-3": {
+   "SR": 101,
+   "rate": 0.488,
+   "rate_ci95": [
+    0.421,
+    0.556
+   ],
+   "mean_queries": 1.961,
+   "max_queries": 3</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E4_policy_replay_20260921.json</code> lines 753&ndash;761 (<code>overall</code>).</p>
+
+<blockquote>  "histogram": {
+   "1": 91,
+   "2": 6,
+   "3": 4,
+   "10": 1
+  },</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E4_policy_replay_20260921.json</code> lines 1516&ndash;1521 (<code>rank_of_first_sr_true</code>).</p>
+
+<blockquote>   "wins_only_P2-3": 10,
+   "wins_only_P0": 0,
+   "p_two_sided_exact": 0.00195</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E4_policy_replay_20260921.json</code> lines 1531&ndash;1533.</p>
+
+<blockquote>  "pooled": {
+   "tau_all": [
+    0.3309,
+    0.0,
+    1063
+   ],
+   "tau_top_quartile": [
+    0.0543,
+    0.2839,
+    265
+   ]</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E4_policy_replay_20260921.json</code> lines 1492&ndash;1503 (<code>tau_reward_vs_SR</code>).</p>
+
+<blockquote>- **Re-grading the top-3 reward-ranked generations at delivery ("P2-3") reaches the oracle within one task
+  on every campaign**: overall 101/207 tasks SR-true vs PORACLE 102/207, at a mean of **1.96 grader</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E4_summary.md</code> lines 9&ndash;10.</p>
+
+<blockquote>- The plateau detector (P6) fires 8/207 times and converts **0 net new tasks**; on its motivating case</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E4_summary.md</code> line 18.</p>
+
+<blockquote>rank 1 &times; 91, rank 2 &times; 6, rank 3 &times; 4, rank 10 &times; 1. Cumulative: k=1 &rarr; 91, k=2 &rarr; 97, k=3 &rarr; 101, k=10 &rarr; 102.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E4_summary.md</code> line 70. The multiplication and arrow symbols are HTML entities for the source's <code>&times;</code> and <code>-&gt;</code> characters; numbers are verbatim.</p>
+</div></details>
+
+<p class="note say">Why it matters: the reward ranks well but picks badly. Grading one extra candidate converts 10 tasks with no verifier change and no LLM call.</p>
+<p class="note">Amber: <code>P1</code> and <code>PORACLE</code> read recorded VER and SR labels, so they are oracle framings, not shippable policies (script L131 <code>P1</code>, L175 <code>PORACLE</code>; JSON <code>universe.notes</code> L86).</p>
+<p class="note flag">The universe is 8 campaigns, not the 10 the task brief mentioned: two note campaigns have zero graded generations, so the replay is empty there (E4_summary.md L31&ndash;32).</p>
+</div>
+
+<footer>
+<p>Related pages: <a href="exp_index.html">exp_index.html</a> lists every experiment page; <a href="data_experiments.html">data_experiments.html</a> covers the folder itself.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e4_policy_replay.py</code> (484 lines), <code class="path">experiments_verifiers/results/E4_policy_replay_20260921.json</code>, <code class="path">experiments_verifiers/results/E4_summary.md</code>, <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>, <code class="path">experiments_verifiers/ablations/</code> (file count 462), <code class="path">experiments_verifiers/manifest.json</code> (keys only), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
+<p class="skips">Skipped, with reason: <code class="path">experiments_verifiers/.env</code> (never opened, secrets); <code class="path">EXPERIMENTS_PLAN.md</code>, <code class="path">HANDOFF.md</code>, <code class="path">VERIFIER_ARCHITECTURE.md</code> (cited by README.md but absent from disk &mdash; not linked); the 462 ablation note files themselves (the joined fields are in the result JSON and the join rule is cited from the code); every other <code class="path">results/*</code> file (other experiments); <code class="path">run_notes/</code> and <code class="path">sources/workflows/</code> (the notes are copied into <code class="path">ablations/</code>, which the script reads); <code class="path">sources/**</code> app code, including the engine pick that P0 models (<code>sources/core/evolution_engine.py</code>) &mdash; not opened, so P0's tie-break is described only as the script writes it; <code class="path">datasets/ScienceAgentBench/**</code> (no grader was queried by this experiment). Neither the replay nor pytest was run; all numbers are as recorded on disk.</p>
+<p>Volatility: <code>experiments_verifiers/</code> is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

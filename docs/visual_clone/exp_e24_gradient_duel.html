@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e24_gradient_duel - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e24_gradient_duel">
+<div class="wrap">
+
+<h1 class="hud">e24_gradient_duel &mdash; five-way gradient duel</h1>
+<p class="intro">Does a gradient built only from measured execution facts steer the judge as well as text-based gradients? The script writes one measured-facts gradient per frozen generation, then runs a five-way duel behind one identical judge prompt. It compares E24 against E19, E18, E15 and the production verifier on 123 paired generations.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; hypothesis to artifacts</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 920 360" role="img" aria-label="E24 gradient duel design">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+<g class="box" id="bLed"><rect x="20" y="30" width="170" height="54" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/><text class="box-label" x="105.0" y="55.0" text-anchor="middle">reexec + holdout</text><text class="box-sub" x="105.0" y="70.0" text-anchor="middle">ledgers</text></g>
+<g class="box" id="bWg"><rect x="250" y="30" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="340.0" y="55.0" text-anchor="middle">write_gradients</text><text class="box-sub" x="340.0" y="70.0" text-anchor="middle">one gradient per gen</text></g>
+<g class="box" id="bGrad"><rect x="500" y="30" width="200" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="600.0" y="55.0" text-anchor="middle">E24_bt_gradients/</text><text class="box-sub" x="600.0" y="70.0" text-anchor="middle">148 .txt files</text></g>
+<g class="box" id="bPop"><rect x="20" y="150" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="105.0" y="175.0" text-anchor="middle">E16 population</text><text class="box-sub" x="105.0" y="190.0" text-anchor="middle">123 gen items</text></g>
+<g class="box" id="bBq"><rect x="250" y="150" width="180" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="340.0" y="175.0" text-anchor="middle">build_quintuples</text><text class="box-sub" x="340.0" y="190.0" text-anchor="middle">join by (gid, uuid8)</text></g>
+<g class="box" id="bJudge"><rect x="520" y="150" width="160" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="600.0" y="175.0" text-anchor="middle">judge_with_text</text><text class="box-sub" x="600.0" y="190.0" text-anchor="middle">five sides</text></g>
+<g class="box" id="bE16"><rect x="760" y="150" width="140" height="54" rx="2" fill="none" stroke="#8FB8C9"/><text class="box-label" x="830.0" y="175.0" text-anchor="middle">E16 judge + cache</text><text class="box-sub" x="830.0" y="190.0" text-anchor="middle">deepseek-v4.1-flash</text></g>
+<g class="box" id="bE19"><rect x="20" y="270" width="170" height="54" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/><text class="box-label" x="105.0" y="295.0" text-anchor="middle">E19/E18/E15</text><text class="box-sub" x="105.0" y="310.0" text-anchor="middle">gradient dirs</text></g>
+<g class="box" id="bPaired"><rect x="520" y="270" width="160" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="600.0" y="295.0" text-anchor="middle">paired</text><text class="box-sub" x="600.0" y="310.0" text-anchor="middle">bootstrap 95% CI</text></g>
+<g class="box" id="bOut"><rect x="760" y="270" width="140" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/><text class="box-label" x="830.0" y="295.0" text-anchor="middle">E24_gradient_duel</text><text class="box-sub" x="830.0" y="310.0" text-anchor="middle">json + md</text></g>
+<path class="edge" d="M190,57 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="220" y="49" text-anchor="middle">reads</text>
+<path class="edge" d="M430,57 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="465" y="49" text-anchor="middle">writes txt</text>
+<path class="edge" d="M190,177 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="220" y="169" text-anchor="middle">population</text>
+<path class="edge" d="M585,84 V118 H340 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="470" y="112" text-anchor="middle">e24 gradient</text>
+<path class="edge" d="M190,297 H310 V204" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="250" y="289" text-anchor="middle">e19 gradients</text>
+<path class="edge" d="M430,177 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="475" y="169" text-anchor="middle">quintuples</text>
+<path class="edge" d="M600,204 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="610" y="242" text-anchor="start">judgments</text>
+<path class="edge" d="M680,177 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="720" y="169" text-anchor="middle">calls E16._llm</text>
+<path class="edge" d="M680,297 H760" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/><text class="edge-label" x="720" y="289" text-anchor="middle">deltas</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; 10 boxes. Mint = experiment code and its artifacts, steel dashed = the E16 judge instrument. The script is phase 4 of E24: <code>write_gradients</code> renders <code class="path">results/E24_bt_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt</code> from the re-execution and holdout ledgers, <code>build_quintuples</code> joins those gradients to the E16 population item and to the E19 gradient tree, and <code>main</code> judges five sides per generation. Solid = call, dashed blue = reads/writes.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The script</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e24_gradient_duel.py">experiments_verifiers/harness/e24_gradient_duel.py</a></h4>
+<p class="role">Builds measured-facts gradients and runs the five-channel judge duel.</p>
+<p class="meta">379 lines &#183; entry point: <code>main()</code> (def L237, called L379) &#183; no CLI arguments &#183; model <code>openrouter/deepseek/deepseek-v4.1-flash</code> &#183; cost cap $3.0</p>
+<details><summary>functions and their roles</summary><div class="dbody">
+<pre>write_gradients() -&gt; int          L144  one gradient file per generation
+build_quintuples() -&gt; (quads, drops, pop)   L183  join population + gradients
+judge_with_text(item, grad_text, role)      L220  one judge call per side
+main()                                      L237  drive the duel, write results
+_write_md(out)                              L351  render the markdown table</pre>
+<p>A gradient file says only measured execution facts: re-execution status, divergence counters, and the holdout metric against the group field. No SR, VER or reward appears in the text. The judge prompt is the E16v2 instrument (<code>e16_gradient_audit.py::judge_messages</code>, L498); only the gradient text differs between sides.</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>Reads</th><th>Writes</th><th>Path</th><th>Code</th></tr></thead>
+<tbody>
+<tr><td>E16 population items</td><td>judge inputs</td><td class="sym"><code class="path">results/_e16_population.json</code></td><td class="sym">e24_gradient_duel.py::build_quintuples L183</td></tr>
+<tr><td>reexec and holdout ledgers</td><td>one gradient per gen</td><td class="sym"><code class="path">results/E24_bt_gradients/</code></td><td class="sym">e24_gradient_duel.py::write_gradients L144</td></tr>
+<tr><td>E19 / E18 / E15 gradients</td><td>judgments per side</td><td class="sym"><code class="path">results/E19_bt_gradients/</code></td><td class="sym">e24_gradient_duel.py::main L237</td></tr>
+<tr><td>gradients and judgments</td><td>result json and md</td><td class="sym"><code class="path">results/E24_gradient_duel_2026-09-24.json</code></td><td class="sym">e24_gradient_duel.py::_write_md L351</td></tr>
+</tbody>
+</table>
+
+<p class="note">Amber: the e19, e18, e15 and ver sides are served from the E16 judge cache (identical messages, zero new calls). Only the 123 E24 calls are fresh, so the comparison is a text swap inside one fixed prompt.</p>
+<p class="note say">Why it matters: if the E24 text scores highest on hallucination but lowest on gold-relevance, the difference is a framing difference in the feedback, not a factual error in it.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; judge axes per side</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 380" role="img" aria-label="Mean gold-relevance and hallucination rate per gradient side">
+<line x1="90" y1="320" x2="860" y2="320" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="323" text-anchor="end">0.00</text>
+<line x1="90" y1="255.0" x2="860" y2="255.0" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="258.0" text-anchor="end">0.25</text>
+<line x1="90" y1="190.0" x2="860" y2="190.0" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="193.0" text-anchor="end">0.50</text>
+<line x1="90" y1="125.0" x2="860" y2="125.0" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="128.0" text-anchor="end">0.75</text>
+<line x1="90" y1="60.0" x2="860" y2="60.0" stroke="#1B4B6B" stroke-width="1"/>
+<text class="box-sub" x="82" y="63.0" text-anchor="end">1.00</text>
+<rect x="120.0" y="242.5" width="40" height="77.5" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+<rect x="166.0" y="292.4" width="40" height="27.6" fill="rgba(255,181,71,0.25)" stroke="#FFB547"/>
+<text class="box-sub" x="140.0" y="238.5" text-anchor="middle">0.298</text>
+<text class="box-sub" x="186.0" y="288.4" text-anchor="middle">0.106</text>
+<text class="box-label" x="167.0" y="338" text-anchor="middle">e24</text>
+<rect x="274.0" y="157.0" width="40" height="163.0" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+<rect x="320.0" y="254.5" width="40" height="65.5" fill="rgba(255,181,71,0.25)" stroke="#FFB547"/>
+<text class="box-sub" x="294.0" y="153.0" text-anchor="middle">0.627</text>
+<text class="box-sub" x="340.0" y="250.5" text-anchor="middle">0.252</text>
+<text class="box-label" x="321.0" y="338" text-anchor="middle">e19</text>
+<rect x="428.0" y="183.2" width="40" height="136.8" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+<rect x="474.0" y="282.0" width="40" height="38.0" fill="rgba(255,181,71,0.25)" stroke="#FFB547"/>
+<text class="box-sub" x="448.0" y="179.2" text-anchor="middle">0.526</text>
+<text class="box-sub" x="494.0" y="278.0" text-anchor="middle">0.146</text>
+<text class="box-label" x="475.0" y="338" text-anchor="middle">e18</text>
+<rect x="582.0" y="212.1" width="40" height="107.9" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+<rect x="628.0" y="207.2" width="40" height="112.8" fill="rgba(255,181,71,0.25)" stroke="#FFB547"/>
+<text class="box-sub" x="602.0" y="208.1" text-anchor="middle">0.415</text>
+<text class="box-sub" x="648.0" y="203.2" text-anchor="middle">0.434</text>
+<text class="box-label" x="629.0" y="338" text-anchor="middle">e15</text>
+<rect x="736.0" y="172.3" width="40" height="147.7" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+<rect x="782.0" y="167.9" width="40" height="152.1" fill="rgba(255,181,71,0.25)" stroke="#FFB547"/>
+<text class="box-sub" x="756.0" y="168.3" text-anchor="middle">0.568</text>
+<text class="box-sub" x="802.0" y="163.9" text-anchor="middle">0.585</text>
+<text class="box-label" x="783.0" y="338" text-anchor="middle">ver</text>
+<text class="box-sub" x="90" y="360" text-anchor="start">cyan = mean gold-relevance | amber = hallucination rate | 5 sides, source: md L7-L11</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; bar chart of the real numbers in <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.md</code> lines 7&ndash;11. Values are printed on each bar. Cyan = mean gold-relevance, amber = hallucination rate, both from the E16v2 judge.</p>
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td>Paired generations</td><td>123 across 19 groups</td><td class="sym">md L3</td></tr>
+<tr><td>E24 mean gold-relevance</td><td>0.298</td><td class="sym">md L7</td></tr>
+<tr><td>E19 mean gold-relevance</td><td>0.627</td><td class="sym">md L8</td></tr>
+<tr><td>E24 hallucination rate</td><td>0.106</td><td class="sym">md L7</td></tr>
+<tr><td>ver hallucination rate</td><td>0.585</td><td class="sym">md L11</td></tr>
+<tr><td>E24 direction toward gold</td><td>69 of 123</td><td class="sym">md L7</td></tr>
+<tr><td>E15 direction away from gold</td><td>48 of 122</td><td class="sym">md L10</td></tr>
+<tr><td>Delta relevance E24 &minus; E19</td><td>&minus;0.329 [&minus;0.453,&minus;0.192]</td><td class="sym">md L17</td></tr>
+<tr><td>Delta hallucination E24 &minus; ver</td><td>&minus;0.480 [&minus;0.629,&minus;0.342]</td><td class="sym">md L28</td></tr>
+<tr><td>Fresh judge calls</td><td>123</td><td class="sym">json calls.e24_side_new</td></tr>
+<tr><td>New call cost</td><td>$0.2269</td><td class="sym">json calls.new_call_cost_usd</td></tr>
+<tr><td>Drops (no population join)</td><td>25</td><td class="sym">json population.drops.no_population_join</td></tr>
+</tbody>
+</table>
+
+<details><summary>verbatim result lines (7 quotes)</summary><div class="dbody">
+<blockquote>All numbers `my computation`. Population: 123 paired generations across 19 groups (E24&#8745;E19&#8745;E18&#8745;E15 gradient availability, E16 population). Model: openrouter/deepseek/deepseek-v4.1-flash (temp 0, JSON mode). Instrument: E16v2.</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.md</code> L3</p>
+<blockquote>| e24 | 0.298 | 0.106 | {'toward': 69, 'unsure': 41, 'away': 13} |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.md</code> L7</p>
+<blockquote>| ver | 0.568 | 0.585 | {'toward': 72, 'away': 37, 'unsure': 14} |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.md</code> L11</p>
+<blockquote>| e24_minus_e19 | gold_relevance | 123 | -0.329 | [-0.453,-0.192] |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.md</code> L17</p>
+<blockquote>| e24_minus_e19 | hallucination_flag | 123 | -0.146 | [-0.293,-0.015] |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.md</code> L19</p>
+<blockquote>| e24_minus_ver | hallucination_flag | 123 | -0.480 | [-0.629,-0.342] |</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.md</code> L28</p>
+<blockquote>"E24 gradients = measured execution facts only (re-execution outcome + divergence numbers + verifier-owned holdout metric vs the group field; labels-free)."</blockquote>
+<p>Path: <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.json</code> key <code>provenance_note</code></p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <a href="../../experiments_verifiers/harness/e24_gradient_duel.py">experiments_verifiers/harness/e24_gradient_duel.py</a>; <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.md</code>, <code class="path">experiments_verifiers/results/E24_gradient_duel_2026-09-24.json</code>; <code class="path">experiments_verifiers/harness/e24_common.py</code> (paths, ledgers, cost caps); <code class="path">experiments_verifiers/harness/e16_gradient_audit.py</code> (judge instrument, <code>judge_messages</code> L498, <code>MODEL</code> L55); <code class="path">experiments_verifiers/EXPERIMENTS.md</code> (constitution); <code class="path">experiments_verifiers/README.md</code> (E24 codename row L50); <code class="path">docs/visual_clone/_reference.html</code> and <code class="path">_clone.css</code> for the page skeleton. Line counts and sizes from <code>wc -l</code> and <code>os.path.getsize</code>.</p>
+<p class="skips">Skipped: <code>results/E24_bt_gradients/</code> (148 gradient <code>.txt</code> files, read only through their generator); <code>results/_e16_judge_cache.jsonl</code> (E16 instrument cache, owned by the E16 pages); <code>results/_e24_holdout_ledger_2026-09-24.jsonl</code> and <code>_e24_holdout_keys_2026-09-24.json</code> (component 2, owned by <a href="exp_e24_holdout.html">exp_e24_holdout.html</a>); <code>results/_e24_iomap_2026-09-24.jsonl</code> (owned by <a href="exp_e24_iomap.html">exp_e24_iomap.html</a>). <code>experiments_verifiers/.env</code> was never opened, by the build rules. EXPERIMENTS.md holds no E24 section; only its constitution was read. No experiment, no application and no pytest was run.</p>
+<p>Volatility: experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>
