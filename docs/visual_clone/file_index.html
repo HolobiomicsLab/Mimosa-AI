@@ -6,7 +6,7 @@
 <title>File digests - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests > all 96 files">
+<body data-crumb="File digests &gt; all 96 files" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">File digests</h1>
@@ -66,7 +66,7 @@
   <path class="edge" data-from="s3" data-to="s4" d="M590,173 H620" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw)"/>
 
   <a class="box" id="s6" href="mod_evaluators_gold_feedback.html">
-    <title>Gold feedback oracle package, uncommitted in this build</title>
+    <title>Gold feedback oracle package, not in commit 4020790 (added as ca72107)</title>
     <rect x="20" y="140" width="250" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="145" y="164" text-anchor="middle">gold_feedback/</text>
     <text class="box-sub" x="145" y="182" text-anchor="middle">6 files, 6 digests</text>
@@ -192,7 +192,7 @@
 <tr><td class="sym"><a href="file_hybrid_claims.html">file_hybrid_claims.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/claims.py">hybrid_verifier/claims.py</a></td><td class="size">701</td></tr>
 <tr><td class="sym"><a href="file_hybrid_digest.html">file_hybrid_digest.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/digest.py">hybrid_verifier/digest.py</a></td><td class="size">175</td></tr>
 <tr><td class="sym"><a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td class="size">784</td></tr>
-<tr><td class="sym"><a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td class="size">380</td></tr>
+<tr><td class="sym"><a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td class="size">388</td></tr>
 <tr><td class="sym"><a href="file_hybrid_inventory.html">file_hybrid_inventory.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/inventory.py">hybrid_verifier/inventory.py</a></td><td class="size">282</td></tr>
 <tr><td class="sym"><a href="file_hybrid_layers.html">file_hybrid_layers.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td class="size">1049</td></tr>
 <tr><td class="sym"><a href="file_hybrid_registry.html">file_hybrid_registry.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a></td><td class="size">355</td></tr>
@@ -211,7 +211,7 @@
 <tr><td class="sym"><a href="file_eval_scenario.html">file_eval_scenario.html</a></td><td class="sym"><a href="../../sources/evaluators/scenario/scenario.py">scenario/scenario.py</a></td><td class="size">653</td></tr>
 </tbody>
 </table>
-<p class="note">The six <code class="path">gold_feedback/</code> rows are uncommitted working-tree files <span class="chip warn">oracle - leaks gold</span>; package page: <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>.</p>
+<p class="note">The six <code class="path">gold_feedback/</code> rows are not in <code>4020790</code> (added as <code>ca72107</code>) <span class="chip warn">oracle - leaks gold</span>; package page: <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>.</p>
 <p class="note">Five files are excluded because they are deprecated: <code class="path">legacy_verifier/verifier.py</code>, <code class="path">legacy_verifier/verifier_claims.py</code>, <code class="path">legacy_verifier/verifier_claim_sources.py</code>, <code class="path">legacy_verifier/verifier_per_claim.py</code>, <code class="path">legacy_verifier/verifier_workspace.py</code> (see <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>). Move note: the five files sat flat in <code class="path">sources/evaluators/</code> at commit <code>336fe19</code>; commit <code>4020790</code> deleted the flat copies, leaving them in <code class="path">legacy_verifier/</code>; none has a digest page.</p>
 <p class="note">The folder was restructured at commit <code>336fe19</code>: <code class="path">generic/bs_detection.py</code>, <code class="path">generic/generic.py</code> and <code class="path">scenario/scenario.py</code> moved into sub-folders, so the three rows above point at the new paths. The other current files with no row are the package <code>__init__.py</code> files: <code class="path">sources/evaluators/__init__.py</code> (52 lines), <code class="path">generic/__init__.py</code> (18 lines) and <code class="path">scenario/__init__.py</code> (14 lines).</p>
 <p class="note">Two included files carry a deprecated docstring: <code class="path">generic.py</code> is still built by <code>WorkflowEvaluator</code>, and <code class="path">bs_detection.py</code> is wired into it but stays unused, because the facade passes <code>use_bs_penalty=False</code> (evaluator.py:57, :82) and no caller passes <code>True</code>.</p>
@@ -221,7 +221,7 @@
 <p>Sources: <code class="path">sources/core/*.py</code> (19), <code class="path">experiments_verifiers/harness/*.py</code> (68, of 55 with a page), <code class="path">sources/evaluators/*.py</code> (4 current flat files), <code class="path">sources/evaluators/generic/*.py</code> (3), <code class="path">sources/evaluators/scenario/*.py</code> (2), <code class="path">sources/evaluators/hybrid_verifier/*.py</code> (10), <code class="path">sources/evaluators/gold_feedback/*.py</code> (6), <code class="path">sources/evaluators/legacy_verifier/*.py</code> (6, deprecated, no page). Every line count in the tables was re-measured by <code>wc -l</code> for this build, my computation.</p>
 <p class="skips">Skipped: the 5 deprecated <code class="path">legacy_verifier/</code> files, the 3 package <code>__init__.py</code> files with no card, the 13 harness scripts of E26-E34, E36 and E41 with no page, <code>__pycache__</code> folders, and the non-Python files in those folders.</p>
 <p class="note">Rows that changed since the last build (my computation): <code>evolution_engine.py</code> 1109 &#8594; 1236, <code>schema.py</code> 163 &#8594; 169, <code>workflow_info.py</code> 271 &#8594; 340, <code>workflow_selection.py</code> 396 &#8594; 416, <code>evaluator.py</code> 193 &#8594; 205, and every <code>hybrid_verifier/</code> row except <code>digest.py</code>. The digest pages behind those rows may lag the line counts shown here.</p>
-<p>Built at commit <code>4020790</code> + uncommitted working tree, 2026-09-28.</p>
+<p>Built at commit <code>ca72107</code> + working tree, 2026-09-28.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

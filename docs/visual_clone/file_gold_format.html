@@ -6,12 +6,12 @@
 <title>format.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; format.py">
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; format.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">format.py</h1>
 <p class="intro">This 268-line file turns one benchmark grade into the gold textual gradient: the execution outcome first, then the grader verdict against the gold reference, at most 2000 chars. It also writes the short note used when grading is censored. It is pure text work; <a href="file_gold_evaluator.html">GoldFeedbackEvaluator</a> stores the result.</p>
-<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new, uncommitted</span></p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new in ca72107</span></p>
 
 <div id="legend" data-auto></div>
 
@@ -271,7 +271,7 @@
   <path class="edge dashed-edge" data-from="k11" data-to="k12" d="M830,340 C830,360 800,380 800,396" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
 </svg>
 </div>
-<p class="figcap">Diagram 2 &mdash; red = failure kinds and the cut. Budgets are computed before each verbatim block (L213&#8211;L217, L230), so the decisive lines come first and the cap at L248 cuts only the tail. The <code>2048</code>-char clip in <code>variation_engine.py::VariationEngine.mutation_prompt</code> (L407) is removed in the working tree; this 2000-char cap is now the only cap on <code>build_gold_gradient</code> output.</p>
+<p class="figcap">Diagram 2 &mdash; red = failure kinds and the cut. Budgets are computed before each verbatim block (L213&#8211;L217, L230), so the decisive lines come first and the cap at L248 cuts only the tail. The <code>2048</code>-char clip in <code>variation_engine.py::VariationEngine.mutation_prompt</code> (L407) was removed in commit <code>ca72107</code>; this 2000-char cap is now the only cap on <code>build_gold_gradient</code> output.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -349,8 +349,8 @@ censored_note(reason: str, max_chars: int = 300) -&gt; str       L254</pre>
 
 <footer>
 <p>Sources read: <code class="path">sources/evaluators/gold_feedback/format.py</code> (268 lines, whole file), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (L33, L284&#8211;L310, L431), <code class="path">sources/evaluators/gold_feedback/__init__.py</code> (L21), <code class="path">sources/core/variation_engine.py</code> (L396&#8211;L407, <code>git diff HEAD</code>), <code class="path">experiments_verifiers/harness/e33_truman.py</code> (L144, name only), <code class="path">tests/gold_feedback_test.py</code> (test names by grep). Line counts from <code>wc -l</code>.</p>
-<p class="skips">Skipped: the body of <code>e33_truman.py::gold_gradient_text</code>, because the port is quoted from the docstring and not compared line by line; the exact text of every fixed note (quoted by name only); secret files were not opened; no pytest run, by the build rules. The file is new and uncommitted.</p>
-<p>Built at 4020790 + uncommitted working tree, 2026-09-28.</p>
+<p class="skips">Skipped: the body of <code>e33_truman.py::gold_gradient_text</code>, because the port is quoted from the docstring and not compared line by line; the exact text of every fixed note (quoted by name only); secret files were not opened; no pytest run, by the build rules. The file is new; commit <code>ca72107</code> added it during this build.</p>
+<p>Built at ca72107 + working tree, 2026-09-28.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

@@ -6,7 +6,7 @@
 <title>Evaluators area - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview > sources > evaluators">
+<body data-crumb="Overview &gt; sources &gt; evaluators" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">Evaluators</h1>
@@ -307,7 +307,7 @@ extract_json_payload(text: str) -&gt; str</pre>
 <tr><td class="sym"><a href="../../sources/evaluators/base.py">base.py</a></td><td>Interface plus shared judge LLM helpers.</td><td class="size">380</td><td class="sym">BaseEvaluator, extract_json_payload</td><td>other</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/__init__.py">__init__.py</a></td><td>Lazy package re-exports, no eager legacy import.</td><td class="size">52</td><td class="sym">__getattr__ (_REEXPORTS)</td><td>other</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/grounding.py">grounding.py</a></td><td>Literature block for generic and legacy.</td><td class="size">55</td><td class="sym">get_perspicacite_grounding</td><td>other</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/">hybrid_verifier/</a></td><td>Default verifier: claims, scorers, pairwise reward.</td><td class="size">4 727</td><td class="sym">HybridVerifierEvaluator.evaluate</td><td>default</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/">hybrid_verifier/</a></td><td>Default verifier: claims, scorers, pairwise reward.</td><td class="size">4 735</td><td class="sym">HybridVerifierEvaluator.evaluate</td><td>default</td></tr>
 <tr id="gold"><td class="sym"><a href="../../sources/evaluators/gold_feedback/">gold_feedback/</a></td><td>Wraps hybrid; grader feedback replaces the gradient.</td><td class="size">1 075</td><td class="sym">GoldFeedbackEvaluator.evaluate</td><td><span class="chip warn">oracle - leaks gold</span></td></tr>
 <tr id="generic"><td class="sym"><a href="../../sources/evaluators/generic/">generic/</a></td><td>Four LLM judges; optional fraud penalty.</td><td class="size">1 290</td><td class="sym">GenericEvaluator.evaluate</td><td><span class="tag dep">legacy-deprecated</span></td></tr>
 <tr id="scenario"><td class="sym"><a href="../../sources/evaluators/scenario/">scenario/</a></td><td>Scores a run against rubric assertions.</td><td class="size">667</td><td class="sym">ScenarioEvaluator.evaluate</td><td>other</td></tr>
@@ -358,8 +358,8 @@ extract_json_payload(text: str) -&gt; str</pre>
 <footer>
 <p>Sources: <code class="path">sources/evaluators/</code> (base.py, evaluator.py, __init__.py, grounding.py, generic/__init__.py, generic/generic.py, generic/bs_detection.py, scenario/__init__.py, scenario/scenario.py, legacy_verifier/__init__.py, legacy_verifier/verifier*.py, hybrid_verifier/__init__.py, hybrid_verifier/evaluator.py, all six gold_feedback/*.py); <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>; <code>config.py</code> lines 106-120, 516; <code>main.py</code> lines 76-96, 186-208; <code class="path">sources/core/evolution_engine.py</code> lines 30, 203, 903-938; <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (<code>_set_gold_feedback_task</code>); <code class="path">docs/concepts/architecture.md</code> line 82; <code class="path">docs/concepts/evaluation-pipeline.md</code> (grep); <code class="path">docs/DEVELOPER_GUIDE.md</code> (grep); <code>tests/</code> import headers; <code>git diff 336fe19</code>, <code>git diff HEAD</code>, <code>git status</code> and <code>git ls-files</code> at build time; UPDATE_VISUAL_CLONE.md; docs/visual_clone/_reference.html and _clone.css.</p>
 <p class="skips">Skipped: every <code class="path">__pycache__/</code> directory (compiled caches, one per package) &#183; <code>hybrid_verifier/</code> and <code>gold_feedback/</code> module bodies (own L2 pages) &#183; full bodies of generic/bs_detection.py, scenario/scenario.py, legacy_verifier/verifier_per_claim.py (Tier B, symbol lists only) &#183; the pytest suite and the application (not run, per the build rules) &#183; <code class="path">docs/site/</code> (generated).</p>
-<p>Move note: commit <code>336fe19</code> added the sub-packages <code class="path">generic/</code>, <code class="path">scenario/</code> and <code class="path">legacy_verifier/</code> as copies of the flat modules; commit <code>4020790</code> deleted the eight flat modules and committed the <code>hybrid</code>/<code>legacy</code> channel switch. The <code>gold</code> branch and <code class="path">gold_feedback/</code> are uncommitted working-tree changes (<code>git diff HEAD -- sources/evaluators/evaluator.py</code>, 13 lines added, 1 removed).</p>
-<p>Built at commit <code>4020790</code> + uncommitted working tree, 2026-09-28.</p>
+<p>Move note: commit <code>336fe19</code> added the sub-packages <code class="path">generic/</code>, <code class="path">scenario/</code> and <code class="path">legacy_verifier/</code> as copies of the flat modules; commit <code>4020790</code> deleted the eight flat modules and committed the <code>hybrid</code>/<code>legacy</code> channel switch. The <code>gold</code> branch and <code class="path">gold_feedback/</code> are not in <code>4020790</code>: they were working-tree changes at build time (<code>git diff 4020790 -- sources/evaluators/evaluator.py</code>, 13 lines added, 1 removed), committed later as <code>ca72107</code> (2026-09-28 17:50).</p>
+<p>Built at commit <code>ca72107</code> + working tree, 2026-09-28.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

@@ -2,7 +2,7 @@
 /* Mimosa-AI visual clone - shared behaviour. Offline, no dependencies. */
 (function () {
   /* default stamp; a page overrides it with <body data-built="..." data-built-date="..."> (set from _manifest.json) */
-  var BUILD = { commit: "4020790+wt", date: "2026-09-28" };
+  var BUILD = { commit: "ca72107+wt", date: "2026-09-28" };
 
   /* ---------- top bar ---------- */
   function topbar() {

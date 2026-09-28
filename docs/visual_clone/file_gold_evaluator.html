@@ -6,12 +6,12 @@
 <title>gold_feedback/evaluator.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; evaluator.py">
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; evaluator.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">evaluator.py</h1>
 <p class="intro">This 470-line file holds <code>GoldFeedbackEvaluator</code>, the verifier the facade builds when <code>config.verifier_kind = "gold"</code>. It runs an inner <code>HybridVerifierEvaluator</code>, grades a private copy of the workspace with the benchmark grader, and replaces the steering text with the grader feedback; with <code>gold_feedback_reward = True</code> it also replaces the reward. Package view: <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>.</p>
-<p><span class="chip warn">oracle - leaks gold</span> <span class="chip warn">uncommitted at 4020790</span></p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip warn">new in ca72107</span></p>
 
 <div id="legend" data-auto></div>
 
@@ -370,7 +370,7 @@ class GoldFeedbackEvaluator:                                              L86
 <footer>
 <p>Sources read: <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (470 lines, whole file), <code class="path">grader.py</code>, <code class="path">format.py</code>, <code class="path">reward.py</code>, <code class="path">leak.py</code>, <code class="path">sources/evaluators/evaluator.py</code> (L88&ndash;L110, L174), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (L227&ndash;L229, L433), <code class="path">sources/core/evolution_engine.py</code> (L72&ndash;L110, L903&ndash;L938), <code class="path">sources/core/workflow_info.py</code> (L13&ndash;L38), <code class="path">tests/gold_feedback_test.py</code>.</p>
 <p class="skips">Skipped: the internals of <code>grader.py</code>, <code>format.py</code>, <code>reward.py</code>, <code>leak.py</code> &mdash; each has its own digest page; the inner hybrid verifier &mdash; see <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>; no pytest run and no application run, by the build rules.</p>
-<p>Built at <code>4020790 + uncommitted working tree, 2026-09-28</code>. The file is untracked (uncommitted) at this build.</p>
+<p>Built at <code>ca72107 + working tree, 2026-09-28</code>. Commit <code>ca72107</code> added the file during this build.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

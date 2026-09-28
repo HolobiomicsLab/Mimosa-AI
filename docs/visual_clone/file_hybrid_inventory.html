@@ -6,7 +6,7 @@
 <title>inventory.py &mdash; Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests > sources/evaluators/hybrid_verifier > inventory.py">
+<body data-crumb="File digests &gt; sources/evaluators/hybrid_verifier &gt; inventory.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">inventory.py</h1>
@@ -300,7 +300,7 @@
   <text class="edge-label" x="580" y="223" text-anchor="middle">returns listing</text>
 
   <text class="box-sub" x="14" y="330">no writes: every function returns a dict or a string; the caller decides what to persist.</text>
-  <text class="box-sub" x="14" y="352">The registry JSON path is built by registry.py:76 as &lt;root&gt;/hybrid_registry_&lt;task_key&gt;.json; a real example on disk: experiments_verifiers/results/E19c_registries/hybrid_registry_4a7029eb0b6b62e9.json.</text>
+  <text class="box-sub" x="14" y="352">The registry JSON path is built by registry.py:86 as &lt;root&gt;/hybrid_registry_&lt;task_key&gt;.json; a real example on disk: experiments_verifiers/results/E19c_registries/hybrid_registry_4a7029eb0b6b62e9.json.</text>
 </svg>
 </div>
 <p class="figcap">Diagram 2 &mdash; inputs are the workspace root (from <code>config.workspace_dir</code>, read in the caller) and the registry's union dict; outputs are returned values only. Dashed arrows are reads or passed values; this file writes no file.</p>
@@ -466,17 +466,17 @@ render_union_inventory(union, n_workspaces: int, current=()) -&gt; str        # 
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>scan_workspace</code>, <code>render_union_inventory</code>, <code>deliverable_previews</code> in <code>_extract</code> and <code>_union_for_prompt</code></td><td class="sym">import L34; calls 217-224, 385-388</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/digest.py">hybrid_verifier/digest.py</a></td><td>private <code>_deliverable_rank</code>, to rank digest candidates</td><td class="sym">import L25; calls 147, 150</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td><code>scan_workspace</code>, <code>render_union_inventory</code>, <code>deliverable_previews</code></td><td class="sym">import L48; calls 358, 381-383, 566</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_inventory_signals_and_union_render</code>: signals, artifact check, union text, previews</td><td class="sym">import L45; test 1112-1145</td></tr>
-<tr><td class="sym">test_full_pipeline_real_subprocess</td><td>runs the real scorer path, which exercises <code>scan_workspace</code> through the layer</td><td class="sym">test 467</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_inventory_signals_and_union_render</code>: signals, artifact check, union text, previews</td><td class="sym">import L45; test 1307-1338</td></tr>
+<tr><td class="sym">test_full_pipeline_real_subprocess</td><td>runs the real scorer path, which exercises <code>scan_workspace</code> through the layer</td><td class="sym">test 496</td></tr>
 </tbody>
 </table>
 <p class="note">Not tested directly: <code>_read_head</code>, <code>_count_newlines</code>, <code>png_dims</code>, <code>file_signal</code>, <code>_deliverable_rank</code> have no test of their own; they run through <code>scan_workspace</code> and <code>deliverable_previews</code> in the test above. <code>grep -rn scan_workspace tests/</code> shows only that one test.</p>
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/inventory.py">sources/evaluators/hybrid_verifier/inventory.py</a> (all 282 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L34, L217-L224, L383-L389), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L59, L197, L228, L432-L434, L703-L704), <a href="../../sources/evaluators/hybrid_verifier/digest.py">digest.py</a> (L25, L147-L150), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L76 path build, L286-L299 merge), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L45, L1112-L1145), <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L48, L358-L383, L566), plus greps over <code>sources/</code> and <code>tests/</code>. Line counts from <code>wc -l</code>.</p>
-<p class="skips">Skipped: the ported harness sources named in the module docstring (<code>experiments_verifiers/harness/e19_hybrid_bt.py</code>, <code>e14_bt_enabler.py</code>) were not read; the docstring claim that the union inventory "accumulates across generations" is not implemented in this file (the merge happens in <code>registry.merge_inventory</code>, registry.py:256). Also skipped: <code>experiments_verifiers/.env</code> and every credential file, not opened. No pytest run and no application run, by the build rules.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/inventory.py">sources/evaluators/hybrid_verifier/inventory.py</a> (all 282 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L34, L217-L224, L383-L389), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L59, L197, L228, L432-L434, L703-L704), <a href="../../sources/evaluators/hybrid_verifier/digest.py">digest.py</a> (L25, L147-L150), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L86 path build, L337-L350 merge), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L45, L1307-L1338), <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L48, L358-L383, L566), plus greps over <code>sources/</code> and <code>tests/</code>. Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the ported harness sources named in the module docstring (<code>experiments_verifiers/harness/e19_hybrid_bt.py</code>, <code>e14_bt_enabler.py</code>) were not read; the docstring claim that the union inventory "accumulates across generations" is not implemented in this file (the merge happens in <code>registry.merge_inventory</code>, registry.py:337). Also skipped: <code>experiments_verifiers/.env</code> and every credential file, not opened. No pytest run and no application run, by the build rules.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Updated at <code>ca72107</code> + working tree, 2026-09-28: refs into <code>registry.py</code> and tests re-derived; <code>inventory.py</code> itself is unchanged since the build. All line refs re-derived from the current files. <code class="path">tests/hybrid_verifier_test.py</code> read at 18:06 CEST while it has uncommitted edits in flight, so test line numbers can move.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

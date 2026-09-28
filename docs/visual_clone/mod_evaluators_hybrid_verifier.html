@@ -6,7 +6,7 @@
 <title>hybrid_verifier - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview > sources/evaluators > hybrid_verifier">
+<body data-crumb="Overview &gt; sources/evaluators &gt; hybrid_verifier" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">hybrid_verifier &mdash; default verifier package</h1>
@@ -131,9 +131,12 @@
   <path class="edge" data-from="bEval" data-to="bAgg" d="M710,168 H730" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
   <path class="edge" data-from="bEval" data-to="bGrad" d="M710,268 H730" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
   <text class="edge-label" x="300" y="462" text-anchor="middle">loads, rewards, artifacts</text>
+
+  <path class="edge dotted-edge" data-from="bGrad" data-to="bAgg" d="M850,240 V196" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="856" y="222" text-anchor="start">PASS_THRESHOLD</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 &mdash; one box per package file (<code>10 boxes</code>), mint = L4 verifier. Solid = call, dotted = import only. <code>evaluator.py::HybridVerifierEvaluator.evaluate</code> calls <code>layers.py::ClaimsEvidenceLayer.collect</code> (plus <code>VisualEvidenceLayer.collect</code> and <code>ExecutionGateLayer.gate</code> when enabled), loads <code>registry.py::TaskRegistry.load</code>, takes the reward from <code>aggregation.py::win_rate_reward</code> and renders <code>gradient.py::build_gradient</code>. Dependencies outside the package (<code>BaseEvaluator</code>, <code>WorkflowRunner</code>, <code>LLMProvider</code>) are named in the file cards, not drawn.</p>
+<p class="figcap">Diagram 1 &mdash; one box per package file (<code>10 boxes</code>), mint = L4 verifier. Solid = call, dotted = import only. <code>evaluator.py::HybridVerifierEvaluator.evaluate</code> calls <code>layers.py::ClaimsEvidenceLayer.collect</code> (plus <code>VisualEvidenceLayer.collect</code> and <code>ExecutionGateLayer.gate</code> when enabled), loads <code>registry.py::TaskRegistry.load</code>, takes the reward from <code>aggregation.py::win_rate_reward</code> and renders <code>gradient.py::build_gradient</code>. Dependencies outside the package (<code>BaseEvaluator</code>, <code>WorkflowRunner</code>, <code>LLMProvider</code>) are named in the file cards, not drawn. Since commit <code>4020790</code>: <code>gradient.py</code> imports <code>PASS_THRESHOLD</code> from <code>aggregation.py</code> (drawn), and <code>scorers.py</code> imports <code>_flag</code> and <code>_screen_call</code> from <code>claims.py</code> (not drawn, it would cross the fan of <code>layers.py</code> edges).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -189,10 +192,10 @@
   </a>
 
   <a class="box" id="c6" href="../../sources/evaluators/hybrid_verifier/scorers.py">
-    <title>scorers.static_violations screens imports, write and network calls</title>
+    <title>scorers.static_violations screens imports, write and network calls; then scorers.exact_name_violations asks the judge about exact-name checks</title>
     <rect x="490" y="30" width="340" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="660" y="56" text-anchor="middle">static_violations</text>
-    <text class="box-sub" x="660" y="72" text-anchor="middle">import + API screen first</text>
+    <text class="box-sub" x="660" y="72" text-anchor="middle">import + API screen, then exact-name judge</text>
   </a>
 
   <a class="box" id="c7" href="../../sources/evaluators/hybrid_verifier/evaluator.py">
@@ -250,7 +253,7 @@
 
 <div class="panel"><span class="br"></span>
 <h2>File cards</h2>
-<p class="sub">10 files, 4 727 lines total (<code>wc -l</code>). Role line max 25 words; signatures behind the fold.</p>
+<p class="sub">10 files, 4 735 lines total (<code>wc -l</code>, 2026-09-28 18:06). Role line max 25 words; signatures behind the fold.</p>
 
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a></h4>
@@ -313,7 +316,7 @@ EvidenceLayer.gate(context, collected) -&gt; float | None               # option
 ClaimsEvidenceLayer.collect(context) -&gt; list[LayerScore]
 ClaimsEvidenceLayer.revise(context, dead_claim_ids) -&gt; list[LayerScore]
 ClaimsEvidenceLayer.gate(context, collected) -&gt; None                 # no cap
-ClaimsEvidenceLayer._build_scorer(context, claim) -&gt; tuple[str | None, dict, dict | None]
+ClaimsEvidenceLayer._build_scorer(context, claim) -&gt; tuple[str | None, dict, dict | None]  # + exact-name screen per attempt
 ClaimsEvidenceLayer._score_claim(context, claim) -&gt; LayerScore
 ClaimsEvidenceLayer._score_claim_safe(context, claim) -&gt; LayerScore
 VisualEvidenceLayer.collect(context) -&gt; list[LayerScore]             # figure tasks only
@@ -327,12 +330,14 @@ ExecutionGateLayer.collect(context) / revise(...) -&gt; list[LayerScore]  # both
 
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/scorers.py">sources/evaluators/hybrid_verifier/scorers.py</a></h4>
-<p class="role">Builds the scorer prompts, screens scripts statically, wraps them with the launcher constants and parses the single JSON output line.</p>
+<p class="role">Builds the scorer prompts, screens scripts statically and with one exact-name judge call, wraps them with the launcher constants, parses the JSON output line.</p>
 <p class="meta">411 lines &#183; 9 functions, 2 dataclasses &#183; <code>MAX_CODE_ATTEMPTS = 3</code> (1 build + 2 repairs)</p>
 <details><summary>signatures, allow-list and banned APIs</summary><div class="dbody">
 <pre>scorer_prompt(goal, claim, union_inventory, digests_block="") -&gt; str
 repair_prompt(feedback, prev_code) -&gt; str
 parse_code(text) -&gt; str | None
+_pair_block(claims, scripts) -&gt; list[dict[str, str]]
+exact_name_violations(claims, scripts, llm_text, uuid="") -&gt; dict[str, str]   # one judge call
 static_violations(code) -&gt; list[str]
 build_launcher(workspace, claim, body) -&gt; str
 parse_scorer_output(stdout) -&gt; dict[str, Any] | None
@@ -349,7 +354,7 @@ ScorerAttempt(attempt, parse=None, static_violations=[], executed=False, ok=Fals
 <p class="role">Zero-variance filter, five pairwise modes, temporal elimination, win-rate and Bradley&ndash;Terry rewards; no intra-package imports.</p>
 <p class="meta">454 lines &#183; 7 public functions, 6 constants &#183; <code>PASS_THRESHOLD = 0.5</code>, <code>MIN_OBS_FOR_VARIANCE = 2</code></p>
 <details><summary>signatures and modes</summary><div class="dbody">
-<pre>claim_stats(observed) -&gt; dict            # dropped when all_fail or zero_variance
+<pre>claim_stats(observed) -&gt; dict            # dropped when all_scorer_fail or zero_variance
 decisive(now, prev, claim_ids) -&gt; tuple[int, float, int]   # (d, dm, k)
 winner_of(d, dm, mode) -&gt; int            # +1 / -1 / 0, flat modes
 temporal_winner(now, prev, claims, mode="temporal", stages=STAGES) -&gt; tuple[int, dict]
@@ -364,7 +369,7 @@ mean_claim_score(now, claim_ids) -&gt; float</pre>
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/registry.py">sources/evaluators/hybrid_verifier/registry.py</a></h4>
 <p class="role">Per-task JSON cache: claims with cached scorer scripts, digests, generation score vectors, union inventory, replacement counts.</p>
-<p class="meta">355 lines &#183; class: <code>TaskRegistry</code> &#183; file: <code>hybrid_registry_&lt;16 hex&gt;.json</code> &#183; <code>REGISTRY_VERSION = "hybrid-v1-e19b-20260924"</code></p>
+<p class="meta">355 lines &#183; constants: <code>_SCORER_CRASH_EVIDENCE</code> (4 prefixes), <code>_DEAD_STATES</code> (unused) &#183; class: <code>TaskRegistry</code> &#183; file: <code>hybrid_registry_&lt;16 hex&gt;.json</code> &#183; <code>REGISTRY_VERSION = "hybrid-v1-e19b-20260924"</code></p>
 <details><summary>signatures and keys</summary><div class="dbody">
 <pre>task_key(goal: str) -&gt; str                      # sha256(goal + REGISTRY_VERSION)[:16]
 TaskRegistry.load(root, goal, logger=None) -&gt; TaskRegistry
@@ -376,7 +381,8 @@ TaskRegistry.alive_claims() / dead_claims() / claim(claim_id)
 TaskRegistry.set_scorer(claim_id, script)
 TaskRegistry.record_generation(uuid, scores, evidence, reward=None)
 TaskRegistry.previous_generations(uuid) -&gt; list[dict]
-TaskRegistry.observed_scores(claim_id, exclude_uuid=None) -&gt; list[float]
+TaskRegistry.observed_scores(claim_id, exclude_uuid=None) -&gt; list[float]   # skips None and crash evidence
+TaskRegistry.claim_score_history(claim_id, exclude_uuid=None) -&gt; list[dict]  # no production caller
 TaskRegistry.merge_inventory(current) / n_workspaces</pre>
 <p>JSON keys: <code>version</code>, <code>task_key</code>, <code>goal</code>, <code>claims</code>, <code>generations</code>, <code>inventory</code>, <code>refinements</code>, <code>digests</code>, <code>n_inventories</code>. A version mismatch only warns; <code>_migrate_claim_stages</code> back-fills <code>stage</code> and <code>temporal_index</code> as <code>result</code>/index so pre-ladder registries keep working. Everything stored is label-free: measured scorer output only.</p>
 </div></details>
@@ -384,15 +390,17 @@ TaskRegistry.merge_inventory(current) / n_workspaces</pre>
 
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/gradient.py">sources/evaluators/hybrid_verifier/gradient.py</a></h4>
-<p class="role">Assembles the gradient: elimination point first, then stage losses, wins, all claim scores, transcript, dropped claims; renders the report.</p>
-<p class="meta">380 lines &#183; 4 functions, no classes &#183; transcript cap 4 000 characters</p>
+<p class="role">Assembles the gradient: decisive losses first, then never-passing claims, wins, execution, visual, dead claims, all scores, transcript; renders the report.</p>
+<p class="meta">388 lines &#183; 4 functions, no classes &#183; transcript cap 4 000 characters &#183; <span class="chip warn">in flight: uncommitted changes</span> (read 2026-09-28 18:15)</p>
 <details><summary>signatures and gradient sections</summary><div class="dbody">
-<pre>build_gradient(uuid, goal, now_scores, evidence, claims, surviving, pair_records,
+<pre>_persistent_failure_rows(claims, now_scores, evidence, pair_records, surviving,
+    order, stages) -&gt; list[str]          # section 1b
+build_gradient(uuid, goal, now_scores, evidence, claims, surviving, pair_records,
     reward, win_rate, mean_score, dead_claims, exec_facts=None,
     stages=STAGES) -&gt; str
 build_evaluation_report(uuid, scores, claims, now_scores, evidence, surviving,
     pair_records) -&gt; str</pre>
-<p>Sections of the gradient text (7): 1 <code>WHAT TO FIX FIRST</code> (decisive losses, max 5 rows), 2 <code>WHAT ALREADY WORKS</code> (decisive wins, max 5 rows), 3 execution facts, 4 visual evidence, 5 dead-claims report, 6 all claim scores with verbatim evidence, 7 per-claim sign transcript. There is no elimination-point section (removed; it measured worse). <code>build_evaluation_report</code> writes stage headers <code>--- stage: VISUAL/SCRIPT/LOG/RESULT ---</code> and prints <code>pass &gt;= 0.5</code> next to each score.</p>
+<p>Sections of the gradient text (8): 1 <code>WHAT TO FIX FIRST</code> (decisive losses, max 5 rows), 1b <code>PERSISTENTLY FAILING CLAIMS</code> (below 0.5 now and in every scored predecessor, no row cap; new in <code>4020790</code>), 2 <code>WHAT ALREADY WORKS</code> (decisive wins, max 5 rows), 3 execution facts, 4 visual evidence, 5 dead-claims report, 6 all claim scores with verbatim evidence, 7 per-claim sign transcript. There is no elimination-point section (removed; it measured worse). <code>build_evaluation_report</code> writes stage headers <code>--- stage: VISUAL/SCRIPT/LOG/RESULT ---</code> and prints <code>pass &gt;= 0.5</code> next to each score.</p>
 </div></details>
 </div>
 
@@ -468,7 +476,7 @@ from .registry import TaskRegistry</pre>
 <tr><td class="sym">escalation</td><td>Flat: sign-sum first, mean-diff as tie-break</td></tr>
 </tbody>
 </table>
-<p>Unmeasured claims (<code>score=None</code>) are skipped in every mode. <code>aggregation.claim_stats</code> drops a claim with no observed score (<code>all_fail</code>) or with zero variance over <code>&gt;= 2</code> observations (<code>zero_variance</code>); <code>layers.ClaimsEvidenceLayer.revise</code> then asks for up to <code>refinement_rounds</code> replacement claims, bounded by <code>MAX_CLAIMS_TOTAL = 14</code>.</p>
+<p>Unmeasured claims (<code>score=None</code>) are skipped in every mode. <code>aggregation.claim_stats</code> drops a claim with no measured score (<code>all_scorer_fail</code>; <code>None</code> = crashed scorer, not a measurement) or with zero variance over <code>&gt;= 2</code> observations (<code>zero_variance</code>); <code>layers.ClaimsEvidenceLayer.revise</code> then asks for up to <code>refinement_rounds</code> replacement claims, bounded by <code>MAX_CLAIMS_TOTAL = 14</code>.</p>
 <p>The <code>visual</code> stage reads the figure deliverables with the vision model. The <code>script</code> stage reads the candidate's own code. The <code>log</code> stage regex-parses log files. The <code>result</code> stage reads the artifacts.</p>
 </div></details>
 </div>
@@ -515,8 +523,8 @@ _WRITE_MODE_OPEN_RE = re.compile(r"open\([^)]*['\"][waxb+]['\"]")</blockquote>
 
 <footer>
 <p>Sources read: <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code>, <code class="path">aggregation.py</code>, <code class="path">claims.py</code>, <code class="path">digest.py</code>, <code class="path">evaluator.py</code>, <code class="path">gradient.py</code>, <code class="path">inventory.py</code>, <code class="path">layers.py</code>, <code class="path">registry.py</code>, <code class="path">scorers.py</code>; <code class="path">config.py</code> (hybrid_verifier_* fields, L122&ndash;148), <code class="path">config_default.json</code> (L18&ndash;23), <code class="path">sources/evaluators/evaluator.py</code> (L21, L107: facade picks the class by <code>verifier_kind</code>), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (<code>gold_hybrid_config</code>, inner hybrid), <code class="path">sources/evaluators/base.py</code> (<code>BaseEvaluator</code> L89, <code>_save_results</code> L227), <code class="path">sources/core/workflow_runner.py</code> (L310 <code>execute</code> runs a plain subprocess), <code class="path">tests/hybrid_verifier_test.py</code>, <code class="path">docs/concepts/evaluation-pipeline.md</code> (L190&ndash;275, checked against the code). Line counts from <code>wc -l</code>. Text budget and colours per UPDATE_VISUAL_CLONE.md sections 6&ndash;7.</p>
-<p class="skips">Skipped: <code>sources/evaluators/*.py</code> at the folder root (<code>base.py</code>, <code>verifier*.py</code>, <code>generic.py</code>, <code>scenario.py</code>, <code>grounding.py</code>, <code>bs_detection.py</code>) &mdash; outside this page's scope; they belong to <a href="area_evaluators.html">area_evaluators.html</a> and <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>. Not opened: <code>experiments_verifiers/</code> harnesses referenced in docstrings (outside scope, Tier B). No pytest run and no application run, by the build rules. Diagrams 1 and 2 link <a href="flow_verification.html">flow_verification.html</a> and <a href="area_evaluators.html">area_evaluators.html</a>, which other workers build.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26; line counts, scorer line refs, callers and the registry note re-checked at <code>4020790</code> + uncommitted working tree, 2026-09-28. The file card bodies were not re-read in that pass.</p>
+<p class="skips">Skipped: the rest of <code>sources/evaluators/</code> (<code>base.py</code>, <code>evaluator.py</code>, <code>grounding.py</code>, <code>legacy_verifier/</code>, <code>generic/</code>, <code>scenario/</code>, <code>gold_feedback/</code>) &mdash; outside this page's scope; they belong to <a href="area_evaluators.html">area_evaluators.html</a>, <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a> and <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>. Not opened: <code>experiments_verifiers/</code> harnesses referenced in docstrings (outside scope, Tier B). No pytest run and no application run, by the build rules. Diagrams 1 and 2 link <a href="flow_verification.html">flow_verification.html</a> and <a href="area_evaluators.html">area_evaluators.html</a>, which other workers build.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26; line counts, scorer line refs, callers and the registry note re-checked at <code>4020790</code> + uncommitted working tree, 2026-09-28. Updated at <code>ca72107</code> + working tree, 2026-09-28 18:06: file cards re-read for the <code>4020790</code> changes (exact-name screen, <code>all_scorer_fail</code>, crash-aware registry, gradient section 1b), two new import edges, line total re-counted. <code>gradient.py</code> is <span class="chip warn">in flight: uncommitted changes</span>; it was read at 18:15 CEST.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

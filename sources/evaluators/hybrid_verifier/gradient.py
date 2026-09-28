@@ -71,7 +71,12 @@ def _persistent_failure_rows(
         if pruned and c.get("state") != "dead":
             continue
         s = now_scores.get(cid)
-        if not pruned and (s is None or s >= PASS_THRESHOLD):
+        if s is None:
+            # without this guard the
+            # row below formatted None with "{s:.3f}" and killed the whole
+            # evaluation: "unsupported format string passed to NoneType.__format__
+            continue
+        if not pruned and s >= PASS_THRESHOLD:
             continue
         rivals = [
             p.get("prev_scores", {}).get(cid)
@@ -80,7 +85,7 @@ def _persistent_failure_rows(
         ]
         if not rivals or any(r >= PASS_THRESHOLD for r in rivals):
             continue
-        if s is not None and s >= PASS_THRESHOLD:
+        if s >= PASS_THRESHOLD:
             continue
         stage = c.get("stage", "result")
         rank = order.get(stage, len(stages))

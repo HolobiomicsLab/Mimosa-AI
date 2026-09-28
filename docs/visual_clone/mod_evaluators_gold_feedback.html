@@ -6,12 +6,12 @@
 <title>gold_feedback - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview > sources/evaluators > gold_feedback">
+<body data-crumb="Overview &gt; sources/evaluators &gt; gold_feedback" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">gold_feedback &mdash; ORACLE verifier control</h1>
 <p class="intro">Six files wrap the <a href="mod_evaluators_hybrid_verifier.html">hybrid verifier</a> with the benchmark grader, selected by <code>--verifier_kind gold</code>. The grader&rsquo;s VER/SR messages replace the textual gradient; with <code>gold_feedback_reward</code> the grader also gives the reward. This mode reads the benchmark gold, so its scores must never be reported.</p>
-<p><span class="chip warn">oracle - leaks gold</span> <span class="chip warn">uncommitted at 4020790</span> <span class="chip unknown">research control (E43)</span></p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip warn">new in ca72107</span> <span class="chip unknown">research control (E43)</span></p>
 
 <div id="legend" data-auto></div>
 
@@ -439,7 +439,7 @@
 </tbody>
 </table>
 <p class="sub">Status constants: <code>evaluator.py</code> L44&ndash;L48. In gradient-only mode the reward is always the hybrid one.</p>
-<p class="note say">Why it matters: <code>oracle_censored</code> is in <code>workflow_info.py::FALLBACK_REWARD_KINDS</code>, so a censored generation cannot win the capsule argmax, reach the 0.9 early stop, or enter the QD archive.</p>
+<p class="note say">Why it matters: a censored generation scores 0.0 (<code>CENSORED_ORACLE_REWARD</code>), so it cannot reach the 0.9 early stop or enter the QD archive; its kind <code>oracle_censored</code> is in <code>workflow_info.py::FALLBACK_REWARD_KINDS</code>, so the capsule pick <code>_select_best_run</code> also skips it.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -604,7 +604,7 @@ grade_private_copy(copy_dir, context, grade_fn=grade_directory, timeout_s=None) 
 build_gold_gradient(grade, max_chars=MAX_GRADIENT_CHARS) -&gt; str            L180
 censored_note(reason, max_chars=300) -&gt; str                                L254
 parse_critiques, is_uninformative, decisive_error_line, clip, _figure_block</pre>
-<p>Adapted from <code>experiments_verifiers/harness/e33_truman.py</code> (docstring). The 2048-char clip in <code>variation_engine.py</code> is removed in the working tree, so the gradient reaches the mutation prompt unclipped.</p>
+<p>Adapted from <code>experiments_verifiers/harness/e33_truman.py</code> (docstring). The 2048-char clip in <code>variation_engine.py</code> was removed in commit <code>ca72107</code>, so the gradient reaches the mutation prompt unclipped.</p>
 </div></details>
 </div>
 
@@ -664,7 +664,7 @@ parse_critiques, is_uninformative, decisive_error_line, clip, _figure_block</pre
 <footer>
 <p>Sources read: <code class="path">sources/evaluators/gold_feedback/*.py</code> (all 6, whole files), <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>, <code class="path">sources/evaluators/evaluator.py</code> (L88&ndash;L110, L174), <code class="path">config.py</code>, <code class="path">main.py</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code>, <code class="path">capsule_evaluator.py</code> (L200, L221), <code class="path">execution_sandbox.py</code> (L799&ndash;L806), <code class="path">sources/core/evolution_engine.py</code>, <code class="path">workflow_info.py</code>, <code class="path">workflow_selection.py</code>, <code class="path">variation_engine.py</code> (<code>git diff HEAD</code>), <code class="path">tests/gold_feedback_test.py</code>, <code class="path">audits/gold_feedback_mode_design_2026-09-28.md</code> (intent only). Line counts from <code>wc -l</code>.</p>
 <p class="skips">Skipped: E43 experiment design and results &mdash; not in the code, see the audit report; the visual-judge path of the SAB grader &mdash; covered by <a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a>; no pytest run and no application run, by the build rules. Whether any gold run exists on disk: unknown (not checked; Tier D folders).</p>
-<p>Built at <code>4020790 + uncommitted working tree, 2026-09-28</code>. The whole <code>gold_feedback</code> package is uncommitted (untracked) at this build.</p>
+<p>Built at <code>ca72107 + working tree, 2026-09-28</code>. Commit <code>ca72107</code> added the whole <code>gold_feedback</code> package during this build.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

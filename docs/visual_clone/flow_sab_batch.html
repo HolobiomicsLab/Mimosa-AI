@@ -6,7 +6,7 @@
 <title>Batch benchmark flow - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview > benchmark evaluation > batch benchmark flow">
+<body data-crumb="Overview &gt; benchmark evaluation &gt; batch benchmark flow" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">Batch benchmark flow</h1>
@@ -397,11 +397,11 @@ WorkflowEval.run_workflow_eval_loop_model -&gt; WorkflowOrchestrator.orchestrate
 <details><summary>ablation entries: counted facts (my computation)</summary><div class="dbody">
 <pre>ablation entries total ............... 1267
   source = "snapshot" ................ 1146   (re-graded /tmp workspace)
-  source = "capsule" ................. 121    (best run: capsule metrics reused)
+  source = "capsule" ................. 121    (best run by plain max reward: capsule metrics reused)
   status = "excluded" ................ 10     (infra failure, VER/SR/CBS = null)
   index == position in uuid list ..... 594
   index beyond uuid list length ...... 673    (orphan snapshots)</pre>
-<p>Snapshots are written by <code class="path">sources/utils/workspace_management.py::WorkspaceManager.save_run_snapshot</code> (line 80) as <code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code>. Gates: <code>evaluate_snapshot_ablations</code> (<code>config_default.json</code> line 70, default <code>true</code>). Each non-best entry is the <code>grade_directory</code> dict plus <code>evolution_index</code>, <code>uuid</code>, <code>source</code>.</p>
+<p>Snapshots are written by <code class="path">sources/utils/workspace_management.py::WorkspaceManager.save_run_snapshot</code> (line 80) as <code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code>. Gates: <code>evaluate_snapshot_ablations</code> (<code>config_default.json</code> line 70, default <code>true</code>). Each non-best entry is the <code>grade_directory</code> dict plus <code>evolution_index</code>, <code>uuid</code>, <code>source</code>. The "best" uuid comes from a plain <code>max</code> over reward (csv_mode.py lines 852-856), not from <code>EvolutionEngine</code>'s <code>_select_best_run</code>, which leaves out fallback rewards (details on <a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a>).</p>
 </div></details>
 </div>
 
@@ -520,7 +520,7 @@ ExecutionSandbox.cleanup() -&gt; None</pre>
 <div class="card l4">
 <h4><a href="../../sources/benchmark_evaluation/snapshot_grading.py">sources/benchmark_evaluation/snapshot_grading.py</a></h4>
 <p class="role">Grades one folder with <code>CapsuleEvaluator</code>; used by the ablation loop and by the gold grader.</p>
-<p class="meta">82 lines &#183; function: grade_directory &#183; uncommitted &#183; card: <a href="area_benchmark_evaluation.html#f-snapshot-grading">area page</a></p>
+<p class="meta">82 lines &#183; function: grade_directory &#183; new in ca72107 &#183; card: <a href="area_benchmark_evaluation.html#f-snapshot-grading">area page</a></p>
 <details><summary>signature</summary><div class="dbody">
 <pre>grade_directory(directory, task_row, sab_loader, api_cost=0.0, evaluator_cls=None) -&gt; dict</pre>
 <p>Returns <code>VER</code>, <code>VER_message</code>, <code>SR</code>, <code>SR_message</code>, <code>CBS</code>, <code>cost</code>, <code>status="evaluated"</code>, or the <code>excluded</code> shape with <code>infra_error</code>. Evaluator exceptions propagate to the caller.</p>
@@ -570,7 +570,7 @@ WorkflowEval._display_comparative_report() -&gt; None</pre>
 <p>Code read: <code>main.py</code> (mode dispatch, flags), <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (entry, both loops, run-notes writer, ablation writer, summary), <code class="path">sources/benchmark_evaluation/capsule_evaluator.py</code>, <code class="path">sources/benchmark_evaluation/execution_sandbox.py</code>, <code class="path">sources/benchmark_evaluation/science_agent_bench.py</code>, <code class="path">sources/benchmark_evaluation/scenario_loader.py</code>, <code class="path">sources/benchmark_evaluation/codebert_scorer.py</code>, <code class="path">sources/benchmark_evaluation/eval_workflow_generation.py</code>, <code class="path">sources/cli/evaluation_cli.py</code> (run-notes folder per run), <code class="path">sources/utils/workspace_management.py</code> (snapshot path), <code class="path">sources/utils/transfer_toolomics.py</code> (capsule transfer), <code>config.py</code> and <code>config_default.json</code> (<code>evaluate_snapshot_ablations</code>, <code>max_concurrent_eval_tasks</code>, <code>verifier_kind</code>, <code>gold_feedback_*</code>), <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>, <code class="path">sources/evaluators/gold_feedback/grader.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (<code>evaluate</code>, <code>_apply</code>), <code class="path">sources/core/evolution_engine.py</code> (gold <code>to_thread</code> branch), <code>git diff 336fe19</code> of <code>csv_mode.py</code> and <code>execution_sandbox.py</code>.</p>
 <p>Data read: <code class="path">datasets/ScienceAgentBench.csv</code> (header and row count), <code class="path">datasets/ScienceAgentBench_backup_full.csv</code> (row count), <code class="path">datasets/ScienceAgentBench/eval_programs/</code> (file counts, <code>eval_mat_feature_select.py</code>, <code>eval_papyrus.py</code>, <code>antibioticsai_filter_eval.py</code>, <code>clintox_nn_eval.py</code>, <code>gpt4_visual_judge.py</code>), <code class="path">datasets/ScienceAgentBench/eval_programs/gold_results/</code> (count), <code>run_notes/**/*.json</code> (schema counts) and <code class="path">run_notes/e35_fix_1/llm_response_error_mat_feature_select.json</code> (quoted keys; the older <code>run_notes/run_1/</code> folder is gone from disk).</p>
 <p class="skips">Skipped: <code class="path">datasets/ScienceAgentBench/datasets/</code>, <code>datasets_chemistry/</code>, <code>gold_programs/</code> and <code>scoring_rubrics/</code> contents (data only; counts given). Skipped on purpose: the dependency-rule tables of <code>execution_sandbox.py</code> beyond the 4020790 changes and the 1 901-line body of <code>csv_mode.py</code> summary/email helpers (not on this flow). Skipped: gold_feedback <code>format.py</code>, <code>reward.py</code>, <code>leak.py</code> internals (covered by <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>). Skipped: <code class="path">sources/workflows/</code>, <code>runs_capsule/</code>, <code class="path">sources/memory/</code>, <code>logs/</code> (Tier D runtime, named only). Skipped: the 110 remaining grader files after sampling 5 (their shape is uniform: <code>def eval()</code> plus <code>print(eval())</code> in 110 of 111 files, my count).</p>
-<p>Built at <code>4020790 + uncommitted working tree, 2026-09-28</code> (previous build of this page: <code>7e8463b</code>). Line numbers and counts are a snapshot of this checkout; gold-mode code and <code>snapshot_grading.py</code> are uncommitted.</p>
+<p>Built at <code>ca72107 + working tree, 2026-09-28</code> (previous build of this page: <code>7e8463b</code>). Line numbers and counts are a snapshot of this checkout; gold-mode code and <code>snapshot_grading.py</code> came in commit ca72107.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

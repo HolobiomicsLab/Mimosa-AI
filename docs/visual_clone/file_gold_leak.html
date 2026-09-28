@@ -6,12 +6,12 @@
 <title>leak.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; leak.py">
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; leak.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">leak.py</h1>
 <p class="intro">This 29-line file holds the leakage warning <code>LEAK_WARNING</code> and <code>leak_banner</code>, which frames it between two lines of 78 <code>!</code>. Every gold-mode artifact carries this text, so a run that used the benchmark gold is never read as an honest Mimosa score. It has no logic and no I/O.</p>
-<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new, uncommitted</span></p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new in ca72107</span></p>
 
 <div id="legend" data-auto></div>
 
@@ -253,8 +253,8 @@ leak_banner(width: int = 78) -&gt; str   L19   f"{rule}\n{LEAK_WARNING}\n{rule}"
 
 <footer>
 <p>Sources read: <code class="path">sources/evaluators/gold_feedback/leak.py</code> (29 lines, whole file), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (L41, L52, L137, L168, L339, L403&#8211;L466), <code class="path">sources/evaluators/gold_feedback/__init__.py</code> (L22), <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (L499&#8211;L510, L973&#8211;L998, L1681&#8211;L1683), <code class="path">main.py</code> (L186&#8211;L205, L448), <code class="path">tests/gold_feedback_test.py</code> (test names by grep). Line counts from <code>wc -l</code>.</p>
-<p class="skips">Skipped: the <code>print_warn</code> helper internals (console styling, covered by <a href="area_cli.html">area_cli.html</a>); secret files were not opened; no pytest run, by the build rules. The file is new and uncommitted.</p>
-<p>Built at 4020790 + uncommitted working tree, 2026-09-28.</p>
+<p class="skips">Skipped: the <code>print_warn</code> helper internals (console styling, covered by <a href="area_cli.html">area_cli.html</a>); secret files were not opened; no pytest run, by the build rules. The file is new; commit <code>ca72107</code> added it during this build.</p>
+<p>Built at ca72107 + working tree, 2026-09-28.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

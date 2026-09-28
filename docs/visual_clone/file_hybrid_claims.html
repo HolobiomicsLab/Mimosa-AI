@@ -6,7 +6,7 @@
 <title>claims.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests > sources/evaluators/hybrid_verifier > claims.py">
+<body data-crumb="File digests &gt; sources/evaluators/hybrid_verifier &gt; claims.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">claims.py</h1>
@@ -89,7 +89,7 @@
   </g>
 
   <g class="box" id="pBase">
-    <title>Not imported by this file any more (git diff, working tree)</title>
+    <title>Not imported by this file any more (removed in commit 4020790)</title>
     <rect x="290" y="210" width="230" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="405" y="234" text-anchor="middle">base.extract_json_payload</text>
     <text class="box-sub" x="405" y="252" text-anchor="middle">import line removed</text>
@@ -109,11 +109,11 @@
   <text class="edge-label" x="400" y="252" text-anchor="middle">no verdict list</text>
   <path class="edge dashed-edge" data-from="pBase" data-to="pBlock" d="M405,210 V150" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
   <text class="edge-label" x="415" y="176" text-anchor="start">replaced by</text>
-  <text class="box-sub" x="20" y="380">The screen call is shared by <code>is_generic_claim</code> (381) and <code>t1_violations</code> (426); the agent names are hybrid_screen_generic and hybrid_screen_t1.</text>
-  <text class="box-sub" x="20" y="404">The two helpers are new in the working tree (uncommitted edit); the extraction path in layers.py still parses its object with base.extract_json_payload.</text>
+  <text class="box-sub" x="20" y="380">The screen call is shared by is_generic_claim (381), t1_violations (426) and scorers.exact_name_violations; agents hybrid_screen_generic, _t1, _exact_name.</text>
+  <text class="box-sub" x="20" y="404">The two helpers came in commit 4020790; the extraction path in layers.py still parses its object with base.extract_json_payload.</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 &mdash; <code>7 boxes</code>. Both new helpers are private: <code>_first_json_block</code> keeps a top-level verdict <b>array</b> that the object-first <code>base.extract_json_payload</code> collapsed into a nested object. No test calls the two helpers directly; <code>test_validate_claims_drops_generic_claims</code> and <code>test_is_generic_claim_batch_llm_screen</code> drive them through <code>_screen_call</code> with array-shaped stub replies (<code class="path">tests/hybrid_verifier_test.py:298, 333</code>).</p>
+<p class="figcap">Diagram 1 &mdash; <code>7 boxes</code>. Both new helpers are private: <code>_first_json_block</code> keeps a top-level verdict <b>array</b> that the object-first <code>base.extract_json_payload</code> collapsed into a nested object. No test calls the two helpers directly; <code>test_validate_claims_drops_generic_claims</code> and <code>test_is_generic_claim_batch_llm_screen</code> drive them through <code>_screen_call</code> with array-shaped stub replies (<code class="path">tests/hybrid_verifier_test.py:325, 360</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -356,7 +356,7 @@
   <text class="box-sub" x="20" y="490">A generic claim is dropped, then the count contract runs on the survivors, so a fully generic batch fails with "got 0" (596).</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 &mdash; <code>12 boxes</code>. The composition mandate is checked only when the caller asks for it, and an unmet mandate returns the ordered claims <b>with</b> the error, so <code>layers.py:269</code> keeps the best effort after its retry budget. Test <code>test_validate_claims_drops_generic_claims</code> covers the drop and the floor (<code class="path">tests/hybrid_verifier_test.py:298</code>).</p>
+<p class="figcap">Diagram 3 &mdash; <code>12 boxes</code>. The composition mandate is checked only when the caller asks for it, and an unmet mandate returns the ordered claims <b>with</b> the error, so <code>layers.py:269</code> keeps the best effort after its retry budget. Test <code>test_validate_claims_drops_generic_claims</code> covers the drop and the floor (<code class="path">tests/hybrid_verifier_test.py:325</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -392,7 +392,7 @@
 
 <div class="panel"><span class="br"></span>
 <h2>Full symbol inventory</h2>
-<p class="sub">19 top-level functions, no class, 7 module constants. 701 lines (<code>wc -l</code>). Imports: <code>collections</code>, <code>json</code>, <code>re</code>, <code>typing.Any</code>, <code>collections.abc.Callable</code>. No import from <code>sources.evaluators.base</code> any more (working-tree edit).</p>
+<p class="sub">19 top-level functions, no class, 7 module constants. 701 lines (<code>wc -l</code>). Imports: <code>collections</code>, <code>json</code>, <code>re</code>, <code>typing.Any</code>, <code>collections.abc.Callable</code>. No import from <code>sources.evaluators.base</code> any more (commit <code>4020790</code>).</p>
 <details><summary>every def and constant in sources/evaluators/hybrid_verifier/claims.py</summary><div class="dbody">
 <pre>CLAIM_CATEGORIES: tuple[str, ...]                      # L27  - 9 category names
 STAGES = ("script", "log", "result")                   # L44  - text-task ladder
@@ -437,15 +437,15 @@ return sites (statement positions in this file): 69, 206, 267, 308, 321, 357,
 </div>
 
 <div class="panel"><span class="br"></span>
-<h2>Uncommitted edit in the working tree</h2>
-<p class="sub">Evidence: <code>git diff -- sources/evaluators/hybrid_verifier/claims.py</code>, read 2026-09-26 at commit <code>336fe19</code> with a dirty tree.</p>
+<h2>Change since the last build (committed in 4020790)</h2>
+<p class="sub">Evidence: <code>git diff 336fe19 4020790 -- sources/evaluators/hybrid_verifier/claims.py</code> (68 lines changed); the edit was uncommitted at the 2026-09-26 build and is now part of commit <code>4020790</code>. <code>ca72107</code> and the working tree do not change this file.</p>
 <details><summary>the four hunks of the diff, quoted in one line each</summary><div class="dbody">
 <blockquote>1. <code>-from sources.evaluators.base import extract_json_payload</code> &mdash; the cross-area import is gone; the parser lives here now.<br>
 2. <code>+def _first_json_block(text: str) -&gt; str:</code> &mdash; first balanced JSON block, array-first, fences tolerated (now L271).<br>
 3. <code>+def _as_verdict_list(parsed: Any) -&gt; list[Any] | None:</code> &mdash; list, or the object's first list value (now L312).<br>
 4. <code>-        payload = extract_json_payload(raw or "")</code> / <code>+        payload = _first_json_block(raw or "")</code> and <code>-if isinstance(parsed, list):</code> / <code>+verdicts = _as_verdict_list(parsed)</code> &mdash; the screen call swapped over (now 349, 355).<br>
 5. <code>-CUT</code> &mdash; a stray literal token above the helper region was deleted.</blockquote>
-<p>Why the swap: <code>base.extract_json_payload</code> is object-first, so a judge reply that is a top-level verdict array lost its array shape. <code>layers.py</code> (<code>_llm_json</code>, L179) and <code>digest.py</code> (L88) still call <code>base.extract_json_payload</code> for object-shaped replies.</p>
+<p>Why the swap: <code>base.extract_json_payload</code> is object-first, so a judge reply that is a top-level verdict array lost its array shape. <code>layers.py</code> (<code>_llm_json</code>, L179; <code>VisualEvidenceLayer._vision_json</code>, L722) and <code>digest.py</code> (L88) still call <code>base.extract_json_payload</code> for object-shaped replies.</p>
 </div></details>
 <p class="note say">Why it matters: the two screens judge claim content with the model, so the only thing this file still enforces by code is claim shape, the count contract and the ladder order.</p>
 </div>
@@ -457,29 +457,30 @@ return sites (statement positions in this file): 69, 206, 267, 308, 321, 357,
 <tbody>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>_extract</code> and <code>revise</code> call the prompts, both screens, validation, ids and <code>outcome_report</code></td><td class="sym">import L32; 224, 248, 259, 283, 318, 321, 331, 336, 346</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td><code>STAGES</code> / <code>FIGURE_STAGES</code> pick the ladder; <code>sort_claims_temporally</code> orders reward and gradient</td><td class="sym">import L66; 507, 511, 621, 649</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td><code>STAGES</code>, as the default ladder for the gradient text</td><td class="sym">import L18; default at L47</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td><code>STAGES</code>, as the default ladder for the gradient text</td><td class="sym">import L22; default at L136</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/scorers.py">hybrid_verifier/scorers.py</a></td><td><code>_flag</code> and <code>_screen_call</code> for the exact-name screen (agent <code>hybrid_screen_exact_name</code>); new in <code>4020790</code></td><td class="sym">import L27; call L318, flag L325</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e35_prime.py">experiments_verifiers/harness/e35_prime.py</a></td><td>patches <code>CLAIMS.CLAIM_CATEGORIES</code>, <code>STAGES</code> and <code>STAGE_RANK</code> in-process, then reuses validation and ordering</td><td class="sym">167, 173-174, 1019, 1548</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a>, <a href="../../experiments_verifiers/harness/e32_mirror_v2.py">e32_mirror_v2.py</a>, <a href="../../experiments_verifiers/harness/e30_optimus.py">e30_optimus.py</a></td><td>offline harnesses that reuse <code>extract_claims_prompt</code>, <code>validate_claims</code> and <code>sort_claims_temporally</code></td><td class="sym">e19c_ratchet 384, 398; e32_mirror_v2 477; e30_optimus 581</td></tr>
 <tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports the module as <code>claims_mod</code> and exercises it directly</td><td class="sym">import L44</td></tr>
-<tr><td class="sym">test_validate_claims_enforces_count_and_shape</td><td>count error text, valid claims keep their category, duplicate-id rejection</td><td class="sym">lines 273-285</td></tr>
-<tr><td class="sym">test_next_claim_id_and_dedupe</td><td><code>"C13"</code> after C12; a colliding replacement is re-ided</td><td class="sym">lines 287-295</td></tr>
-<tr><td class="sym">test_validate_claims_drops_generic_claims</td><td>one batched screen call, the drop, the floor failure <code>"got 0"</code></td><td class="sym">lines 298-331</td></tr>
-<tr><td class="sym">test_is_generic_claim_batch_llm_screen</td><td>one call per set; unknown ids ignored; a failed call flags nothing</td><td class="sym">lines 333-359</td></tr>
-<tr><td class="sym">test_t1_firewall_rejects_numeric_answer_keys / test_t1_firewall_passes_structural_constants</td><td><code>t1_violations</code> flags a smuggled number, passes structural constants, degrades open</td><td class="sym">lines 1405-1484</td></tr>
-<tr><td class="sym">test_extract_prompt_demands_content_lever / test_extraction_retries_on_t1_and_composition_then_accepts</td><td>the content mandate and the 3-attempt extract loop with screens between attempts</td><td class="sym">lines 1486-1568</td></tr>
-<tr><td class="sym">test_ladder_claim_validation_and_ordering</td><td>returns <code>["script", "log", "result"]</code>; unknown stage to "result"</td><td class="sym">lines 1164-1200</td></tr>
-<tr><td class="sym">test_stage_order_visual_first_configurable</td><td>the same claim set ordered under <code>FIGURE_STAGES</code> and <code>STAGES</code></td><td class="sym">lines 1909-1937</td></tr>
-<tr><td class="sym">test_zero_variance_drops_claim_and_triggers_replacement</td><td>the refine path through <code>layers.revise</code>: outcome report, fresh id, replacement claims</td><td class="sym">lines 592-680</td></tr>
-<tr><td class="sym">_first_json_block / _as_verdict_list (object-wrapped case)</td><td>no direct test; array-shaped stubs only, so wrapping branch 323 untested</td><td class="sym">grep tests/, 2026-09-26</td></tr>
+<tr><td class="sym">test_validate_claims_enforces_count_and_shape</td><td>count error text, valid claims keep their category, duplicate-id rejection</td><td class="sym">lines 300-311</td></tr>
+<tr><td class="sym">test_next_claim_id_and_dedupe</td><td><code>"C13"</code> after C12; a colliding replacement is re-ided</td><td class="sym">lines 314-322</td></tr>
+<tr><td class="sym">test_validate_claims_drops_generic_claims</td><td>one batched screen call, the drop, the floor failure <code>"got 0"</code></td><td class="sym">lines 325-357</td></tr>
+<tr><td class="sym">test_is_generic_claim_batch_llm_screen</td><td>one call per set; unknown ids ignored; a failed call flags nothing</td><td class="sym">lines 360-382</td></tr>
+<tr><td class="sym">test_t1_firewall_rejects_numeric_answer_keys / test_t1_firewall_passes_structural_constants</td><td><code>t1_violations</code> flags a smuggled number, passes structural constants, degrades open</td><td class="sym">lines 1600-1673</td></tr>
+<tr><td class="sym">test_extract_prompt_demands_content_lever / test_extraction_retries_on_t1_and_composition_then_accepts</td><td>the content mandate and the 3-attempt extract loop with screens between attempts</td><td class="sym">lines 1681-1762</td></tr>
+<tr><td class="sym">test_ladder_claim_validation_and_ordering</td><td>returns <code>["script", "log", "result"]</code>; unknown stage to "result"</td><td class="sym">lines 1359-1395</td></tr>
+<tr><td class="sym">test_stage_order_visual_first_configurable</td><td>the same claim set ordered under <code>FIGURE_STAGES</code> and <code>STAGES</code></td><td class="sym">lines 2104-2132</td></tr>
+<tr><td class="sym">test_zero_variance_drops_claim_and_triggers_replacement</td><td>the refine path through <code>layers.revise</code>: outcome report, fresh id, replacement claims</td><td class="sym">lines 665-741</td></tr>
+<tr><td class="sym">_first_json_block / _as_verdict_list (object-wrapped case)</td><td>no direct test; array-shaped stubs only, so wrapping branch 323 untested</td><td class="sym">grep tests/, 2026-09-28 18:06</td></tr>
 </tbody>
 </table>
-<p class="note">My run: <code>uv run pytest tests/hybrid_verifier_test.py -q</code> gives <code>53 passed</code> (2 warnings, 2.02 s) on 2026-09-26 &mdash; my computation, not a recorded result.</p>
+<p class="note">My run: <code>uv run pytest tests/hybrid_verifier_test.py -q</code> gives <code>53 passed</code> (2 warnings, 2.02 s) on 2026-09-26 &mdash; my computation, not a recorded result. On 2026-09-28 the file defines 65 <code>test_*</code> functions (my count, AST, 18:06); no pytest run in this update.</p>
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/claims.py">sources/evaluators/hybrid_verifier/claims.py</a> (all 701 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L30-L32 imports, L167-L189 <code>_llm_json</code>, L200-L289 <code>_extract</code>, L291-L365 <code>revise</code>), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L66 import, L507-L511 stage order, L616-L649 gradient and report inputs), <a href="../../sources/evaluators/hybrid_verifier/gradient.py">gradient.py</a> (L18 import), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (<code>task_key</code>), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L44 import, L273-L359, L592-L680, L1164-L1200, L1405-L1568, L1909-L1937), <a href="../../experiments_verifiers/harness/e35_prime.py">experiments_verifiers/harness/e35_prime.py</a> (L167-L174), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code> and greps; text budget and colours per UPDATE_VISUAL_CLONE.md sections 6-7.</p>
-<p class="skips">Skipped: the long prompt prose inside <code>extract_claims_prompt</code> and <code>refinement_prompt</code> (summarised as the four hard rules plus the E29/E30 mandates, with line numbers instead of quotes); <code>CLAIM_CATEGORIES</code> listed by count, not quoted in full; <a href="area_evaluators_legacy.html">the deprecated legacy verifier</a> (<code>verifier_claims.py</code>), which is gone from the working tree; <code>sources/evaluators/hybrid_verifier/scorers.py</code> and <code>digest.py</code> (they keep using <code>base.extract_json_payload</code>, covered by their own cards). No application run, by the build rules.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes; this page describes the working tree. <code>git status --porcelain</code> lists <code>claims.py</code>, <code>gradient.py</code> and <code>tests/hybrid_verifier_test.py</code> as modified, so this page mixes the committed file with the uncommitted edit.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/claims.py">sources/evaluators/hybrid_verifier/claims.py</a> (all 701 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L30-L32 imports, L167-L189 <code>_llm_json</code>, L200-L289 <code>_extract</code>, L291-L365 <code>revise</code>), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L66 import, L507-L511 stage order, L616-L649 gradient and report inputs), <a href="../../sources/evaluators/hybrid_verifier/gradient.py">gradient.py</a> (L18 import), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (<code>task_key</code>), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L44 import, L300-L382, L665-L741, L1359-L1395, L1600-L1762, L2104-L2132, L2306-L2354), <a href="../../experiments_verifiers/harness/e35_prime.py">experiments_verifiers/harness/e35_prime.py</a> (L167-L174), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code> and greps; text budget and colours per UPDATE_VISUAL_CLONE.md sections 6-7.</p>
+<p class="skips">Skipped: the long prompt prose inside <code>extract_claims_prompt</code> and <code>refinement_prompt</code> (summarised as the four hard rules plus the E29/E30 mandates, with line numbers instead of quotes); <code>CLAIM_CATEGORIES</code> listed by count, not quoted in full; <a href="area_evaluators_legacy.html">the deprecated legacy verifier</a> (now <code>sources/evaluators/legacy_verifier/verifier_claims.py</code>, out of scope); the bodies of <code>scorers.py</code> and <code>digest.py</code> (own cards; <code>digest.py</code> keeps <code>base.extract_json_payload</code>, <code>scorers.py</code> reuses <code>_screen_call</code>). No application run, by the build rules.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26 (it then described the uncommitted <code>claims.py</code> edit). Updated at <code>ca72107</code> + working tree, 2026-09-28: the edit is now committed in <code>4020790</code> and <code>claims.py</code> is unchanged since, so its line refs stay; new caller <code>scorers.py</code>; test and <code>gradient.py</code> refs re-derived. <code class="path">tests/hybrid_verifier_test.py</code> read at 18:06 CEST while it has uncommitted edits in flight, so test line numbers can move.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

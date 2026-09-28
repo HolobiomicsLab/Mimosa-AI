@@ -2488,6 +2488,48 @@ def test_gradient_surfaces_pruned_persistent_failures():
     assert fp_block.strip() == "(none)"
 
 
+def test_gradient_pruned_claim_with_crashed_scorer_does_not_crash():
+    """A pruned (zero-variance) claim whose scorer crashed this generation
+    has NO measured score, so "never passed" cannot be asserted for it: the
+    "None disqualifies" rule must cover pruned claims too.
+
+    Regression (clintox, 2026-09-28): the pruned branch formatted the None
+    score with "{s:.3f}" and raised
+    TypeError: unsupported format string passed to NoneType.__format__,
+    which aborted the whole ScienceAgentBench evaluation row.
+    """
+    from sources.evaluators.hybrid_verifier import gradient as g
+
+    dead = dict(
+        _claim("C16", stage="result", tidx=0),
+        state="dead",
+        drop_reason="zero_variance",
+    )
+    pair_records = [
+        {"prev_uuid": f"u{i}", "outcome": "tie",
+         "prev_scores": {"C16": 0.2}, "d": 0, "dm": 0.0}
+        for i in range(2)
+    ]
+    text = g.build_gradient(
+        uuid="u2",
+        goal=GOAL,
+        now_scores={"C16": None},  # scorer crashed this generation
+        evidence={"C16": "scorer raised: boom"},
+        claims=[dead],
+        surviving=[],
+        pair_records=pair_records,
+        reward=0.0,
+        win_rate=0.0,
+        mean_score=0.0,
+        dead_claims=[dead],
+    )
+    block = text.split("## 1b.")[1].split("\n", 1)[1].split("## 2.")[0]
+    assert block.strip() == "(none)"
+    assert "[C16]" not in block
+    # the claim is still reported as unscored in the all-claims transcript
+    assert "NOT SCORED" in text
+
+
 def test_registry_exposes_dead_claim_score_history(tmp_path: Path):
     """The registry keeps a pruned claim's per-generation measurements —
     the gradient's persistent-failure verdict for dead claims depends on

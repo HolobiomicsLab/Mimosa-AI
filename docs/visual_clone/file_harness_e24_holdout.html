@@ -6,7 +6,7 @@
 <title>e24_holdout.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests &gt; harness &gt; e24_holdout.py">
+<body data-crumb="File digests &gt; harness &gt; e24_holdout.py" data-built="7e8463b" data-built-date="2026-10-02">
 <div class="wrap">
 <h1 class="hud">e24_holdout.py</h1>
 <p class="intro">This file is E24 Phase 2: the verifier builds its own labeled evaluation from the workspace's own train data, with zero gold access. It cuts one fixed 80/20 split per admissible group (seed 20260924), rewrites the held-out 20% as the test file with labels stripped, re-executes the delivered script on that swapped copy, and scores the fresh predictions against the labels it kept. Two commands: <code>split</code> then <code>run</code> (<code>--pilot</code> redacts every metric value).</p>

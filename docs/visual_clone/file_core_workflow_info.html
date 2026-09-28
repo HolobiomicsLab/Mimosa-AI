@@ -8,7 +8,7 @@
 </head>
 <!-- file_core_workflow_info.html - file digest: sources/core/workflow_info.py.
      Built by the visual-clone worker "file-digests-core-workflow". Sources: see footer. -->
-<body data-crumb="File digests > sources/core > workflow_info.py">
+<body data-crumb="File digests &gt; sources/core &gt; workflow_info.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">workflow_info.py</h1>
@@ -117,7 +117,7 @@
     <text class="box-label" x="120" y="428" text-anchor="middle">is_oracle_generation()</text>
     <text class="box-sub" x="120" y="446" text-anchor="middle">FALLBACK_REWARD_KINDS</text>
     <text class="box-sub" x="120" y="462" text-anchor="middle">ORACLE_SIDECAR</text>
-    <text class="box-sub" x="120" y="478" text-anchor="middle">uncommitted, lines 13-38</text>
+    <text class="box-sub" x="120" y="478" text-anchor="middle">ca72107, lines 13-38</text>
   </a>
 
   <a class="box" id="b9" href="file_core_workflow_selection.html">
@@ -388,7 +388,7 @@
     <text class="box-label" x="860" y="52" text-anchor="middle">float(value), else 0.0</text>
     <text class="box-sub" x="860" y="70" text-anchor="middle">TypeError, ValueError: 0.0</text>
   </g>
-  <text class="box-sub" x="20" y="120">lane B - reward_is_fallback (line 200); FALLBACK_REWARD_KINDS is uncommitted</text>
+  <text class="box-sub" x="20" y="120">lane B - reward_is_fallback (line 200); FALLBACK_REWARD_KINDS came in ca72107</text>
   <g class="box" id="f1">
     <title>Line 215 reads the block that also backs overall_score.</title>
     <rect x="20" y="132" width="300" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
@@ -524,14 +524,14 @@ WorkflowInfo                                                    line 41   lazy a
 <tr><td class="sym">sources/core/__init__.py</td><td>re-export of <code>WorkflowInfo</code> only</td><td class="sym">lines 19, 49</td></tr>
 </tbody>
 </table>
-<p>Tests: <code class="path">tests/evolution_engine_selection_test.py</code> (added in <code>4020790</code>) builds <code>WorkflowInfo</code> on temp folders and checks <code>reward_is_fallback</code> for mean-claim, pairwise, short-circuit, legacy and mixed-block cases (lines 79-107, 200-210). <code class="path">tests/gold_feedback_test.py</code> (uncommitted) checks <code>reward_is_fallback</code> on gold blocks (lines 381-467) and the oracle skip in <code>WorkflowSelector</code> (line 1001). <code class="path">tests/variation_engine_test.py:51</code> defines <code>_FakeWorkflowInfo</code>, a duck-typed stand-in used at lines 213-299.</p>
+<p>Tests: <code class="path">tests/evolution_engine_selection_test.py</code> (added in <code>4020790</code>) builds <code>WorkflowInfo</code> on temp folders and checks <code>reward_is_fallback</code> for mean-claim, pairwise, short-circuit, legacy and mixed-block cases (lines 79-107, 200-210). <code class="path">tests/gold_feedback_test.py</code> (ca72107) checks <code>reward_is_fallback</code> on gold blocks (lines 381-467) and the oracle skip in <code>WorkflowSelector</code> (line 1001). <code class="path">tests/variation_engine_test.py:51</code> defines <code>_FakeWorkflowInfo</code>, a duck-typed stand-in used at lines 213-299.</p>
 <p>Related pages: <a href="file_core_workflow_selection.html">file_core_workflow_selection.html</a> (main consumer), <a href="file_core_schema.html">file_core_schema.html</a> (<code>IndividualRun.reward_is_fallback</code>), <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> (writer of the oracle marks), <a href="file_core_workflow_runner.html">file_core_workflow_runner.html</a> (writer of the folder), <a href="area_sources_core.html">area_sources_core.html</a>, <a href="file_index.html">file_index.html</a>.</p>
 </div>
 
 <footer>
-<p>Sources: <code class="path">sources/core/workflow_info.py</code> (340 lines, every def and property), <code class="path">sources/core/workflow_selection.py</code> (lines 10, 85-141, 258), <code class="path">sources/core/variation_engine.py</code> (lines 14, 395-397, 485-490), <code class="path">sources/core/evolution_engine.py</code> (lines 42, 72-178, 607-667), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (lines 30, 225-255), <code class="path">sources/core/planner.py</code> (lines 740-790), <code class="path">sources/evaluators/base.py</code> (lines 18, 147-215), <code class="path">sources/utils/evolution_tree.py</code>, <code class="path">sources/utils/archive_projection.py</code>, <code class="path">sources/core/__init__.py</code>, <code class="path">tests/evolution_engine_selection_test.py</code>, <code class="path">tests/gold_feedback_test.py</code>, <code class="path">tests/variation_engine_test.py</code>; diff <code>git diff 336fe19 -- sources/core/workflow_info.py</code> (+88/-19 lines, 35 of the added lines are uncommitted).</p>
+<p>Sources: <code class="path">sources/core/workflow_info.py</code> (340 lines, every def and property), <code class="path">sources/core/workflow_selection.py</code> (lines 10, 85-141, 258), <code class="path">sources/core/variation_engine.py</code> (lines 14, 395-397, 485-490), <code class="path">sources/core/evolution_engine.py</code> (lines 42, 72-178, 607-667), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (lines 30, 225-255), <code class="path">sources/core/planner.py</code> (lines 740-790), <code class="path">sources/evaluators/base.py</code> (lines 18, 147-215), <code class="path">sources/utils/evolution_tree.py</code>, <code class="path">sources/utils/archive_projection.py</code>, <code class="path">sources/core/__init__.py</code>, <code class="path">tests/evolution_engine_selection_test.py</code>, <code class="path">tests/gold_feedback_test.py</code>, <code class="path">tests/variation_engine_test.py</code>; diff <code>git diff 336fe19 -- sources/core/workflow_info.py</code> (+88/-19 lines, 35 of the added lines came in ca72107).</p>
 <p class="skips">Skipped: the bodies of the callers (owned by their own digest pages); <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>tmp/</code> (runtime folders, not read); the <code>__main__</code> smoke block beyond its line number; the tests were read, not run, because this page only maps code. Nothing was modified outside <code>docs/visual_clone/</code>.</p>
-<p>Built at 4020790 + uncommitted working tree, 2026-09-28. <code>_selected_evaluation</code> and <code>reward_is_fallback</code> are in <code>4020790</code> (there it tests <code>== "mean_claim"</code>); <code>FALLBACK_REWARD_KINDS</code>, <code>ORACLE_SIDECAR</code> and <code>is_oracle_generation</code> are uncommitted.</p>
+<p>Built at ca72107 + working tree, 2026-09-28. <code>_selected_evaluation</code> and <code>reward_is_fallback</code> are in <code>4020790</code> (there it tests <code>== "mean_claim"</code>); <code>FALLBACK_REWARD_KINDS</code>, <code>ORACLE_SIDECAR</code> and <code>is_oracle_generation</code> came in commit ca72107.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

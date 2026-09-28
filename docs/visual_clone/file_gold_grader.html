@@ -6,12 +6,12 @@
 <title>grader.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; grader.py">
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; grader.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">grader.py</h1>
 <p class="intro">This 253-line file resolves the benchmark task row, copies the generation workspace to a private <code>mimosa_gold_*</code> temp dir and grades the copy with the shared <code>grade_directory</code>. A harness error or a run over the wall-clock cap becomes a censored <code>excluded</code> result, so the verifier never crashes. Its only caller is <a href="file_gold_evaluator.html">GoldFeedbackEvaluator</a>.</p>
-<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new, uncommitted</span></p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new in ca72107</span></p>
 
 <div id="legend" data-auto></div>
 
@@ -417,8 +417,8 @@ grade_private_copy(copy_dir, context, grade_fn=grade_directory,
 
 <footer>
 <p>Sources read: <code class="path">sources/evaluators/gold_feedback/grader.py</code> (253 lines, whole file), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (L34&#8211;L40, L61, L135, L170&#8211;L262), <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code> (82 lines), <code class="path">sources/benchmark_evaluation/capsule_evaluator.py</code> (L85, L200, L221), <code class="path">sources/benchmark_evaluation/execution_sandbox.py</code> (L705, L799&#8211;L805), <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (L906, L1001&#8211;L1021), <code class="path">config.py</code> (L110&#8211;L120), <code class="path">tests/gold_feedback_test.py</code> (test names by grep). Line counts from <code>wc -l</code>.</p>
-<p class="skips">Skipped: the internals of <code>CapsuleEvaluator</code> and <code>ExecutionSandbox</code> beyond the lines above, because <a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a> covers them; secret files (<code>.env</code>, <code>token.json</code>, <code>credentials.json</code>) were not opened; no pytest run, by the build rules. The file is new and uncommitted (untracked in <code>git status</code>).</p>
-<p>Built at 4020790 + uncommitted working tree, 2026-09-28.</p>
+<p class="skips">Skipped: the internals of <code>CapsuleEvaluator</code> and <code>ExecutionSandbox</code> beyond the lines above, because <a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a> covers them; secret files (<code>.env</code>, <code>token.json</code>, <code>credentials.json</code>) were not opened; no pytest run, by the build rules. The file is new; commit <code>ca72107</code> added it during this build.</p>
+<p>Built at ca72107 + working tree, 2026-09-28.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

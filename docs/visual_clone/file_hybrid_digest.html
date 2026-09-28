@@ -6,7 +6,7 @@
 <title>digest.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests > sources/evaluators/hybrid_verifier > digest.py">
+<body data-crumb="File digests &gt; sources/evaluators/hybrid_verifier &gt; digest.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">digest.py</h1>
@@ -164,7 +164,7 @@
     <rect x="20" y="30" width="220" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="130" y="54" text-anchor="middle">config field</text>
     <text class="box-sub" x="130" y="72" text-anchor="middle">hybrid_verifier_digest_max_files</text>
-    <text class="box-sub" x="130" y="88" text-anchor="middle">default 8 (config.py:88)</text>
+    <text class="box-sub" x="130" y="88" text-anchor="middle">default 8 (config.py:132)</text>
     <text class="box-sub" x="130" y="104" text-anchor="middle">read at evaluator.py:245</text>
   </g>
 
@@ -193,8 +193,8 @@
     <rect x="760" y="180" width="200" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="860" y="204" text-anchor="middle">registry.digests</text>
     <text class="box-sub" x="860" y="222" text-anchor="middle">written by layers.py:411</text>
-    <text class="box-sub" x="860" y="238" text-anchor="middle">JSON key "digests" (registry.py:132)</text>
-    <text class="box-sub" x="860" y="254" text-anchor="middle">loaded at registry.py:92</text>
+    <text class="box-sub" x="860" y="238" text-anchor="middle">JSON key "digests" (registry.py:142)</text>
+    <text class="box-sub" x="860" y="254" text-anchor="middle">loaded at registry.py:102</text>
     <text class="box-sub" x="860" y="270" text-anchor="middle">one judge call per task</text>
   </g>
 
@@ -231,7 +231,7 @@
   <text class="box-sub" x="20" y="318">Config fields: one (hybrid_verifier_digest_max_files). Files written: none.</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. The only config field is <code>hybrid_verifier_digest_max_files</code> (<a href="../../config.py">config.py</a>:88, default 8); it is read by the evaluator (<code>evaluator.py:245</code>) and passed to the layer as <code>max_files</code>. This file writes nothing: the caller stores the returned map in the registry JSON.</p>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. The only config field is <code>hybrid_verifier_digest_max_files</code> (<a href="../../config.py">config.py</a>:132, default 8); it is read by the evaluator (<code>evaluator.py:245</code>) and passed to the layer as <code>max_files</code>. This file writes nothing: the caller stores the returned map in the registry JSON.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -346,7 +346,7 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_digest_max_files</td><td>config.py:88, read at evaluator.py:245</td><td>cap on sampled files, default 8</td></tr>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_digest_max_files</td><td>config.py:132, read at evaluator.py:245</td><td>cap on sampled files, default 8</td></tr>
 <tr><td class="sym">argument</td><td class="sym">workspace, inventory, cached</td><td>lines 117-119</td><td>root, file rows, cache to honour</td></tr>
 <tr><td class="sym">argument</td><td class="sym">llm_text</td><td>line 120, called at 165</td><td>one judge round-trip, injected by the caller</td></tr>
 <tr><td class="sym">argument</td><td class="sym">uuid, max_files, logger</td><td>lines 121-123</td><td>memory scoping, cap, warning sink</td></tr>
@@ -395,11 +395,11 @@ judge agent name used: "hybrid_format_digest"                           # L165</
 <tbody>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>ClaimsEvidenceLayer._ensure_digests</code> and <code>_build_scorer</code></td><td class="sym">import L33; calls 399, 401, 412, 424</td></tr>
 <tr><td class="sym">ClaimsEvidenceLayer._ensure_digests</td><td><code>render_digests</code> on the cache hit path, else <code>ensure_digests</code> with <code>max_files=self.digest_max_files</code></td><td class="sym">layers.py 391-412</td></tr>
-<tr><td class="sym">ClaimsEvidenceLayer.collect</td><td>calls <code>_ensure_digests</code> once per generation, before scoring</td><td class="sym">layers.py 565</td></tr>
+<tr><td class="sym">ClaimsEvidenceLayer.collect</td><td>calls <code>_ensure_digests</code> once per generation, before scoring</td><td class="sym">layers.py 577</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td><code>ensure_digests</code> with <code>MAX_FILES_DEFAULT</code>, and <code>render_digests</code> for the prompt</td><td class="sym">import L47; 367-371, 567</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_digest_sampling_deterministic_and_bounded</code>: same text twice, byte bound, JSON parsing</td><td class="sym">lines 1288-1307</td></tr>
-<tr><td class="sym">test_format_digest_cached_once_per_task</td><td>runs <code>layer._ensure_digests</code> twice; asserts one LLM call and <code>registry.digests</code> filled</td><td class="sym">lines 1248-1286</td></tr>
-<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>checks the rendered digest text reaches <code>scorers.scorer_prompt</code></td><td class="sym">lines 1309-1326</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_digest_sampling_deterministic_and_bounded</code>: same text twice, byte bound, JSON parsing</td><td class="sym">lines 1483-1501</td></tr>
+<tr><td class="sym">test_format_digest_cached_once_per_task</td><td>runs <code>layer._ensure_digests</code> twice; asserts one LLM call and <code>registry.digests</code> filled</td><td class="sym">lines 1443-1480</td></tr>
+<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>checks the rendered digest text reaches <code>scorers.scorer_prompt</code></td><td class="sym">lines 1504-1514</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a></td><td><code>extract_json_payload</code>, the tolerant JSON fence stripper</td><td class="sym">import L23; definition base.py:21</td></tr>
 <tr><td class="sym">digest_prompt / render_digests</td><td>no direct unit test; both run through the layer tests above</td><td class="sym">grep tests/</td></tr>
 </tbody>
@@ -408,9 +408,9 @@ judge agent name used: "hybrid_format_digest"                           # L165</
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/digest.py">sources/evaluators/hybrid_verifier/digest.py</a> (all 175 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L33 import, L391-L412 digest helper, L424-L433 scorer prompt, L565 collect), <a href="../../sources/evaluators/hybrid_verifier/inventory.py">inventory.py</a> (<code>_deliverable_rank</code> L178, <code>scan_workspace</code> L95), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L63, L92, L132 for the <code>digests</code> key), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L241-L249 <code>digest_max_files</code>), <a href="../../config.py">config.py</a> (L88), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L1248-L1326), <a href="../../sources/evaluators/base.py">base.py</a> (L21), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/digest.py">sources/evaluators/hybrid_verifier/digest.py</a> (all 175 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L33 import, L391-L412 digest helper, L424-L433 scorer prompt, L577 collect), <a href="../../sources/evaluators/hybrid_verifier/inventory.py">inventory.py</a> (<code>_deliverable_rank</code> L178, <code>scan_workspace</code> L95), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L73, L102, L142 for the <code>digests</code> key), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L241-L249 <code>digest_max_files</code>), <a href="../../config.py">config.py</a> (L132), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L1443-L1514), <a href="../../sources/evaluators/base.py">base.py</a> (L21), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
 <p class="skips">Skipped: the full prompt prose of <code>digest_prompt</code> (summarised as four rules with line numbers); the internals of <code>inventory._deliverable_rank</code> (private to <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>); the binary-content handling of files that are not UTF-8 (line 49 uses <code>errors="replace"</code>, not read further); <code>docs/concepts/evaluation-pipeline.md</code> (doc claims were not used as evidence on this page). No pytest run and no application run, by the build rules.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Updated at <code>ca72107</code> + working tree, 2026-09-28: refs into <code>registry.py</code>, <code>config.py</code>, <code>layers.py</code> (after L452) and tests re-derived; <code>digest.py</code> itself is unchanged since the build. All line refs re-derived from the current files. <code class="path">tests/hybrid_verifier_test.py</code> read at 18:06 CEST while it has uncommitted edits in flight, so test line numbers can move.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

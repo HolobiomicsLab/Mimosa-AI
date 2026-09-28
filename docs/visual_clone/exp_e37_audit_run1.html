@@ -6,7 +6,7 @@
 <title>e37_audit_run1 - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Experiments &gt; E37">
+<body data-crumb="Experiments &gt; E37" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">e37_audit_run1 &mdash; run_1 under E35 PRIME: 0/4 tasks pass, every failure named</h1>
@@ -150,7 +150,7 @@
 <div class="panel"><span class="br"></span>
 <h2>Recommendations &mdash; 9 in the report, status in the current tree</h2>
 <table>
-<thead><tr><th>R</th><th>What to change (report &sect;7)</th><th>Status at 4020790 + working tree</th></tr></thead>
+<thead><tr><th>R</th><th>What to change (report &sect;7)</th><th>Status at ca72107 + working tree</th></tr></thead>
 <tbody>
 <tr><td class="sym">R1</td><td>exclude the gen-0 mean-claim fallback before argmax</td><td><span class="chip ok">in code</span> <code>evolution_engine.py::_select_best_run</code> (L136)</td></tr>
 <tr><td class="sym">R2</td><td>resolve both <code>worker_&lt;task&gt;/pred_results/X</code> and <code>pred_results/X</code></td><td><span class="chip unknown">unknown</span> no code comment cites R2</td></tr>
@@ -169,7 +169,7 @@
 <p>Sources read: <a href="../../experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.md"><code class="path">experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.md</code></a> (133 lines, read in full) and <code class="path">experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.json</code> (154 lines, read in full); on 2026-09-28 also <code>ls</code> of the <code>e35_first_attempt/</code> folders and <code>grep</code>/<code>git show</code> of <code>sources/</code> for the R-status table. Every number on this page comes from those two files or the evidence paths they name; the audit itself was offline ($0 LLM, local rdkit 2026.03.6 reproduction).</p>
 <p class="skips">Skipped: the prior-campaign comparison table (report &sect;5), the per-generation steering tables (&sect;1), the bulk success anatomy (&sect;6) beyond the numbers shown, and the full claim ladders &mdash; read the report instead: <code class="path">experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.md</code>.</p>
 <p class="skips">Caveats from the report: this audit is a snapshot dated 2026-09-27 &mdash; two further run_1 tasks (t-SNE, FACTORS) were still mid-flight; the 12 clintox generations were attributed by goal-text match; no <code>/tmp/mimosa_run_*</code> workspaces and no <code>datasets/ScienceAgentBench/gold_results/</code> remain in this checkout.</p>
-<p>Built at 4020790 + uncommitted working tree, 2026-09-28. First written 2026-09-27; the audit itself read a dirty tree at <code>336fe19</code> (report line 3). 2026-09-28 update: evidence paths moved to <code>e35_first_attempt/</code>, code line refs re-derived, recommendation status added.</p>
+<p>Built at ca72107 + working tree, 2026-09-28. First written 2026-09-27; the audit itself read a dirty tree at <code>336fe19</code> (report line 3). 2026-09-28 update: evidence paths moved to <code>e35_first_attempt/</code>, code line refs re-derived, recommendation status added.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

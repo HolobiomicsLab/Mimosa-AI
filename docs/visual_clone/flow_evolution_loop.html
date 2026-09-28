@@ -6,7 +6,7 @@
 <title>Evolution loop - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview > flows > evolution loop">
+<body data-crumb="Overview &gt; flows &gt; evolution loop" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">Evolution loop</h1>
@@ -274,7 +274,7 @@
 <ul>
 <li>The verifier stores the full text under <code>abstracted_textual_gradient</code> in the run's <code>state_result.json</code> (<code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>:631) and writes it to <code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/textual_gradient.txt</code> (<code>HybridVerifierEvaluator._write_artifacts</code>).</li>
 <li><code>WorkflowInfo.abstracted_textual_gradient</code> (<code class="path">sources/core/workflow_info.py</code>:241) reads the state key first, the sidecar file second.</li>
-<li>Mutation path: <code>VariationEngine.mutation_prompt</code> replaces <code>_</code> with a space and sends the rest whole (<code class="path">sources/core/variation_engine.py</code>:402-407). The <code>[:2048]</code> cut at L407 was removed in the uncommitted working tree. No other summary is computed.</li>
+<li>Mutation path: <code>VariationEngine.mutation_prompt</code> replaces <code>_</code> with a space and sends the rest whole (<code class="path">sources/core/variation_engine.py</code>:402-407). The <code>[:2048]</code> cut at L407 was removed in commit ca72107. No other summary is computed.</li>
 <li>Crossover path: each parent's gradient goes in whole, with no character cap; only the fallback (stderr tail) is cut to the last 1 024 characters (<code class="path">sources/core/variation_engine.py</code>:486-489).</li>
 <li>Measured size: the gradient quoted below is 4 428 characters. At <code>4020790</code> the 2 048 cut kept about 46 % of it; the working tree sends all of it (my computation).</li>
 </ul>
@@ -342,7 +342,7 @@
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/gradient.py">sources/evaluators/hybrid_verifier/gradient.py</a></h4>
 <p class="role">Renders the textual gradient and <code>evaluation.txt</code> from measured claim scores, leading with the elimination point.</p>
-<p class="meta">380 lines &#183; <code>build_gradient</code>, <code>build_evaluation_report</code></p>
+<p class="meta">388 lines &#183; <code>build_gradient</code>, <code>build_evaluation_report</code></p>
 </div>
 
 <div class="card l4">
@@ -379,7 +379,7 @@
 <footer>
 <p>Sources read for this page: <code class="path">UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/core/selection.py</code>, <code class="path">sources/core/variation_engine.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/workflow_selection.py</code>, <code class="path">sources/core/lineage.py</code>, <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/utils/run_metrics.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (entry and artifact writes only), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/hybrid_verifier/gradient.py</code>, <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code>, <code class="path">sources/evaluators/hybrid_verifier/registry.py</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, and one real gradient file under <code class="path">sources/workflows/</code>.</p>
 <p class="skips">Skipped: <code class="path">sources/core/factory.py</code>, <code>workflow_factory.py</code>, <code>single_agent_factory.py</code> and <code>schema.py</code> (builder helpers, not the loop) &#183; <code class="path">sources/core/failure_fingerprint.py</code> (written by the verifier, not read by the loop) &#183; <code class="path">sources/core/orchestrator.py</code> in depth (one arrow here; its own flow is <a href="flow_task_run.html">flow_task_run.html</a>) &#183; <code class="path">sources/evaluators/hybrid_verifier/claims.py</code>, <code>layers.py</code>, <code>scorers.py</code>, <code>inventory.py</code>, <code>digest.py</code> (verifier internals; <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>) &#183; <code>sources/evaluators/legacy_verifier/</code> (deprecated; one box only) &#183; gold grader internals (<a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>) &#183; <code>webui/</code>, <code>datasets/</code>, <code>logs/</code>, <code>CLA/</code>, lock files and secret files (Tier D) &#183; <code class="path">diversity_experiments/code_reference/selection.py</code> (a frozen copy of selection.py for an experiment, not the runtime loop).</p>
-<p>Built at commit <code>4020790</code> + uncommitted working tree, 2026-09-28. Every default and line number above was read from the working tree, not from commit <code>4020790</code>. Changes drawn: the <code>verifier_kind</code> branch at the score step (gold is uncommitted), the removed 2 048-character gradient cut, and the capsule pick <code>_select_best_run</code>.</p>
+<p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. Every default and line number above was read from the working tree, not from commit <code>4020790</code>. Changes drawn: the <code>verifier_kind</code> branch at the score step (gold added in ca72107), the removed 2 048-character gradient cut, and the capsule pick <code>_select_best_run</code>.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

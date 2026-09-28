@@ -7,11 +7,11 @@
 <link rel="stylesheet" href="_clone.css">
 </head>
 <!-- data_runs.html - Tier C data page. Sources and skips are in the footer. -->
-<body data-crumb="Overview > data and experiments > run artifacts">
+<body data-crumb="Overview &gt; data and experiments &gt; run artifacts" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">Run artifacts on disk</h1>
-<p class="intro">One campaign writes four trees: per-task records in <code>run_notes/</code>, the shipped workspace in <code>runs_capsule/</code>, the per-generation genotypes in <code class="path">sources/workflows/</code>, and volatile workspace copies in <code>/tmp/mimosa_run_*</code>. This page measures those trees and names the code that writes them. All counts are a snapshot of this working tree.</p>
+<p class="intro">One campaign writes four trees: per-task records in <code>run_notes/</code>, the shipped workspace in <code>runs_capsule/</code>, the per-generation genotypes in <code class="path">sources/workflows/</code>, and volatile workspace copies in <code>/tmp/mimosa_run_*</code>. This page measures those trees and names the code that writes them. All counts are a snapshot of this working tree on 2026-09-28; a campaign was still writing into the <code>run_1</code> folders.</p>
 
 <div id="legend" data-auto></div>
 
@@ -55,9 +55,10 @@
     <path d="M18,330 A88,8 0 0 0 194,330" fill="none" stroke="#5E8CA3"/>
     <text class="box-label" x="106" y="146" text-anchor="middle">run_notes/</text>
     <text class="box-sub" x="106" y="166" text-anchor="middle">record per task</text>
-    <text class="box-sub" x="106" y="184" text-anchor="middle">462 task files</text>
-    <text class="box-sub" x="106" y="202" text-anchor="middle">11 campaign files</text>
-    <text class="box-sub" x="106" y="220" text-anchor="middle">5.7 MB</text>
+    <text class="box-sub" x="106" y="184" text-anchor="middle">479 task files</text>
+    <text class="box-sub" x="106" y="202" text-anchor="middle">14 campaign files</text>
+    <text class="box-sub" x="106" y="220" text-anchor="middle">5.9 MB</text>
+    <text class="box-sub" x="106" y="238" text-anchor="middle">untracked in git</text>
   </a>
 
   <a class="box" id="c2" href="area_benchmark_evaluation.html">
@@ -67,7 +68,7 @@
     <path d="M210,330 A88,8 0 0 0 386,330" fill="none" stroke="#7DF9C7"/>
     <text class="box-label" x="298" y="146" text-anchor="middle">runs_capsule/</text>
     <text class="box-sub" x="298" y="166" text-anchor="middle">final workspace copy</text>
-    <text class="box-sub" x="298" y="184" text-anchor="middle">260 capsules</text>
+    <text class="box-sub" x="298" y="184" text-anchor="middle">277 capsules</text>
     <text class="box-sub" x="298" y="202" text-anchor="middle">evaluation_results.json</text>
     <text class="box-sub" x="298" y="220" text-anchor="middle">13 GB</text>
   </a>
@@ -79,9 +80,9 @@
     <path d="M402,330 A88,8 0 0 0 578,330" fill="none" stroke="#00E5FF"/>
     <text class="box-label" x="490" y="146" text-anchor="middle">sources/workflows/</text>
     <text class="box-sub" x="490" y="166" text-anchor="middle">genotype + sidecars</text>
-    <text class="box-sub" x="490" y="184" text-anchor="middle">1249 uuid folders</text>
-    <text class="box-sub" x="490" y="202" text-anchor="middle">803 evaluation.txt</text>
-    <text class="box-sub" x="490" y="220" text-anchor="middle">561 MB</text>
+    <text class="box-sub" x="490" y="184" text-anchor="middle">1339 generation folders</text>
+    <text class="box-sub" x="490" y="202" text-anchor="middle">843 evaluation.txt</text>
+    <text class="box-sub" x="490" y="220" text-anchor="middle">580 MB</text>
   </a>
 
   <a class="box" id="c4" href="flow_evolution_loop.html">
@@ -91,8 +92,8 @@
     <path d="M594,330 A88,8 0 0 0 770,330" fill="none" stroke="#4D9FFF" stroke-dasharray="5 4"/>
     <text class="box-label" x="682" y="146" text-anchor="middle">/tmp/mimosa_run_*</text>
     <text class="box-sub" x="682" y="166" text-anchor="middle">per-round workspace</text>
-    <text class="box-sub" x="682" y="184" text-anchor="middle">3 dirs remain</text>
-    <text class="box-sub" x="682" y="202" text-anchor="middle">44 MB each</text>
+    <text class="box-sub" x="682" y="184" text-anchor="middle">185 dirs, 31 sessions</text>
+    <text class="box-sub" x="682" y="202" text-anchor="middle">2.7 GB, 20 KB-217 MB</text>
     <text class="box-sub" x="682" y="220" text-anchor="middle">volatile</text>
   </a>
 
@@ -104,8 +105,8 @@
     <text class="box-label" x="874" y="146" text-anchor="middle">logs/</text>
     <text class="box-sub" x="874" y="166" text-anchor="middle">dns_watchdog.log</text>
     <text class="box-sub" x="874" y="184" text-anchor="middle">evaluation_csv_mode.log</text>
-    <text class="box-sub" x="874" y="202" text-anchor="middle">10.6 MB</text>
-    <text class="box-sub" x="874" y="220" text-anchor="middle">503 128 lines</text>
+    <text class="box-sub" x="874" y="202" text-anchor="middle">10.7 MB</text>
+    <text class="box-sub" x="874" y="220" text-anchor="middle">503 437 lines</text>
   </a>
 </svg>
 </div>
@@ -115,7 +116,7 @@
 <div class="panel"><span class="br"></span>
 <h2>Diagram 2 - one run-notes JSON</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 980 400" role="img" aria-label="Key tree of one run-notes JSON file">
+<svg class="diagram" viewBox="0 0 980 400" role="img" aria-label="Key tree of one run-notes JSON file, with the gold-mode leak stamp keys">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -196,21 +197,33 @@
     <text class="box-label" x="874" y="132" text-anchor="middle">ablations[]</text>
     <text class="box-sub" x="874" y="152" text-anchor="middle">list of dicts</text>
     <text class="box-sub" x="874" y="170" text-anchor="middle">one per generation</text>
-    <text class="box-sub" x="874" y="188" text-anchor="middle">207 files non-empty</text>
+    <text class="box-sub" x="874" y="188" text-anchor="middle">220 files non-empty</text>
   </a>
 
   <path class="edge" data-from="d5" data-to="d6" d="M874,286 V312" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw2m)"/>
 
   <g class="box" id="d6">
-    <title>Ten keys, plus infra_error on an excluded snapshot.</title>
-    <rect x="18" y="312" width="944" height="76" rx="12" fill="rgba(125,249,199,0.06)" stroke="#7DF9C7"/>
-    <text class="box-label" x="490" y="334" text-anchor="middle">ablations[i]</text>
-    <text class="box-sub" x="490" y="354" text-anchor="middle">evolution_index, uuid, VER, VER_message, SR</text>
-    <text class="box-sub" x="490" y="372" text-anchor="middle">SR_message, CBS, cost, status, source</text>
+    <title>Ten keys; an excluded entry drops both messages and adds infra_error.</title>
+    <rect x="402" y="312" width="560" height="76" rx="12" fill="rgba(125,249,199,0.06)" stroke="#7DF9C7"/>
+    <text class="box-label" x="682" y="334" text-anchor="middle">ablations[i]</text>
+    <text class="box-sub" x="682" y="354" text-anchor="middle">evolution_index, uuid, VER, VER_message, SR</text>
+    <text class="box-sub" x="682" y="372" text-anchor="middle">SR_message, CBS, cost, status, source</text>
   </g>
+
+  <path class="edge dashed-edge" data-from="d0" data-to="d7" d="M290,32 H8 V350 H16" fill="none" stroke="#7DF9C7" stroke-width="1.25" stroke-dasharray="5 4" marker-end="url(#arw2m)"/>
+
+  <a class="box" id="d7" href="mod_evaluators_gold_feedback.html">
+    <title>Added by _save_run_notes only when verifier_kind is gold; no file on disk has them yet.</title>
+    <rect x="18" y="312" width="368" height="82" fill="rgba(125,249,199,0.06)" stroke="#7DF9C7" stroke-dasharray="5 4"/>
+    <text class="box-label" x="30" y="330">gold-mode stamps</text>
+    <text class="box-sub" x="374" y="330" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+    <text class="box-sub" x="30" y="348">verifier_kind, oracle_feedback</text>
+    <text class="box-sub" x="30" y="364">gold_feedback_reward, benchmark_leak_warning</text>
+    <text class="box-sub" x="30" y="382">on disk: 0 of 493 files</text>
+  </a>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - key tree quoted from <code class="path">run_notes/run_1/llm_response_error_charge_density_difference.json</code> (newest record, <code>timestamp 2026-09-20T23:30:15</code>). The same 23-key set appears in 460 of 473 <code>run_notes</code> JSON files.</p>
+<p class="figcap">Diagram 2 - key tree quoted from <code class="path">run_notes/e35_fix_2/protein_protein_tanimoto_fingerprint_similarity_plot_protein_protein_fingerprint_similarity_vis.json</code> (newest record, <code>timestamp 2026-09-28T08:33:46</code>). The same 23-key set appears in 476 of 493 <code>run_notes</code> JSON files. Dashed box = keys that only a <code>--verifier_kind gold</code> run writes (<code>csv_mode.py::CsvEvaluationMode._save_run_notes</code>, lines 499-510).</p>
 </div>
 
 <div class="panel" id="schema"><span class="br"></span>
@@ -218,46 +231,59 @@
 <table>
 <thead><tr><th>Result</th><th>Count</th><th>Detail</th></tr></thead>
 <tbody>
-<tr><td>Files scanned</td><td class="size">473</td><td>every <code>*.json</code> under <code>run_notes/</code></td></tr>
-<tr><td>Follow schema S</td><td class="size">460</td><td>S = the 23 keys in diagram 2</td></tr>
-<tr><td>Differ</td><td class="size">13</td><td>11 campaign manifests, 2 early task records</td></tr>
-<tr><td>Task records with <code>evolved_workflows_uuids</code></td><td class="size">460</td><td>all 24-character uuids</td></tr>
-<tr><td>Task records with non-empty <code>ablations</code></td><td class="size">207</td><td>253 records store <code>[]</code></td></tr>
-<tr><td>Total ablation entries</td><td class="size">1166</td><td>1156 evaluated, 10 <code>excluded</code></td></tr>
+<tr><td>Files scanned</td><td class="size">493</td><td>every <code>*.json</code> under <code>run_notes/</code></td></tr>
+<tr><td>Follow schema S</td><td class="size">476</td><td>S = the 23 keys in diagram 2</td></tr>
+<tr><td>Differ</td><td class="size">17</td><td>14 campaign manifests, 3 early task records</td></tr>
+<tr><td>Task records with <code>evolved_workflows_uuids</code></td><td class="size">476</td><td>1627 slots: 1207 uuids, 219 <code>single_agent_&#8230;</code>, 201 <code>generation_failed</code></td></tr>
+<tr><td>Task records with non-empty <code>ablations</code></td><td class="size">220</td><td>256 records store <code>[]</code></td></tr>
+<tr><td>Total ablation entries</td><td class="size">1267</td><td>1257 evaluated, 10 <code>excluded</code></td></tr>
+<tr><td>Files with gold-mode stamp keys</td><td class="size">0</td><td>0 of 493 run notes; 0 of 277 <code>evaluation_results.json</code></td></tr>
 </tbody>
 </table>
 
-<h3>Named exceptions (13 files that break the schema)</h3>
+<h3>Named exceptions (17 files that break the schema)</h3>
 <table>
 <thead><tr><th>File</th><th>Keys</th><th>Why it differs</th></tr></thead>
 <tbody>
-<tr><td class="sym"><code class="path">run_notes/evaluations/20260831_deepseek-v4-flash_iterative_1.json</code></td><td class="size">17</td><td>Campaign manifest, not a task record.</td></tr>
-<tr><td class="sym"><code class="path">run_notes/evaluations/20260906_deepseek-v4-flash_single_agent_1.json</code></td><td class="size">17</td><td>Same 17-key campaign manifest.</td></tr>
-<tr><td class="sym"><code class="path">run_notes/evaluations/20260907_deepseek-v4-flash_one_shot.json</code></td><td class="size">17</td><td>Same 17-key campaign manifest.</td></tr>
-<tr><td class="sym"><code class="path">run_notes/evaluations/20260915_chemistry_deepseek-v3.2_iterative.json</code></td><td class="size">17</td><td>Same 17-key campaign manifest.</td></tr>
-<tr><td class="sym"><code class="path">run_notes/evaluations/20260918_chemistry_deepseek-v4-flash_single_agent.json</code></td><td class="size">20</td><td>Adds <code>restore_cache</code> and <code>restore_notes_file</code>.</td></tr>
-<tr><td class="sym">2 remaining <code>evaluations/*.json</code> + 2 task records</td><td class="size">&#8212;</td><td><code class="path">asb_full_single_1/clintox_multitask_toxicity_approval_prediction_clintox_nn.json</code> and <code class="path">chemistry_iterative_v4_flash/plot_phonon_dos_dfpt_vasp_plot_phonon_dos.json</code> hold 7 early keys only.</td></tr>
+<tr><td class="sym">8 files in <code class="path">run_notes/evaluations/</code>, 2026-08-31 to 2026-09-17</td><td class="size">17</td><td>Campaign manifest, not a task record.</td></tr>
+<tr><td class="sym"><code class="path">run_notes/evaluations/20260918_chemistry_deepseek-v4-flash_single_agent.json</code> + 2 <code>20260927/28_*_run1_*</code></td><td class="size">20</td><td>Adds <code>restore_cache</code>, <code>restore_notes_file</code>, <code>start_row</code>.</td></tr>
+<tr><td class="sym"><code class="path">run_notes/evaluations/20260928_150422_run1_openrouter_openai_gpt-oss-120b_iterative.json</code> + 2 more</td><td class="size">18</td><td>No <code>final_results</code>, <code>finished_at</code>; <code>status</code> still <code>running</code>.</td></tr>
+<tr><td class="sym">3 task records</td><td class="size">7</td><td><details><summary>7 early keys only</summary><div class="dbody"><pre>run_notes/asb_full_single_1/clintox_multitask_toxicity_approval_prediction_clintox_nn.json
+run_notes/chemistry_iterative_v4_flash/plot_phonon_dos_dfpt_vasp_plot_phonon_dos.json
+run_notes/e35_first_attempt/clintox_multitask_toxicity_fda_prediction_clintox_nn.json
+keys: execution_time_seconds, git, goal, model, start_row, timestamp, total_eval</pre></div></details></td></tr>
+</tbody>
+</table>
+
+<h3><code>evaluation_results.json</code> key sets (all 277 capsules)</h3>
+<table>
+<thead><tr><th>Key set</th><th>Count</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td class="sym">10 keys</td><td class="size">254</td><td><code>CBS, SR, SR_message, VER, VER_message, cost_usd, status, summary, task_id, timestamp</code></td></tr>
+<tr><td class="sym">10 + <code>infra_error</code></td><td class="size">20</td><td><code>status: excluded</code> (infra fault, not graded).</td></tr>
+<tr><td class="sym">10 + <code>CBS_error</code></td><td class="size">3</td><td>All 3: "No generated Python file in capsule".</td></tr>
+<tr><td class="sym">10 + 4 gold stamps <span class="chip warn">oracle - leaks gold</span></td><td class="size">0</td><td>Written by <code>_stamp_gold_capsule_results</code> in gold mode only.</td></tr>
 </tbody>
 </table>
 
 <span id="ablation"></span>
-<div class="note flag">Red note: <code>ablations[i].uuid</code> is not a stable uuid. In 1166 entries it appears as an 8-character suffix (632), a full 24-character uuid (433), the literal <code>generation_failed</code> (52), <code>failed</code> (41) and eight 37-character <code>single_agent_&#8230;</code> names; and in 125 of the 207 non-empty lists <code>evolution_index</code> does not equal the position in <code>evolved_workflows_uuids</code>. <code>AGENTS.md</code> tells the auditor to join by uuid, so that join needs <code>evolved_workflows_uuids</code> instead.</div>
+<div class="note flag">Red note: <code>ablations[i].uuid</code> is not a stable uuid. In 1267 entries it appears as an 8-character suffix (632), a full 24-character uuid (530), the literal <code>generation_failed</code> (56), <code>failed</code> (41) and eight 37-character <code>single_agent_&#8230;</code> names; and in 99 of the 220 non-empty lists <code>evolved_workflows_uuids[evolution_index]</code> is not that entry's uuid (the index is offset or out of range). <code>AGENTS.md</code> tells the auditor to join by uuid, so match the uuid (or its 8-character suffix) against <code>evolved_workflows_uuids</code>, not the index.</div>
 
-<div class="note">Amber note: 447 of the 1249 generation folders hold no <code>evaluation.txt</code>. The code path is documented (<code>on_error: true</code> in <code>run_metrics.json</code>), but the run-time error cause is not written anywhere.</div>
+<div class="note">Amber note: 496 of the 1339 generation folders hold no <code>evaluation.txt</code> (178 are empty); 280 of the 1148 <code>run_metrics.json</code> say <code>on_error: true</code>. The run-time error cause is not written anywhere.</div>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>One generation folder</h2>
-<p class="sub">Listing of <code class="path">sources/workflows/run_1/20260920_181842_d8e1c063/</code> - <b>my computation</b>, one sample folder.</p>
+<p class="sub">Listing of <code class="path">sources/workflows/e35_fix_2/20260928_080823_30d67b4d/</code> (13 files, hybrid verifier report) - <b>my computation</b>, one sample folder.</p>
 <table>
 <thead><tr><th>File</th><th>Holds</th><th>Writer</th></tr></thead>
 <tbody>
 <tr><td class="sym"><code>workflow_genotype_&lt;uuid&gt;.py</code></td><td>Generated workflow source.</td><td class="sym">Factory.save_workflow_files</td></tr>
-<tr><td class="sym"><code>evaluation.txt</code></td><td>Per-claim verdicts, overall score.</td><td class="sym">HybridVerifierEvaluator._write_artifacts</td></tr>
+<tr><td class="sym"><code>evaluation.txt</code></td><td>Per-claim verdicts by stage, reward, win-rate.</td><td class="sym">HybridVerifierEvaluator._write_artifacts</td></tr>
 <tr><td class="sym"><code>textual_gradient.txt</code></td><td>Diagnosis fed to the next mutation.</td><td class="sym">HybridVerifierEvaluator._write_artifacts</td></tr>
 <tr><td class="sym"><code>lineage_&lt;uuid&gt;.json</code></td><td><code>parents[]</code>, <code>evolution_kind</code>, <code>iteration</code>.</td><td class="sym">record_lineage</td></tr>
-<tr><td class="sym"><code>run_metrics.json</code></td><td>16 keys: reward, cost, novelty, <code>on_error</code>.</td><td class="sym">EvolutionEngine._persist_iteration_metrics</td></tr>
-<tr><td class="sym"><code>state_result.json</code></td><td>Workflow answers, success flags.</td><td class="sym">generated workflow code</td></tr>
+<tr><td class="sym"><code>run_metrics.json</code></td><td>16 keys; 17 with <code>reward_is_fallback</code> (3 newest files).</td><td class="sym">EvolutionEngine._persist_iteration_metrics</td></tr>
+<tr><td class="sym"><code>state_result.json</code></td><td>Workflow answers, success flags, verifier block.</td><td class="sym">generated workflow code</td></tr>
 <tr><td class="sym"><code>evolution_prompt_&lt;uuid&gt;.md</code></td><td>Prompt with the <code>&lt;directive&gt;</code> block.</td><td class="sym">EvolutionEngine._save_evolution_prompt_artifact</td></tr>
 <tr><td class="sym"><code>system_prompt_&lt;uuid&gt;.md</code></td><td>System prompt used for the run.</td><td class="sym">Factory.save_workflow_files</td></tr>
 <tr><td class="sym"><code>goal_&lt;uuid&gt;.txt</code></td><td>Task goal text.</td><td class="sym">Factory.save_workflow_files</td></tr>
@@ -265,28 +291,36 @@
 <tr><td class="sym"><code>evolution_tree.png</code></td><td>Tree of generations for this goal.</td><td class="sym">EvolutionEngine._refresh_evolution_tree</td></tr>
 <tr><td class="sym"><code>reward_progress.png</code></td><td>Reward against iteration.</td><td class="sym">EvolutionEngine._save_final_plots</td></tr>
 <tr><td class="sym"><code>workflow_&lt;uuid&gt;.png</code></td><td>Diagram of the workflow graph.</td><td class="sym">WorkflowFactory.assemble_workflow</td></tr>
+<tr><td class="sym"><code>gold_feedback.json</code> <span class="chip warn">oracle - leaks gold</span></td><td>Gold-mode record; marks the folder as oracle. 0 on disk.</td><td class="sym">GoldFeedbackEvaluator._persist</td></tr>
+<tr><td class="sym"><code>textual_gradient_hybrid.txt</code> <span class="chip warn">oracle</span></td><td>Hybrid gradient kept next to the gold one. 0 on disk.</td><td class="sym">GoldFeedbackEvaluator._persist</td></tr>
 </tbody>
 </table>
 <div class="slotstrip">
-<span class="slot"><b>2 dirs</b>style <code>run_1</code><span class="chip ok">evaluation.txt</span></span>
-<span class="slot"><b>1249 dirs</b>all runs<span class="chip warn">447 lack report</span></span>
+<span class="slot"><b>110 reports</b>hybrid header<span class="chip ok">evaluation.txt</span></span>
+<span class="slot"><b>733 reports</b>legacy header<span class="tag dep">DEPRECATED</span></span>
+<span class="slot"><b>1339 dirs</b>all runs<span class="chip warn">496 lack report</span></span>
+<span class="slot"><b>0 dirs</b>gold mode<span class="chip warn">oracle - leaks gold</span></span>
 </div>
+<p class="sub">Gold mode also prepends a leak banner to <code>evaluation.txt</code>; <code>workflow_info.py::is_oracle_generation</code> reads <code>gold_feedback.json</code>, and <code>workflow_selection.py</code> skips such folders unless <code>verifier_kind</code> is <code>gold</code>.</p>
 <details><summary>files per generation folder - count of each sidecar across <code class="path">sources/workflows/</code></summary><div class="dbody">
-<pre>workflow_genotype_*.py   1078
-lineage_*.json           1081
-evolution_prompt_*.md    1081
-system_prompt_*.md       1078
-goal_*.txt               1078
-original_task_*.txt      1078
-run_metrics.json         1074
-evolution_tree.png       1073
-state_result.json         835
-evaluation.txt            803
-textual_gradient.txt      797
-reward_progress.png       893
-workflow_*.png            757
-*.png (all)              2727</pre>
-<p><b>my computation</b>: one <code>find sources/workflows -name '&lt;pattern&gt;' | wc -l</code> per line.</p>
+<pre>workflow_genotype_*.py   1154   (120 are single_agent_*)
+lineage_*.json           1157   (119 single_agent_*, 7 generation_failed)
+evolution_prompt_*.md    1157
+system_prompt_*.md       1154
+goal_*.txt               1154
+original_task_*.txt      1154
+run_metrics.json         1147
+evolution_tree.png       1147
+reward_progress.png       952
+state_result.json         877
+evaluation.txt            843   (733 "Verifier Evaluation", 97 hybrid E35 PRIME, 13 hybrid E19/E19b)
+textual_gradient.txt      837
+workflow_*.png            797
+*.png (all)              2896
+gold_feedback.json          0
+textual_gradient_hybrid     0
+_verifier_tmp/hybrid_registry_*.json   23</pre>
+<p><b>my computation</b>: one Python pass over 1339 generation folders (1212 <code>YYYYMMDD_HHMMSS_&lt;8hex&gt;</code>, 120 <code>single_agent_*</code>, 7 <code>generation_failed</code>; <code>_verifier_tmp/</code> excluded), matching file names per folder and the first line of each <code>evaluation.txt</code>.</p>
 </div></details>
 </div>
 
@@ -297,65 +331,67 @@ workflow_*.png            757
   <text class="box-sub" x="8" y="16">MB on disk</text>
   <line x1="230" y1="24" x2="230" y2="322" stroke="#1B4B6B"/>
   <text class="box-sub" x="230" y="336" text-anchor="middle">0</text>
-  <text class="box-sub" x="430" y="336" text-anchor="middle">125</text>
-  <text class="box-sub" x="630" y="336" text-anchor="middle">250</text>
-  <text class="box-sub" x="830" y="336" text-anchor="middle">375</text>
+  <text class="box-sub" x="430" y="336" text-anchor="middle">150</text>
+  <text class="box-sub" x="630" y="336" text-anchor="middle">300</text>
+  <text class="box-sub" x="830" y="336" text-anchor="middle">450</text>
   <line x1="430" y1="24" x2="430" y2="322" stroke="#0E2A3F"/>
   <line x1="630" y1="24" x2="630" y2="322" stroke="#0E2A3F"/>
   <line x1="830" y1="24" x2="830" y2="322" stroke="#0E2A3F"/>
 
   <text class="box-sub" x="224" y="50" text-anchor="end">asb_iterative_1</text>
-  <rect x="230" y="32" width="600" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
-  <text class="box-sub" x="838" y="47" text-anchor="end">372</text>
+  <rect x="230" y="32" width="539" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
+  <text class="box-sub" x="761" y="47" text-anchor="end">404</text>
 
-  <text class="box-sub" x="224" y="84" text-anchor="end">run_1</text>
-  <rect x="230" y="66" width="81" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
-  <text class="box-sub" x="319" y="81">50</text>
+  <text class="box-sub" x="224" y="84" text-anchor="end">chemistry_iterative_v4_flash</text>
+  <rect x="230" y="66" width="67" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
+  <text class="box-sub" x="305" y="81">50</text>
 
-  <text class="box-sub" x="224" y="118" text-anchor="end">chemistry_iterative_v4_flash</text>
-  <rect x="230" y="100" width="78" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
-  <text class="box-sub" x="316" y="115">49</text>
+  <text class="box-sub" x="224" y="118" text-anchor="end">e35_fix_2</text>
+  <rect x="230" y="100" width="49" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
+  <text class="box-sub" x="287" y="115">37</text>
 
-  <text class="box-sub" x="224" y="152" text-anchor="end">chemistry_iterative_2_v3.2</text>
+  <text class="box-sub" x="224" y="152" text-anchor="end">e35_first_attempt</text>
   <rect x="230" y="134" width="35" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
-  <text class="box-sub" x="273" y="149">22</text>
+  <text class="box-sub" x="273" y="149">26</text>
 
-  <text class="box-sub" x="224" y="186" text-anchor="end">asb_single_1</text>
-  <rect x="230" y="168" width="24" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
-  <text class="box-sub" x="262" y="183">15</text>
+  <text class="box-sub" x="224" y="186" text-anchor="end">chemistry_iterative_2_v3.2</text>
+  <rect x="230" y="168" width="31" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
+  <text class="box-sub" x="269" y="183">23</text>
 
-  <text class="box-sub" x="224" y="220" text-anchor="end">chemistry_oneshot_2_v3.2</text>
-  <rect x="230" y="202" width="10" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
-  <text class="box-sub" x="248" y="217">6.2</text>
+  <text class="box-sub" x="224" y="220" text-anchor="end">asb_single_1</text>
+  <rect x="230" y="202" width="26" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
+  <text class="box-sub" x="264" y="217">20</text>
 
-  <text class="box-sub" x="224" y="254" text-anchor="end">chemistry_single_v4_flash_wf</text>
-  <rect x="230" y="236" width="3" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
-  <text class="box-sub" x="241" y="251">1.6</text>
+  <text class="box-sub" x="224" y="254" text-anchor="end">chemistry_oneshot_2_v3.2</text>
+  <rect x="230" y="236" width="9" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
+  <text class="box-sub" x="247" y="251">6.7</text>
 
-  <text class="box-sub" x="224" y="288" text-anchor="end">chemistry_single_2_v3.2</text>
-  <rect x="230" y="270" width="2" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
-  <text class="box-sub" x="240" y="285">1.0</text>
+  <text class="box-sub" x="224" y="288" text-anchor="end">hp_attempt1</text>
+  <rect x="230" y="270" width="8" height="20" fill="rgba(77,159,255,0.22)" stroke="#4D9FFF"/>
+  <text class="box-sub" x="246" y="285">6.2</text>
 
-  <text class="box-sub" x="230" y="314">Not shown: 7 leftovers, 0.6 MB together</text>
+  <text class="box-sub" x="230" y="314">Not shown: 10 smaller entries, 6.5 MB together</text>
 </svg>
 </div>
-<p class="figcap">Chart - sizes of the run folders inside <code class="path">sources/workflows/</code>. <b>my computation</b>: <code>du -sh sources/workflows/*/</code>, converted from bytes. <code>asb_iterative_1</code> holds 372 MB of the 561 MB total.</p>
+<p class="figcap">Chart - sizes of the run folders inside <code class="path">sources/workflows/</code>. <b>my computation</b>: <code>du -sk sources/workflows/*/</code> divided by 1024. <code>asb_iterative_1</code> holds 404 MB of the 580 MB total. Not shown: <code>chemistry_single_v4_flash_wf</code>, <code>chemistry_single_2_v3.2</code>, live <code>run_1</code>, <code>_verifier_tmp</code>, <code>generation_failed</code> and 5 loose <code>20260926_*</code> folders.</p>
 
 <h3>Folder inventory</h3>
 <table>
 <thead><tr><th>Path</th><th>Entries</th><th>Size</th><th>What it holds</th></tr></thead>
 <tbody>
-<tr><td class="sym"><code>run_notes/&lt;run&gt;/</code></td><td class="size">10 runs</td><td class="size">5.7 MB</td><td>One JSON per capsule: goal, uuids, rewards, ablations.</td></tr>
-<tr><td class="sym"><code class="path">run_notes/evaluations/</code></td><td class="size">11 files</td><td class="size">&#8212;</td><td>Campaign manifest: dataset, eval_mode, model ids, status.</td></tr>
-<tr><td class="sym"><code>runs_capsule/&lt;run&gt;/&lt;capsule&gt;/</code></td><td class="size">260 capsules</td><td class="size">13 GB</td><td>Final script, <code>pred_results/</code>, <code>evaluation_results.json</code>.</td></tr>
-<tr><td class="sym"><code>sources/workflows/&lt;run&gt;/&lt;uuid&gt;/</code></td><td class="size">1249 folders</td><td class="size">561 MB</td><td>Genotype plus 13 sidecar files per generation.</td></tr>
-<tr><td class="sym"><code class="path">sources/workflows/qd_archive.jsonl</code></td><td class="size">2 files</td><td class="size">24 KB</td><td>Append-only QD trail and mutation-scope trail.</td></tr>
-<tr><td class="sym"><code>/tmp/mimosa_run_*</code></td><td class="size">3 dirs</td><td class="size">132 MB</td><td>Per-round workspace copy; 44 MB each.</td></tr>
-<tr><td class="sym"><code>tmp/</code></td><td class="size">200 476 files</td><td class="size">4.9 GB</td><td>Five <code>exec_*.py</code>, three sandbox venvs, one repo venv.</td></tr>
-<tr><td class="sym"><code>logs/</code></td><td class="size">2 files</td><td class="size">10.6 MB</td><td>Network watchdog log and the CSV-mode run log.</td></tr>
+<tr><td class="sym"><code>run_notes/&lt;run&gt;/</code></td><td class="size">13 runs</td><td class="size">5.9 MB</td><td>One JSON per capsule; <code>run_1/</code> empty (live run).</td></tr>
+<tr><td class="sym"><code class="path">run_notes/evaluations/</code></td><td class="size">14 files</td><td class="size">56 KB</td><td>Campaign manifest: dataset, eval_mode, model ids, status.</td></tr>
+<tr><td class="sym"><code>runs_capsule/&lt;run&gt;/&lt;capsule&gt;/</code></td><td class="size">10 runs, 277 capsules</td><td class="size">13 GB</td><td>Final script, <code>pred_results/</code>, <code>evaluation_results.json</code>.</td></tr>
+<tr><td class="sym"><code>sources/workflows/&lt;run&gt;/&lt;uuid&gt;/</code></td><td class="size">1339 folders</td><td class="size">580 MB</td><td>Genotype plus up to 12 sidecar files per generation.</td></tr>
+<tr><td class="sym"><code>sources/workflows/**/qd_archive.jsonl</code>, <code>variation_log.jsonl</code></td><td class="size">19 files</td><td class="size">8.0 MB</td><td>Append-only QD trail and mutation-scope trail, per run.</td></tr>
+<tr><td class="sym"><code>sources/workflows/**/_verifier_tmp/</code></td><td class="size">9 dirs</td><td class="size">&#8212;</td><td>Scorer scratch plus 23 <code>hybrid_registry_*.json</code>.</td></tr>
+<tr><td class="sym"><code>/tmp/mimosa_run_*</code></td><td class="size">185 dirs</td><td class="size">2.7 GB</td><td>Per-round workspace copy, 2026-09-25 to 09-28; 11 <code>*_generation_failed</code>.</td></tr>
+<tr><td class="sym"><code>tmp/</code></td><td class="size">51 231 files</td><td class="size">1.2 GB</td><td>Only <code>tmp/run_1/</code>: 130 <code>exec_*.py</code>, one sandbox venv.</td></tr>
+<tr><td class="sym"><code>logs/</code></td><td class="size">2 files</td><td class="size">10.7 MB</td><td>Network watchdog log and the CSV-mode run log.</td></tr>
 </tbody>
 </table>
-<div class="note say">The clone is read-only evidence: <code>AGENTS.md</code> says never modify, move or delete anything inside a run folder.</div>
+<div class="note">Gotcha: the ablation loop grades each <code>/tmp/mimosa_run_*</code> snapshot in place (<code>snapshot_grading.py::grade_directory</code>), and <code>ExecutionSandbox.run_generated_code</code> replaces its <code>pred_results/</code> with the re-run output (<code>execution_sandbox.py</code> lines 799-806), so an audited snapshot may not hold the round's original outputs.</div>
+
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -363,8 +399,8 @@ workflow_*.png            757
 <div class="grid2">
 <div class="card l3">
 <h4><a href="../../sources/benchmark_evaluation/csv_mode.py">sources/benchmark_evaluation/csv_mode.py</a></h4>
-<p class="role">Runs the CSV campaign, calls the ablations, writes the per-task run note.</p>
-<p class="meta"><code>CsvEvaluationMode</code> &#183; writers: <code>_save_run_notes</code>, <code>_evaluate_snapshot_ablations</code> &#183; reader: <code>_load_previous_run_notes</code></p>
+<p class="role">Runs the CSV campaign, calls the ablations, writes the per-task run note; stamps leak keys in gold mode.</p>
+<p class="meta"><code>CsvEvaluationMode</code> &#183; 1901 lines &#183; writers: <code>_save_run_notes</code>, <code>_evaluate_snapshot_ablations</code>, <code>_stamp_gold_capsule_results</code> &#183; reader: <code>_load_previous_run_notes</code></p>
 </div>
 <div class="card l4">
 <h4><a href="../../sources/benchmark_evaluation/capsule_evaluator.py">sources/benchmark_evaluation/capsule_evaluator.py</a></h4>
@@ -379,7 +415,7 @@ workflow_*.png            757
 <div class="card steel">
 <h4><a href="../../sources/utils/run_metrics.py">sources/utils/run_metrics.py</a></h4>
 <p class="role">Filesystem helper: dumps one metrics dict to <code>run_metrics.json</code>, appends JSONL lines.</p>
-<p class="meta">112 lines &#183; <code>write_run_metrics</code>, <code>append_jsonl</code> &#183; schema owned by <code>evolution_engine</code></p>
+<p class="meta">71 lines &#183; <code>write_run_metrics</code>, <code>append_jsonl</code> &#183; schema owned by <code>evolution_engine</code></p>
 </div>
 <div class="card steel">
 <h4><a href="../../sources/utils/transfer_toolomics.py">sources/utils/transfer_toolomics.py</a></h4>
@@ -391,28 +427,46 @@ workflow_*.png            757
 <p class="role">Copies the workspace to <code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code> after each round.</p>
 <p class="meta"><code>WorkspaceManager</code> &#183; <code>save_run_snapshot</code>, <code>restore_best</code> reads the copies back</p>
 </div>
+<div class="card l4">
+<h4><a href="../../sources/benchmark_evaluation/snapshot_grading.py">sources/benchmark_evaluation/snapshot_grading.py</a></h4>
+<p class="role">Grades one directory with <code>CapsuleEvaluator</code>; returns VER/SR/CBS; never calls <code>save_results</code>.</p>
+<p class="meta">82 lines &#183; <code>grade_directory</code> &#183; callers: ablation loop, gold grader</p>
+</div>
+<div class="card l4">
+<h4><a href="../../sources/evaluators/gold_feedback/evaluator.py">sources/evaluators/gold_feedback/evaluator.py</a> <span class="tag">ORACLE</span></h4>
+<p class="role">Gold-mode verifier; writes <code>gold_feedback.json</code>, both gradients and the <code>evaluation.txt</code> leak banner.</p>
+<p class="meta"><code>GoldFeedbackEvaluator._persist</code> &#183; page: <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>, <a href="file_gold_evaluator.html">file_gold_evaluator.html</a></p>
+</div>
 </div>
 
 <details><summary>all writer and reader symbols, with their file</summary><div class="dbody">
 <pre>run_notes/&lt;run&gt;/&lt;capsule&gt;.json
   writes  sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode._save_run_notes
+          (+ 4 leak stamp keys when verifier_kind == "gold"; ORACLE)
   reads   sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode._load_previous_run_notes
   reads   sources/utils/shared_visualization.py::SharedVisualizationData
 run_notes/evaluations/*.json
-  writes  sources/cli/evaluation_cli.py::_save_start_notes
+  writes  sources/cli/evaluation_cli.py::EvaluationCLI._save_start_notes
   reads   sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode._load_run_notes_from_file
 runs_capsule/&lt;run&gt;/&lt;capsule&gt;/
   writes  sources/utils/transfer_toolomics.py::LocalTransfer.transfer_workspace_files_to_capsule
   writes  sources/utils/transfer_toolomics.py::LocalTransfer.create_capsule_folder
+runs_capsule/&lt;best_uuid&gt;/ (astra.yaml, universes/best.yaml)
+  writes  sources/transparency/astra_exporter.py::AstraExporter.export
 runs_capsule/**/evaluation_results.json
   writes  sources/benchmark_evaluation/capsule_evaluator.py::CapsuleEvaluator.save_results
-  reads   sources/transparency/astra_exporter.py
+  rewrites sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode._stamp_gold_capsule_results (gold only; ORACLE)
 sources/workflows/&lt;run&gt;/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py, system_prompt, goal, original_task
   writes  sources/core/factory.py::Factory.save_workflow_files
 sources/workflows/&lt;run&gt;/&lt;uuid&gt;/evaluation.txt, textual_gradient.txt
   writes  sources/evaluators/hybrid_verifier/evaluator.py::HybridVerifierEvaluator._write_artifacts
+  writes  sources/evaluators/gold_feedback/evaluator.py::GoldFeedbackEvaluator._persist (leak banner; ORACLE)
   writes  sources/evaluators/legacy_verifier/verifier.py (deprecated path, same file names)
-  reads   sources/core/workflow_info.py::WorkflowInfo.evaluation
+  reads   sources/core/workflow_info.py::WorkflowInfo.judge_evaluation
+sources/workflows/&lt;run&gt;/&lt;uuid&gt;/gold_feedback.json, textual_gradient_hybrid.txt
+  writes  sources/evaluators/gold_feedback/evaluator.py::GoldFeedbackEvaluator._persist (ORACLE)
+  reads   sources/core/workflow_info.py::is_oracle_generation (ORACLE_SIDECAR)
+  reads   sources/core/workflow_selection.py (skips oracle folders unless gold)
 sources/workflows/&lt;run&gt;/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json
   writes  sources/core/lineage.py::record_lineage
   reads   sources/core/lineage.py::load_lineage
@@ -433,10 +487,13 @@ sources/workflows/&lt;run&gt;/&lt;uuid&gt;/workflow_&lt;uuid&gt;.png
   writes  sources/core/workflow_factory.py::WorkflowFactory.assemble_workflow
 sources/workflows/&lt;run&gt;/qd_archive.jsonl, variation_log.jsonl
   writes  sources/core/evolution_engine.py::EvolutionEngine._persist_qd_archive / _persist_variation_log
+sources/workflows/&lt;run&gt;/_verifier_tmp/hybrid_registry_&lt;task_key&gt;.json
+  writes  sources/evaluators/hybrid_verifier/registry.py::TaskRegistry.save
 /tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;/
   writes  sources/utils/workspace_management.py::WorkspaceManager.save_run_snapshot
   reads   sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode._evaluate_snapshot_ablations
-  reads   sources/transparency/astra_exporter.py</pre>
+          -&gt; sources/benchmark_evaluation/snapshot_grading.py::grade_directory (re-run rewrites pred_results/)
+  reads   sources/transparency/astra_exporter.py::AstraExporter._resolve_artefacts_dir</pre>
 </div></details>
 </div>
 
@@ -447,19 +504,20 @@ sources/workflows/&lt;run&gt;/qd_archive.jsonl, variation_log.jsonl
 <tbody>
 <tr><td class="sym"><code class="path">run_notes/asb_full_iterative_1/capsule_clintox_nn_clintox_nn.json</code></td><td class="size">2026-08-31</td><td class="size">2</td><td><span class="chip ok">VER 1</span> <span class="chip err">SR 0</span></td></tr>
 <tr><td class="sym"><code class="path">run_notes/asb_full_oneshot_1/llm_response_error_nvc_heatmap.json</code></td><td class="size">2026-09-09</td><td class="size">3</td><td><span class="chip warn">VER 49</span> <span class="chip err">SR 17</span></td></tr>
-<tr><td class="sym"><code class="path">run_notes/run_1/llm_response_error_charge_density_difference.json</code></td><td class="size">2026-09-20</td><td class="size">7</td><td><span class="chip ok">VER 1</span> <span class="chip ok">SR 1</span></td></tr>
+<tr><td class="sym"><code class="path">run_notes/e35_fix_2/protein_protein_tanimoto_fingerprint_similarity_plot_protein_protein_fingerprint_similarity_vis.json</code></td><td class="size">2026-09-28</td><td class="size">2</td><td><span class="chip warn">VER 7</span> <span class="chip err">SR 1</span></td></tr>
 </tbody>
 </table>
-<p class="sub">Oldest, random and newest of 462 task records. <code>ver_success</code> and <code>sr_success</code> are counts, <code>total_eval</code> is the denominator. Sampled keys quoted verbatim in diagram 2.</p>
+<p class="sub">Oldest, random and newest of 479 task records. <code>ver_success</code> and <code>sr_success</code> are counts, <code>total_eval</code> is the denominator (56 and 12 in rows 2 and 3). The record quoted by the 336fe19 build (<code>run_notes/run_1/llm_response_error_charge_density_difference.json</code>, <code>timestamp 2026-09-20T23:30:15</code>) is now at <code class="path">run_notes/e35_fix_1/llm_response_error_charge_density_difference.json</code>.</p>
 </div>
 
 <footer>
-<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>; <code class="path">docs/visual_clone/_clone.css</code>; <code class="path">docs/visual_clone/_clone.js</code>; <code>AGENTS.md</code> (read-only rule, audit procedure); <code>run_notes/**/*.json</code> (all 473, keys only); <code class="path">run_notes/run_1/llm_response_error_charge_density_difference.json</code>; <code class="path">sources/workflows/run_1/20260920_181842_d8e1c063/</code> (listing plus <code>evaluation.txt</code>, <code>textual_gradient.txt</code>, <code>lineage_*.json</code>, <code>run_metrics.json</code>); <code class="path">runs_capsule/run_1/llm_response_error_charge_density_difference/evaluation_results.json</code>; <code>logs/</code>; <code>tmp/</code>; <code>/tmp/mimosa_run_*</code>; code: <code class="path">sources/benchmark_evaluation/csv_mode.py</code>, <code>capsule_evaluator.py</code>, <code class="path">sources/utils/run_metrics.py</code>, <code>workspace_management.py</code>, <code>transfer_toolomics.py</code>, <code>evolution_tree.py</code>, <code>shared_visualization.py</code>, <code class="path">sources/core/lineage.py</code>, <code>evolution_engine.py</code>, <code>factory.py</code>, <code>workflow_info.py</code>, <code>workflow_factory.py</code>, <code>single_agent_factory.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/legacy_verifier/verifier.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/transparency/astra_exporter.py</code>.</p>
-<p class="skips">Numbers marked <b>my computation</b> come from: <code>find run_notes -name '*.json' | wc -l</code> (473); <code>du -sh run_notes runs_capsule sources/workflows logs tmp</code>; <code>find sources/workflows -type f | wc -l</code> (32 371); <code>find sources/workflows -name '&lt;sidecar&gt;' | wc -l</code>; <code>du -sh sources/workflows/*/</code>; <code>du -sh runs_capsule/*</code>; <code>wc -l logs/*</code>; <code>find tmp -type f | wc -l</code>; <code>du -sh /tmp/mimosa_run_*</code>; and a Python pass over all <code>run_notes</code> JSON and all <code>run_metrics.json</code> for key sets, uuid forms, <code>on_error</code> and date ranges.</p>
-<p class="skips">Skipped: the 1 078 <code>workflow_genotype_*.py</code> files under <code class="path">sources/workflows/</code> (Tier C pattern summary only - they are generated code, not hand-maintained); the 2 727 PNG files (name and writer only); <code class="path">run_notes/__pycache__/</code> (compiled artifact); <code class="path">tmp/mimosa_venv/</code>, <code class="path">tmp/run_1..3/mimosa_venv/</code> (~4.9 GB of installed packages); <code>runs_capsule/**</code> contents beyond one capsule listing and every <code>evaluation_results.json</code> key set; <code class="path">sources/workflows/run_1/_verifier_tmp/</code> (2 scratch folders); <code>qd_archive.jsonl</code> and <code>variation_log.jsonl</code> line contents (line counts and writer only); <code>logs/*.log</code> bodies (size and line count only); <code>datasets/</code> (Tier D).</p>
-<p class="skips">The working tree had uncommitted changes at build time, so these counts are a dated snapshot and will drift as campaigns run.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes in <code>sources/evaluators/</code>; the runtime folders described here are unmodified.</p>
-<p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>; <code class="path">docs/visual_clone/_clone.css</code>; <code>AGENTS.md</code> (read-only rule, audit procedure); <code>run_notes/**/*.json</code> (all 493, keys only); <code>runs_capsule/**/evaluation_results.json</code> (all 277, keys only); <code class="path">sources/workflows/e35_fix_2/20260928_080823_30d67b4d/</code> (listing, <code>evaluation.txt</code> head, <code>run_metrics.json</code>); first line of all 843 <code>evaluation.txt</code>; all 1148 <code>run_metrics.json</code> (key count, <code>on_error</code>); <code>logs/</code>; <code>tmp/</code>; <code>/tmp/mimosa_run_*</code> (names and sizes); code: <code class="path">sources/benchmark_evaluation/csv_mode.py</code>, <code>capsule_evaluator.py</code>, <code>snapshot_grading.py</code>, <code>execution_sandbox.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code>, <code class="path">sources/core/workflow_info.py</code>, <code>workflow_selection.py</code>, <code>evolution_engine.py</code>, <code>lineage.py</code>, <code>factory.py</code>, <code>workflow_factory.py</code>, <code>single_agent_factory.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code>gradient.py</code>, <code>registry.py</code>, <code class="path">sources/evaluators/legacy_verifier/verifier.py</code>, <code class="path">sources/utils/run_metrics.py</code>, <code>workspace_management.py</code>, <code>transfer_toolomics.py</code>, <code>evolution_tree.py</code>, <code>shared_visualization.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/transparency/astra_exporter.py</code>.</p>
+<p class="skips">Numbers marked <b>my computation</b> come from: <code>find run_notes -type f</code> (493 JSON, 1 <code>.pyc</code>, 1 <code>.DS_Store</code>); <code>du -sk run_notes runs_capsule sources/workflows logs tmp</code>; <code>du -sk sources/workflows/*/</code>; <code>du -sck /tmp/mimosa_run_*</code>; <code>find sources/workflows -type f | wc -l</code> (31 827); <code>find tmp -type f | wc -l</code>; <code>wc -l logs/*</code>; <code>git ls-files run_notes</code> (0 at HEAD; <code>git ls-tree 336fe19 run_notes</code> also 0: <code>run_notes/</code> is untracked); and one Python pass over all run-notes JSON, all capsule <code>evaluation_results.json</code>, all generation folders and all <code>run_metrics.json</code> for key sets, uuid forms, index joins, gold stamp keys, <code>on_error</code> and dates.</p>
+<p class="skips">Moved since the 336fe19 build: <code>run_notes/run_1/</code> is now empty (created 2026-09-28 16:57 by a live campaign); the old sample folder <code>sources/workflows/run_1/20260920_181842_d8e1c063/</code> and <code>runs_capsule/run_1/</code> no longer exist anywhere on disk; new run folders are <code>e35_first_attempt</code>, <code>e35_fix_1</code>, <code>e35_fix_2</code> (run notes, capsules; no <code>e35_fix_1</code> under <code>sources/workflows/</code>) and <code>hp_attempt1</code> (workflows only). Where the old <code>run_1</code> files went, beyond the one record named above: unknown.</p>
+<p class="skips">Skipped: the 1154 <code>workflow_genotype_*.py</code> files (generated code, Tier C pattern only); the 2896 PNG files (name and writer only); <code class="path">run_notes/__pycache__/</code> (compiled artifact); <code class="path">tmp/run_1/mimosa_venv/</code> (1.2 GB of installed packages); <code>runs_capsule/**</code> contents beyond key sets of <code>evaluation_results.json</code>; <code>_verifier_tmp/</code> scorer scratch contents; <code>qd_archive.jsonl</code> and <code>variation_log.jsonl</code> line contents (size and writer only); <code>logs/*.log</code> bodies (size and line count only); <code>/tmp/mimosa_run_*</code> contents (names and sizes only); <code>datasets/</code> (Tier D).</p>
+<p class="skips">A campaign was writing into <code>sources/workflows/run_1/</code> and <code>logs/evaluation_csv_mode.log</code> during the count, so these numbers are a dated snapshot and will drift.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
+<p>Updated at commit <code>ca72107</code> + working tree, 2026-09-28: re-counted all trees, fixed moved <code>run_1</code> paths, added gold-mode (ORACLE) stamp keys and sidecars (none on disk yet), <code>snapshot_grading.py</code>, <code>evaluation_results.json</code> key sets.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

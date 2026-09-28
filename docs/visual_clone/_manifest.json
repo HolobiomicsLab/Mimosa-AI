@@ -1,18 +1,19 @@
 {
-  "built_commit": "336fe19",
-  "built_date": "2026-09-26",
-  "build_note": "Update build. HEAD is 336fe19 (it committed the sources/evaluators sub-package split: generic/, scenario/, legacy_verifier/); the working tree additionally deletes the 8 flat sources/evaluators/*.py modules and modifies sources/evaluators/evaluator.py plus hybrid_verifier/claims.py and gradient.py. 36 pages (34 edited + 2 new) were re-synced on 2026-09-26.",
+  "built_commit": "ca72107",
+  "built_date": "2026-09-28",
+  "build_note": "Update build (gold feedback oracle mode). The manifest was at 336fe19. HEAD was 4020790 at the start. Commit ca72107 (2026-09-28 17:50, \"feat: gold based gradient for study\") landed while the wave ran and committed the gold_feedback work. The build INCLUDES WORKING-TREE STATE. For code, the tree equals ca72107, except for the uncommitted, in-flight edits to sources/evaluators/hybrid_verifier/gradient.py and tests/hybrid_verifier_test.py (mtime 17:59; the hybrid pages read them at 18:06-18:15), plus datasets/ and .gitignore (Tier D). 45 pages were re-synced or written (7 new: mod_evaluators_gold_feedback.html and file_gold_{init,evaluator,grader,format,reward,leak}.html), plus index.html, _clone.js and this manifest. Pages with working_tree=true were built from that tree. Stamp \"ca72107+wt\" in the top bar. E41 CAGE was still running at 2026-09-28 17:37. Its rows are a dated snapshot.",
   "pages": {
     "area_benchmark_evaluation.html": {
       "covers": [
         "sources/benchmark_evaluation/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "datasets/ScienceAgentBench/{datasets,datasets_chemistry,gold_programs,scoring_rubrics}: Tier D, counted only",
         "98 of 111 grader scripts: pattern check only"
-      ]
+      ],
+      "working_tree": true
     },
     "area_cli.html": {
       "covers": [
@@ -34,12 +35,13 @@
         "cleanup.sh",
         "workflow_evolution_anim.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/utils/*, sources/cli/*: read only for call targets, owned by area_utils.html / area_cli.html",
         "Tier D: docs/*, webui/, datasets/, run_notes/, runs_capsule/, sources/workflows/, sources/memory/, logs/, audits/, CLA/"
-      ]
+      ],
+      "working_tree": true
     },
     "area_evaluators.html": {
       "covers": [
@@ -47,11 +49,13 @@
         "sources/evaluators/generic/*.py",
         "sources/evaluators/scenario/*.py",
         "sources/evaluators/legacy_verifier/*.py",
-        "sources/evaluators/hybrid_verifier/*.py"
+        "sources/evaluators/hybrid_verifier/*.py",
+        "sources/evaluators/gold_feedback/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "area_evaluators_legacy.html": {
       "covers": [
@@ -92,21 +96,23 @@
       "covers": [
         "sources/core/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "area_tests.html": {
       "covers": [
         "tests/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "tests/__pycache__/*.pyc: generated output, not source",
         "test bodies: page is a coverage matrix, not per-test text",
         "did not run the pytest suite (rule 10)"
-      ]
+      ],
+      "working_tree": true
     },
     "area_utils.html": {
       "covers": [
@@ -123,15 +129,16 @@
         "audits/*",
         "audits/**/*"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "bodies of the large HTML reports: read title, first heading and TL;DR only (Tier C method)",
         "audits/reward_signal_analysis/*.pdf: binary, no text read",
         "audits/.DS_Store: macOS system file",
         "per-task transition HTML bodies: same five-block template, described once",
         "chemical-correctness judgments: out of scope"
-      ]
+      ],
+      "working_tree": true
     },
     "data_experiments.html": {
       "covers": [
@@ -139,25 +146,27 @@
         "experiments_verifiers/results/*",
         "diversity_experiments/*"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "experiments_verifiers/.env: never opened (secrets rule)",
         "results/_e24_venv/: virtualenv, size counted only",
         "report bodies: titles/intro text only"
-      ]
+      ],
+      "working_tree": true
     },
     "data_modules_prompts.html": {
       "covers": [
         "sources/modules/*.py",
         "sources/prompts/*.md"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "line-by-line reading of the 10 prompt files - Tier C; sampled 3",
         "sources/modules/__pycache__/"
-      ]
+      ],
+      "working_tree": true
     },
     "data_runs.html": {
       "covers": [
@@ -165,15 +174,17 @@
         "runs_capsule/**",
         "sources/workflows/**",
         "logs/**",
-        "tmp/**"
+        "tmp/**",
+        "/tmp/mimosa_run_*"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/workflows/**/workflow_genotype_*.py (20474 files): name and writer only",
         "tmp/mimosa_venv/: ~4.9 GB of installed packages",
         "logs/*.log bodies: size and line count only"
-      ]
+      ],
+      "working_tree": true
     },
     "flow_evolution_loop.html": {
       "covers": [
@@ -188,29 +199,33 @@
         "sources/evaluators/hybrid_verifier/gradient.py",
         "sources/evaluators/hybrid_verifier/aggregation.py",
         "sources/evaluators/hybrid_verifier/registry.py",
-        "config.py"
+        "config.py",
+        "sources/evaluators/evaluator.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/core/factory.py, workflow_factory.py, single_agent_factory.py, schema.py: builder helpers, not the loop",
         "sources/core/failure_fingerprint.py: written by the verifier, not read by the loop",
         "diversity_experiments/code_reference/selection.py: frozen experiment copy"
-      ]
+      ],
+      "working_tree": true
     },
     "flow_sab_batch.html": {
       "covers": [
         "sources/benchmark_evaluation/*.py",
         "datasets/ScienceAgentBench/eval_programs/*.py",
         "run_notes/**/*.json",
-        "main.py"
+        "main.py",
+        "sources/benchmark_evaluation/snapshot_grading.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "datasets/ScienceAgentBench/datasets/, gold_programs/, scoring_rubrics/: data only, counts given",
         "105 of 111 eval_programs files after sampling 5"
-      ]
+      ],
+      "working_tree": true
     },
     "flow_task_run.html": {
       "covers": [
@@ -234,35 +249,43 @@
         "sources/utils/precheck.py",
         "sources/cli/evaluation_cli.py",
         "sources/benchmark_evaluation/csv_mode.py",
-        "sources/benchmark_evaluation/capsule_evaluator.py"
+        "sources/benchmark_evaluation/capsule_evaluator.py",
+        "sources/evaluators/gold_feedback/evaluator.py",
+        "sources/evaluators/gold_feedback/grader.py",
+        "sources/benchmark_evaluation/snapshot_grading.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/core/planner.py, single_agent_factory.py: --goal and --single_agent paths, outside this flow",
         "sources/evaluators/{verifier,verifier_*,generic,scenario,bs_detection}.py: not on the default verifier path",
         "tests/: not on the runtime path"
-      ]
+      ],
+      "working_tree": true
     },
     "flow_verification.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/*.py",
         "sources/evaluators/base.py",
-        "sources/evaluators/evaluator.py"
+        "sources/evaluators/evaluator.py",
+        "sources/evaluators/gold_feedback/evaluator.py",
+        "sources/benchmark_evaluation/snapshot_grading.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/evaluators/verifier*.py etc: covered by area_evaluators_legacy.html"
-      ]
+      ],
+      "working_tree": true
     },
     "index.html": {
       "covers": [
         "docs/visual_clone/*.html"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "mod_core_evolution_engine.html": {
       "covers": [
@@ -271,25 +294,28 @@
         "sources/core/failure_fingerprint.py",
         "sources/core/orchestrator.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/utils/* one-line roles only, no cards",
         "sources/core/genotype_embedding.py: only its entry point embed_genotype is shown"
-      ]
+      ],
+      "working_tree": true
     },
     "mod_core_lineage.html": {
       "covers": [
         "sources/core/lineage.py",
         "sources/core/workflow_info.py",
         "sources/core/schema.py",
-        "sources/utils/evolution_tree.py"
+        "sources/utils/evolution_tree.py",
+        "sources/modules/state_schema.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/workflows/** runtime data: only lineage/run_metrics/goal files opened"
-      ]
+      ],
+      "working_tree": true
     },
     "mod_core_planner.html": {
       "covers": [
@@ -324,11 +350,12 @@
         "sources/core/selection.py",
         "sources/core/workflow_selection.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/core/genotype_embedding.py, code_features.py: covered by mod_core_variation.html"
-      ]
+      ],
+      "working_tree": true
     },
     "mod_core_tools_llm.html": {
       "covers": [
@@ -349,20 +376,22 @@
         "sources/core/genotype_embedding.py",
         "sources/core/code_features.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "mod_evaluators_hybrid_verifier.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/evaluators/*.py at folder root: covered by area_evaluators.html / area_evaluators_legacy.html",
         "experiments_verifiers/ harnesses: not opened, out of scope"
-      ]
+      ],
+      "working_tree": true
     },
     "overview.html": {
       "covers": [
@@ -372,20 +401,24 @@
         "config.py",
         "sources/core/*.py",
         "sources/evaluators/hybrid_verifier/*.py",
-        "sources/utils/paths.py"
+        "sources/utils/paths.py",
+        "sources/evaluators/evaluator.py",
+        "sources/evaluators/gold_feedback/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "_reference.html": {
       "covers": [
         "docs/visual_clone/_clone.css",
         "docs/visual_clone/_clone.js"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "note": "_clone.js: top bar reads per-page data-built/data-built-date"
     },
     "exp_run_e2.html": {
       "covers": [
@@ -630,9 +663,10 @@
         "experiments_verifiers/harness/*.py",
         "experiments_verifiers/results/*"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "exp_e18_bt_eval.html": {
       "covers": [
@@ -1363,9 +1397,10 @@
       "covers": [
         "sources/core/evolution_engine.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_core_factory.html": {
       "covers": [
@@ -1427,9 +1462,10 @@
       "covers": [
         "sources/core/schema.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_core_selection.html": {
       "covers": [
@@ -1459,9 +1495,10 @@
       "covers": [
         "sources/core/variation_engine.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_core_workflow_factory.html": {
       "covers": [
@@ -1475,9 +1512,10 @@
       "covers": [
         "sources/core/workflow_info.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_core_workflow_runner.html": {
       "covers": [
@@ -1491,9 +1529,10 @@
       "covers": [
         "sources/core/workflow_selection.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_harness_init.html": {
       "covers": [
@@ -1939,9 +1978,10 @@
       "covers": [
         "sources/evaluators/evaluator.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_eval_generic.html": {
       "covers": [
@@ -1971,81 +2011,91 @@
       "covers": [
         "sources/evaluators/hybrid_verifier/__init__.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_aggregation.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/aggregation.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_claims.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/claims.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_digest.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/digest.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_evaluator.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/evaluator.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_gradient.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/gradient.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_inventory.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/inventory.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_layers.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/layers.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_registry.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/registry.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_hybrid_scorers.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/scorers.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "skipped": [],
+      "working_tree": true
     },
     "file_index.html": {
       "covers": [
@@ -2054,11 +2104,12 @@
         "sources/evaluators/*.py",
         "experiments_verifiers/harness/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "ca72107",
+      "date": "2026-09-28",
       "skipped": [
         "sources/evaluators/verifier*.py (deprecated)"
-      ]
+      ],
+      "working_tree": true
     },
     "exp_e25_creed.html": {
       "covers": [
@@ -2110,6 +2161,80 @@
       "skipped": [],
       "commit": "336fe19",
       "date": "2026-09-26"
+    },
+    "exp_e37_audit_run1.html": {
+      "covers": [
+        "experiments_verifiers/results/E37_*"
+      ],
+      "skipped": [],
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "working_tree": true
+    },
+    "file_gold_evaluator.html": {
+      "covers": [
+        "sources/evaluators/gold_feedback/evaluator.py"
+      ],
+      "skipped": [],
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "working_tree": true
+    },
+    "file_gold_format.html": {
+      "covers": [
+        "sources/evaluators/gold_feedback/format.py"
+      ],
+      "skipped": [],
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "working_tree": true
+    },
+    "file_gold_grader.html": {
+      "covers": [
+        "sources/evaluators/gold_feedback/grader.py"
+      ],
+      "skipped": [],
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "working_tree": true
+    },
+    "file_gold_init.html": {
+      "covers": [
+        "sources/evaluators/gold_feedback/__init__.py"
+      ],
+      "skipped": [],
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "working_tree": true
+    },
+    "file_gold_leak.html": {
+      "covers": [
+        "sources/evaluators/gold_feedback/leak.py"
+      ],
+      "skipped": [],
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "working_tree": true
+    },
+    "file_gold_reward.html": {
+      "covers": [
+        "sources/evaluators/gold_feedback/reward.py"
+      ],
+      "skipped": [],
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "working_tree": true
+    },
+    "mod_evaluators_gold_feedback.html": {
+      "covers": [
+        "sources/evaluators/gold_feedback/*.py",
+        "sources/benchmark_evaluation/snapshot_grading.py",
+        "tests/gold_feedback_test.py"
+      ],
+      "skipped": [],
+      "commit": "ca72107",
+      "date": "2026-09-28",
+      "working_tree": true
     }
   },
   "changelog": [
@@ -2294,6 +2419,62 @@
         "mod_evaluators_hybrid_verifier.html"
       ],
       "note": "Update after the sources/evaluators split and experiment E35. (a) sources/evaluators/ was reorganised at 336fe19 into sub-packages generic/, scenario/ and legacy_verifier/, and the 8 flat modules are deleted in the working tree; the area page, the deprecated-legacy page and the six file digest pages were re-pointed, and 9 pages outside the area had their stale links fixed. (b) sources/evaluators/evaluator.py now selects the verifier channel from config.verifier_kind (default hybrid, 'legacy' lazy-imports .legacy_verifier.VerifierEvaluator). (c) the hybrid_verifier package was committed at 336fe19 much larger than the previous build saw (layers.py 497->1037, evaluator.py 645->784, claims.py 375->701), so 8 file cards plus the L2 page were re-synced; claims.py gained _first_json_block/_as_verdict_list and gradient.py dropped its 3-line 'Generated: verifier v3 PRIME' preamble. The three hub pages (exp_index.html, file_index.html, data_experiments.html) were recounted the same day (harness 54->67 scripts, 28 266->31 115 charted lines over the 55 pages, results/ 145->235 entries, core rows corrected by -1 for factory.py, orchestrator.py, workflow_runner.py). (d) E35 PRIME is new to the clone: exp_e35_prime.html + file_harness_e35_prime.html; E26-E34 and E36 still have no page. 34 pages edited and 2 created; date is the git author date of 336fe19; older changelog rows carry 2026-10-02, the date recorded by the previous build session. An independent reviewer then checked the 36 pages: 0 external refs, 4034 local links resolve, index/manifest/disk 1:1, no secrets, the restructure claims true. It found 13 defects (1 wrong writer, 4 wrong line refs, 6 stale test line refs, over-budget table cells); the polish pass fixed them all, plus 7 further stale test refs found in the same files."
+    },
+    {
+      "date": "2026-09-28",
+      "commit": "ca72107",
+      "working_tree": true,
+      "pages": [
+        "area_benchmark_evaluation.html",
+        "area_entry_config.html",
+        "area_evaluators.html",
+        "area_sources_core.html",
+        "area_tests.html",
+        "data_audits.html",
+        "data_experiments.html",
+        "data_modules_prompts.html",
+        "data_runs.html",
+        "exp_e37_audit_run1.html",
+        "exp_index.html",
+        "file_core_evolution_engine.html",
+        "file_core_schema.html",
+        "file_core_variation_engine.html",
+        "file_core_workflow_info.html",
+        "file_core_workflow_selection.html",
+        "file_eval_evaluator.html",
+        "file_gold_evaluator.html",
+        "file_gold_format.html",
+        "file_gold_grader.html",
+        "file_gold_init.html",
+        "file_gold_leak.html",
+        "file_gold_reward.html",
+        "file_hybrid_aggregation.html",
+        "file_hybrid_claims.html",
+        "file_hybrid_digest.html",
+        "file_hybrid_evaluator.html",
+        "file_hybrid_gradient.html",
+        "file_hybrid_init.html",
+        "file_hybrid_inventory.html",
+        "file_hybrid_layers.html",
+        "file_hybrid_registry.html",
+        "file_hybrid_scorers.html",
+        "file_index.html",
+        "flow_evolution_loop.html",
+        "flow_sab_batch.html",
+        "flow_task_run.html",
+        "flow_verification.html",
+        "index.html",
+        "mod_core_evolution_engine.html",
+        "mod_core_lineage.html",
+        "mod_core_selection.html",
+        "mod_core_variation.html",
+        "mod_evaluators_gold_feedback.html",
+        "mod_evaluators_hybrid_verifier.html",
+        "overview.html",
+        "_clone.js",
+        "_manifest.json"
+      ],
+      "note": "Gold feedback oracle mode (--verifier_kind gold). New L2 page and 6 file digests for sources/evaluators/gold_feedback/. snapshot_grading.grade_directory is drawn as shared by the csv_mode ablation loop and the gold grader (CapsuleEvaluator -> ExecutionSandbox). Verifier-kind branch hybrid/legacy/gold on overview, flow_task_run, flow_evolution_loop, flow_verification and area_evaluators. Oracle rules in core: the FALLBACK_REWARD_KINDS/is_oracle_generation skip is in the PARENT POOL (WorkflowSelector.discover_workflows), not in _select_best_run. Also: 2048-char gradient cut removed, reward_source benchmark_grader. Config and CLI flags, tests matrix (gold_feedback_test.py, 49 passed). 11 hybrid_verifier pages re-synced to the 4020790 changes. data_runs, data_audits, data_experiments, exp_index (E36-E41, E41 in flight), data_modules_prompts (workflow_v15.md changed in 4020790). Orphan exp_e37_audit_run1.html added to the menu and the manifest. _clone.js: the top bar reads per-page data-built. All 184 pages got a stamp from this manifest. Workers re-derived every line count and line ref they touched. Code gaps are flagged on pages: csv_mode ablation best-run uses plain max (not _select_best_run); ablation grading may overwrite pred_results/ in the /tmp snapshot; config.py comment names sources/evaluators/verifier.py for legacy. Review (vc-review, read-only): it checked 190 claims and found 4 minor errors, all fixed: the censored-reward wording, the hybrid_verifier total 4 735, gradient.py 388 lines on 3 pages, and \"removed in working tree\" -> \"removed in ca72107\". One blocker, fixed: the first stamp pass broke <body> on 96 pages whose data-crumb had a literal \">\". The crumb is now escaped as &gt; and all 96 crumbs match HEAD. Open: 24 table cells over 12 words on 13 pages; area_tests shows hybrid_verifier_test.py at its HEAD size, 2514 lines (2556 in the working tree, in flight)."
     }
   ],
   "review": {
@@ -2310,7 +2491,8 @@
       "fd-rev-harness-a",
       "fd-rev-harness-b",
       "reviewer-2026-09-26",
-      "polish-2026-09-26"
+      "polish-2026-09-26",
+      "vc-review-2026-09-28"
     ],
     "numbers_re_derived": 1625,
     "checks": [
@@ -2323,16 +2505,15 @@
       "banned words",
       "footer skips",
       "no secrets"
-    ]
+    ],
+    "last": "2026-09-28: 190 claims sampled, 4 minor wrong (fixed), 1 blocker (body stamp, fixed); links/external/box/banned/secrets pass"
   },
   "counts": {
-    "pages": 176,
-    "html_files": 176,
-    "diagrams": 447,
-    "file_digest_pages": 90,
-    "file_digest_files_with_prefix": 91,
-    "experiment_pages": 55,
-    "experiment_files_with_prefix": 56,
-    "note": "prefix counts include the two hub pages file_index.html and exp_index.html"
-  }
+    "pages": 184,
+    "html_files": 184,
+    "file_digest_pages": 96,
+    "experiment_pages": 56,
+    "note": "digest/experiment counts exclude the hubs file_index.html and exp_index.html"
+  },
+  "working_tree": true
 }

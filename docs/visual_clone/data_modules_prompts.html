@@ -6,7 +6,7 @@
 <title>Modules and prompts - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview > sources > modules and prompts">
+<body data-crumb="Overview &gt; sources &gt; modules and prompts" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">Modules and prompts</h1>
@@ -38,14 +38,14 @@
     <title>State template, injected verbatim as state_code</title>
     <rect x="16" y="20" width="200" height="42" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
     <text class="box-label" x="116" y="39" text-anchor="middle">state_schema.py</text>
-    <text class="box-sub" x="116" y="55" text-anchor="middle">151 lines</text>
+    <text class="box-sub" x="116" y="55" text-anchor="middle">150 lines</text>
   </a>
 
   <a class="box" id="t2" href="../../sources/modules/smolagent_factory.py">
     <title>Agent factory template, injected verbatim as smolagent_factory_code</title>
     <rect x="16" y="72" width="200" height="42" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
     <text class="box-label" x="116" y="91" text-anchor="middle">smolagent_factory.py</text>
-    <text class="box-sub" x="116" y="107" text-anchor="middle">501 lines</text>
+    <text class="box-sub" x="116" y="107" text-anchor="middle">500 lines</text>
   </a>
 
   <a class="box" id="t3" href="../../sources/prompts/workflow_v15.md">
@@ -103,7 +103,7 @@
 </div>
 <p class="figcap">Diagram 1 - injection chain. <code>WorkflowFactory.get_system_prompt()</code> (<code>sources/core/workflow_factory.py:49</code>) reads <code>workflow_v15.md</code>; <code>Factory.load_single_agent_system_prompt()</code> (<code>sources/core/factory.py:99</code>) reads <code>smolagent_sys_prompt.md</code>; <code>WorkflowFactory.craft_workflow()</code> (<code>sources/core/workflow_factory.py:412</code>) reads both <code>sources/modules/*.py</code> files at lines 466-469 and passes them to <code>assemble_workflow()</code> (<code>sources/core/workflow_factory.py:283</code>); <code>WorkflowOrchestrator.workflow_sandbox_run()</code> (<code>sources/core/orchestrator.py:64</code>) hands the assembled code to <code>WorkflowRunner.execute()</code> (<code>sources/core/workflow_runner.py:310</code>).</p>
 
-<details><summary>the splice point, verbatim (workflow_factory.py lines 364-374)</summary><div class="dbody">
+<details><summary>the splice point, verbatim (workflow_factory.py lines 364-376)</summary><div class="dbody">
 <blockquote># Load tools
 &#123;tools_code&#125;
 
@@ -114,7 +114,10 @@
 &#123;smolagent_factory_code&#125;
 
 # Generated workflow
-&#123;workflow_genotype_code&#125;</blockquote>
+&#123;workflow_genotype_code&#125;
+
+app = workflow.compile()</blockquote>
+<p>The assembled script compiles the graph by the name <code>workflow</code>. <code>WorkflowFactory.validate_workflow_structure</code> (line 210) also requires <code>workflow = StateGraph(WorkflowState)</code>.</p>
 <p class="path">sources/core/workflow_factory.py</p>
 </div></details>
 </div>
@@ -174,7 +177,7 @@
   <text class="box-sub" x="14" y="288">rounded = class/TypedDict | rectangle = one state key | my reading of state_schema.py</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - the 9 keys of <code>WorkflowState</code> (<code>sources/modules/state_schema.py:95</code>) plus the nested <code>Action</code> and <code>Observation</code> TypedDicts (lines 89 and 92). <code>master_router</code> (line 109) and <code>debate_router</code> (line 142) read <code>answers</code>; the module also sets <code>MAX_CONSECUTIVE_FALLBACKS = 3</code> and <code>MAX_CONSECUTIVE_RETRY = 5</code>. The factory builds the initial state from <code>WorkflowState.__annotations__</code> (<code>sources/core/workflow_factory.py:336</code>).</p>
+<p class="figcap">Diagram 2 - the 9 keys of <code>WorkflowState</code> (<code>sources/modules/state_schema.py:95</code>) plus the nested <code>Action</code> and <code>Observation</code> TypedDicts (lines 89 and 92). <code>master_router</code> (line 109) reads <code>answers</code> and the last 5 <code>step_name</code> entries; <code>debate_router</code> (line 142) counts <code>verdict</code> values in the last 3 <code>answers</code>; the module also sets <code>MAX_CONSECUTIVE_FALLBACKS = 3</code> and <code>MAX_CONSECUTIVE_RETRY = 5</code>. The factory builds the initial state from <code>WorkflowState.__annotations__</code> (<code>sources/core/workflow_factory.py:336</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -182,8 +185,8 @@
 <table>
 <thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/modules/state_schema.py">state_schema.py</a></td><td>Injects the shared state, the two routers, and the <code>Answer</code> parser.</td><td class="size">151</td><td class="sym">WorkflowState, Answer, master_router, debate_router</td></tr>
-<tr><td class="sym"><a href="../../sources/modules/smolagent_factory.py">smolagent_factory.py</a></td><td>Injects the agent factory and the graph-node wrapper.</td><td class="size">501</td><td class="sym">SmolAgentFactory, WorkflowNodeFactory.create_agent_node</td></tr>
+<tr><td class="sym"><a href="../../sources/modules/state_schema.py">state_schema.py</a></td><td>Injects the shared state, the two routers, and the <code>Answer</code> parser.</td><td class="size">150</td><td class="sym">WorkflowState, Answer, master_router, debate_router</td></tr>
+<tr><td class="sym"><a href="../../sources/modules/smolagent_factory.py">smolagent_factory.py</a></td><td>Injects the agent factory and the graph-node wrapper.</td><td class="size">500</td><td class="sym">SmolAgentFactory, WorkflowNodeFactory.create_agent_node</td></tr>
 </tbody>
 </table>
 
@@ -191,7 +194,7 @@
 <div class="card steel">
 <h4><a href="../../sources/modules/state_schema.py">sources/modules/state_schema.py</a></h4>
 <p class="role">Defines <code>WorkflowState</code>, the <code>Answer</code> model that parses agent JSON, and two routing functions. The factory injects it verbatim as <code>state_code</code>.</p>
-<p class="meta">151 lines &#183; not imported at runtime &#183; read by <code>WorkflowFactory.craft_workflow</code> (workflow_factory.py:466)</p>
+<p class="meta">150 lines &#183; not imported at runtime &#183; read by <code>WorkflowFactory.craft_workflow</code> (workflow_factory.py:466)</p>
 <details><summary>symbols and constants</summary><div class="dbody">
 <pre>class Answer(BaseModel): status, message, retry_advice, error
 class Action(TypedDict): tool: str
@@ -208,7 +211,7 @@ def debate_router(state) -&gt; str</pre>
 <div class="card steel">
 <h4><a href="../../sources/modules/smolagent_factory.py">sources/modules/smolagent_factory.py</a></h4>
 <p class="role">Wraps a SmolAgents <code>CodeAgent</code> with memory caching, logprobs, and a graph-node factory. The factory injects it verbatim as <code>smolagent_factory_code</code>.</p>
-<p class="meta">501 lines &#183; read by <code>WorkflowFactory.craft_workflow</code> (workflow_factory.py:468) &#183; imports <code>MODEL_ID</code>, <code>MEMORY_PATH</code>, <code>SYSTEM_PROMPT</code> globals</p>
+<p class="meta">500 lines &#183; read by <code>WorkflowFactory.craft_workflow</code> (workflow_factory.py:468) &#183; imports <code>MODEL_ID</code>, <code>MEMORY_PATH</code>, <code>SYSTEM_PROMPT</code> globals</p>
 <details><summary>symbols</summary><div class="dbody">
 <pre>TOP_LOGPROBS = 5
 def logprobs_kwargs_for(model_id) -&gt; dict
@@ -222,7 +225,7 @@ class SmolAgentFactory:
     run(state) -&gt; dict
 class WorkflowNodeFactory:
     create_agent_node(agent_factory) -&gt; Callable[[WorkflowState], dict]</pre>
-<p><code>CodeAgent(...)</code> at line 145 carries an <code>additional_authorized_imports</code> allow-list (line 155 onward); the comment there limits action-as-code to basic libraries.</p>
+<p><code>CodeAgent(...)</code> at line 145 carries an <code>additional_authorized_imports</code> allow-list (line 154 onward); the comment there limits action-as-code to basic libraries.</p>
 </div></details>
 </div>
 </div>
@@ -233,16 +236,16 @@ class WorkflowNodeFactory:
 <table>
 <thead><tr><th>Name</th><th class="size">Lines</th><th>Used by</th><th>Purpose</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/prompts/planner_paperbench_codedev.md">planner_paperbench_codedev.md</a></td><td class="size">95</td><td>no code reference found (unknown)</td><td>Planner prompt for paperbench code-dev tasks.</td></tr>
-<tr><td class="sym"><a href="../../sources/prompts/planner_reproduction.md">planner_reproduction.md</a></td><td class="size">122</td><td><code>config.prompt_planner</code>; <code>Planner._read_prompt</code></td><td>Planner prompt for paper reproduction plans.</td></tr>
-<tr><td class="sym"><a href="../../sources/prompts/smolagent_sys_prompt.md">smolagent_sys_prompt.md</a></td><td class="size">407</td><td><code>config.prompt_smolagent</code>; <code>Factory.load_single_agent_system_prompt</code></td><td>System prompt for the code-action agent.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/planner_paperbench_codedev.md">planner_paperbench_codedev.md</a></td><td class="size">94</td><td>no code reference found (unknown)</td><td>Planner prompt for paperbench code-dev tasks.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/planner_reproduction.md">planner_reproduction.md</a></td><td class="size">121</td><td><code>config.prompt_planner</code>; <code>Planner._read_prompt</code></td><td>Planner prompt for paper reproduction plans.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/smolagent_sys_prompt.md">smolagent_sys_prompt.md</a></td><td class="size">406</td><td><code>config.prompt_smolagent</code>; <code>Factory.load_single_agent_system_prompt</code></td><td>System prompt for the code-action agent.</td></tr>
 <tr><td class="sym"><a href="../../sources/prompts/workflow_v8.md">workflow_v8.md</a></td><td class="size">297</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Polymorphic architect; 49 headings, pattern catalogue.</td></tr>
 <tr><td class="sym"><a href="../../sources/prompts/workflow_v9.md">workflow_v9.md</a></td><td class="size">429</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Longest file; adds custom routers and deliberation.</td></tr>
 <tr><td class="sym"><a href="../../sources/prompts/workflow_v10.md">workflow_v10.md</a></td><td class="size">183</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Shortest workflow prompt; kept for diffing.</td></tr>
 <tr><td class="sym"><a href="../../sources/prompts/workflow_v11.md">workflow_v11.md</a></td><td class="size">227</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Adds router reference and debate protocol.</td></tr>
 <tr><td class="sym"><a href="../../sources/prompts/workflow_v12_model_select.md">workflow_v12_model_select.md</a></td><td class="size">258</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Adds a model-choice section for agents.</td></tr>
 <tr><td class="sym"><a href="../../sources/prompts/workflow_v13_model_select.md">workflow_v13_model_select.md</a></td><td class="size">241</td><td>override only (<code>--prompt_workflow_creator</code>)</td><td>Revisions of the model-choice variant.</td></tr>
-<tr><td class="sym"><a href="../../sources/prompts/workflow_v15.md">workflow_v15.md</a></td><td class="size">333</td><td><code>config.prompt_workflow_creator</code> (default)</td><td>Flexible-routing variant; lets the LLM write routers.</td></tr>
+<tr><td class="sym"><a href="../../sources/prompts/workflow_v15.md">workflow_v15.md</a></td><td class="size">331</td><td><code>config.prompt_workflow_creator</code> (default)</td><td>Flexible-routing variant; lets the LLM write routers.</td></tr>
 </tbody>
 </table>
 
@@ -279,14 +282,14 @@ class WorkflowNodeFactory:
   <rect x="552" y="87.7" width="56" height="117.3" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
   <text class="box-sub" x="580.0" y="83.7" text-anchor="middle">11.3k</text>
   <text class="box-sub" x="580.0" y="218" text-anchor="middle">v13_model_select</text>
-  <rect x="634" y="67.6" width="56" height="137.4" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
-  <text class="box-sub" x="662.0" y="63.599999999999994" text-anchor="middle">13.2k</text>
+  <rect x="634" y="66.0" width="56" height="139.0" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="662.0" y="62.0" text-anchor="middle">13.4k</text>
   <text class="box-sub" x="662.0" y="218" text-anchor="middle">v15</text>
   <rect x="716" y="100.4" width="56" height="104.6" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
   <text class="box-sub" x="744.0" y="96.4" text-anchor="middle">10.1k</text>
   <text class="box-sub" x="744.0" y="218" text-anchor="middle">v8</text>
-  <rect x="798" y="52.30000000000001" width="56" height="152.7" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
-  <text class="box-sub" x="826.0" y="48.30000000000001" text-anchor="middle">14.7k</text>
+  <rect x="798" y="52.3" width="56" height="152.7" rx="1" fill="rgba(0,229,255,0.14)" stroke="#00E5FF"/>
+  <text class="box-sub" x="826.0" y="48.3" text-anchor="middle">14.7k</text>
   <text class="box-sub" x="826.0" y="218" text-anchor="middle">v9</text>
   <line x1="40" y1="205" x2="880" y2="205" stroke="#1B4B6B" stroke-width="1"/>
   <text class="box-sub" x="40" y="238">bytes, one bar per prompt file (my computation) | max = 15889 bytes = smolagent_sys_prompt.md</text>
@@ -295,40 +298,61 @@ class WorkflowNodeFactory:
 <p class="figcap">Bar chart - the ten prompts range from <code>6.1 kB</code> (<code>workflow_v10.md</code>) to <code>15.9 kB</code> (<code>smolagent_sys_prompt.md</code>). Numbers are my computation from <code>os.path.getsize</code>.</p>
 
 <h3>Pattern of the prompt files</h3>
-<p>All ten are plain Markdown: no YAML front matter, first line is a single <code>#</code> title, then <code>##</code> sections. Length runs from 95 to 429 lines. Heading count ranges from 7 to 65.</p>
+<p>All ten are plain Markdown: no YAML front matter, first line is a single <code>#</code> title, then <code>##</code> sections. Length runs from 94 to 429 lines (<code>wc -l</code>; no file ends with a newline). Lines that start with <code>#</code>, code comments included, range from 7 to 65 (my computation).</p>
 
 <div class="grid3">
 <div class="card steel">
 <h4><a href="../../sources/prompts/workflow_v15.md">workflow_v15.md</a></h4>
 <p class="role">Starts with execution context and router reference, then a section that lets the LLM design its own routers with a stated contract.</p>
-<p class="meta">333 lines &#183; 21 headings &#183; <code>git log</code>: added by commit <code>80b386e</code> "feat: new v15 prompt + sandbox fix"</p>
+<p class="meta">331 lines &#183; 23 <code>#</code> lines &#183; added by <code>80b386e</code> "feat: new v15 prompt + sandbox fix"; last changed by <code>4020790</code></p>
 </div>
 <div class="card steel">
 <h4><a href="../../sources/prompts/workflow_v9.md">workflow_v9.md</a></h4>
 <p class="role">Oldest style: architecture principles first, then a long catalogue of workflow patterns for scientific computing.</p>
-<p class="meta">429 lines &#183; 65 headings &#183; largest heading count of the set</p>
+<p class="meta">429 lines &#183; 65 <code>#</code> lines &#183; largest count of the set</p>
 </div>
 <div class="card steel">
 <h4><a href="../../sources/prompts/smolagent_sys_prompt.md">smolagent_sys_prompt.md</a></h4>
 <p class="role">Tells one agent how to work: tool use versus Python, execution boundaries, output format, core patterns.</p>
-<p class="meta">407 lines &#183; 24 headings &#183; loaded as <code>SYSTEM_PROMPT</code>, then applied by <code>SmolAgentFactory.override_system_prompt</code></p>
+<p class="meta">406 lines &#183; 24 <code>#</code> lines &#183; loaded as <code>SYSTEM_PROMPT</code>, then applied by <code>SmolAgentFactory.override_system_prompt</code></p>
 </div>
+</div>
+
+<h3>What changed in workflow_v15.md (commit 4020790)</h3>
+<div class="card steel">
+<h4><a href="../../sources/prompts/workflow_v15.md">workflow_v15.md</a> <span class="chip ok">prompt now matches code</span></h4>
+<p class="role">Commit <code>4020790</code> rewrote the prompt (+80 / -81 lines): router docs now match <code>state_schema.py</code>, and examples use the graph name the factory checks.</p>
+<p class="meta"><code>git diff 336fe19..HEAD -- sources/prompts/workflow_v15.md</code> &#183; 333 &#8594; 331 lines (<code>wc -l</code>) &#183; 13233 &#8594; 13388 bytes</p>
+<details><summary>pattern-level changes (5)</summary><div class="dbody">
+<table>
+<thead><tr><th>Part of prompt</th><th>Change</th></tr></thead>
+<tbody>
+<tr><td><code>debate_router</code> doc</td><td>Now: 2 of last 3 <code>verdict</code> = APPROVE; else loops.</td></tr>
+<tr><td>Router contract</td><td>Custom statuses need a custom router; <code>master_router</code> ends on others.</td></tr>
+<tr><td>Example router</td><td>Copy of <code>master_router</code> replaced by a 3-branch <code>my_router</code>.</td></tr>
+<tr><td>Example workflows</td><td>Graph renamed to <code>workflow</code>; <code>app = workflow.compile()</code> removed.</td></tr>
+<tr><td>End of prompt</td><td>New <code># Compilation</code> and <code># Advice</code> sections; MCP names marked as examples.</td></tr>
+</tbody>
+</table>
+<p>Code check: <code>debate_router</code> (<code>sources/modules/state_schema.py:142</code>) returns <code>another_round</code> unless 2 of 3 votes are <code>APPROVE</code>; its <code>len(recent_answers) &lt; 9</code> test is always true, so <code>fallback_node</code> is never returned (my reading). <code>validate_workflow_structure</code> (<code>sources/core/workflow_factory.py:210</code>) matches the literal <code>workflow = StateGraph(WorkflowState)</code>. The assembled script adds <code>app = workflow.compile()</code> (<code>sources/core/workflow_factory.py:376</code>).</p>
+</div></details>
 </div>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Which workflow_v* prompt does the code select?</h2>
-<p>Newest file: <code>workflow_v15.md</code>, modified 2026-09-21 (<code>os.path.getmtime</code>, my computation). Selected prompt: <code>workflow_v15.md</code>, set in <code>config.py</code> and mirrored in <code>config_default.json</code>.</p>
+<p>Newest file: <code>workflow_v15.md</code>, modified 2026-09-28 (<code>os.path.getmtime</code>, my computation). Selected prompt: <code>workflow_v15.md</code>, set in <code>config.py</code> and mirrored in <code>config_default.json</code>.</p>
 <details><summary>grep evidence (grep -rn 'workflow_v' --include=*.py --include=*.json)</summary><div class="dbody">
-<pre>config.py:207:            "sources/prompts/workflow_v15.md"
-config_default.json:60:  "prompt_workflow_creator": "sources/prompts/workflow_v15.md",
+<pre>config.py:260:            "sources/prompts/workflow_v15.md"
+config_default.json:62:  "prompt_workflow_creator": "sources/prompts/workflow_v15.md",
 tests/paths_test.py:78:            "prompt_planner": "sources/prompts/workflow_v10.md",
-.git HEAD (7e8463b) config.py:153: workflow_v15.md</pre>
-<p>Only <code>workflow_v15.md</code> is named as a default. No .py or .json file outside <code>config.py</code>, <code>config_default.json</code> and <code class="path">tests/paths_test.py</code> names any <code>workflow_v*.md</code> file. CLI override: <code>--prompt_workflow_creator</code> (<code>main.py:68</code>, applied at <code>main.py:113</code>).</p>
+tests/paths_test.py:85:    assert config.prompt_planner == paths.resource_path("sources/prompts/workflow_v10.md")
+git show HEAD:config.py (ca72107) line 260: workflow_v15.md</pre>
+<p>Only <code>workflow_v15.md</code> is named as a default. No .py or .json file outside <code>config.py</code>, <code>config_default.json</code> and <code class="path">tests/paths_test.py</code> names any <code>workflow_v*.md</code> file. CLI override: <code>--prompt_workflow_creator</code> (<code>main.py:68</code>, applied at <code>main.py:142-143</code>).</p>
 </div></details>
 <p class="note say">A prompt that is not selected is never read: <code>WorkflowFactory.get_system_prompt()</code> opens exactly one path, <code>config.prompt_workflow_creator</code>.</p>
 <p class="note">No <code>workflow_v14.md</code> exists; the set jumps from <code>workflow_v13_model_select.md</code> to <code>workflow_v15.md</code>. Whether a v14 was ever written is unknown.</p>
-<p class="note flag"><code>docs/DEVELOPER_GUIDE.md:160</code> and <code>docs/reference/configuration.md:37</code> both name <code>workflow_v11.md</code> as the current default; the code default is <code>workflow_v15.md</code> (<code>config.py:206-208</code>, <code>config_default.json:60</code>).</p>
+<p class="note flag"><code>docs/DEVELOPER_GUIDE.md:160</code> and <code>docs/reference/configuration.md:37</code> both name <code>workflow_v11.md</code> as the current default; the code default is <code>workflow_v15.md</code> (<code>config.py:259-261</code>, <code>config_default.json:62</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -338,17 +362,18 @@ tests/paths_test.py:78:            "prompt_planner": "sources/prompts/workflow_v
 <div class="card l2"><h4><a href="mod_core_planner.html">mod_core_planner.html</a></h4><p class="role">Shows <code>Planner._read_prompt</code>, which opens <code>prompt_planner</code>.</p><p class="meta">page</p></div>
 <div class="card ice"><h4><a href="area_entry_config.html">area_entry_config.html</a></h4><p class="role">Holds the <code>config.py</code> and <code>config_default.json</code> fields that name the prompts.</p><p class="meta">page</p></div>
 </div>
-<div class="grid2">
+<div class="grid3">
+<div class="card l2"><h4><a href="file_core_workflow_factory.html">file_core_workflow_factory.html</a></h4><p class="role">File card for <code>craft_workflow</code>, <code>assemble_workflow</code> and <code>validate_workflow_structure</code>.</p><p class="meta">page</p></div>
 <div class="card l3"><h4><a href="flow_task_run.html">flow_task_run.html</a></h4><p class="role">Shows the same chain as a sequence: craft, assemble, execute, evaluate.</p><p class="meta">page</p></div>
 <div class="card l2"><h4><a href="overview.html">overview.html</a></h4><p class="role">Places the sandbox step in the 5-layer picture.</p><p class="meta">page</p></div>
 </div>
 </div>
 
 <footer>
-<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>; <code class="path">docs/visual_clone/_clone.css</code>; <code class="path">docs/visual_clone/_clone.js</code>; <code class="path">sources/modules/state_schema.py</code>; <code class="path">sources/modules/smolagent_factory.py</code>; <code>sources/prompts/*.md</code> (10 files); <code class="path">sources/core/workflow_factory.py</code>; <code class="path">sources/core/factory.py</code>; <code class="path">sources/core/orchestrator.py</code>; <code class="path">sources/core/workflow_runner.py</code>; <code class="path">sources/core/planner.py</code>; <code class="path">sources/core/single_agent_factory.py</code>; <code>config.py</code>; <code>config_default.json</code>; <code>main.py</code>; <code class="path">tests/paths_test.py</code>; <code class="path">docs/DEVELOPER_GUIDE.md</code> (lines 155-168); <code class="path">docs/reference/configuration.md</code> (lines 33-40); <code class="path">docs/reference/file-layout.md</code> (lines 68-72).</p>
-<p class="skips">Skipped: <code class="path">sources/modules/__pycache__/</code> - bytecode cache. Skipped: line-by-line reading of the 10 prompt files - Tier C, sampled 3 (<code>planner_reproduction.md</code>, <code>smolagent_sys_prompt.md</code>, <code>workflow_v15.md</code>) and measured the rest by headings and size. Skipped: <code class="path">.venv/lib/python3.11/site-packages/config.py</code> - Tier D; noted only that its default is the older <code>workflow_v12_model_select.md</code>. Skipped: <code class="path">docs/site/</code>, <code>datasets/</code>, <code>webui/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code> - Tier D, out of scope. Skipped: the 8 older <code>workflow_v*.md</code> files beyond sampling - same pattern, differ by section count and size.</p>
-<p>The working tree had uncommitted changes when this page was built: <code>git status --porcelain</code> lists modified files (including <code>config.py</code>, <code>docs/</code>) and <code class="path">docs/visual_clone/</code> as untracked. The prompt defaults were checked against <code>git show HEAD:config.py</code> and match. <code class="path">sources/modules/</code> and <code class="path">sources/prompts/</code> were unmodified.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>; <code class="path">docs/visual_clone/_clone.css</code>; <code class="path">docs/visual_clone/_clone.js</code>; <code class="path">sources/modules/state_schema.py</code>; <code class="path">sources/modules/smolagent_factory.py</code>; <code>sources/prompts/*.md</code> (10 files); <code class="path">sources/core/workflow_factory.py</code> (incl. <code>validate_workflow_structure</code>); <code class="path">sources/core/factory.py</code>; <code class="path">sources/core/orchestrator.py</code>; <code class="path">sources/core/workflow_runner.py</code>; <code class="path">sources/core/planner.py</code>; <code class="path">sources/core/single_agent_factory.py</code>; <code>config.py</code>; <code>config_default.json</code>; <code>main.py</code>; <code class="path">tests/paths_test.py</code>; <code class="path">docs/DEVELOPER_GUIDE.md</code> (lines 155-168); <code class="path">docs/reference/configuration.md</code> (lines 33-40); <code class="path">docs/reference/file-layout.md</code> (lines 68-72).</p>
+<p class="skips">Skipped: <code class="path">sources/modules/__pycache__/</code> - bytecode cache. Skipped: line-by-line reading of the 10 prompt files - Tier C, sampled 3 (<code>planner_reproduction.md</code>, <code>smolagent_sys_prompt.md</code>, <code>workflow_v15.md</code>; v15 re-read in full with its diff) and measured the rest by headings and size. Skipped: <code class="path">.venv/lib/python3.11/site-packages/config.py</code> - Tier D; noted only that its default is the older <code>workflow_v12_model_select.md</code>. Skipped: <code class="path">docs/site/</code>, <code>datasets/</code>, <code>webui/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code> - Tier D, out of scope. Skipped: the 8 older <code>workflow_v*.md</code> files beyond sampling - same pattern, differ by section count and size.</p>
+<p>Refresh check: <code>git diff 7e8463b..HEAD -- sources/prompts sources/modules</code> changes only <code class="path">sources/prompts/workflow_v15.md</code> (commit <code>4020790</code>). <code>git status --short</code> shows no uncommitted change in <code class="path">sources/modules/</code>, <code class="path">sources/prompts/</code>, <code>config.py</code>, <code>main.py</code> or the four core files cited. Refs in <code class="path">sources/core/workflow_factory.py</code>, <code>factory.py</code>, <code>orchestrator.py</code>, <code>workflow_runner.py</code> and <code>planner.py</code> were re-checked with <code>grep -n</code> and did not move; <code>config.py</code>, <code>config_default.json</code> and <code>main.py</code> refs moved and were updated. <code>config_default.json</code> is not tracked at HEAD (matched by <code>config_*.json</code> in <code>.gitignore</code>); it was read from disk.</p>
+<p>Built at commit <code>ca72107</code> + working tree, 2026-09-28 (first built at <code>7e8463b</code>).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

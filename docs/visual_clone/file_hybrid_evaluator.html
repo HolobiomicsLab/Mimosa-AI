@@ -6,7 +6,7 @@
 <title>evaluator.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests > sources/evaluators/hybrid_verifier > evaluator.py">
+<body data-crumb="File digests &gt; sources/evaluators/hybrid_verifier &gt; evaluator.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">evaluator.py</h1>
@@ -279,7 +279,7 @@
   <text class="box-sub" x="20" y="404">Config objects: one. Fields read: 9 hybrid_verifier_* / workspace / reward plus the base-class dirs.</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 &mdash; <code>8 boxes</code>. Note the temp root: line 228 reads <code>getattr(config, "temp_dir", None)</code>, and <a href="../../config.py">config.py</a> defines <code>runner_temp_dir</code> (line 245), not <code>temp_dir</code> (grep over <code>config.py</code>, 2026-10-02), so the per-task registry always lands under <code>workflow_dir/_verifier_tmp</code> in this working tree.</p>
+<p class="figcap">Diagram 2 &mdash; <code>8 boxes</code>. Note the temp root: line 228 reads <code>getattr(config, "temp_dir", None)</code>, and <a href="../../config.py">config.py</a> defines <code>runner_temp_dir</code> (line 289), not <code>temp_dir</code> (grep over <code>config.py</code>, 2026-09-28), so the per-task registry always lands under <code>workflow_dir/_verifier_tmp</code> in this working tree.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -390,7 +390,7 @@
   <text class="box-sub" x="20" y="462">Two exits never reach the reward: a bad uuid raises, and a failed generation returns the synthetic claim with reward 0.0.</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 &mdash; <code>9 boxes</code>. The short-circuit path exists for parity with the legacy verifier: it writes a non-empty gradient so the engine never receives an empty one (module docstring lines 3-4). Tests <code>test_short_circuit_flags_artifacts_when_workspace_has_them</code> (line 998) cover both branches.</p>
+<p class="figcap">Diagram 3 &mdash; <code>9 boxes</code>. The short-circuit path exists for parity with the legacy verifier: it writes a non-empty gradient so the engine never receives an empty one (module docstring lines 3-4). Tests <code>test_short_circuit_flags_artifacts_when_workspace_has_them</code> (line 1193) cover both branches.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -398,13 +398,13 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_num_claims</td><td>lines 199-200 (config.py:78, default 10)</td><td>claim target, floored at 3</td></tr>
-<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_refinement_rounds</td><td>line 205 (config.py:80, default 2)</td><td>replacement claim budget per generation</td></tr>
-<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_scorer_timeout_s</td><td>line 210 (config.py:82, default 60)</td><td>scorer subprocess timeout, floored at 5</td></tr>
-<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_pairwise_mode</td><td>line 213 (config.py:86, default "temporal")</td><td>passed to <code>win_rate_reward</code> at 390</td></tr>
-<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_reward</td><td>line 216 (config.py:94, default "win_rate")</td><td>win_rate or bradley_terry; unknown becomes bradley_terry (218-219)</td></tr>
-<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_digest_max_files</td><td>line 245 (config.py:88, default 8)</td><td>cap for the format digest</td></tr>
-<tr><td class="sym">config field</td><td class="sym">workspace_dir</td><td>line 197 (config.py:44 default, 451 override)</td><td>workspace scanned and scored</td></tr>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_num_claims</td><td>lines 199-200 (config.py:122, default 10)</td><td>claim target, floored at 3</td></tr>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_refinement_rounds</td><td>line 205 (config.py:124, default 2)</td><td>replacement claim budget per generation</td></tr>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_scorer_timeout_s</td><td>line 210 (config.py:126, default 60)</td><td>scorer subprocess timeout, floored at 5</td></tr>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_pairwise_mode</td><td>line 213 (config.py:130, default "temporal")</td><td>passed to <code>win_rate_reward</code> at 390</td></tr>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_reward</td><td>line 216 (config.py:138, default "win_rate")</td><td>win_rate or bradley_terry; unknown becomes bradley_terry (218-219)</td></tr>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_digest_max_files</td><td>line 245 (config.py:132, default 8)</td><td>cap for the format digest</td></tr>
+<tr><td class="sym">config field</td><td class="sym">workspace_dir</td><td>line 197 (config.py:70 default, 497 override)</td><td>workspace scanned and scored</td></tr>
 <tr><td class="sym">config field</td><td class="sym">memory_dir, workflow_dir</td><td>base.py:118-119, used at 311, 775</td><td>LLM call cache, artifact output root</td></tr>
 <tr><td class="sym">config field</td><td class="sym">temp_dir</td><td>line 228 via getattr, absent in config.py</td><td>falls back to <code>workflow_dir/_verifier_tmp</code></td></tr>
 <tr><td class="sym">file read</td><td class="sym">workflow_dir/&lt;uuid&gt;/state_result.json</td><td>line 416 (base.py:147-187)</td><td>empty-run check and state</td></tr>
@@ -463,27 +463,28 @@ imports outside: sources.cli.pretty_print, sources.core.failure_fingerprint,
 <table>
 <thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>facade builds it when <code>verifier_kind</code> is not legacy</td><td class="sym">import L21; build L95; kind check L85</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>facade builds it when <code>verifier_kind</code> is neither <code>legacy</code> nor <code>gold</code></td><td class="sym">import L21; build L107; kind check L88</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/evaluator.py">gold_feedback/evaluator.py</a> <span class="tag">ORACLE</span></td><td><code>GoldFeedbackEvaluator.__init__</code> builds an inner instance with <code>gold_hybrid_config(config)</code>; <code>evaluate</code> calls it first (<a href="file_gold_evaluator.html">file_gold_evaluator.html</a>)</td><td class="sym">build L120-L124; call L183</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td>re-exports the class in <code>__all__</code></td><td class="sym">export L113, L128</td></tr>
-<tr><td class="sym">facade call site</td><td>calls <code>evaluate(uuid)</code> once per generation, after the workflow ran</td><td class="sym">sources/evaluators/evaluator.py:162</td></tr>
+<tr><td class="sym">facade call site</td><td>calls <code>evaluate(uuid)</code> once per generation, after the workflow ran</td><td class="sym">sources/evaluators/evaluator.py:174</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a></td><td>parent class: <code>_load_workflow_data</code> (147), <code>_save_results</code> (227), <code>extract_json_payload</code> (21)</td><td class="sym">import L61-L64</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td>receives this class's <code>_llm_text</code> and <code>_execute_scorer_script</code> as callbacks</td><td class="sym">evaluator.py 234-243</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>builds instances with <code>__new__</code> and a stub runner, then drives <code>evaluate</code></td><td class="sym">import L38-L43; helpers L151-L213</td></tr>
-<tr><td class="sym">test_full_pipeline_real_subprocess</td><td>real pinned subprocess through <code>_execute_scorer_script</code></td><td class="sym">lines 467-563</td></tr>
-<tr><td class="sym">test_short_circuit_flags_artifacts_when_workspace_has_them</td><td>empty run scores 0.0, synthetic claim present, non-empty gradient</td><td class="sym">lines 998-1012</td></tr>
-<tr><td class="sym">test_config_defaults_and_overrides, test_facade_defaults_to_hybrid, test_cli_flags_apply_overrides</td><td>the <code>hybrid_verifier_*</code> fields reach this constructor</td><td class="sym">lines 911, 951, 1013</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>builds instances with <code>__new__</code> and a stub runner, then drives <code>evaluate</code></td><td class="sym">import L38-L49; helpers L141-L297</td></tr>
+<tr><td class="sym">test_full_pipeline_real_subprocess</td><td>real pinned subprocess through <code>_execute_scorer_script</code></td><td class="sym">lines 496-591</td></tr>
+<tr><td class="sym">test_short_circuit_flags_artifacts_when_workspace_has_them</td><td>empty run scores 0.0, synthetic claim present, non-empty gradient</td><td class="sym">lines 1193-1203</td></tr>
+<tr><td class="sym">test_config_defaults_and_overrides, test_facade_defaults_to_hybrid, test_cli_flags_apply_overrides</td><td>the <code>hybrid_verifier_*</code> fields reach this constructor</td><td class="sym">lines 1106, 1146, 1208</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td>drives the package pieces directly, not this class</td><td class="sym">harness L3, L46-L50</td></tr>
 <tr><td class="sym"><code>_run_coro_sync</code> / <code>_run_coro_in_worker</code></td><td>no other importer; <a href="../../sources/evaluators/legacy_verifier/verifier_per_claim.py">legacy_verifier/verifier_per_claim.py</a> (deprecated) has its own copy</td><td class="sym">legacy_verifier/verifier_per_claim.py:278-295</td></tr>
 </tbody>
 </table>
-<p class="note flag">Line 228 reads <code>config.temp_dir</code>, and <code>Config</code> has no such attribute (only <code>runner_temp_dir</code>, config.py:245), so the registry path silently ignores the configured temp dir.</p>
+<p class="note flag">Line 228 reads <code>config.temp_dir</code>, and <code>Config</code> has no such attribute (only <code>runner_temp_dir</code>, config.py:289), so the registry path silently ignores the configured temp dir. Exception: <code>gold_feedback/evaluator.py::gold_hybrid_config</code> sets <code>temp_dir</code> on a config copy (<code>workflow_dir/_verifier_tmp_gold</code>) for the inner hybrid of the <a href="mod_evaluators_gold_feedback.html">oracle mode</a>.</p>
 <p class="note say">Why it matters: <code>evaluate</code> is the only place that turns measured claim scores into a reward, and it degrades per layer instead of failing the run, so one broken layer still yields a scored generation.</p>
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a> (all 784 lines, line by line), <a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a> (L21, L96-L145, L147-L187, L227-L277), <a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a> (L21, L85-L105, L162), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L556-L596 collect/gate), <a href="../../sources/evaluators/hybrid_verifier/aggregation.py">aggregation.py</a> (imported names L69-L74), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L31-L35, load and save), <a href="../../config.py">config.py</a> (L78-L94, L245), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L38-L48, L151-L213, L467-L563, L911-L1013), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a> (all 784 lines, line by line), <a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a> (L21, L96-L145, L147-L187, L227-L277), <a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a> (L21, L85-L110, L174), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L568-L608 collect/gate), <a href="../../sources/evaluators/hybrid_verifier/aggregation.py">aggregation.py</a> (imported names L69-L74), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L41-L45, load and save), <a href="../../config.py">config.py</a> (L122-L148, L289), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L38-L49, L141-L297, L496-L591, L1106-L1247), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
 <p class="skips">Skipped: <code>WorkflowRunner.execute</code> and <code>RuntimeConfig</code> internals (own page: <a href="mod_core_runner.html">mod_core_runner.html</a>); <code>LLMProvider</code> internals (own page: <a href="mod_core_tools_llm.html">mod_core_tools_llm.html</a>); the claim/scorer mechanics inside <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>; the parser of <code>state_result.json</code> in <code>WorkflowInfo</code> (base.py, outside this file); the deprecated copy of the coroutine helpers in <code>verifier_per_claim.py</code> beyond its line numbers. No pytest run and no application run, by the build rules.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Updated at <code>ca72107</code> + working tree, 2026-09-28: <code>config.py</code>, <code>layers.py</code>, <code>registry.py</code> and test refs re-derived; facade <code>gold</code> branch and the <code>GoldFeedbackEvaluator</code> caller added. <code>evaluator.py</code> itself is unchanged since the build. All line refs re-derived from the current files. <code class="path">tests/hybrid_verifier_test.py</code> read at 18:06 CEST while it has uncommitted edits in flight, so test line numbers can move.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

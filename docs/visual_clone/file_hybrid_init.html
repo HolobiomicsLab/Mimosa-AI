@@ -6,7 +6,7 @@
 <title>hybrid_verifier/__init__.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests &gt; sources/evaluators/hybrid_verifier &gt; __init__.py">
+<body data-crumb="File digests &gt; sources/evaluators/hybrid_verifier &gt; __init__.py" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">__init__.py</h1>
@@ -192,7 +192,7 @@
   <text class="edge-label" x="500" y="264" text-anchor="middle">writes none</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 &mdash; the only input is the import statement. The config keys in the upper box are read by <code>HybridVerifierEvaluator.__init__</code> (evaluator.py L213, L216) after this file has finished, and the defaults live in <code class="path">config.py</code> L86 and L94.</p>
+<p class="figcap">Diagram 2 &mdash; the only input is the import statement. The config keys in the upper box are read by <code>HybridVerifierEvaluator.__init__</code> (evaluator.py L213, L216) after this file has finished, and the defaults live in <code class="path">config.py</code> L130 and L138.</p>
 <p class="note say">No control-flow diagram on this page: the file has no <code>if</code>, no loop, no function, no class, so there is no decision rule to draw. The whole file is 110 docstring lines plus 26 code lines.</p>
 </div>
 
@@ -211,7 +211,7 @@
 <tr><td>exposes</td><td class="sym">package docstring</td><td>module attribute __doc__</td><td>the design record other pages cite</td><td class="size">L1&#8211;L110</td></tr>
 </tbody>
 </table>
-<p class="note">Amber note: <code>__all__</code> L124&#8211;L136 names 12 symbols, while <code>aggregation.py</code> defines 13 public names (6 constants and 7 functions). <code>temporal_winner</code>, <code>win_rate_reward</code>, <code>bradley_terry_reward</code>, <code>mean_claim_score</code>, <code>PAIRWISE_MODES</code>, <code>DEFAULT_PAIRWISE_MODE</code>, <code>STAGES</code>, <code>FIGURE_STAGES</code>, <code>PASS_THRESHOLD</code> and <code>MIN_OBS_FOR_VARIANCE</code> are not re-exported from the package; callers import the submodule instead (evaluator.py L58&#8211;L62).</p>
+<p class="note">Amber note: <code>__all__</code> L124&#8211;L136 names 12 symbols, while <code>aggregation.py</code> defines 13 public names (6 constants and 7 functions). <code>temporal_winner</code>, <code>win_rate_reward</code>, <code>bradley_terry_reward</code>, <code>mean_claim_score</code>, <code>PAIRWISE_MODES</code>, <code>DEFAULT_PAIRWISE_MODE</code>, <code>STAGES</code>, <code>FIGURE_STAGES</code>, <code>PASS_THRESHOLD</code> and <code>MIN_OBS_FOR_VARIANCE</code> are not re-exported from the package; callers import the submodule instead (hybrid_verifier/evaluator.py L69&#8211;L74).</p>
 <p class="note">Amber note: the layout list in the docstring (L62&#8211;L92) names nine submodules, and this file re-exports from four of them: <code>aggregation</code>, <code>evaluator</code>, <code>layers</code>, <code>registry</code>. <code>claims</code>, <code>digest</code>, <code>inventory</code>, <code>scorers</code> and <code>gradient</code> are reachable only as submodules, so <code>from sources.evaluators.hybrid_verifier import gradient</code> works while no name of theirs appears in <code>__all__</code>.</p>
 </div>
 
@@ -264,21 +264,22 @@ __all__ = [                                                            L124
 <table>
 <thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td><code>from .hybrid_verifier import HybridVerifierEvaluator</code>, the only importer in <code>sources/</code></td><td class="sym">L21</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td><code>from .hybrid_verifier import HybridVerifierEvaluator</code> at module top; the other importer in <code>sources/</code> is the gold row below</td><td class="sym">L21</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/evaluator.py">sources/evaluators/gold_feedback/evaluator.py</a> <span class="tag">ORACLE</span></td><td>lazy <code>from sources.evaluators.hybrid_verifier import HybridVerifierEvaluator</code> for the inner verifier</td><td class="sym">L120</td></tr>
 <tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports <code>ClaimsEvidenceLayer</code>, <code>HybridVerifierEvaluator</code>, <code>TaskRegistry</code> and the <code>aggregation</code> submodule from the package</td><td class="sym">L38&#8211;L43</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports the <code>gradient</code> and <code>digest</code> submodules through the package</td><td class="sym">L784, L1289</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports the <code>gradient</code> and <code>digest</code> submodules through the package</td><td class="sym">L857, L1484 (and 4 more <code>gradient</code> imports)</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_eval.py">experiments_verifiers/harness/e19c_eval.py</a></td><td>bypasses this file and imports <code>hybrid_verifier.aggregation</code> directly</td><td class="sym">L39&#8211;L41</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_online_bt.py">experiments_verifiers/harness/e19c_online_bt.py</a></td><td>same bypass, to reach <code>bradley_terry_reward</code></td><td class="sym">L33</td></tr>
 </tbody>
 </table>
-<p>No importer found outside these files: a repo-wide grep for <code>hybrid_verifier import</code> returns <code class="path">sources/evaluators/evaluator.py</code> L21, <code class="path">tests/hybrid_verifier_test.py</code> L38&#8211;L46, L690, L1161 and no other Python file. <code class="path">main.py</code> and <code class="path">config.py</code> only contain the <code>hybrid_verifier_*</code> config key names, not an import of this package.</p>
+<p>No importer found outside these files: a repo-wide grep for <code>hybrid_verifier import</code> returns <code class="path">sources/evaluators/evaluator.py</code> L21, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> L120 (lazy import inside <code>GoldFeedbackEvaluator.__init__</code>, <a href="file_gold_evaluator.html">oracle mode</a>), <code class="path">tests/hybrid_verifier_test.py</code> L38&#8211;L46, L857, L989, L1080, L1484, L2435, L2501 and no other Python file (grep 2026-09-28 18:06). <code class="path">main.py</code> and <code class="path">config.py</code> only contain the <code>hybrid_verifier_*</code> config key names, not an import of this package.</p>
 <p>See also: the <a href="mod_evaluators_hybrid_verifier.html">hybrid verifier package page</a>, the <a href="area_evaluators.html">evaluators area</a>, <a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a>, <a href="file_eval_scenario.html">file_eval_scenario.html</a>, <a href="flow_verification.html">flow_verification.html</a> and the <a href="file_index.html">file digest index</a>.</p>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code> (136 lines, whole file), <code class="path">sources/evaluators/evaluator.py</code> (L21, L58&#8211;L62), <code class="path">config.py</code> (L78&#8211;L94), <code class="path">tests/hybrid_verifier_test.py</code> (import block L38&#8211;L43, L784, L1289), <code class="path">experiments_verifiers/harness/e19c_eval.py</code> and <code class="path">e19c_online_bt.py</code> (import lines), <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> (public name count), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers.</p>
+<p>Sources read: <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code> (136 lines, whole file), <code class="path">sources/evaluators/evaluator.py</code> (L21), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (L69&#8211;L74), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (L120), <code class="path">config.py</code> (L122&#8211;L148), <code class="path">tests/hybrid_verifier_test.py</code> (import block L38&#8211;L43, L857, L1484), <code class="path">experiments_verifiers/harness/e19c_eval.py</code> and <code class="path">e19c_online_bt.py</code> (import lines), <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> (public name count), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers.</p>
 <p class="skips">Skipped, with reason: <code class="path">.env</code> and <code class="path">experiments_verifiers/.env</code> (never opened, secrets); <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">layers.py</code> and <code class="path">registry.py</code> bodies beyond their import lines (each has its own digest page); the 72 docstring lines are summarised by section, not quoted in full; no pytest run and no script executed, as instructed.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Updated at <code>ca72107</code> + working tree, 2026-09-28: config, test and importer refs re-derived; new importer <code>gold_feedback/evaluator.py</code>. <code>__init__.py</code> itself is unchanged since the build. All line refs re-derived from the current files. <code class="path">tests/hybrid_verifier_test.py</code> read at 18:06 CEST while it has uncommitted edits in flight, so test line numbers can move.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

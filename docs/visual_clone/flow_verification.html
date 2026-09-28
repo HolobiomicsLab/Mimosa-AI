@@ -6,7 +6,7 @@
 <title>Hybrid verification flow - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview > evaluators > verification flow">
+<body data-crumb="Overview &gt; evaluators &gt; verification flow" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">Hybrid verification flow</h1>
@@ -352,7 +352,7 @@ honest runs             WorkflowSelector skips folders where is_oracle_generatio
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/aggregation.py">hybrid_verifier/aggregation.py</a></td><td>Variance filter and the pairwise reward modes.</td><td class="sym">win_rate_reward, temporal_winner</td><td class="size">454</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/claims.py">hybrid_verifier/claims.py</a></td><td>Ladder claim extraction, validation and refinement prompts.</td><td class="sym">extract_claims_prompt, validate_claims</td><td class="size">701</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/scorers.py">hybrid_verifier/scorers.py</a></td><td>Scorer prompts, static policy screen, output parsing, launcher.</td><td class="sym">build_launcher, static_violations</td><td class="size">411</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td>Elimination-first gradient and <code>evaluation.txt</code> renderer.</td><td class="sym">build_gradient</td><td class="size">380</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td>Elimination-first gradient and <code>evaluation.txt</code> renderer.</td><td class="sym">build_gradient</td><td class="size">388</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a></td><td>Per-task JSON state: claims, scorers, score vectors.</td><td class="sym">TaskRegistry.load</td><td class="size">355</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/inventory.py">hybrid_verifier/inventory.py</a></td><td>Workspace inventory with CSV and PNG content signals.</td><td class="sym">scan_workspace</td><td class="size">282</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/digest.py">hybrid_verifier/digest.py</a></td><td>One format-digest call per task, cached for the scorer prompts.</td><td class="sym">ensure_digests</td><td class="size">175</td></tr>
@@ -443,7 +443,7 @@ workflow_dir/_verifier_tmp/hybrid_registry_&lt;key&gt;.json   claims, cached sco
 <footer>
 <p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>; all ten files of <code class="path">sources/evaluators/hybrid_verifier/</code> (grep and <code>wc -l</code> for this build); all six files of <code class="path">sources/evaluators/gold_feedback/</code>; <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>; <code class="path">sources/evaluators/base.py</code>; <code class="path">sources/evaluators/evaluator.py</code>; <code class="path">sources/core/evolution_engine.py</code> (lines 903-938); <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/workflow_selection.py</code> (grep); <code class="path">sources/core/workflow_runner.py</code> (grep + slices); <code>config.py</code>, <code>config_default.json</code>, <code>main.py</code> (grep); <code>AGENTS.md</code>.</p>
 <p class="skips">Skipped: <code>sources/evaluators/legacy_verifier/verifier*.py</code>, <code>generic/bs_detection.py</code>, <code>generic/generic.py</code>, <code>scenario/scenario.py</code>, <code>grounding.py</code> - deprecated or unrelated verifier channels, covered by <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>; <code>gold_feedback/format.py</code> message rules - covered by <a href="file_gold_format.html">file_gold_format.html</a>; <code class="path">experiments_verifiers/harness/e19b_extract.py</code> and friends - experiment harness the package only ports from, not on the runtime path; <code>.venv/</code>, <code>tmp/</code>, <code>datasets/</code>, <code>webui/</code> - out of scope for this page.</p>
-<p>Built at commit <code>4020790</code> + uncommitted working tree, 2026-09-28. The <code>gold</code> branch and <code class="path">sources/evaluators/gold_feedback/</code> are uncommitted; the hybrid package lines come from commit <code>4020790</code>.</p>
+<p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. The <code>gold</code> branch and <code class="path">sources/evaluators/gold_feedback/</code> are not in <code>4020790</code> (committed later as <code>ca72107</code>); the hybrid package lines come from commit <code>4020790</code>.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

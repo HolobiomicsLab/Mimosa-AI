@@ -6,7 +6,7 @@
 <title>Test coverage matrix - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview > tests > coverage matrix">
+<body data-crumb="Overview &gt; tests &gt; coverage matrix" data-built="ca72107+wt" data-built-date="2026-09-28">
 <div class="wrap">
 
 <h1 class="hud">Test coverage matrix</h1>
@@ -257,18 +257,18 @@
   <text class="edge-label" x="450" y="138" text-anchor="middle">imports and calls</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - the largest new test file (uncommitted) reaches 9 modules in 4 areas. Left: verifier and benchmark code; right: core and entry code. Box symbols come from its imports (<code>gold_feedback_test.py:26-40</code>) and local imports (<code>:227</code>, <code>:859</code>, <code>:1001</code>, <code>:1060</code>, <code>:1130</code>).</p>
+<p class="figcap">Diagram 2 - the largest new test file (ca72107) reaches 9 modules in 4 areas. Left: verifier and benchmark code; right: core and entry code. Box symbols come from its imports (<code>gold_feedback_test.py:26-40</code>) and local imports (<code>:227</code>, <code>:859</code>, <code>:1001</code>, <code>:1060</code>, <code>:1130</code>).</p>
 
 <details><summary>new or changed test files since 336fe19, with the symbols they name</summary><div class="dbody">
 <table>
 <thead><tr><th>Test file</th><th>State</th><th>Symbols named (grep-checked)</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">gold_feedback_test.py</a></td><td>new, uncommitted</td><td><code>GoldFeedbackEvaluator</code>, <code>CopyHandoff</code>, <code>gold_hybrid_config</code>, <code>oracle_reward</code>, <code>build_gold_gradient</code>, <code>grade_directory</code>, <code>_select_best_run</code>, <code>WorkflowSelector</code>, <code>warn_gold_feedback_mode</code></td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">gold_feedback_test.py</a></td><td>new in ca72107</td><td><code>GoldFeedbackEvaluator</code>, <code>CopyHandoff</code>, <code>gold_hybrid_config</code>, <code>oracle_reward</code>, <code>build_gold_gradient</code>, <code>grade_directory</code>, <code>_select_best_run</code>, <code>WorkflowSelector</code>, <code>warn_gold_feedback_mode</code></td></tr>
 <tr><td class="sym"><a href="../../tests/evolution_engine_selection_test.py">evolution_engine_selection_test.py</a></td><td>new in 4020790</td><td><code>_select_best_run</code>, <code>WorkflowInfo.reward_is_fallback</code>, <code>IndividualRun</code></td></tr>
 <tr><td class="sym"><a href="../../tests/csv_mode_run_notes_fallback_test.py">csv_mode_run_notes_fallback_test.py</a></td><td>new in 4020790</td><td><code>CsvEvaluationMode</code>, <code>IndividualRun</code></td></tr>
 <tr><td class="sym"><a href="../../tests/test_sandbox_provisioning_pins.py">test_sandbox_provisioning_pins.py</a></td><td>new in 4020790; old page row said 198 lines, now 259</td><td><code>ExecutionSandbox</code>, <code>PINNED_CONSTRAINTS</code>, <code>IMPORT_NAME_REMAP</code>, <code>SPECIAL_CASE_INSTALLS</code></td></tr>
 <tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">hybrid_verifier_test.py</a></td><td>changed, 1270 to 2514 lines</td><td><code>ExecutionGateLayer</code>, <code>GATE_CAPS</code>, <code>VisualEvidenceLayer</code>, <code>ClaimsEvidenceLayer</code>, <code>LayerContext</code>, <code>task_key</code>, <code>LLMConfig</code></td></tr>
-<tr><td class="sym"><a href="../../tests/config_roundtrip_test.py">config_roundtrip_test.py</a></td><td>changed, uncommitted, +4 lines</td><td><code>NOT_PERSISTED</code> adds <code>gold_feedback_task_row</code>, <code>gold_feedback_sab_loader</code></td></tr>
+<tr><td class="sym"><a href="../../tests/config_roundtrip_test.py">config_roundtrip_test.py</a></td><td>changed in ca72107, +4 lines</td><td><code>NOT_PERSISTED</code> adds <code>gold_feedback_task_row</code>, <code>gold_feedback_sab_loader</code></td></tr>
 </tbody>
 </table>
 <p>Six legacy verifier tests also changed by 1 to 8 lines since 336fe19 (<code>git diff --stat</code>); their line and test counts are unchanged.</p>
@@ -445,9 +445,9 @@ tests/judge_test.py:16      from sources.core.judge import WorkflowJudge</pre>
 <footer>
 <p>Sources read: <code class="path">AGENTS.md</code> (Testing section, lines 196-212); <code class="path">UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <code class="path">_clone.js</code>; all 47 <code class="path">tests/*.py</code> files (imports, path literals, <code>def test_*</code> names); <code class="path">sources/core/</code>, <code class="path">sources/utils/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/cli/</code>, <code class="path">sources/benchmark_evaluation/</code>, <code class="path">sources/transparency/</code>, <code class="path">sources/modules/</code> file listings; <code class="path">config.py</code>, <code class="path">main.py</code> symbol greps.</p>
 <p class="skips">Skipped: <code class="path">tests/__pycache__/</code> (46 compiled <code>.pyc</code> files; generated output, not source); test bodies (this page is a coverage matrix, not per-test text); <code>pytest.ini</code>/<code>pyproject.toml</code> collection settings are not repeated here (they live on <a href="area_entry_config.html">area_entry_config.html</a>); <code>datasets/</code> and <code class="path">sources/memory/</code> contents (Tier D / runtime data, on <a href="data_runs.html">data_runs.html</a>); the full pytest suite was not run; only <code>uv run pytest tests/gold_feedback_test.py -q</code> was run (49 passed).</p>
-<p>Built at <code>4020790</code> + uncommitted working tree, 2026-09-28 (previous build <code>336fe19</code>, 2026-09-26). Uncommitted at build time in <code>tests/</code>: new <code>gold_feedback_test.py</code>, changed <code>config_roundtrip_test.py</code> (<code>git status --short</code>), so line numbers may differ from a clean checkout of <code>4020790</code>.</p>
+<p>Built at <code>ca72107</code> + working tree, 2026-09-28 (previous build <code>336fe19</code>, 2026-09-26). At build time <code>tests/gold_feedback_test.py</code> (new) and <code>config_roundtrip_test.py</code> (changed) were uncommitted; commit <code>ca72107</code> then added both. <code>tests/hybrid_verifier_test.py</code> still has uncommitted edits.</p>
 <p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
-<p>Updated at <code>4020790</code> + uncommitted working tree, 2026-09-28: added <code>gold_feedback_test.py</code> (diagram 2) and <code>evolution_engine_selection_test.py</code>; re-counted lines and test functions for all 47 files; fixed stale <code>AGENTS.md</code> and path-loading line refs.</p>
+<p>Updated at <code>ca72107</code> + working tree, 2026-09-28: added <code>gold_feedback_test.py</code> (diagram 2) and <code>evolution_engine_selection_test.py</code>; re-counted lines and test functions for all 47 files; fixed stale <code>AGENTS.md</code> and path-loading line refs.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>
