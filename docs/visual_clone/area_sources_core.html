@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">sources/core</h1>
-<p class="intro">Twenty files hold the engine that synthesizes, selects and runs workflows. This page maps them; the seven <code>mod_core_*.html</code> pages hold the file cards. Every arrow below is a real import.</p>
+<p class="intro">Nineteen files hold the engine that synthesizes, selects and runs workflows. This page maps them; the seven <code>mod_core_*.html</code> pages hold the file cards. Every arrow below is a real import.</p>
 
 <div id="legend" data-auto></div>
 
@@ -36,7 +36,7 @@
     <title>The engine hub</title>
     <rect x="20" y="150" width="190" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="115" y="176" text-anchor="middle">evolution_engine.py</text>
-    <text class="box-sub" x="115" y="194" text-anchor="middle">1 109 lines, the hub</text>
+    <text class="box-sub" x="115" y="194" text-anchor="middle">1 236 lines, the hub</text>
     <text class="box-sub" x="115" y="212" text-anchor="middle">start_workflow_evolution</text>
   </a>
 
@@ -125,15 +125,15 @@
   <text class="edge-label" x="620" y="470">writes</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - eleven import edges out of the 20-file folder, grouped. Import lines: <code class="path">evolution_engine.py:36-42</code>, <code class="path">orchestrator.py:18-20</code>, <code class="path">planner.py:31-34</code>, <code class="path">selection.py:22</code>, <code class="path">code_features.py:7</code>, <code class="path">workflow_factory.py:12-16</code>, <code class="path">workflow_selection.py:9-11</code>, <code class="path">factory.py:13</code>, <code class="path">single_agent_factory.py:11-12</code>, <code class="path">variation_engine.py:12-14</code>.</p>
+<p class="figcap">Diagram 1 - eleven import edges out of the 19-file folder, grouped. Import lines: <code class="path">evolution_engine.py:37-43</code>, <code class="path">orchestrator.py:18-20</code>, <code class="path">planner.py:31-34</code>, <code class="path">selection.py:22</code>, <code class="path">code_features.py:7</code>, <code class="path">workflow_factory.py:12-16</code>, <code class="path">workflow_selection.py:9-11</code>, <code class="path">factory.py:13</code>, <code class="path">single_agent_factory.py:11-12</code>, <code class="path">variation_engine.py:12-14</code>.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
-<h2>All twenty files</h2>
+<h2>All nineteen files</h2>
 <table>
 <thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a></td><td>Runs the per-task generation loop.</td><td class="size">1 109</td><td class="sym">EvolutionEngine.start_workflow_evolution, evolve_generation</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a></td><td>Runs the per-task generation loop.</td><td class="size">1 236</td><td class="sym">EvolutionEngine.start_workflow_evolution, evolve_generation, _select_best_run</td></tr>
 <tr><td class="sym"><a href="../../sources/core/selection.py">selection.py</a></td><td>Scores candidates and picks parents.</td><td class="size">842</td><td class="sym">SelectionPressure, SelectionStrategy, select_parent</td></tr>
 <tr><td class="sym"><a href="../../sources/core/planner.py">planner.py</a></td><td>Turns a goal into an ordered task list.</td><td class="size">1 053</td><td class="sym">Planner, Plan, PlanStep</td></tr>
 <tr><td class="sym"><a href="../../sources/core/tools_manager.py">tools_manager.py</a></td><td>Finds MCP servers and their tools.</td><td class="size">679</td><td class="sym">ToolManager, MCP, Tool, normalize_mcp_endpoint</td></tr>
@@ -142,20 +142,20 @@
 <tr><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a></td><td>Mutates or crosses genotypes with the LLM.</td><td class="size">609</td><td class="sym">VariationEngine, seed_genome_prompt</td></tr>
 <tr><td class="sym"><a href="../../sources/core/workflow_factory.py">workflow_factory.py</a></td><td>Builds the workflow source and its state graph.</td><td class="size">514</td><td class="sym">WorkflowFactory</td></tr>
 <tr><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a></td><td>Grounds, generates and runs one round.</td><td class="size">427</td><td class="sym">WorkflowOrchestrator.orchestrate_workflow</td></tr>
-<tr><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a></td><td>Reads past workflows and offers parents.</td><td class="size">396</td><td class="sym">WorkflowSelector.select_parent_workflows</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a></td><td>Reads past workflows and offers parents; skips oracle runs.</td><td class="size">416</td><td class="sym">WorkflowSelector.select_parent_workflows, discover_workflows, _rehydrate_workflow_info</td></tr>
 <tr><td class="sym"><a href="../../sources/core/genotype_embedding.py">genotype_embedding.py</a></td><td>Embeds workflow code for novelty.</td><td class="size">329</td><td class="sym">GenotypeEmbedder, embed_genotype, load_sentence_transformer</td></tr>
 <tr><td class="sym"><a href="../../sources/core/single_agent_factory.py">single_agent_factory.py</a></td><td>Builds the one-agent baseline.</td><td class="size">315</td><td class="sym">SingleAgentFactory</td></tr>
-<tr><td class="sym"><a href="../../sources/core/workflow_info.py">workflow_info.py</a></td><td>Carries one workflow's identity and score.</td><td class="size">271</td><td class="sym">WorkflowInfo</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_info.py">workflow_info.py</a></td><td>Carries one workflow's identity and score.</td><td class="size">340</td><td class="sym">WorkflowInfo, FALLBACK_REWARD_KINDS, is_oracle_generation</td></tr>
 <tr><td class="sym"><a href="../../sources/core/factory.py">factory.py</a></td><td>Shared base: prompts, files, tools.</td><td class="size">207</td><td class="sym">Factory</td></tr>
 <tr><td class="sym"><a href="../../sources/core/failure_fingerprint.py">failure_fingerprint.py</a></td><td>Deprecated. Builds a failure vector from results.</td><td class="size">195</td><td class="sym">compute_failure_fingerprint</td></tr>
 <tr><td class="sym"><a href="../../sources/core/lineage.py">lineage.py</a></td><td>Writes and reads parent records.</td><td class="size">173</td><td class="sym">record_lineage, load_lineage, scan_all</td></tr>
-<tr><td class="sym"><a href="../../sources/core/schema.py">schema.py</a></td><td>Dataclasses shared with runners and the planner.</td><td class="size">163</td><td class="sym">Plan, PlanStep, Task, IndividualRun, SelectionLog</td></tr>
+<tr><td class="sym"><a href="../../sources/core/schema.py">schema.py</a></td><td>Dataclasses shared with runners and the planner.</td><td class="size">169</td><td class="sym">Plan, PlanStep, Task, IndividualRun, SelectionLog</td></tr>
 <tr><td class="sym"><a href="../../sources/core/__init__.py">__init__.py</a></td><td>Re-exports only.</td><td class="size">77</td><td class="sym">-</td></tr>
 <tr><td class="sym"><a href="../../sources/core/code_features.py">code_features.py</a></td><td>One descriptor vector per genotype.</td><td class="size">37</td><td class="sym">genotype_embedding_descriptor</td></tr>
-<tr><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a> (2)</td><td>Also rehydrates workflow info from disk.</td><td class="size">396</td><td class="sym">_rehydrate_workflow_info</td></tr>
 </tbody>
 </table>
-<p class="note say">Nineteen modules, <code>__init__.py</code> included; <code>__pycache__/</code> is not counted. <code>failure_fingerprint.py</code> says deprecated in its own docstring, but the deprecated <a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py:32</a> still imports it.</p>
+<p class="note say">Nineteen modules, <code>__init__.py</code> included, 8 911 lines in total (my computation, <code>wc -l</code>); <code>__pycache__/</code> is not counted. <code>failure_fingerprint.py</code> says deprecated in its own docstring, but the deprecated <a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py:32</a> still imports it.</p>
+<p class="note">Inbound edge: the gold verifier (ORACLE, <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>) imports <code>WorkflowInfo</code> and <code>is_oracle_generation</code> from <code class="path">sources/core/workflow_info.py</code> (<code class="path">sources/evaluators/gold_feedback/evaluator.py:30</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -177,9 +177,9 @@
 </div>
 
 <footer>
-<p>Sources: <code class="path">sources/core/*.py</code> (import lines, <code>wc -l</code>, top-level <code>class</code>/<code>def</code>), <code class="path">sources/evaluators/legacy_verifier/verifier.py</code>.</p>
+<p>Sources: <code class="path">sources/core/*.py</code> (import lines, <code>wc -l</code>, top-level <code>class</code>/<code>def</code>), <code class="path">sources/evaluators/legacy_verifier/verifier.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (import line only).</p>
 <p class="skips">Skipped: <code class="path">sources/core/__pycache__/</code> (bytecode); method bodies (owned by the seven L2 pages); the <code>__main__</code> smoke blocks. First write of this page failed inside the coordinator's worker, so the coordinator wrote it directly from the same evidence.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes in <code>sources/evaluators/</code>; <code>sources/core/*.py</code> is unmodified.</p>
+<p>Built at commit <code>4020790</code> + uncommitted working tree, 2026-09-28. Line counts re-derived with <code>wc -l sources/core/*.py</code>: changed since <code>336fe19</code> are <code>evolution_engine.py</code>, <code>workflow_info.py</code>, <code>workflow_selection.py</code>, <code>schema.py</code> and <code>variation_engine.py</code> (one-line change, same count). The duplicate <code>workflow_selection.py</code> row and the "twenty files" count were removed: the folder has 19 files.</p>
 <p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
 </footer>
 </div>

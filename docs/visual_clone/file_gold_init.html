@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gold_feedback/__init__.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; __init__.py">
+<div class="wrap">
+
+<h1 class="hud">__init__.py</h1>
+<p class="intro">This 29-line file is the front door of the <a href="mod_evaluators_gold_feedback.html">gold_feedback</a> package: an 18-line docstring, three import lines and a 4-name <code>__all__</code>. Every importer in <code>sources/</code> imports it lazily, inside a function or a branch, so non-gold runs never load it. Importing it also loads <a href="../../sources/evaluators/gold_feedback/evaluator.py">evaluator.py</a> and, through it, <code>grader.py</code>, <code>reward.py</code> and <code>snapshot_grading.py</code>.</p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip warn">uncommitted at 4020790</span></p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what the file does: run the docstring, import three submodules, publish four names</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1080 420" role="img" aria-label="gold_feedback __init__.py: importers trigger the body, which imports three submodules and lists four names">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="i1" href="file_eval_evaluator.html">
+    <title>sources/evaluators/evaluator.py L101: from .gold_feedback import GoldFeedbackEvaluator, inside the verifier_kind == gold branch</title>
+    <rect x="20" y="40" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="64" text-anchor="middle">facade (lazy)</text>
+    <text class="box-sub" x="120" y="82" text-anchor="middle">evaluators/evaluator.py L101</text>
+    <text class="box-sub" x="120" y="100" text-anchor="middle">GoldFeedbackEvaluator</text>
+  </a>
+  <a class="box" id="i2" href="area_entry_config.html">
+    <title>main.py L198 and csv_mode.py L502, L983, L1681 import LEAK_WARNING inside functions</title>
+    <rect x="20" y="150" width="200" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="172" text-anchor="middle">warning users (lazy)</text>
+    <text class="box-sub" x="120" y="190" text-anchor="middle">main.py L198</text>
+    <text class="box-sub" x="120" y="208" text-anchor="middle">csv_mode.py L502 L983 L1681</text>
+    <text class="box-sub" x="120" y="226" text-anchor="middle">LEAK_WARNING</text>
+  </a>
+  <a class="box" id="i3" href="area_tests.html">
+    <title>tests/gold_feedback_test.py L33-L40 imports the package, the format submodule and reward.oracle_reward</title>
+    <rect x="20" y="280" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="304" text-anchor="middle">tests</text>
+    <text class="box-sub" x="120" y="322" text-anchor="middle">gold_feedback_test.py</text>
+    <text class="box-sub" x="120" y="340" text-anchor="middle">L33&#8211;L40</text>
+  </a>
+  <a class="box" id="i4" href="../../sources/evaluators/gold_feedback/__init__.py">
+    <title>Docstring L1-L18: what gold mode does, the leak statement, the module list</title>
+    <rect x="280" y="40" width="220" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="390" y="71" text-anchor="middle">package docstring</text>
+    <text class="box-sub" x="390" y="89" text-anchor="middle">gold mode &#183; L1&#8211;L10</text>
+    <text class="box-sub" x="390" y="107" text-anchor="middle">module list &#183; L12&#8211;L17</text>
+  </a>
+  <a class="box" id="i5" href="file_gold_evaluator.html">
+    <title>Line 20: from .evaluator import GoldFeedbackEvaluator</title>
+    <rect x="570" y="30" width="220" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="680" y="56" text-anchor="middle">evaluator.py</text>
+    <text class="box-sub" x="680" y="74" text-anchor="middle">GoldFeedbackEvaluator &#183; L20</text>
+  </a>
+  <a class="box" id="i6" href="file_gold_format.html">
+    <title>Line 21: from .format import MAX_GRADIENT_CHARS, build_gold_gradient</title>
+    <rect x="570" y="120" width="220" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="680" y="146" text-anchor="middle">format.py</text>
+    <text class="box-sub" x="680" y="164" text-anchor="middle">2 names &#183; L21</text>
+  </a>
+  <a class="box" id="i7" href="file_gold_leak.html">
+    <title>Line 22: from .leak import LEAK_WARNING</title>
+    <rect x="570" y="210" width="220" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="680" y="236" text-anchor="middle">leak.py</text>
+    <text class="box-sub" x="680" y="254" text-anchor="middle">LEAK_WARNING &#183; L22</text>
+  </a>
+  <a class="box" id="i8" href="file_gold_grader.html">
+    <title>evaluator.py imports grader.py, which imports snapshot_grading.grade_directory, which imports CapsuleEvaluator</title>
+    <rect x="850" y="20" width="210" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="955" y="42" text-anchor="middle">loaded with evaluator.py</text>
+    <text class="box-sub" x="955" y="60" text-anchor="middle">grader.py, reward.py</text>
+    <text class="box-sub" x="955" y="78" text-anchor="middle">snapshot_grading.py</text>
+    <text class="box-sub" x="955" y="96" text-anchor="middle">capsule_evaluator.py</text>
+  </a>
+  <a class="box" id="i9" href="../../sources/evaluators/gold_feedback/__init__.py">
+    <title>__all__ at L24-L29 lists 4 names</title>
+    <rect x="570" y="310" width="220" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="680" y="331" text-anchor="middle">__all__</text>
+    <text class="box-sub" x="680" y="349" text-anchor="middle">4 names &#183; L24&#8211;L29</text>
+    <text class="box-sub" x="680" y="367" text-anchor="middle">no logic</text>
+  </a>
+  <g class="box" id="i10">
+    <title>The names importers receive; the five submodules stay importable too</title>
+    <rect x="850" y="310" width="210" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="955" y="331" text-anchor="middle">package namespace</text>
+    <text class="box-sub" x="955" y="349" text-anchor="middle">4 names bound</text>
+    <text class="box-sub" x="955" y="367" text-anchor="middle">submodules importable</text>
+  </g>
+
+  <path class="edge dotted-edge" data-from="i1" data-to="i4" d="M220,78 C250,78 250,70 280,70" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="250" y="32" text-anchor="middle">executes body</text>
+  <path class="edge dotted-edge" data-from="i2" data-to="i4" d="M220,195 C250,195 250,100 280,100" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="i3" data-to="i4" d="M220,318 C255,318 255,118 280,118" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="i4" data-to="i5" d="M500,60 H570" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="535" y="52" text-anchor="middle">imports</text>
+  <path class="edge dotted-edge" data-from="i4" data-to="i6" d="M500,95 C535,95 535,151 570,151" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="i4" data-to="i7" d="M500,120 C530,120 530,241 570,241" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="i5" data-to="i8" d="M790,61 H850" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="820" y="54" text-anchor="middle">imports</text>
+  <path class="edge" data-from="i7" data-to="i9" d="M680,272 V310" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="690" y="296" text-anchor="start">3 imports, 4 names</text>
+  <path class="edge" data-from="i9" data-to="i10" d="M790,345 H850" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="820" y="337" text-anchor="middle">exports</text>
+  <text class="box-sub" x="20" y="392">dotted grey = import only &#183; mint = binds a name &#183; grey dashed = outside the file</text>
+  <text class="box-sub" x="20" y="410">no def, no class, no if, no for in the file</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. The docstring module list (L12&ndash;L17) names five submodules; the file imports from three (<code>evaluator</code>, <code>format</code>, <code>leak</code>). <code>grader</code> and <code>reward</code> load only because <code>evaluator.py</code> imports them (L34&ndash;L42).</p>
+<p class="note say">No control-flow diagram on this page: the file has no <code>if</code>, no loop, no function and no class.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">evaluator.GoldFeedbackEvaluator</td><td>import from .evaluator</td><td>the oracle verifier class</td><td class="size">L20</td></tr>
+<tr><td>reads</td><td class="sym">format.MAX_GRADIENT_CHARS, build_gold_gradient</td><td>import from .format</td><td>gradient cap (2000) and builder</td><td class="size">L21</td></tr>
+<tr><td>reads</td><td class="sym">leak.LEAK_WARNING</td><td>import from .leak</td><td>the shared warning text</td><td class="size">L22</td></tr>
+<tr><td>reads</td><td class="sym">config</td><td>none in this file</td><td>fields are read by <code>GoldFeedbackEvaluator.__init__</code></td><td class="size">&#8212;</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td>no file handle, no logger, no print</td><td>the file only binds names</td><td class="size">&#8212;</td></tr>
+<tr><td>exposes</td><td class="sym">__all__</td><td>module attribute</td><td>4 public names</td><td class="size">L24&#8211;L29</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>0 classes, 0 functions, 3 imports, 4 exported names &mdash; every line of code</summary><div class="dbody">
+<pre>from .evaluator import GoldFeedbackEvaluator                 L20
+from .format import MAX_GRADIENT_CHARS, build_gold_gradient  L21
+from .leak import LEAK_WARNING                               L22
+
+__all__ = [                                                  L24
+    "GoldFeedbackEvaluator",                                 L25
+    "LEAK_WARNING",                                          L26
+    "MAX_GRADIENT_CHARS",                                    L27
+    "build_gold_gradient",                                   L28
+]                                                            L29</pre>
+<table>
+<thead><tr><th>Name</th><th>Home</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td class="sym">GoldFeedbackEvaluator</td><td class="sym"><a href="file_gold_evaluator.html">evaluator.py</a></td><td>verifier chosen by <code>verifier_kind = "gold"</code></td></tr>
+<tr><td class="sym">LEAK_WARNING</td><td class="sym"><a href="file_gold_leak.html">leak.py</a></td><td>warning text for logs, stamps, banners</td></tr>
+<tr><td class="sym">MAX_GRADIENT_CHARS</td><td class="sym"><a href="file_gold_format.html">format.py</a></td><td>gradient length cap, 2000</td></tr>
+<tr><td class="sym">build_gold_gradient</td><td class="sym"><a href="file_gold_format.html">format.py</a></td><td>grade dict to gradient text</td></tr>
+</tbody>
+</table>
+<p>Docstring sections: purpose and leak statement L1&ndash;L10, module list L12&ndash;L17. <code>MAX_GRADIENT_CHARS</code> and <code>build_gold_gradient</code> are imported from the package only by <code>tests/gold_feedback_test.py</code>; production code calls <code>fmt.build_gold_gradient</code> through the submodule (<code>evaluator.py</code> L306).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td><code>from .gold_feedback import GoldFeedbackEvaluator</code> inside the <code>verifier_kind == "gold"</code> branch</td><td class="sym">L101</td></tr>
+<tr><td class="sym"><a href="../../main.py">main.py</a></td><td><code>LEAK_WARNING</code> inside <code>warn_gold_feedback_mode</code></td><td class="sym">L198</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/csv_mode.py">csv_mode.py</a></td><td><code>LEAK_WARNING</code> in <code>_save_run_notes</code>, <code>_stamp_gold_capsule_results</code>, <code>_print_final_summary</code></td><td class="sym">L502, L983, L1681</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">tests/gold_feedback_test.py</a></td><td>the 4 package names, plus the <code>format</code> submodule and <code>reward.oracle_reward</code></td><td class="sym">L33&#8211;L40</td></tr>
+</tbody>
+</table>
+<p>Grep for <code>gold_feedback import</code> over <code>sources/</code>, <code>main.py</code>, <code>config.py</code>, <code>tests/</code> and <code>experiments_verifiers/</code> finds no other importer. See also <a href="file_gold_evaluator.html">file_gold_evaluator.html</a>, <a href="file_hybrid_init.html">file_hybrid_init.html</a> (the hybrid twin) and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/gold_feedback/__init__.py</code> (29 lines, whole file), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (import block L30&ndash;L42, L306), <code class="path">sources/evaluators/evaluator.py</code> (L97&ndash;L105), <code class="path">main.py</code> (L186&ndash;L208), <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (gold lines), <code class="path">tests/gold_feedback_test.py</code> (L26&ndash;L40); repo-wide grep for importers.</p>
+<p class="skips">Skipped: bodies of the five submodules &mdash; each has its own digest page; no pytest run and no script executed, by the build rules.</p>
+<p>Built at <code>4020790 + uncommitted working tree, 2026-09-28</code>. The file is untracked (uncommitted) at this build.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

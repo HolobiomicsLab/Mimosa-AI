@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>leak.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; leak.py">
+<div class="wrap">
+
+<h1 class="hud">leak.py</h1>
+<p class="intro">This 29-line file holds the leakage warning <code>LEAK_WARNING</code> and <code>leak_banner</code>, which frames it between two lines of 78 <code>!</code>. Every gold-mode artifact carries this text, so a run that used the benchmark gold is never read as an honest Mimosa score. It has no logic and no I/O.</p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new, uncommitted</span></p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; one string, three importers, six places where it lands</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 400" role="img" aria-label="leak.py: LEAK_WARNING and leak_banner are imported by main.py, the gold evaluator and csv_mode, which print it to the console and write it into state_result.json, gold_feedback.json, evaluation.txt, the run notes and the capsule evaluation_results.json">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="l1" href="../../sources/evaluators/gold_feedback/leak.py">
+    <title>Module constant: the one leakage warning string, reused everywhere</title>
+    <rect x="300" y="20" width="240" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="420" y="44" text-anchor="middle">LEAK_WARNING</text>
+    <text class="box-sub" x="420" y="62" text-anchor="middle">L11 &#183; str constant</text>
+    <text class="box-sub" x="420" y="80" text-anchor="middle">ORACLE / BENCHMARK-LEAKING</text>
+    <text class="box-sub" x="420" y="98" text-anchor="middle">never report VER/SR/CBS</text>
+    <text class="box-sub" x="532" y="33" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <a class="box" id="l2" href="../../sources/evaluators/gold_feedback/leak.py">
+    <title>Frames LEAK_WARNING between two rule lines of ! characters</title>
+    <rect x="600" y="20" width="240" height="86" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="720" y="44" text-anchor="middle">leak_banner</text>
+    <text class="box-sub" x="720" y="62" text-anchor="middle">L19 &#183; width = 78</text>
+    <text class="box-sub" x="720" y="80" text-anchor="middle">rule + warning + rule L28-L29</text>
+    <text class="box-sub" x="832" y="33" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <a class="box" id="l3" href="area_entry_config.html">
+    <title>warn_gold_feedback_mode prints the warning when verifier_kind is gold</title>
+    <rect x="20" y="160" width="240" height="96" rx="2" fill="rgba(230,251,255,0.06)" stroke="#E6FBFF"/>
+    <text class="box-label" x="140" y="184" text-anchor="middle">main.py</text>
+    <text class="box-sub" x="140" y="202" text-anchor="middle">warn_gold_feedback_mode L186</text>
+    <text class="box-sub" x="140" y="220" text-anchor="middle">import L198 &#183; print L200</text>
+    <text class="box-sub" x="140" y="238" text-anchor="middle">called L448</text>
+  </a>
+  <a class="box" id="l4" href="file_gold_evaluator.html">
+    <title>GoldFeedbackEvaluator logs and stores the warning in every artifact of a generation</title>
+    <rect x="330" y="160" width="420" height="96" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="540" y="184" text-anchor="middle">GoldFeedbackEvaluator (evaluator.py)</text>
+    <text class="box-sub" x="540" y="202" text-anchor="middle">import L41 &#183; log banner L137 &#183; log L168</text>
+    <text class="box-sub" x="540" y="220" text-anchor="middle">block L339 &#183; gold_oracle L415</text>
+    <text class="box-sub" x="540" y="238" text-anchor="middle">sidecar L435 &#183; evaluation.txt L451</text>
+    <text class="box-sub" x="742" y="173" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <a class="box" id="l5" href="area_benchmark_evaluation.html">
+    <title>CsvEvaluationMode stamps run notes and capsule results and prints the warning</title>
+    <rect x="820" y="160" width="260" height="96" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="950" y="184" text-anchor="middle">csv_mode.py</text>
+    <text class="box-sub" x="950" y="202" text-anchor="middle">_save_run_notes L502-L510</text>
+    <text class="box-sub" x="950" y="220" text-anchor="middle">_stamp_gold_capsule_results L973</text>
+    <text class="box-sub" x="950" y="238" text-anchor="middle">_print_final_summary L1681</text>
+  </a>
+  <g class="box" id="l6">
+    <title>Console output through print_warn</title>
+    <rect x="20" y="310" width="240" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="140" y="334" text-anchor="middle">console</text>
+    <text class="box-sub" x="140" y="352" text-anchor="middle">print_warn L200</text>
+    <text class="box-sub" x="140" y="370" text-anchor="middle">(csv_mode L510 L1683)</text>
+  </g>
+  <g class="box" id="l7">
+    <title>state_result.json: evaluation.verifier.gold_feedback_warning and evaluation.gold_oracle.warning</title>
+    <rect x="300" y="310" width="160" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="380" y="334" text-anchor="middle">state_result.json</text>
+    <text class="box-sub" x="380" y="352" text-anchor="middle">2 warning keys</text>
+  </g>
+  <g class="box" id="l8">
+    <title>Per-generation sidecar with the warning and the grade</title>
+    <rect x="470" y="310" width="150" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="545" y="334" text-anchor="middle">gold_feedback.json</text>
+    <text class="box-sub" x="545" y="352" text-anchor="middle">key warning</text>
+  </g>
+  <g class="box" id="l9">
+    <title>Banner at the top of evaluation.txt, above the unchanged hybrid report</title>
+    <rect x="630" y="310" width="160" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="710" y="334" text-anchor="middle">evaluation.txt</text>
+    <text class="box-sub" x="710" y="352" text-anchor="middle">leak_banner header</text>
+  </g>
+  <g class="box" id="l10">
+    <title>Run-note JSON: benchmark_leak_warning key</title>
+    <rect x="820" y="310" width="125" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="882.5" y="334" text-anchor="middle">run notes</text>
+    <text class="box-sub" x="882.5" y="352" text-anchor="middle">benchmark_leak_</text>
+    <text class="box-sub" x="882.5" y="370" text-anchor="middle">warning L509</text>
+  </g>
+  <g class="box" id="l11">
+    <title>Capsule evaluation_results.json: benchmark_leak_warning key; VER/SR/CBS unchanged</title>
+    <rect x="955" y="310" width="125" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="1017.5" y="334" text-anchor="middle">capsule results</text>
+    <text class="box-sub" x="1017.5" y="352" text-anchor="middle">evaluation_</text>
+    <text class="box-sub" x="1017.5" y="370" text-anchor="middle">results.json L993</text>
+  </g>
+  <path class="edge" data-from="l2" data-to="l1" d="M600,63 H540" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="570" y="55" text-anchor="middle">uses</text>
+  <path class="edge dotted-edge" data-from="l3" data-to="l1" d="M140,160 C140,120 250,63 300,63" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="200" y="110" text-anchor="middle">imports</text>
+  <path class="edge dotted-edge" data-from="l4" data-to="l1" d="M450,160 V106" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dotted-edge" data-from="l4" data-to="l2" d="M650,160 V106" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dotted-edge" data-from="l5" data-to="l1" d="M950,160 C950,120 560,130 420,106" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="760" y="128" text-anchor="middle">via package __init__</text>
+  <path class="edge dashed-edge" data-from="l3" data-to="l6" d="M140,256 V310" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="154" y="288" text-anchor="start">prints</text>
+  <path class="edge dashed-edge" data-from="l4" data-to="l7" d="M380,256 V310" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dashed-edge" data-from="l4" data-to="l8" d="M545,256 V310" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="559" y="288" text-anchor="start">writes</text>
+  <path class="edge dashed-edge" data-from="l4" data-to="l9" d="M710,256 V310" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dashed-edge" data-from="l5" data-to="l10" d="M882,256 V310" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dashed-edge" data-from="l5" data-to="l11" d="M1017,256 V310" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="1030" y="288" text-anchor="start">writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; dotted = import only, dashed = writes. <code>csv_mode.py</code> and <code>main.py</code> import <code>LEAK_WARNING</code> lazily from the package <code>sources.evaluators.gold_feedback</code> (re-export at <code>__init__.py</code> L22); only <code>evaluator.py</code> imports <code>.leak</code> directly and is the only user of <code>leak_banner</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; where the banner sits: the top of evaluation.txt</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 370" role="img" aria-label="evaluation.txt layout in gold mode: leak banner, summary line, optional reason and grader lines, the report marker, then the unchanged hybrid report">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="v1" href="../../sources/evaluators/gold_feedback/leak.py">
+    <title>leak_banner(): 78 ! characters, the warning, 78 ! characters</title>
+    <rect x="20" y="20" width="520" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="280" y="44" text-anchor="middle">leak_banner() output</text>
+    <text class="box-sub" x="280" y="62" text-anchor="middle">&quot;!&quot; x 78 &#183; LEAK_WARNING &#183; &quot;!&quot; x 78</text>
+    <text class="box-sub" x="532" y="33" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <g class="box" id="v2">
+    <title>Summary line written by the evaluator</title>
+    <rect x="20" y="96" width="520" height="50" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="280" y="120" text-anchor="middle">Gold feedback: status line</text>
+    <text class="box-sub" x="280" y="138" text-anchor="middle">evaluator.py L452-L455</text>
+  </g>
+  <g class="box" id="v3">
+    <title>Optional lines: the reason, then VER SR CBS when a grade exists</title>
+    <rect x="20" y="166" width="520" height="50" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="280" y="190" text-anchor="middle">Reason &#183; Grader lines</text>
+    <text class="box-sub" x="280" y="208" text-anchor="middle">L456 &#183; L458-L462</text>
+  </g>
+  <g class="box" id="v4">
+    <title>Marker; a re-evaluation strips the old banner up to it instead of stacking</title>
+    <rect x="20" y="236" width="520" height="50" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="280" y="260" text-anchor="middle">_REPORT_MARKER line</text>
+    <text class="box-sub" x="280" y="278" text-anchor="middle">hybrid report (unchanged) L52 &#183; split L446</text>
+  </g>
+  <g class="box" id="v5">
+    <title>The hybrid verifier report, kept as written</title>
+    <rect x="20" y="306" width="520" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="280" y="330" text-anchor="middle">hybrid report body</text>
+    <text class="box-sub" x="280" y="348" text-anchor="middle">previous text L443-L445</text>
+  </g>
+  <path class="edge dashed-edge" data-from="v1" data-to="v2" d="M280,76 V96" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dashed-edge" data-from="v2" data-to="v3" d="M280,146 V166" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dashed-edge" data-from="v3" data-to="v4" d="M280,216 V236" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dashed-edge" data-from="v4" data-to="v5" d="M280,286 V306" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="box-sub" x="580" y="40">top to bottom = line order in evaluation.txt</text>
+  <text class="box-sub" x="580" y="62">written by GoldFeedbackEvaluator._persist (evaluator.py L403)</text>
+  <text class="box-sub" x="580" y="84">test: banner appears once after 2 evaluations</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the layout is built in <code>evaluator.py::GoldFeedbackEvaluator._persist</code>, L450&#8211;L466; this file only supplies the first block. <code>test_evaluation_banner_not_stacked_on_reevaluation</code> checks <code>LEAK_WARNING</code> appears once.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>defines</td><td class="sym">LEAK_WARNING</td><td>module constant, 4 joined literals</td><td>the single warning text</td><td class="size">L11&#8211;L16</td></tr>
+<tr><td>reads</td><td class="sym">width</td><td>leak_banner argument, default 78</td><td>length of the ! rule lines</td><td class="size">L19 L28</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no config import</td><td>callers check verifier_kind</td><td class="size">&#8212;</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td>no I/O here</td><td>callers write it (Diagram 1)</td><td class="size">&#8212;</td></tr>
+<tr><td>returns</td><td class="sym">str</td><td>leak_banner</td><td>rule, warning, rule; no trailing newline</td><td class="size">L29</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: this string is the only marker that tells a reader a run used the benchmark gold, so each gold artifact must carry it.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Symbol inventory</h2>
+<details><summary>1 constant, 1 function &mdash; signatures and the warning text</summary><div class="dbody">
+<pre>LEAK_WARNING: str                     L11
+leak_banner(width: int = 78) -&gt; str   L19   f"{rule}\n{LEAK_WARNING}\n{rule}", rule = "!" * width</pre>
+<p>Text of <code>LEAK_WARNING</code> (L12&#8211;L15, joined): <code>ORACLE / BENCHMARK-LEAKING MODE (verifier_kind=gold): the benchmark grader's verdict against the gold reference is fed back into evolution. Results of this run are contaminated by the benchmark and must NEVER be reported as Mimosa benchmark scores (VER/SR/CBS).</code></p>
+<p>Imports: <code>from __future__ import annotations</code> only.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_gold_evaluator.html">gold_feedback/evaluator.py</a></td><td>imports both; 2 log lines, 3 stored keys, 1 banner</td><td class="sym">L41 L137 L168 L339 L415 L435 L451</td></tr>
+<tr><td class="sym"><a href="file_gold_init.html">gold_feedback/__init__.py</a></td><td>re-exports <code>LEAK_WARNING</code></td><td class="sym">L22</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/csv_mode.py">benchmark_evaluation/csv_mode.py</a></td><td>run notes, capsule results, final summary</td><td class="sym">L502 L983 L1681</td></tr>
+<tr><td class="sym"><a href="../../main.py">main.py</a></td><td><code>warn_gold_feedback_mode</code> prints it at start</td><td class="sym">L186 L198 L448</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Test in tests/gold_feedback_test.py</th><th>What it checks</th><th>Path</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_gradient_only_keeps_hybrid_reward_and_swaps_gradient</a></td><td>evaluation.txt starts with !!!; block and sidecar keys</td><td>via evaluator</td><td class="size">L378</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_no_task_context_falls_back_to_hybrid_gradient</a></td><td>warning in the log</td><td>via evaluator</td><td class="size">L486</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_evaluation_banner_not_stacked_on_reevaluation</a></td><td>banner once after 2 evaluations</td><td>via evaluator</td><td class="size">L990</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_capsule_results_get_leak_markers</a></td><td>capsule JSON gets benchmark_leak_warning</td><td>via csv_mode</td><td class="size">L1041</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_cli_accepts_gold_and_reward_flag</a></td><td>warn_gold_feedback_mode returns True for gold</td><td>via main.py</td><td class="size">L226</td></tr>
+</tbody>
+</table>
+<p class="note">Not tested: the run-note stamp in <code>_save_run_notes</code> (L499&#8211;L510); no test names <code>leak_banner</code> directly.</p>
+<p>See also: <a href="mod_evaluators_gold_feedback.html">gold_feedback package page</a>, <a href="file_gold_grader.html">file_gold_grader.html</a>, <a href="file_gold_format.html">file_gold_format.html</a>, <a href="file_gold_reward.html">file_gold_reward.html</a>, <a href="data_runs.html">data_runs.html</a> (run notes and capsules) and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/gold_feedback/leak.py</code> (29 lines, whole file), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (L41, L52, L137, L168, L339, L403&#8211;L466), <code class="path">sources/evaluators/gold_feedback/__init__.py</code> (L22), <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (L499&#8211;L510, L973&#8211;L998, L1681&#8211;L1683), <code class="path">main.py</code> (L186&#8211;L205, L448), <code class="path">tests/gold_feedback_test.py</code> (test names by grep). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the <code>print_warn</code> helper internals (console styling, covered by <a href="area_cli.html">area_cli.html</a>); secret files were not opened; no pytest run, by the build rules. The file is new and uncommitted.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

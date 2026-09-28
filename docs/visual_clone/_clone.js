@@ -1,7 +1,8 @@
 
 /* Mimosa-AI visual clone - shared behaviour. Offline, no dependencies. */
 (function () {
-  var BUILD = { commit: "7e8463b", date: "2026-10-02" };
+  /* default stamp; a page overrides it with <body data-built="..." data-built-date="..."> (set from _manifest.json) */
+  var BUILD = { commit: "4020790+wt", date: "2026-09-28" };
 
   /* ---------- top bar ---------- */
   function topbar() {
@@ -13,7 +14,8 @@
     var parts = crumb.split(">");
     var html = '<div class="tb"><a class="menu" href="index.html">Menu</a>'
       + '<span class="crumb">' + parts.join(" \u203a ") + "</span>"
-      + '<span class="built">built <b>' + BUILD.commit + "</b> \u00b7 " + BUILD.date + "</span></div>";
+      + '<span class="built">built <b>' + (b.getAttribute("data-built") || BUILD.commit) + "</b> \u00b7 "
+      + (b.getAttribute("data-built-date") || BUILD.date) + "</span></div>";
     bar.innerHTML = html;
     document.body.insertBefore(bar, document.body.firstChild);
   }

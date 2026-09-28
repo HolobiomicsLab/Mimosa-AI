@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">Entry point and configuration</h1>
-<p class="intro">The shell calls <code>main.py::cli_main</code>, which parses 37 flags and dispatches to one of eight modes. <code>config.py::Config</code> holds every default, then reads a JSON file and applies CLI overrides. This page covers the six files of the entry and config area.</p>
+<p class="intro">The shell calls <code>main.py::cli_main</code>, which parses 41 flags and dispatches to one of eight modes. <code>config.py::Config</code> holds every default, then reads a JSON file and applies CLI overrides. This page covers the six files of the entry and config area, plus the <code>verifier_kind</code> choice (hybrid, legacy, gold).</p>
 
 <div id="legend" data-auto></div>
 
@@ -55,11 +55,18 @@
     <text class="box-sub" x="129" y="259" text-anchor="middle">parse, load, precheck</text>
   </a>
 
+  <a class="box" id="b5" href="#verifier-kind">
+    <title>Runs after the three early returns; prints LEAK_WARNING only when verifier_kind is gold</title>
+    <rect x="24" y="300" width="210" height="50" rx="20" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="129" y="319" text-anchor="middle">warn_gold_feedback_mode()</text>
+    <text class="box-sub" x="129" y="336" text-anchor="middle">ORACLE - prints leak warning</text>
+  </a>
+
   <a class="box" id="b4" href="#modes">
     <title>The if / elif chain that picks one mode</title>
-    <rect x="24" y="340" width="210" height="46" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
-    <text class="box-label" x="129" y="359" text-anchor="middle">mode dispatch</text>
-    <text class="box-sub" x="129" y="375" text-anchor="middle">if / elif chain</text>
+    <rect x="24" y="390" width="210" height="46" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="129" y="409" text-anchor="middle">mode dispatch</text>
+    <text class="box-sub" x="129" y="425" text-anchor="middle">if / elif chain</text>
   </a>
 
   <a class="box" id="r1" href="area_cli.html">
@@ -116,16 +123,18 @@
   <text class="edge-label" x="137" y="116">argv</text>
   <path class="edge" data-from="b2" data-to="b3" d="M129,180 V224" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwI)"/>
   <text class="edge-label" x="137" y="206">calls main()</text>
-  <path class="edge" data-from="b3" data-to="b4" d="M129,270 V340" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwI)"/>
-  <text class="edge-label" x="137" y="308">flags + config</text>
+  <path class="edge" data-from="b3" data-to="b5" d="M129,270 V300" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwI)"/>
+  <text class="edge-label" x="137" y="289">after overrides</text>
+  <path class="edge" data-from="b5" data-to="b4" d="M129,350 V390" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwI)"/>
+  <text class="edge-label" x="137" y="374">flags + config</text>
 
-  <path class="edge" data-from="b4" data-to="r1" d="M234,363 H400 V40 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="b4" data-to="r1" d="M234,413 H400 V40 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <path class="edge" data-from="b4" data-to="r2" d="M400,102 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <path class="edge" data-from="b4" data-to="r3" d="M400,164 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <path class="edge" data-from="b4" data-to="r4" d="M400,226 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwS)"/>
   <path class="edge" data-from="b4" data-to="r5" d="M400,288 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwS)"/>
   <path class="edge" data-from="b4" data-to="r6" d="M400,351 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <path class="edge" data-from="b4" data-to="r7" d="M400,363 V416 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwS)"/>
+  <path class="edge" data-from="b4" data-to="r7" d="M400,413 V416 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwS)"/>
 
   <text class="edge-label" x="406" y="34">--evaluation_cli</text>
   <text class="edge-label" x="406" y="96">--memory_cli</text>
@@ -136,14 +145,14 @@
   <text class="edge-label" x="406" y="410">--workflow_eval_mode</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - <code>main.py::cli_main</code> to <code>main.py::main</code> to the eight mode branches (three return before the dispatch chain). Solid = call; ice white = entry/config, cyan = <code>sources/core</code>, steel = other areas.</p>
+<p class="figcap">Diagram 1 - <code>main.py::cli_main</code> to <code>main.py::main</code> to the eight mode branches. The three interactive branches return before <code>main.py::apply_config_overrides</code> and <code>main.py::warn_gold_feedback_mode</code>. Solid = call; ice white = entry/config, cyan = <code>sources/core</code>, steel = other areas.</p>
 
 <table>
 <thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../main.py">main.py</a></td><td>Parses flags and dispatches to one mode.</td><td class="size">423</td><td class="sym">cli_main, main, apply_config_overrides</td></tr>
-<tr><td class="sym"><a href="../../config.py">config.py</a></td><td>Holds every default field and loads JSON.</td><td class="size">722</td><td class="sym">Config, AddressMCP</td></tr>
-<tr><td class="sym"><a href="../../config_default.json">config_default.json</a></td><td>Template config to copy and edit.</td><td class="size">111</td><td class="sym">56 top-level keys</td></tr>
+<tr><td class="sym"><a href="../../main.py">main.py</a></td><td>Parses flags and dispatches to one mode.</td><td class="size">486</td><td class="sym">cli_main, main, apply_config_overrides, warn_gold_feedback_mode</td></tr>
+<tr><td class="sym"><a href="../../config.py">config.py</a></td><td>Holds every default field and loads JSON.</td><td class="size">794</td><td class="sym">Config, AddressMCP, _json_bool</td></tr>
+<tr><td class="sym"><a href="../../config_default.json">config_default.json</a></td><td>Local template config; not tracked by git.</td><td class="size">113</td><td class="sym">58 top-level keys</td></tr>
 <tr><td class="sym"><a href="../../auto-install.sh">auto-install.sh</a></td><td>Installs deps, starts Toolomics and Perspicacite.</td><td class="size">411</td><td class="sym">6 numbered steps</td></tr>
 <tr><td class="sym"><a href="../../cleanup.sh">cleanup.sh</a></td><td>Empties <code>tmp/</code> and <code>sources/workflows</code>.</td><td class="size">32</td><td class="sym">clean_directory</td></tr>
 <tr><td class="sym"><a href="../../workflow_evolution_anim.py">workflow_evolution_anim.py</a></td><td>Pygame replay of the evolution tree and memory.</td><td class="size">1852</td><td class="sym">App, load_all, main</td></tr>
@@ -173,12 +182,13 @@
 </table>
 
 <p class="note">Amber note: <code>--evaluation_cli</code>, <code>--memory_cli</code> and the no-flag wizard return before <code>apply_config_overrides</code>, so flags such as <code>--runner_default_timeout</code> do nothing there.</p>
-<p class="note flag">Red note: <code class="path">docs/reference/cli.md</code> lists 35 of the 37 flags; <code>--hybrid_verifier_reward</code> and <code>--planner_human_approve</code> are missing (checked with grep at this commit).</p>
+<p class="note flag">Red note: <code class="path">docs/reference/cli.md</code> (working tree) lists 37 of the 41 flags; <code>--hybrid_verifier_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code> and <code>--planner_human_approve</code> are missing (grep, 2026-09-28).</p>
 
 <details><summary>the other flags: behaviour, logging, batch</summary><div class="dbody">
 <p><code>--csv_runs_limit</code> (int, default 200), <code>--disable_judge</code>, <code>--debug</code>, <code>--verbose</code>, <code>--memory_uuid</code>, <code>--max_evolve_iterations</code> (writes <code>config.max_learning_evolve_iterations</code>).</p>
-<p>19 further flags come from <code>main.py::add_config_arguments</code> and are applied by <code>main.py::apply_config_overrides</code>: <code>--workflow_dir</code>, <code>--schema_code_path</code>, <code>--smolagent_factory_code_path</code>, <code>--prompt_workflow_creator</code>, <code>--runner_default_python_version</code>, <code>--runner_default_timeout</code>, <code>--runner_default_max_memory_mb</code>, <code>--runner_default_max_cpu_percent</code>, <code>--runner_temp_dir</code>, <code>--pushover_token</code>, <code>--pushover_user</code>, <code>--verifier_kind</code>, <code>--hybrid_verifier_num_claims</code>, <code>--hybrid_verifier_refinement_rounds</code>, <code>--hybrid_verifier_scorer_timeout_s</code>, <code>--hybrid_verifier_digest_max_files</code>, <code>--hybrid_verifier_pairwise_mode</code>, <code>--hybrid_verifier_reward</code>, <code>--planner_human_approve</code>.</p>
-<p>Before the dispatch chain <code>main.py::main</code> also calls <code>apply_config_overrides</code>, <code>validate_environment</code>, <code>Config.create_paths</code>, <code>Config.validate_paths</code> and builds <code>WorkspaceManager</code>. Every argument-driven mode, <code>--manual</code> included, therefore needs one API key from <code>validate_environment</code>.</p>
+<p>23 further flags come from <code>main.py::add_config_arguments</code> and are applied by <code>main.py::apply_config_overrides</code>: <code>--workflow_dir</code>, <code>--schema_code_path</code>, <code>--smolagent_factory_code_path</code>, <code>--prompt_workflow_creator</code>, <code>--runner_default_python_version</code>, <code>--runner_default_timeout</code>, <code>--runner_default_max_memory_mb</code>, <code>--runner_default_max_cpu_percent</code>, <code>--runner_temp_dir</code>, <code>--pushover_token</code>, <code>--pushover_user</code>, <code>--verifier_kind</code>, <code>--gold_feedback_reward</code>, <code>--gold_feedback_timeout_s</code>, <code>--hybrid_verifier_num_claims</code>, <code>--hybrid_verifier_refinement_rounds</code>, <code>--hybrid_verifier_scorer_timeout_s</code>, <code>--hybrid_verifier_digest_max_files</code>, <code>--hybrid_verifier_pairwise_mode</code>, <code>--hybrid_verifier_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code>, <code>--planner_human_approve</code>.</p>
+<p>18 flags are declared in <code>main.py::main</code> itself. 41 in total. Three flags use <code>argparse.BooleanOptionalAction</code> and also accept a <code>--no-</code> form: <code>--gold_feedback_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code> (default <code>None</code> = keep the config value).</p>
+<p>Before the dispatch chain <code>main.py::main</code> also calls <code>apply_config_overrides</code>, <code>warn_gold_feedback_mode</code>, <code>validate_environment</code>, <code>Config.create_paths</code>, <code>Config.validate_paths</code> and builds <code>WorkspaceManager</code>. Every argument-driven mode, <code>--manual</code> included, therefore needs one API key from <code>validate_environment</code>.</p>
 </div></details>
 </div>
 
@@ -207,10 +217,10 @@
   </a>
 
   <a class="box" id="c2" href="#config-default">
-    <title>JSON template; also the --config path and the installed user config</title>
+    <title>Local JSON template, not tracked by git; also the --config path and the installed user config</title>
     <rect x="30" y="92" width="250" height="54" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="155" y="114" text-anchor="middle">config_default.json</text>
-    <text class="box-sub" x="155" y="131" text-anchor="middle">56 keys, read by --config</text>
+    <text class="box-sub" x="155" y="131" text-anchor="middle">58 keys, read by --config</text>
   </a>
 
   <a class="box" id="c3" href="#c-config">
@@ -253,19 +263,140 @@
   <text class="edge-label" x="168" y="389">paths checked</text>
 
   <text class="box-sub" x="300" y="40">also: paths.user_config_file() on installed runs</text>
-  <text class="box-sub" x="300" y="118">jsonify() writes 57 top-level keys</text>
+  <text class="box-sub" x="300" y="118">jsonify() writes 61 top-level keys</text>
   <text class="box-sub" x="300" y="196">_reanchor_relative_paths() fixes legacy paths</text>
+  <text class="box-sub" x="300" y="212">_json_bool() parses gold_feedback_reward</text>
 </svg>
 </div>
 <p class="figcap">Diagram 2 - the order that decides final field values. Arrows: <code>config.py::Config.dump</code> writes the JSON skeleton, <code>config.py::Config.load</code> reads it back.</p>
 
 <p class="note flag">Red note: <code>config_default.json</code> sets <code>judge_model</code> and <code>vision_judge_model</code>, but <code>config.py::Config.from_json</code> reads neither key, so editing them in a JSON config has no effect.</p>
 
-<details id="plumbing"><summary>config defaults versus the JSON template (my computation)</summary><div class="dbody">
-<p>4 of the 56 JSON keys hold a different value from the <code>config.py</code> default: <code>smolagent_model_id</code> (<code>deepseek-v4-flash-0731</code> vs <code>deepseek-v3.2</code>), <code>learned_score_threshold</code> (0.9 vs 0.92), <code>max_concurrent_eval_tasks</code> (1 vs 2), <code>crossover_rate</code> (0.4 vs 0.25).</p>
-<p>1 key <code>Config.jsonify</code> writes is absent from the template file: <code>capsule_namer_model</code>.</p>
-<p>2 fields set in <code>Config.__init__</code> are absent from <code>jsonify</code> and <code>from_json</code>, so a JSON file cannot set them: <code>literrature_grounding</code> (this spelling) and <code>orchestrator_choose_model</code>. <code class="path">tests/config_roundtrip_test.py</code> records both in <code>KNOWN_GAPS</code> (issue #182).</p>
-<p><code>Config.jsonify</code> emits 57 top-level keys; <code>config_default.json</code> has 56.</p>
+<details id="plumbing"><summary>config defaults versus the local JSON template (my computation)</summary><div class="dbody">
+<p>7 of the 58 JSON keys hold a different value from the <code>config.py</code> default: <code>workflow_llm_model</code> (<code>glm-5.3-prime</code> vs <code>glm-5.3</code>), <code>judge_model</code> (<code>xiaomi/mimo-v2.6-pro-ultraspeed</code> vs <code>deepseek-v4.1-flash</code>, not read, see red note), <code>learned_score_threshold</code> (0.92 vs 0.9), <code>crossover_rate</code> (0.25 vs 0.4), <code>hybrid_verifier_num_claims</code> (16 vs 10), <code>hybrid_verifier_scorer_timeout_s</code> (120 vs 60), <code>hybrid_verifier_digest_max_files</code> (16 vs 8). Path, secret and provider-list keys were not compared.</p>
+<p>3 keys <code>Config.jsonify</code> writes are absent from the local file: <code>capsule_namer_model</code>, <code>hybrid_verifier_visual_rung</code>, <code>hybrid_verifier_execution_gate</code>. The file has the gold keys <code>verifier_kind</code> (<code>hybrid</code>), <code>gold_feedback_reward</code> (<code>false</code>) and <code>gold_feedback_timeout_s</code> (<code>1800</code>).</p>
+<p>2 fields set in <code>Config.__init__</code> are absent from <code>jsonify</code> and <code>from_json</code>, so a JSON file cannot set them: <code>literrature_grounding</code> (this spelling) and <code>orchestrator_choose_model</code>. <code class="path">tests/config_roundtrip_test.py</code> records both in <code>KNOWN_GAPS</code> (issue #182). 2 more are runtime-only by design: <code>gold_feedback_task_row</code>, <code>gold_feedback_sab_loader</code> (<code>NOT_PERSISTED</code>).</p>
+<p><code>Config.jsonify</code> emits 61 top-level keys; the local <code>config_default.json</code> has 58. Computed with <code>uv run python</code> on <code>Config().jsonify()</code>, 2026-09-28.</p>
+</div></details>
+</div>
+
+<div class="panel" id="verifier-kind"><span class="br"></span>
+<h2>Diagram 3 - verifier_kind: from flag to evaluator</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 400" role="img" aria-label="verifier_kind flag and JSON key set Config.verifier_kind; WorkflowEvaluator builds hybrid, legacy or gold evaluator">
+  <defs>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw3D" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow3" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="v1" href="#c-main">
+    <title>argparse choices: hybrid, legacy, gold</title>
+    <rect x="20" y="30" width="220" height="50" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="130" y="51" text-anchor="middle">--verifier_kind</text>
+    <text class="box-sub" x="130" y="68" text-anchor="middle">hybrid | legacy | gold</text>
+  </a>
+  <a class="box" id="v2" href="#config-default">
+    <title>Config.from_json copies the JSON value as a string, with no choice check</title>
+    <rect x="20" y="120" width="220" height="50" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="130" y="141" text-anchor="middle">JSON "verifier_kind"</text>
+    <text class="box-sub" x="130" y="158" text-anchor="middle">any string, no check</text>
+  </a>
+  <a class="box" id="v3" href="#c-config">
+    <title>Config field, default hybrid</title>
+    <rect x="290" y="75" width="220" height="50" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="400" y="96" text-anchor="middle">Config.verifier_kind</text>
+    <text class="box-sub" x="400" y="113" text-anchor="middle">default "hybrid"</text>
+  </a>
+  <a class="box" id="v4" href="file_eval_evaluator.html">
+    <title>Facade built once in EvolutionEngine.__init__; lower-cases the value</title>
+    <rect x="290" y="200" width="220" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="400" y="221" text-anchor="middle">WorkflowEvaluator.__init__</text>
+    <text class="box-sub" x="400" y="238" text-anchor="middle">sources/evaluators/evaluator.py</text>
+  </a>
+  <a class="box" id="v5" href="mod_evaluators_hybrid_verifier.html">
+    <title>Default; also built for any unknown value</title>
+    <rect x="570" y="20" width="240" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="690" y="41" text-anchor="middle">HybridVerifierEvaluator</text>
+    <text class="box-sub" x="690" y="58" text-anchor="middle">hybrid, or unknown value</text>
+  </a>
+  <a class="box" id="v6" href="area_evaluators_legacy.html">
+    <title>Deprecated per-claim verifier, imported lazily</title>
+    <rect x="570" y="100" width="240" height="50" rx="12" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="690" y="121" text-anchor="middle">VerifierEvaluator</text>
+    <text class="box-sub" x="690" y="138" text-anchor="middle">legacy - DEPRECATED</text>
+  </a>
+  <a class="box" id="v7" href="file_gold_evaluator.html">
+    <title>Oracle control: inner hybrid reward plus benchmark-grader gradient; imported lazily</title>
+    <rect x="570" y="200" width="240" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="690" y="221" text-anchor="middle">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="690" y="238" text-anchor="middle">gold - ORACLE</text>
+  </a>
+  <a class="box" id="v8" href="#c-config">
+    <title>True = full oracle: the reward also comes from the grader</title>
+    <rect x="760" y="320" width="200" height="52" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="860" y="341" text-anchor="middle">gold_feedback_reward</text>
+    <text class="box-sub" x="860" y="358" text-anchor="middle">default False</text>
+  </a>
+  <a class="box" id="v9" href="#c-config">
+    <title>Wall-clock cap on grading one generation; 0 disables the cap</title>
+    <rect x="550" y="320" width="190" height="52" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="645" y="341" text-anchor="middle">gold_feedback_timeout_s</text>
+    <text class="box-sub" x="645" y="358" text-anchor="middle">default 1800 s, 0 = no cap</text>
+  </a>
+  <a class="box" id="v10" href="#c-config">
+    <title>Runtime-only fields; jsonify never writes them</title>
+    <rect x="290" y="320" width="230" height="52" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="405" y="341" text-anchor="middle">gold_feedback_task_row</text>
+    <text class="box-sub" x="405" y="358" text-anchor="middle">+ gold_feedback_sab_loader</text>
+  </a>
+  <a class="box" id="v11" href="area_benchmark_evaluation.html">
+    <title>Sets the CSV row and loader per task, only when verifier_kind is gold</title>
+    <rect x="20" y="320" width="220" height="52" rx="12" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="130" y="341" text-anchor="middle">_set_gold_feedback_task</text>
+    <text class="box-sub" x="130" y="358" text-anchor="middle">csv_mode.py, per task</text>
+  </a>
+
+  <path class="edge" data-from="v1" data-to="v3" d="M240,55 H265 V92 H290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="246" y="48">overrides win</text>
+  <path class="edge" data-from="v2" data-to="v3" d="M240,145 H265 V108 H290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="246" y="162">load()</text>
+  <path class="edge" data-from="v3" data-to="v4" d="M400,125 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="408" y="166">str.lower()</text>
+  <path class="edge" data-from="v4" data-to="v5" d="M510,215 H540 V45 H570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="515" y="38">else</text>
+  <path class="edge" data-from="v4" data-to="v6" d="M540,125 H570" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="515" y="118">"legacy"</text>
+  <path class="edge" data-from="v4" data-to="v7" d="M510,230 H570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="520" y="246">"gold"</text>
+  <path class="edge dashed-edge" data-from="v10" data-to="v7" d="M405,320 V290 H610 V250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3D)"/>
+  <text class="edge-label" x="420" y="284">read at evaluate</text>
+  <path class="edge dashed-edge" data-from="v9" data-to="v7" d="M660,320 V250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3D)"/>
+  <path class="edge dashed-edge" data-from="v8" data-to="v7" d="M860,320 V290 H770 V250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3D)"/>
+  <text class="edge-label" x="818" y="284">read in __init__</text>
+  <path class="edge dashed-edge" data-from="v11" data-to="v10" d="M240,346 H290" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw3D)"/>
+  <text class="edge-label" x="246" y="338">sets</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> picks the verifier. <code>legacy</code> and <code>gold</code> are imported lazily. <span class="chip warn">oracle - leaks gold</span> <code>gold</code> reads the benchmark grader's verdict; <code>main.py::warn_gold_feedback_mode</code> prints <code>LEAK_WARNING</code>, and without <code>--science_agent_bench</code> every generation falls back to the hybrid gradient.</p>
+<details><summary>verifier flags: flag | type | default | effect</summary><div class="dbody">
+<table>
+<thead><tr><th>Flag</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td class="sym">--verifier_kind</td><td>str, 3 choices</td><td class="sym">hybrid</td><td>Picks the evaluator built by the facade.</td></tr>
+<tr><td class="sym">--gold_feedback_reward / --no-gold_feedback_reward</td><td>BooleanOptionalAction</td><td class="sym">False</td><td>gold only: reward also from the benchmark grader.</td></tr>
+<tr><td class="sym">--gold_feedback_timeout_s</td><td>int</td><td class="sym">1800 s</td><td>gold only: grading cap; 0 or less disables it.</td></tr>
+</tbody>
+</table>
+<p>JSON parsing in <code>config.py::Config.from_json</code>: <code>gold_feedback_reward</code> goes through <code>config.py::_json_bool</code> (<code>"false"</code>, <code>"0"</code>, <code>"no"</code>, <code>"off"</code>, <code>""</code> give <code>False</code>). <code>hybrid_verifier_visual_rung</code> and <code>hybrid_verifier_execution_gate</code> still use <code>bool()</code>, so the JSON string <code>"false"</code> gives <code>True</code> for them (my reading of the code, not run).</p>
+<p>Tests: <code class="path">tests/gold_feedback_test.py</code> checks the defaults, the JSON round trip, that <code>jsonify</code> omits the two runtime-only fields, the CLI flags, <code>warn_gold_feedback_mode</code> and the facade <code>"gold"</code> branch. <code class="path">tests/config_roundtrip_test.py</code> lists the two runtime-only fields in <code>NOT_PERSISTED</code>.</p>
 </div></details>
 </div>
 
@@ -274,14 +405,15 @@
 
 <div class="card ice" id="c-main">
 <h4><a href="../../main.py">main.py</a></h4>
-<p class="role">Parses 37 flags, validates the environment, and dispatches to one mode. Also declares the console script target.</p>
-<p class="meta">423 lines &#183; console script <code>mimosa = main:cli_main</code> &#183; reads: <code>config.py::Config</code>, <code class="path">sources/utils/paths.py</code></p>
+<p class="role">Parses 41 flags, prints the gold leak warning when selected, validates the environment, and dispatches to one mode.</p>
+<p class="meta">486 lines &#183; console script <code>mimosa = main:cli_main</code> &#183; reads: <code>config.py::Config</code>, <code class="path">sources/utils/paths.py</code></p>
 <details><summary>functions and the dispatch order</summary><div class="dbody">
 <pre>cli_main() -&gt; None
 main() -&gt; None
 validate_environment() -&gt; None
 add_config_arguments(parser, config) -&gt; None
 apply_config_overrides(args, config) -&gt; None
+warn_gold_feedback_mode(args, config) -&gt; bool
 load_goal_from_file_or_string(goal_input) -&gt; str
 manual_mode(args, config) -&gt; None
 papers_mode(args, config) -&gt; None
@@ -289,7 +421,8 @@ science_bench_papers_mode(args, config) -&gt; None
 workflow_generation_evals(args, config) -&gt; None
 normal_execution_mode(args, config) -&gt; None
 setup_signal_handlers() -&gt; None</pre>
-<p>Order inside <code>main.py::main</code>: <code>dotenv.load_dotenv</code> at import, then <code>argparse</code>, config load (<code>--config</code>, else the installed user config), logging, <code>ensure_environment(auto_install=True)</code>, the three early-return branches, <code>apply_config_overrides</code>, <code>validate_environment</code>, path checks, <code>WorkspaceManager</code>, then the dispatch chain.</p>
+<p>Order inside <code>main.py::main</code>: <code>dotenv.load_dotenv</code> at import, then <code>argparse</code>, config load (<code>--config</code>, else the installed user config), logging, <code>ensure_environment(auto_install=True)</code>, the three early-return branches, <code>apply_config_overrides</code>, <code>warn_gold_feedback_mode</code>, <code>validate_environment</code>, path checks, <code>WorkspaceManager</code>, then the dispatch chain.</p>
+<p><code>main.py::warn_gold_feedback_mode</code> returns <code>False</code> unless <code>verifier_kind</code> is <code>gold</code>. Then it prints <code>LEAK_WARNING</code> (from <code class="path">sources/evaluators/gold_feedback/leak.py</code>), a FULL ORACLE line when <code>gold_feedback_reward</code> is true, and a hybrid-fallback line without <code>--science_agent_bench</code>. Returns <code>True</code>.</p>
 <p><code>main.py::main</code> raises <code>ValueError("No goal provided. Use --task, --goal to start.")</code> when <code>normal_execution_mode</code> gets no task, goal or scenario.</p>
 </div></details>
 </div>
@@ -297,9 +430,10 @@ setup_signal_handlers() -&gt; None</pre>
 <div class="card ice" id="c-config">
 <h4><a href="../../config.py">config.py</a></h4>
 <p class="role">Owns every default field, loads and dumps JSON, checks paths, and resolves per-model OpenRouter routing.</p>
-<p class="meta">722 lines &#183; classes: <code>Config</code>, <code>AddressMCP</code> &#183; reads: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/pricing.py</code></p>
+<p class="meta">794 lines &#183; classes: <code>Config</code>, <code>AddressMCP</code> &#183; function: <code>_json_bool</code> &#183; reads: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/pricing.py</code></p>
 <details><summary>methods, fields and path checks</summary><div class="dbody">
-<pre>AddressMCP.__post_init__() -&gt; None
+<pre>_json_bool(value, default) -&gt; bool
+AddressMCP.__post_init__() -&gt; None
 Config.openrouter_provider_for(model_id) -&gt; list[str] | None
 Config.openrouter_quantizations_for(model_id) -&gt; list[str] | None
 Config.model_pricing -&gt; dict (property)
@@ -319,8 +453,8 @@ Config.load(filepath) -&gt; None</pre>
 
 <div class="card ice" id="config-default">
 <h4><a href="../../config_default.json">config_default.json</a></h4>
-<p class="role">Template config: 56 top-level keys, dumped by running <code>python config.py</code>. Copy it, edit it, pass it with <code>--config</code>.</p>
-<p class="meta">111 lines &#183; keys: 56 &#183; read by: <code>config.py::Config.from_json</code></p>
+<p class="role">Local template config: 58 top-level keys. <code>python config.py</code> rewrites it with <code>Config.dump</code>. Copy it, edit it, pass it with <code>--config</code>.</p>
+<p class="meta">113 lines &#183; keys: 58 &#183; read by: <code>config.py::Config.from_json</code> &#183; <span class="chip warn">not tracked by git</span> removed in commit <code>09b57da</code>, ignored by <code>config_*.json</code> in <code class="path">.gitignore</code>; AGENTS.md still calls it the template.</p>
 <details><summary>important fields: field | default in config.py | used by</summary><div class="dbody">
 <table>
 <thead><tr><th>Field</th><th>Default in config.py</th><th>Used by</th></tr></thead>
@@ -333,13 +467,18 @@ Config.load(filepath) -&gt; None</pre>
 <tr><td class="sym">judge_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">sources/evaluators/base.py</td></tr>
 <tr><td class="sym">capsule_namer_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">sources/utils/transfer_toolomics.py</td></tr>
 <tr><td class="sym">vision_judge_model</td><td class="sym">openrouter/moonshotai/kimi-k3</td><td class="sym">sources/evaluators/hybrid_verifier/evaluator.py &#183; legacy: legacy_verifier/verifier.py</td></tr>
-<tr><td class="sym">verifier_kind</td><td class="sym">hybrid</td><td class="sym">sources/evaluators/evaluator.py</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="sym">hybrid (also legacy, gold)</td><td class="sym">sources/evaluators/evaluator.py</td></tr>
+<tr><td class="sym">gold_feedback_reward</td><td class="sym">false</td><td class="sym">gold_feedback/evaluator.py, csv_mode.py, main.py</td></tr>
+<tr><td class="sym">gold_feedback_timeout_s</td><td class="sym">1800 s</td><td class="sym">gold_feedback/evaluator.py</td></tr>
+<tr><td class="sym">gold_feedback_task_row / gold_feedback_sab_loader</td><td class="sym">None, runtime only</td><td class="sym">gold_feedback/grader.py, set by csv_mode.py</td></tr>
 <tr><td class="sym">hybrid_verifier_num_claims</td><td class="sym">10 claims</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
-<tr><td class="sym">hybrid_verifier_refinement_rounds</td><td class="sym">2</td><td class="sym">hybrid_verifier/layers.py</td></tr>
-<tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="sym">60 s</td><td class="sym">hybrid_verifier/layers.py</td></tr>
+<tr><td class="sym">hybrid_verifier_refinement_rounds</td><td class="sym">2</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
+<tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="sym">60 s</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
 <tr><td class="sym">hybrid_verifier_pairwise_mode</td><td class="sym">temporal</td><td class="sym">hybrid_verifier/aggregation.py</td></tr>
 <tr><td class="sym">hybrid_verifier_reward</td><td class="sym">win_rate</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
 <tr><td class="sym">hybrid_verifier_digest_max_files</td><td class="sym">8 files</td><td class="sym">hybrid_verifier/digest.py</td></tr>
+<tr><td class="sym">hybrid_verifier_visual_rung</td><td class="sym">true</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
+<tr><td class="sym">hybrid_verifier_execution_gate</td><td class="sym">true</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
 <tr><td class="sym">engine_name</td><td class="sym">litellm</td><td class="sym">sources/core/workflow_factory.py</td></tr>
 <tr><td class="sym">reasoning_effort</td><td class="sym">medium</td><td class="sym">sources/core/llm_provider.py</td></tr>
 <tr><td class="sym">max_tokens</td><td class="sym">16 384 tokens</td><td class="sym">sources/core/llm_provider.py</td></tr>
@@ -404,11 +543,12 @@ App.run() ; App.record(path, fps, hold_seconds)</pre>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">main.py</code> (423 lines), <code class="path">config.py</code> (722 lines), <code class="path">config_default.json</code> (111 lines), <code class="path">auto-install.sh</code> (411 lines), <code class="path">cleanup.sh</code> (32 lines), <code class="path">workflow_evolution_anim.py</code> (1852 lines), <code class="path">pyproject.toml</code>, <code class="path">docs/reference/cli.md</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/cli/__init__.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">tests/config_roundtrip_test.py</code>. Greps for mode, symbol and config-field names used the same files plus <code class="path">sources/core/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/benchmark_evaluation/</code> and <code class="path">sources/utils/</code>.</p>
-<p class="skips">Skipped: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/ensure_env.py</code>, <code class="path">sources/utils/precheck.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">sources/cli/pretty_print.py</code>, <code class="path">sources/cli/onboard_cli.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/cli/memory_chat_cli.py</code> - read for the call targets only, their own pages are <code>area_utils.html</code> and <code>area_cli.html</code>. Skipped <code>sources/core/*</code>, <code>sources/benchmark_evaluation/*</code>, <code>sources/evaluators/*</code>, <code>sources/extensibility/*</code>, <code>sources/transparency/*</code>, <code>sources/modules/*</code> - named as targets only. Skipped as Tier D: <code>docs/*</code> (except <code class="path">docs/reference/cli.md</code>), <code>webui/</code>, <code>datasets/</code>, <code>tests/</code> (except the round-trip test), <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code>, <code>audits/</code>, <code>CLA/</code>, <code>.venv/</code>, lock files, images and videos.</p>
+<p>Sources read: <code class="path">main.py</code> (486 lines), <code class="path">config.py</code> (794 lines), <code class="path">config_default.json</code> (113 lines), <code class="path">auto-install.sh</code> (411 lines), <code class="path">cleanup.sh</code> (32 lines), <code class="path">workflow_evolution_anim.py</code> (1852 lines), <code class="path">pyproject.toml</code>, <code class="path">docs/reference/cli.md</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/cli/__init__.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/grader.py</code>, <code class="path">sources/evaluators/gold_feedback/leak.py</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (<code>_set_gold_feedback_task</code> only), <code class="path">tests/config_roundtrip_test.py</code>, <code class="path">tests/gold_feedback_test.py</code>. Greps for mode, symbol and config-field names used the same files plus <code class="path">sources/core/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/benchmark_evaluation/</code> and <code class="path">sources/utils/</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/ensure_env.py</code>, <code class="path">sources/utils/precheck.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">sources/cli/pretty_print.py</code>, <code class="path">sources/cli/onboard_cli.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/cli/memory_chat_cli.py</code> - read for the call targets only, their own pages are <code>area_utils.html</code> and <code>area_cli.html</code>. Skipped <code>sources/core/*</code>, <code>sources/benchmark_evaluation/*</code>, <code>sources/evaluators/*</code>, <code>sources/extensibility/*</code>, <code>sources/transparency/*</code>, <code>sources/modules/*</code> - named as targets only. Skipped as Tier D: <code>docs/*</code> (except <code class="path">docs/reference/cli.md</code>), <code>webui/</code>, <code>datasets/</code>, <code>tests/</code> (except the round-trip and gold-feedback tests), <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code>, <code>audits/</code>, <code>CLA/</code>, <code>.venv/</code>, lock files, images and videos.</p>
 <p>The working tree had uncommitted changes when this page was built (<code>git status --porcelain</code> lists modified <code>main.py</code>, <code>config.py</code> and <code class="path">docs/reference/cli.md</code>, among others). All counts, defaults and line numbers are from that working tree. <code class="path">docs/getting-started/configuration.md</code> and <code class="path">docs/reference/configuration.md</code> were not opened, so their field lists are not checked here.</p>
 <p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (the flat <code>sources/evaluators/*.py</code> modules are deleted into sub-packages); <code>config.py</code> is unmodified by that diff.</p>
 <p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
+<p>Updated at 4020790 + uncommitted working tree, 2026-09-28: gold-feedback flags and <code>warn_gold_feedback_mode</code> (Diagram 1, Diagram 3), new <code>config.py</code> fields and <code>_json_bool</code>, the visual-rung and execution-gate flags from <code>4020790</code>, all line and key counts recomputed. <code>config_default.json</code> is a local, untracked file, so its key counts can differ on another checkout.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

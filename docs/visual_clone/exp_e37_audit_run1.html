@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">e37_audit_run1 &mdash; run_1 under E35 PRIME: 0/4 tasks pass, every failure named</h1>
-<p class="intro">E37 audits the finished <code>run_1</code> campaign (model <code>openrouter/deepseek/deepseek-v3.2</code>, verifier <code>hybrid-v1-e19b-20260924</code> / E35 PRIME): 0/4 tasks pass, $15.13 spent, 11/26 generation slots wrote no script at all. Each failure traces to one fixable mechanism &mdash; selection math, a scorer path bug, a deliverable-format trap, a missing <code>deepchem</code> import at grading &mdash; not to claim extraction. All numbers on this page come from the E37 report; the audit itself cost $0 LLM (offline files + local rdkit reproduction).</p>
+<p class="intro">E37 audits the finished <code>run_1</code> campaign (model <code>openrouter/deepseek/deepseek-v3.2</code>, verifier <code>hybrid-v1-e19b-20260924</code> / E35 PRIME): 0/4 tasks pass, $15.13 spent, 11/26 generation slots wrote no script at all. Each task failure traces to one fixable mechanism &mdash; capsule selection math, one fingerprint setting (<code>nBits</code>), a deliverable-format trap, a missing <code>deepchem</code> import at grading &mdash; not to claim extraction. All numbers on this page come from the E37 report; the audit itself cost $0 LLM (offline files + local rdkit reproduction).</p>
 
 <div id="legend" data-auto></div>
 
@@ -113,12 +113,13 @@
 <table>
 <thead><tr><th>Task</th><th>Capsule verdict</th><th>Gens SR-true</th><th>Root cause (short)</th><th>Key evidence</th></tr></thead>
 <tbody>
-<tr><td>bulk_modulus</td><td><span class="chip err">SR false</span></td><td>6/16</td><td>argmax reward picked gen 0 fallback 0.8889; gen 11 was SR-true</td><td class="sym"><code class="path">run_notes/run_1/predict_compound_predict_bulk_modulus.json</code></td></tr>
-<tr><td>pains_brenk</td><td><span class="chip err">SR false</span> 0.9881</td><td>0/5</td><td>nBits 1024 vs gold default 2048; grader needs overlap 1.0</td><td class="sym"><code class="path">runs_capsule/run_1/compound_filter_pains_brenk_tanimoto_compound_filter/compound_filter.py</code></td></tr>
-<tr><td>mat_diffusion</td><td><span class="chip err">SR false</span> "N/A"</td><td>0/5</td><td>saved feature-name list; grader wants the matrix (&ge;14 columns)</td><td class="sym"><code class="path">runs_capsule/run_1/mat_diffusion_shap_feature_selection_mat_feature_select/pred_results/mat_diffusion_features.csv</code></td></tr>
-<tr><td>clintox</td><td><span class="chip err">EXCLUDED</span></td><td>not graded</td><td>grading venv lacks deepchem; *_prob names vs FDA_APPROVED / CT_TOX</td><td class="sym"><code class="path">runs_capsule/run_1/clintox_multitask_toxicity_fda_prediction_clintox_nn/evaluation_results.json</code></td></tr>
+<tr><td>bulk_modulus</td><td><span class="chip err">SR false</span></td><td>6/16</td><td>argmax reward picked gen 0 fallback 0.8889; gen 11 was SR-true</td><td class="sym"><code class="path">run_notes/e35_first_attempt/predict_compound_predict_bulk_modulus.json</code></td></tr>
+<tr><td>pains_brenk</td><td><span class="chip err">SR false</span> 0.9881</td><td>0/5</td><td>nBits 1024 vs gold default 2048; grader needs overlap 1.0</td><td class="sym"><code class="path">runs_capsule/e35_first_attempt/compound_filter_pains_brenk_tanimoto_compound_filter/compound_filter.py</code></td></tr>
+<tr><td>mat_diffusion</td><td><span class="chip err">SR false</span> "N/A"</td><td>0/5</td><td>saved feature-name list; grader wants the matrix (&ge;14 columns)</td><td class="sym"><code class="path">runs_capsule/e35_first_attempt/mat_diffusion_shap_feature_selection_mat_feature_select/pred_results/mat_diffusion_features.csv</code></td></tr>
+<tr><td>clintox</td><td><span class="chip err">EXCLUDED</span></td><td>not graded</td><td>grading venv lacks deepchem; *_prob names vs FDA_APPROVED / CT_TOX</td><td class="sym"><code class="path">runs_capsule/e35_first_attempt/clintox_multitask_toxicity_fda_prediction_clintox_nn/evaluation_results.json</code></td></tr>
 </tbody>
 </table>
+<p class="note">Amber: the report cites these files under <code>run_1/</code>. On 2026-09-28 they sit under the <code>e35_first_attempt/</code> folders of <code>run_notes/</code>, <code>runs_capsule/</code> and <code>sources/workflows/</code> (checked with <code>ls</code>); <code>run_1/</code> now holds a newer run. The paths above are the current ones.</p>
 
 <div class="slotstrip">
 <div class="slot"><span>tasks pass</span><b>0 / 4</b></div>
@@ -136,9 +137,9 @@
 <table>
 <thead><tr><th>Loop break</th><th>What happens</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td>scorer paths</td><td>scorers cannot resolve <code>worker_&lt;task&gt;/pred_results/&hellip;</code>; constant 0, then dropped as <code>zero_variance</code></td><td>pains C9/C10 dropped in gen 4, <code class="path">sources/workflows/run_1/20260927_115459_e4f5a77e/evaluation.txt</code></td></tr>
-<tr><td>first-gen fallback</td><td>gen 0 reward = mean claim score 0.8889; argmax locks it in</td><td><code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> L231&ndash;L242, <code class="path">sources/core/evolution_engine.py</code> L429&ndash;L439</td></tr>
-<tr><td>constant claims invisible</td><td>clintox C16 = 0.333 in all 12 gens; never in "WHAT TO FIX FIRST"</td><td><code class="path">sources/workflows/run_1/20260927_094135_98d59e61/textual_gradient.txt</code></td></tr>
+<tr><td>scorer paths</td><td>scorers cannot resolve <code>worker_&lt;task&gt;/pred_results/&hellip;</code>; constant 0, then dropped as <code>zero_variance</code></td><td>pains C9/C10 dropped in gen 4, <code class="path">sources/workflows/e35_first_attempt/20260927_115459_e4f5a77e/evaluation.txt</code></td></tr>
+<tr><td>first-gen fallback</td><td>gen 0 reward = mean claim score 0.8889; argmax locks it in</td><td>report: <code>aggregation.py:231-242</code>, <code>evolution_engine.py:429-439</code> at <code>336fe19</code>; now <code>aggregation.py::win_rate_reward</code> (<code>if not previous</code>, L240)</td></tr>
+<tr><td>constant claims invisible</td><td>clintox C16 = 0.333 in all 12 gens; never in "WHAT TO FIX FIRST"</td><td><code class="path">sources/workflows/e35_first_attempt/20260927_094135_98d59e61/textual_gradient.txt</code></td></tr>
 <tr><td>degenerate labels</td><td>bulk K_VRH zeroed (232 rows), clintox labels all 1s (292/292) &rarr; AUC nan</td><td>bulk C25/C26/C36, clintox C13/C30 (report &sect;4)</td></tr>
 <tr><td>re-exec gate off</td><td>every gradient: "no re-execution evidence; gate consequence: none"</td><td>11/26 slots wrote no script (report &sect;3)</td></tr>
 </tbody>
@@ -147,25 +148,28 @@
 </div>
 
 <div class="panel"><span class="br"></span>
-<h2>Recommendations &mdash; top 3 of 9</h2>
+<h2>Recommendations &mdash; 9 in the report, status in the current tree</h2>
 <table>
-<thead><tr><th>Fix</th><th>What to change</th><th>Pays off here</th></tr></thead>
+<thead><tr><th>R</th><th>What to change (report &sect;7)</th><th>Status at 4020790 + working tree</th></tr></thead>
 <tbody>
-<tr><td>selection</td><td>exclude the gen-0 mean-claim fallback before argmax (<code>evolution_engine.py</code> L429&ndash;L439)</td><td>bulk passes (gen 11, reward 0.70)</td></tr>
-<tr><td>scorer paths</td><td>resolve both <code>worker_&lt;task&gt;/pred_results/X</code> and <code>pred_results/X</code>; never prune a crashed scorer as zero-variance</td><td>C9/C10/C16-family checks run again on all four tasks</td></tr>
-<tr><td>trap memory</td><td>task&rarr;known-trap table in the gen-1 prompt: mat saves the matrix; pains uses RDKit default nBits=2048</td><td>both named traps stop recurring</td></tr>
+<tr><td class="sym">R1</td><td>exclude the gen-0 mean-claim fallback before argmax</td><td><span class="chip ok">in code</span> <code>evolution_engine.py::_select_best_run</code> (L136)</td></tr>
+<tr><td class="sym">R2</td><td>resolve both <code>worker_&lt;task&gt;/pred_results/X</code> and <code>pred_results/X</code></td><td><span class="chip unknown">unknown</span> no code comment cites R2</td></tr>
+<tr><td class="sym">R3</td><td>never prune a crashed scorer as <code>zero_variance</code></td><td><span class="chip ok">in code</span> <code>aggregation.py::claim_stats</code>, <code>registry.py</code></td></tr>
+<tr><td class="sym">R4</td><td>surface claims that fail in every generation</td><td><span class="chip ok">in code</span> <code>hybrid_verifier/gradient.py</code> (L6, L48)</td></tr>
+<tr><td class="sym">R6</td><td>deepchem in the grading venv</td><td><span class="chip ok">in code</span> <code>execution_sandbox.py</code> pin <code>deepchem&lt;=2.7.1</code> (L67)</td></tr>
+<tr><td class="sym">R5, R7-R9</td><td>label guard, E24 admission cap, trap memory, <code>./cleanup.sh</code></td><td><span class="chip unknown">unknown</span> no code comment cites them</td></tr>
 </tbody>
 </table>
-<p class="note say">The report lists six more (R4&ndash;R9), including surfacing constant-failing claims in the gradient, guarding label claims, deepchem provisioning parity, the E24 admission cap, and <code>./cleanup.sh</code> before sweeps.</p>
+<p class="note say">Status comes from <code>grep -rn "E37 R"</code> over <code>sources/</code>; R1, R3 and R4 are absent at <code>336fe19</code> and present at <code>4020790</code> (<code>git show</code>). E38 re-audited after R1/R3/R4/R6 and found that R1 also shipped crashed generations (bug N1): <a href="../../experiments_verifiers/results/E38_audit_run1_round2_2026-09-27.md">E38 report</a>.</p>
 </div>
 
-<p class="sub">Related pages: <a href="exp_index.html">exp_index.html</a> is the experiment hub; <a href="exp_e35_prime.html">exp_e35_prime.html</a> is the E35 PRIME prototype this verifier shipped from; <a href="data_experiments.html">data_experiments.html</a> indexes the results folder.</p>
+<p class="sub">Related pages: <a href="exp_index.html">exp_index.html</a> is the experiment hub; <a href="data_experiments.html">data_experiments.html</a> has short rows for the follow-up audits E38-E40; <a href="exp_e35_prime.html">exp_e35_prime.html</a> is the E35 PRIME prototype this verifier shipped from.</p>
 
 <footer>
-<p>Sources read: <code class="path">experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.md</code> (133 lines, read in full) and <code class="path">experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.json</code> (154 lines, read in full). Every number on this page comes from those two files or the evidence paths they name; the audit itself was offline ($0 LLM, local rdkit 2026.03.6 reproduction).</p>
+<p>Sources read: <a href="../../experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.md"><code class="path">experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.md</code></a> (133 lines, read in full) and <code class="path">experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.json</code> (154 lines, read in full); on 2026-09-28 also <code>ls</code> of the <code>e35_first_attempt/</code> folders and <code>grep</code>/<code>git show</code> of <code>sources/</code> for the R-status table. Every number on this page comes from those two files or the evidence paths they name; the audit itself was offline ($0 LLM, local rdkit 2026.03.6 reproduction).</p>
 <p class="skips">Skipped: the prior-campaign comparison table (report &sect;5), the per-generation steering tables (&sect;1), the bulk success anatomy (&sect;6) beyond the numbers shown, and the full claim ladders &mdash; read the report instead: <code class="path">experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.md</code>.</p>
 <p class="skips">Caveats from the report: this audit is a snapshot dated 2026-09-27 &mdash; two further run_1 tasks (t-SNE, FACTORS) were still mid-flight; the 12 clintox generations were attributed by goal-text match; no <code>/tmp/mimosa_run_*</code> workspaces and no <code>datasets/ScienceAgentBench/gold_results/</code> remain in this checkout.</p>
-<p>Built at commit <code>336fe19</code> (dirty working tree, per the report), 2026-09-27.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28. First written 2026-09-27; the audit itself read a dirty tree at <code>336fe19</code> (report line 3). 2026-09-28 update: evidence paths moved to <code>e35_first_attempt/</code>, code line refs re-derived, recommendation status added.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

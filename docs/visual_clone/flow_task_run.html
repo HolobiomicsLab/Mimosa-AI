@@ -66,8 +66,8 @@
     <text class="box-label" x="890" y="53" text-anchor="middle">Workspace disk</text>
   </a>
   <path d="M 890,70 V 764" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
-  <a class="box" id="l7" href="mod_evaluators_hybrid_verifier.html">
-    <title>Verifier</title>
+  <a class="box" id="l7" href="#verifier-choice">
+    <title>Verifier chosen by config.verifier_kind: hybrid (default), legacy or gold</title>
     <rect x="977" y="26" width="146" height="44" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="1050" y="53" text-anchor="middle">Verifier</text>
   </a>
@@ -78,14 +78,14 @@
     <text class="edge-label" x="170.0" y="94" text-anchor="middle">1 args override</text>
   </g>
   <g>
-    <title>sources/utils/precheck.py::PreCheck.run</title>
-    <path class="edge" data-from="l1" data-to="l2" d="M 90,144 H 250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-    <text class="edge-label" x="170.0" y="138" text-anchor="middle">2 provider precheck</text>
+    <title>config.py::Config.create_paths</title>
+    <path class="edge" data-from="l1" data-to="l6" d="M 90,144 H 890" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="490.0" y="138" text-anchor="middle">2 creates dirs</text>
   </g>
   <g>
-    <title>config.py::Config.create_paths</title>
-    <path class="edge" data-from="l1" data-to="l6" d="M 90,188 H 890" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-    <text class="edge-label" x="490.0" y="182" text-anchor="middle">3 creates dirs</text>
+    <title>sources/utils/precheck.py::PreCheck.run</title>
+    <path class="edge" data-from="l1" data-to="l2" d="M 90,188 H 250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="170.0" y="182" text-anchor="middle">3 provider precheck</text>
   </g>
   <g>
     <title>main.py::normal_execution_mode</title>
@@ -128,12 +128,12 @@
     <text class="edge-label" x="730.0" y="534" text-anchor="middle">11 uuid</text>
   </g>
   <g>
-    <title>sources/evaluators/hybrid_verifier/evaluator.py::HybridVerifierEvaluator._write_artifacts</title>
+    <title>hybrid: HybridVerifierEvaluator._write_artifacts; gold: GoldFeedbackEvaluator._persist</title>
     <path class="edge dashed-edge" data-from="l7" data-to="l6" d="M 1050,584 H 890" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
     <text class="edge-label" x="970.0" y="578" text-anchor="middle">12 evaluation.txt, gradient</text>
   </g>
   <g>
-    <title>sources/evaluators/hybrid_verifier/evaluator.py::HybridVerifierEvaluator.evaluate</title>
+    <title>sources/evaluators/evaluator.py::WorkflowEvaluator.evaluate, then the chosen verifier's evaluate</title>
     <path class="edge" data-from="l7" data-to="l3" d="M 1050,628 H 410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
     <text class="edge-label" x="730.0" y="622" text-anchor="middle">13 reward 0-1</text>
   </g>
@@ -153,11 +153,11 @@
 <p class="figcap">Diagram 1 - lanes are components; time runs downward; each numbered arrow is one call. Every arrow and box cites its symbol in the step table below.</p>
 <h3>Step table</h3>
 <table><thead><tr><th>Step</th><th>What runs</th><th>Function</th><th>What it writes</th></tr></thead><tbody>
-<tr><td class="size">1</td><td>Parse argv</td><td class="sym"><a href="../../main.py">main.py</a>::<code>apply_config_overrides</code></td><td>nothing</td></tr>
-<tr><td class="size">2</td><td>Model precheck</td><td class="sym"><a href="../../sources/utils/precheck.py">sources/utils/precheck.py</a>::<code>PreCheck.run</code></td><td>nothing (config in memory)</td></tr>
-<tr><td class="size">3</td><td>Create dirs</td><td class="sym"><a href="../../config.py">config.py</a>::<code>Config.create_paths</code></td><td>three directories</td></tr>
-<tr><td class="size">4</td><td>Validate paths</td><td class="sym"><a href="../../config.py">config.py</a>::<code>Config.validate_paths</code></td><td>nothing</td></tr>
-<tr><td class="size">5</td><td>Enter task mode</td><td class="sym"><a href="../../main.py">main.py</a>::<code>normal_execution_mode</code></td><td>nothing</td></tr>
+<tr><td class="size">1</td><td>Parse argv; gold leak warning if <code>verifier_kind = "gold"</code></td><td class="sym"><a href="../../main.py">main.py</a>::<code>apply_config_overrides</code>, <code>warn_gold_feedback_mode</code></td><td>nothing (prints)</td></tr>
+<tr><td class="size">2</td><td>Create dirs</td><td class="sym"><a href="../../config.py">config.py</a>::<code>Config.create_paths</code></td><td>three directories</td></tr>
+<tr><td class="size">3</td><td>Validate paths</td><td class="sym"><a href="../../config.py">config.py</a>::<code>Config.validate_paths</code></td><td>nothing</td></tr>
+<tr><td class="size">4</td><td>Model precheck</td><td class="sym"><a href="../../sources/utils/precheck.py">sources/utils/precheck.py</a>::<code>PreCheck.run</code></td><td>nothing (config in memory)</td></tr>
+<tr><td class="size">5</td><td>Enter task mode; engine builds the verifier facade</td><td class="sym"><a href="../../main.py">main.py</a>::<code>normal_execution_mode</code>, <code>EvolutionEngine.__init__</code></td><td>nothing</td></tr>
 <tr><td class="size">6</td><td>Select parent</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>EvolutionEngine.select_parent_workflow</code></td><td>nothing</td></tr>
 <tr><td class="size">7</td><td>Start session</td><td class="sym"><a href="../../sources/utils/workspace_management.py">workspace_management.py</a>::<code>WorkspaceManager.begin_session</code></td><td><code>/tmp/mimosa_initial_&lt;session&gt;</code></td></tr>
 <tr><td class="size">8</td><td>Build prompt</td><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a>::<code>VariationEngine.mutation_prompt</code></td><td>nothing</td></tr>
@@ -171,12 +171,12 @@
 <tr><td class="size">16</td><td>Save prompt</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>EvolutionEngine._save_evolution_prompt_artifact</code></td><td><code>evolution_prompt_&lt;uuid&gt;.md</code></td></tr>
 <tr><td class="size">17</td><td>Record lineage</td><td class="sym"><a href="../../sources/core/lineage.py">lineage.py</a>::<code>record_lineage</code></td><td><code>lineage_&lt;uuid&gt;.json</code></td></tr>
 <tr><td class="size">18</td><td>Snapshot run</td><td class="sym"><a href="../../sources/utils/workspace_management.py">workspace_management.py</a>::<code>WorkspaceManager.save_run_snapshot</code></td><td><code>/tmp/mimosa_run_&lt;session&gt;_&lt;uuid&gt;</code></td></tr>
-<tr><td class="size">19</td><td>Score the run</td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a>::<code>HybridVerifierEvaluator.evaluate</code></td><td><code>evaluation.txt</code>, <code>textual_gradient.txt</code></td></tr>
-<tr><td class="size">20</td><td>Persist score</td><td class="sym"><a href="../../sources/evaluators/base.py">evaluators/base.py</a>::<code>BaseEvaluator._save_results</code></td><td><code>state_result.json</code> under <code>evaluation.verifier</code></td></tr>
+<tr><td class="size">19</td><td>Score the run with the <a href="#verifier-choice">chosen verifier</a></td><td class="sym"><a href="../../sources/evaluators/evaluator.py">evaluators/evaluator.py</a>::<code>WorkflowEvaluator.evaluate</code></td><td><code>evaluation.txt</code>, <code>textual_gradient.txt</code></td></tr>
+<tr><td class="size">20</td><td>Persist score; engine reads it back</td><td class="sym"><a href="../../sources/evaluators/base.py">evaluators/base.py</a>::<code>BaseEvaluator._save_results</code>, <code>WorkflowInfo.reward_is_fallback</code></td><td><code>state_result.json</code> under <code>evaluation.verifier</code></td></tr>
 <tr><td class="size">21</td><td>Price the run</td><td class="sym"><a href="../../sources/utils/pricing.py">utils/pricing.py</a>::<code>PricingCalculator.calculate_cost</code></td><td>nothing (reads memory)</td></tr>
 <tr><td class="size">22</td><td>QD verdict</td><td class="sym"><a href="../../sources/core/selection.py">selection.py</a>::<code>SelectionPressure.validate_survivor</code></td><td><code>qd_archive.jsonl</code></td></tr>
 <tr><td class="size">23</td><td>Iteration metrics</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>EvolutionEngine._persist_iteration_metrics</code></td><td><code>run_metrics.json</code></td></tr>
-<tr><td class="size">24</td><td>Restore best</td><td class="sym"><a href="../../sources/utils/workspace_management.py">workspace_management.py</a>::<code>WorkspaceManager.restore_best</code></td><td>workspace files</td></tr>
+<tr><td class="size">24</td><td>Pick best (fallback rewards skipped), restore it</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a>::<code>_select_best_run</code>, <a href="../../sources/utils/workspace_management.py">workspace_management.py</a>::<code>WorkspaceManager.restore_best</code></td><td>workspace files</td></tr>
 <tr><td class="size">25</td><td>Exit</td><td class="sym"><a href="../../main.py">main.py</a>::<code>main</code></td><td>nothing (no session started)</td></tr>
 </tbody></table>
 
@@ -202,12 +202,132 @@ WorkflowOrchestrator.orchestrate_workflow(goal, craft_instructions, original_tas
 WorkflowFactory.craft_workflow(goal, craft_instructions, save_workflow=True, original_task=None)
     -&gt; (complete_code, genotype_code, uuid)
 WorkflowRunner.execute(code, execution_id=None, progress_callback=None) -&gt; ExecutionResult
+WorkflowEvaluator.evaluate(uuid, agent_answers=None, evaluator_type="verifier", scenario_rubric=None) -&gt; dict
 HybridVerifierEvaluator.evaluate(uuid) -&gt; dict
+GoldFeedbackEvaluator.evaluate(uuid) -&gt; dict
 WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / restore_best(uuid)</pre>
-<p>Config fields read on this path: <code>workflow_dir</code>, <code>memory_dir</code>, <code>runner_temp_dir</code>, <code>runner_default_python_version</code> (<code>3.12</code>), <code>runner_default_timeout</code> (<code>10800 s</code>), <code>agent_execution_timeout</code> (<code>18000 s</code>), <code>runner_requirements</code>, <code>workspace_dir</code>, <code>workflow_llm_model</code>, <code>smolagent_model_id</code>, <code>judge_model</code>, <code>literrature_grounding</code>, <code>verifier_kind</code> (<code>hybrid</code>), <code>hybrid_verifier_num_claims</code> (<code>10</code>), <code>hybrid_verifier_scorer_timeout_s</code> (<code>60</code>), <code>hybrid_verifier_pairwise_mode</code> (<code>temporal</code>), <code>learned_score_threshold</code> (<code>0.9</code>), <code>max_learning_evolve_iterations</code> (<code>16</code>), <code>initial_population</code> (<code>2</code>), <code>selection_strategy</code> (<code>qd</code>), <code>export_astra</code> (<code>False</code>).</p>
-<p>Structural note: the default <code>template_uuid</code> <code class="uuid">20260512_162504_70ccefbf</code> is not a folder in <code class="path">sources/workflows/</code> here, and <code>select_parent_workflow</code> returns it without checking the disk. Generation 1 is therefore recorded as <code>evolution_kind = "mutation"</code> against a parent that is absent, and <code>WorkflowInfo.load_code</code> returns <code>""</code> for it.</p>
+<p>Config fields read on this path: <code>workflow_dir</code>, <code>memory_dir</code>, <code>runner_temp_dir</code>, <code>runner_default_python_version</code> (<code>3.12</code>), <code>runner_default_timeout</code> (<code>10800 s</code>), <code>agent_execution_timeout</code> (<code>18000 s</code>), <code>runner_requirements</code>, <code>workspace_dir</code>, <code>workflow_llm_model</code>, <code>smolagent_model_id</code>, <code>judge_model</code>, <code>literrature_grounding</code>, <code>verifier_kind</code> (<code>hybrid</code>; also <code>legacy</code>, <code>gold</code>), <code>gold_feedback_reward</code> (<code>False</code>), <code>gold_feedback_timeout_s</code> (<code>1800 s</code>), <code>gold_feedback_task_row</code> / <code>gold_feedback_sab_loader</code> (<code>None</code> on this path), <code>hybrid_verifier_num_claims</code> (<code>10</code>), <code>hybrid_verifier_scorer_timeout_s</code> (<code>60</code>), <code>hybrid_verifier_pairwise_mode</code> (<code>temporal</code>), <code>learned_score_threshold</code> (<code>0.9</code>), <code>max_learning_evolve_iterations</code> (<code>16</code>), <code>initial_population</code> (<code>2</code>), <code>selection_strategy</code> (<code>qd</code>), <code>export_astra</code> (<code>False</code>).</p>
+<p>Structural note: the default <code>template_uuid</code> <code class="uuid">20260512_162504_70ccefbf</code> is not a folder in <code class="path">sources/workflows/</code> here (checked 2026-09-28). When <code>workflow_dir</code> holds at least one <code>state_result.json</code>, <code>select_parent_workflow</code> returns the template without checking its folder. Generation 1 is therefore recorded as <code>evolution_kind = "mutation"</code> against a parent that is absent, and <code>WorkflowInfo.load_code</code> returns <code>""</code> for it.</p>
 </div></details>
 <p class="note flag">Docs say the runner uses the SmolAgents <code>LocalPythonExecutor</code> with an AST allow-list (<code>AGENTS.md</code>, <code>README.md</code> line 98); <code>WorkflowRunner.execute</code> actually writes the script to <code>tmp/</code> and starts a plain subprocess with <code>cwd = workspace_dir</code> and a timeout, and no AST check exists on that path.</p>
+</div>
+
+<div class="panel" id="verifier-choice"><span class="br"></span>
+<h2>Step 19 - which verifier runs</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1160 350" role="img" aria-label="EvolutionEngine calls WorkflowEvaluator, which calls the hybrid, legacy or gold verifier; gold also grades a private copy with the benchmark grader">
+  <defs>
+    <marker id="arw5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw5D" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow5" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="e1" href="file_core_evolution_engine.html">
+    <title>Calls the facade; for gold only through asyncio.to_thread</title>
+    <rect x="20" y="30" width="220" height="50" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="130" y="51" text-anchor="middle">_evaluate_workflow_phenotype</text>
+    <text class="box-sub" x="130" y="68" text-anchor="middle">to_thread only for gold</text>
+  </a>
+  <a class="box" id="e2" href="file_eval_evaluator.html">
+    <title>Built in EvolutionEngine.__init__ from config.verifier_kind</title>
+    <rect x="290" y="30" width="210" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="395" y="51" text-anchor="middle">WorkflowEvaluator.evaluate</text>
+    <text class="box-sub" x="395" y="68" text-anchor="middle">evaluator_type="verifier"</text>
+  </a>
+  <a class="box" id="e3" href="file_hybrid_evaluator.html">
+    <title>Default; also built for unknown verifier_kind values</title>
+    <rect x="580" y="18" width="220" height="48" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="690" y="38" text-anchor="middle">HybridVerifierEvaluator</text>
+    <text class="box-sub" x="690" y="55" text-anchor="middle">hybrid (default)</text>
+  </a>
+  <a class="box" id="e4" href="area_evaluators_legacy.html">
+    <title>Deprecated per-claim verifier</title>
+    <rect x="580" y="86" width="220" height="48" rx="12" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="690" y="106" text-anchor="middle">VerifierEvaluator</text>
+    <text class="box-sub" x="690" y="123" text-anchor="middle">legacy - DEPRECATED</text>
+  </a>
+  <a class="box" id="e5" href="file_gold_evaluator.html">
+    <title>Hybrid reward plus benchmark-grader gradient; research control only</title>
+    <rect x="580" y="170" width="220" height="48" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="690" y="190" text-anchor="middle">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="690" y="207" text-anchor="middle">gold - ORACLE</text>
+  </a>
+  <a class="box" id="e6" href="file_gold_evaluator.html">
+    <title>gold_hybrid_config gives the inner hybrid its own _gold registry dir</title>
+    <rect x="850" y="100" width="290" height="48" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="995" y="120" text-anchor="middle">inner HybridVerifierEvaluator</text>
+    <text class="box-sub" x="995" y="137" text-anchor="middle">registry dir with _gold suffix</text>
+  </a>
+  <a class="box" id="e7" href="file_gold_grader.html">
+    <title>Grades a private workspace copy; never raises; timeout gives a censored result</title>
+    <rect x="850" y="190" width="290" height="48" rx="20" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="995" y="210" text-anchor="middle">grade_private_copy()</text>
+    <text class="box-sub" x="995" y="227" text-anchor="middle">ORACLE - cap gold_feedback_timeout_s</text>
+  </a>
+  <a class="box" id="e8" href="area_benchmark_evaluation.html">
+    <title>Shared helper, also used by the per-generation ablations</title>
+    <rect x="850" y="280" width="290" height="48" rx="20" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="995" y="300" text-anchor="middle">grade_directory()</text>
+    <text class="box-sub" x="995" y="317" text-anchor="middle">snapshot_grading.py</text>
+  </a>
+  <a class="box" id="e9" href="area_benchmark_evaluation.html">
+    <title>Builds ExecutionSandbox: VER re-run, SR eval program, CodeBERT CBS</title>
+    <rect x="560" y="280" width="240" height="48" rx="12" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="680" y="300" text-anchor="middle">CapsuleEvaluator.evaluate_all</text>
+    <text class="box-sub" x="680" y="317" text-anchor="middle">ExecutionSandbox: VER, SR, CBS</text>
+  </a>
+  <a class="box" id="e10" href="../../datasets/ScienceAgentBench/README.md">
+    <title>eval_programs, eval_programs/gold_results and gold_programs</title>
+    <rect x="270" y="276" width="240" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <ellipse cx="390" cy="276" rx="120" ry="8" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="390" y="300" text-anchor="middle">benchmark gold</text>
+    <text class="box-sub" x="390" y="317" text-anchor="middle">ORACLE - datasets/ScienceAgentBench/</text>
+  </a>
+  <a class="box" id="e11" href="#files">
+    <title>gold adds textual_gradient_hybrid.txt, gold_feedback.json and a banner in evaluation.txt</title>
+    <rect x="20" y="166" width="220" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <ellipse cx="130" cy="166" rx="110" ry="8" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="130" y="190" text-anchor="middle">&lt;uuid&gt;/ gold sidecars</text>
+    <text class="box-sub" x="130" y="207" text-anchor="middle">gold_feedback.json + 2 gradients</text>
+  </a>
+
+  <path class="edge" data-from="e1" data-to="e2" d="M240,55 H290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="265" y="48" text-anchor="middle">uuid</text>
+  <path class="edge" data-from="e2" data-to="e3" d="M500,50 H530 V42 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="506" y="36">hybrid</text>
+  <path class="edge" data-from="e2" data-to="e4" d="M530,55 V110 H580" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="536" y="102">legacy</text>
+  <path class="edge" data-from="e2" data-to="e5" d="M530,110 V194 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="536" y="186">gold</text>
+  <path class="edge" data-from="e5" data-to="e6" d="M800,182 H825 V124 H850" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="830" y="94">1 hybrid reward, gradient</text>
+  <path class="edge" data-from="e5" data-to="e7" d="M800,208 H850" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="806" y="202">2 grade</text>
+  <path class="edge" data-from="e7" data-to="e8" d="M995,238 V280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="1003" y="264">task row + loader</text>
+  <path class="edge" data-from="e8" data-to="e9" d="M850,304 H800" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <path class="edge dashed-edge" data-from="e10" data-to="e9" d="M510,304 H560" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw5D)"/>
+  <text class="edge-label" x="535" y="296" text-anchor="middle">reads</text>
+  <path class="edge dashed-edge" data-from="e5" data-to="e11" d="M580,208 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw5D)"/>
+  <text class="edge-label" x="300" y="200">3 writes grader gradient</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> builds one verifier from <code>config.verifier_kind</code>. <span class="chip warn">oracle - leaks gold</span> For <code>gold</code>, <code>GoldFeedbackEvaluator.evaluate</code> first copies the workspace (<code>make_private_copy</code>), runs the inner hybrid, grades the copy, then writes the grader's VER/SR text as <code>textual_gradient.txt</code>.</p>
+<p class="note">Amber note: on a plain <code>--task</code> run, <code>gold_feedback_task_row</code> is unset, so <code>resolve_task_context</code> returns no context, nothing is graded, and the gradient stays the hybrid one; only <code>--science_agent_bench</code> sets the row (<code>CsvEvaluationMode._set_gold_feedback_task</code>).</p>
+<details><summary>gold reward and gradient rules</summary><div class="dbody">
+<table><thead><tr><th>Grade status</th><th>Gradient</th><th>Reward (default)</th><th>Reward with <code>gold_feedback_reward</code></th></tr></thead><tbody>
+<tr><td class="sym">gold (graded)</td><td>grader text, <code>build_gold_gradient</code></td><td>hybrid reward</td><td><code>oracle_reward</code>: SR 1.0, VER 0.5 x CBS, else 0.0</td></tr>
+<tr><td class="sym">censored_infra / censored_copy_failed</td><td>censored note + hybrid gradient</td><td>hybrid reward</td><td>0.0, <code>reward_fallback = "oracle_censored"</code></td></tr>
+<tr><td class="sym">no_task_context / skipped_short_circuit</td><td>hybrid gradient</td><td>hybrid reward</td><td>hybrid reward</td></tr>
+</tbody></table>
+<p>Source: <a href="../../sources/evaluators/gold_feedback/evaluator.py">gold_feedback/evaluator.py</a>::<code>GoldFeedbackEvaluator._apply</code>, <a href="../../sources/evaluators/gold_feedback/reward.py">gold_feedback/reward.py</a>::<code>oracle_reward</code>. <code>FALLBACK_REWARD_KINDS</code> in <a href="../../sources/core/workflow_info.py">workflow_info.py</a> holds <code>mean_claim</code> and <code>oracle_censored</code>, so <code>_select_best_run</code> skips both. <code>WorkflowSelector</code> skips oracle generations as parents unless the current run is also <code>gold</code> (<code>is_oracle_generation</code>).</p>
+</div></details>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -320,7 +440,7 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
   <text class="box-sub" x="20" y="438">cylinders = folders of data on disk  |  amber tag = level a plain --task run never writes</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - paths come from <code>sources/utils/paths.py::default_workflow_dir</code>, <code>::default_memory_dir</code>, <code>::default_runs_capsule_dir</code> and <code>::default_tmp_dir</code>; a repo checkout keeps them in-tree, an installed wheel moves them to XDG dirs. <code>run_&lt;x&gt;/</code>, <code>runs_capsule/run_&lt;x&gt;/</code> and <code>run_notes/run_&lt;x&gt;/</code> are set by <a href="../../sources/cli/evaluation_cli.py">sources/cli/evaluation_cli.py</a>::<code>EvaluationCLI</code> (lines 1051-1078).</p>
+<p class="figcap">Diagram 3 - paths come from <code>sources/utils/paths.py::default_workflow_dir</code>, <code>::default_memory_dir</code>, <code>::default_runs_capsule_dir</code> and <code>::default_tmp_dir</code>; a repo checkout keeps them in-tree, an installed wheel moves them to XDG dirs. <code>run_&lt;x&gt;/</code>, <code>runs_capsule/run_&lt;x&gt;/</code> and <code>run_notes/run_&lt;x&gt;/</code> are set by <a href="../../sources/cli/evaluation_cli.py">sources/cli/evaluation_cli.py</a>::<code>EvaluationCLI</code> (lines 1051-1078).</p>
 <details><summary>10 files inside one &lt;uuid&gt;/ folder</summary><div class="dbody">
 <table><thead><tr><th>File under <code>&lt;uuid&gt;/</code></th><th>Written by</th><th>Holds</th></tr></thead><tbody>
 <tr><td class="sym"><code>workflow_genotype_&lt;uuid&gt;.py</code></td><td class="sym">Factory.save_workflow_files</td><td>genotype, the mutant</td></tr>
@@ -334,6 +454,7 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
 <tr><td class="sym"><code>evaluation.txt</code></td><td class="sym">HybridVerifierEvaluator._write_artifacts</td><td>claim verdicts</td></tr>
 <tr><td class="sym"><code>textual_gradient.txt</code></td><td class="sym">HybridVerifierEvaluator._write_artifacts</td><td>gradient for next mutation</td></tr>
 </tbody></table>
+<p>With <code>verifier_kind = "gold"</code>, <code>GoldFeedbackEvaluator._persist</code> also writes <code>textual_gradient_hybrid.txt</code> and <code>gold_feedback.json</code>, puts a leak banner on top of <code>evaluation.txt</code>, and adds an <code>evaluation.gold_oracle</code> block to <code>state_result.json</code>. The inner hybrid registry goes to <code>_verifier_tmp_gold/</code> under <code>workflow_dir</code>, because <code>Config</code> sets no <code>temp_dir</code> (<code>gold_hybrid_config</code>).</p>
 <p>Also under <code>workflow_dir</code> itself: <code>qd_archive.jsonl</code> (<code>EvolutionEngine._persist_qd_archive</code>), <code>variation_log.jsonl</code> (<code>::_persist_variation_log</code>), and <code>_verifier_tmp/hybrid_registry_&lt;key&gt;.json</code> plus <code>_verifier_tmp/&lt;uuid&gt;/verify_*.py</code> (<a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a>::<code>TaskRegistry.save</code>).</p>
 </div></details>
 </div>
@@ -397,7 +518,7 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
     <text class="box-sub" x="735" y="286" text-anchor="middle">from gen 3 onwards</text>
   </a>
   <a class="box" id="g8" href="flow_evolution_loop.html">
-    <title>next generation repeats steps 5 to 21</title>
+    <title>next generation repeats steps 8 to 24</title>
     <rect x="880" y="195" width="180" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="970" y="217" text-anchor="middle">gen N+1 runs</text>
     <text class="box-sub" x="970" y="233" text-anchor="middle">new uuid folder</text>
@@ -419,15 +540,16 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
   <text class="edge-label" x="850" y="240" text-anchor="middle">prompt</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - the branch taken after each scored generation. Source: <a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a>::<code>EvolutionEngine.evolve_generation</code>; <code>initial_population</code> and <code>learned_score_threshold</code> come from <a href="../../config.py">config.py</a>.</p>
+<p class="figcap">Diagram 4 - the branch taken after each scored generation. Source: <a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a>::<code>EvolutionEngine.evolve_generation</code>; <code>initial_population</code> and <code>learned_score_threshold</code> come from <a href="../../config.py">config.py</a>.</p>
 <p class="note say">With <code>--learn</code>, generation 2 is a <b>seed</b>, not a mutation: <code>runs</code> holds 1 element, below <code>initial_population = 2</code>.</p>
 </div>
 
 <footer>
-<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code>AGENTS.md</code> (claims checked against the code), <a href="../../main.py">main.py</a>, <a href="../../config.py">config.py</a>, <a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a>, <a href="../../sources/core/orchestrator.py">orchestrator.py</a>, <a href="../../sources/core/workflow_factory.py">workflow_factory.py</a>, <a href="../../sources/core/factory.py">factory.py</a>, <a href="../../sources/core/workflow_runner.py">workflow_runner.py</a>, <a href="../../sources/core/variation_engine.py">variation_engine.py</a>, <a href="../../sources/core/selection.py">selection.py</a>, <a href="../../sources/core/lineage.py">lineage.py</a>, <a href="../../sources/core/workflow_info.py">workflow_info.py</a>, <a href="../../sources/core/llm_provider.py">llm_provider.py</a>, <a href="../../sources/modules/smolagent_factory.py">sources/modules/smolagent_factory.py</a>, <a href="../../sources/evaluators/evaluator.py">evaluators/evaluator.py</a>, <a href="../../sources/evaluators/base.py">evaluators/base.py</a>, <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a>, <a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a>, <a href="../../sources/utils/paths.py">utils/paths.py</a>, <a href="../../sources/utils/workspace_management.py">workspace_management.py</a>, <a href="../../sources/utils/run_metrics.py">run_metrics.py</a>, <a href="../../sources/utils/precheck.py">precheck.py</a>, <a href="../../sources/utils/ensure_env.py">ensure_env.py</a>, <a href="../../sources/utils/transfer_toolomics.py">transfer_toolomics.py</a>, <a href="../../sources/cli/evaluation_cli.py">cli/evaluation_cli.py</a>, <a href="../../sources/benchmark_evaluation/csv_mode.py">benchmark_evaluation/csv_mode.py</a>, <a href="../../sources/benchmark_evaluation/capsule_evaluator.py">capsule_evaluator.py</a>.</p>
-<p class="skips">Skipped, with reason: <code class="path">sources/core/planner.py</code> and <code>single_agent_factory.py</code> (<code>--goal</code> and <code>--single_agent</code> paths, outside this flow) &#183; <code class="path">sources/core/tools_manager.py</code> (MCP discovery internals, <code>mod_core_tools_llm.html</code>) &#183; <code>sources/core/{schema,workflow_selection}.py</code> (only the fields used here were read) &#183; <code class="path">sources/modules/state_schema.py</code> (read for the initial-state keys only) &#183; the legacy verifier files <code>sources/evaluators/{verifier,verifier_claims,verifier_per_claim,verifier_workspace,verifier_claim_sources,generic,scenario,bs_detection}.py</code> (not on the default verifier path) &#183; <code>sources/evaluators/hybrid_verifier/{claims,layers,scorers,aggregation,gradient,digest,inventory}.py</code> (pipeline internals, <code>flow_verification.html</code>) &#183; <code>sources/utils/{pricing,logging,notify,visualization,evolution_tree}.py</code> (internals; only their write behaviour is named) &#183; <code>sources/benchmark_evaluation/*</code> except the two files cited (batch and ablation flows, <code>flow_sab_batch.html</code>) &#183; <code>tests/</code> (not on the runtime path) &#183; Tier D data and tooling: <code>docs/</code>, <code>datasets/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>tmp/</code>, <code>logs/</code>, <code>webui/</code>, <code>.venv/</code>.</p>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code>AGENTS.md</code> (claims checked against the code), <a href="../../main.py">main.py</a>, <a href="../../config.py">config.py</a>, <a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a>, <a href="../../sources/core/orchestrator.py">orchestrator.py</a>, <a href="../../sources/core/workflow_factory.py">workflow_factory.py</a>, <a href="../../sources/core/factory.py">factory.py</a>, <a href="../../sources/core/workflow_runner.py">workflow_runner.py</a>, <a href="../../sources/core/variation_engine.py">variation_engine.py</a>, <a href="../../sources/core/selection.py">selection.py</a>, <a href="../../sources/core/lineage.py">lineage.py</a>, <a href="../../sources/core/workflow_info.py">workflow_info.py</a>, <a href="../../sources/core/llm_provider.py">llm_provider.py</a>, <a href="../../sources/modules/smolagent_factory.py">sources/modules/smolagent_factory.py</a>, <a href="../../sources/evaluators/evaluator.py">evaluators/evaluator.py</a>, <a href="../../sources/evaluators/base.py">evaluators/base.py</a>, <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a>, <a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a>, <a href="../../sources/utils/paths.py">utils/paths.py</a>, <a href="../../sources/utils/workspace_management.py">workspace_management.py</a>, <a href="../../sources/utils/run_metrics.py">run_metrics.py</a>, <a href="../../sources/utils/precheck.py">precheck.py</a>, <a href="../../sources/utils/ensure_env.py">ensure_env.py</a>, <a href="../../sources/utils/transfer_toolomics.py">transfer_toolomics.py</a>, <a href="../../sources/cli/evaluation_cli.py">cli/evaluation_cli.py</a>, <a href="../../sources/benchmark_evaluation/csv_mode.py">benchmark_evaluation/csv_mode.py</a>, <a href="../../sources/benchmark_evaluation/capsule_evaluator.py">capsule_evaluator.py</a>, <a href="../../sources/benchmark_evaluation/snapshot_grading.py">snapshot_grading.py</a>, <a href="../../sources/evaluators/gold_feedback/evaluator.py">gold_feedback/evaluator.py</a>, <a href="../../sources/evaluators/gold_feedback/grader.py">gold_feedback/grader.py</a>, <a href="../../sources/evaluators/gold_feedback/reward.py">gold_feedback/reward.py</a>.</p>
+<p class="skips">Skipped, with reason: <code class="path">sources/core/planner.py</code> and <code>single_agent_factory.py</code> (<code>--goal</code> and <code>--single_agent</code> paths, outside this flow) &#183; <code class="path">sources/core/tools_manager.py</code> (MCP discovery internals, <code>mod_core_tools_llm.html</code>) &#183; <code>sources/core/{schema,workflow_selection}.py</code> (only the fields used here were read) &#183; <code class="path">sources/modules/state_schema.py</code> (read for the initial-state keys only) &#183; the legacy verifier package <code>sources/evaluators/legacy_verifier/*.py</code> and <code>sources/evaluators/{generic,scenario}/*.py</code> (not on the default verifier path) &#183; <code>sources/evaluators/gold_feedback/{format,reward,leak}.py</code> (only the rules named in the gold table were read; see <code>mod_evaluators_gold_feedback.html</code>) &#183; <code>sources/evaluators/hybrid_verifier/{claims,layers,scorers,aggregation,gradient,digest,inventory}.py</code> (pipeline internals, <code>flow_verification.html</code>) &#183; <code>sources/utils/{pricing,logging,notify,visualization,evolution_tree}.py</code> (internals; only their write behaviour is named) &#183; <code>sources/benchmark_evaluation/*</code> except <code>csv_mode.py</code>, <code>capsule_evaluator.py</code>, <code>snapshot_grading.py</code> (batch and ablation flows, <code>flow_sab_batch.html</code>) &#183; <code>tests/</code> (not on the runtime path) &#183; Tier D data and tooling: <code>docs/</code>, <code>datasets/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>tmp/</code>, <code>logs/</code>, <code>webui/</code>, <code>.venv/</code>.</p>
 <p>Unconfirmed: the exact artifacts of the OS-level Python 3.12 install in <a href="../../sources/utils/ensure_env.py">ensure_env.py</a> (package-manager commands run outside the repo) - <code>unknown</code>.</p>
 <p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (<code>git status --porcelain</code> lists modified files, among them <code>main.py</code>, <code>config.py</code> and <code class="path">sources/evaluators/evaluator.py</code>), so line numbers may shift.</p>
+<p>Updated at 4020790 + uncommitted working tree, 2026-09-28: steps 2-4 put in code order (<code>PreCheck.run</code> runs after the path checks), step 1 adds <code>warn_gold_feedback_mode</code>, step 5 names the facade build, step 19 routes through <code>WorkflowEvaluator.evaluate</code>, step 24 names <code>_select_best_run</code>, new Diagram 2 (verifier choice). Every step symbol was re-checked with an AST scan of the current files.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

@@ -10,13 +10,13 @@
 <div class="wrap">
 
 <h1 class="hud">audits/ &mdash; which report answers what</h1>
-<p class="intro">Ten files and three subfolders sit in <code>audits/</code> (35 files, 8.4 MB), written between 2026-09-06 and 2026-09-23. Each answers a different question about the verifier-driven evolution loop and the ScienceAgentBench chemistry runs. This page maps the families, the sizes, and the evidence each report reads.</p>
+<p class="intro">Eleven files and three subfolders sit in <code>audits/</code> (36 files, 8.5 MB), written between 2026-09-06 and 2026-09-28. Each answers a different question about the verifier-driven evolution loop, the ScienceAgentBench chemistry runs, or the new gold-feedback oracle mode. This page maps the families, the sizes, and the evidence each report reads.</p>
 
 <div id="legend" data-auto></div>
 <div class="panel"><span class="br"></span>
 <h2>Diagram 1 &mdash; map of the reports</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 920 245" role="img" aria-label="Map of audit report families">
+<svg class="diagram" viewBox="0 0 920 350" role="img" aria-label="Map of audit report families">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -81,24 +81,31 @@
     <text class="box-label" x="823" y="179" text-anchor="middle">Reward-signal charts</text>
     <text class="box-sub" x="823" y="197" text-anchor="middle">scripts + PNG and PDF</text>
   </a>
-  <text class="box-sub" x="10" y="238">cyan = report reads artifacts &middot; aqua = gap analysis and charts &middot; steel = code-reading report</text>
+  <a class="box" href="../../audits/gold_feedback_mode_design_2026-09-28.md">
+    <title>Design of --verifier_kind gold: the benchmark grader writes the gradient.</title>
+    <rect x="10" y="250" width="352" height="78" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="186" y="278" text-anchor="middle">Gold-feedback mode design</text>
+    <text class="box-sub" x="186" y="296" text-anchor="middle">ORACLE &middot; 259 lines, 2026-09-28</text>
+  </a>
+  <text class="box-sub" x="380" y="284">mint = verifier-layer design report, ORACLE mode (reads gold)</text>
+  <text class="box-sub" x="10" y="343">cyan = report reads artifacts &middot; aqua = gap analysis and charts &middot; steel = code-reading report &middot; mint = oracle-mode design</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - ten report families; every box links to the report or to the family index. Family lists are in the table below.</p>
+<p class="figcap">Diagram 1 - eleven report families; every box links to the report or to the family index. Family lists are in the table below. The mint box is new since the last build.</p>
 </div>
 <div class="panel"><span class="br"></span>
 <h2>Diagram 2 &mdash; evidence the reports read</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 860 310" role="img" aria-label="Evidence sources read by the audit reports">
+<svg class="diagram" viewBox="0 0 860 358" role="img" aria-label="Evidence sources read by the audit reports">
   <defs>
     <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
   <rect x="20" y="120" width="170" height="78" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
   <text class="box-label" x="105" y="154" text-anchor="middle">audit reports</text>
-  <text class="box-sub" x="105" y="172" text-anchor="middle">13 files in audits/</text>
+  <text class="box-sub" x="105" y="172" text-anchor="middle">11 files + 3 folders</text>
   <path class="edge" d="M190,159 H265" fill="none" stroke="#5E8CA3" stroke-width="1.25"/>
-  <path class="edge" d="M265,32 V272" fill="none" stroke="#5E8CA3" stroke-width="1.25"/>
+  <path class="edge" d="M265,32 V320" fill="none" stroke="#5E8CA3" stroke-width="1.25"/>
   <rect x="340" y="14" width="500" height="36" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
   <text class="box-label" x="352" y="30">run_notes/</text>
   <text class="box-sub" x="352" y="44">campaign records: rewards, ablations</text>
@@ -123,16 +130,20 @@
   <text class="box-label" x="352" y="270">datasets/ScienceAgentBench.csv</text>
   <text class="box-sub" x="352" y="284">instance rows, 102 tasks</text>
   <path class="edge dashed-edge" d="M265,272 H340" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <rect x="340" y="302" width="500" height="36" rx="2" fill="none" stroke="#5E8CA3" stroke-dasharray="5 4"/>
+  <text class="box-label" x="352" y="318">sources/**/*.py</text>
+  <text class="box-sub" x="352" y="332">code; 3 reports cite .py paths</text>
+  <path class="edge dashed-edge" d="M265,320 H340" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw3)"/>
   <text class="edge-label" x="196" y="152">reads</text>
-  <text class="box-sub" x="340" y="304">dashed = reads data on disk; the run workspaces are volatile and may be gone</text>
+  <text class="box-sub" x="340" y="352">dashed = reads data on disk; the run workspaces are volatile and may be gone</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - evidence folders the reports cite. Counts of mentions across all reports: <code>sources/workflows</code> 857, <code>eval_programs</code> 419, <code>/tmp/mimosa_run_</code> 353, <code>run_notes</code> 318, <code>runs_capsule</code> 109 (my computation, grep count).</p>
+<p class="figcap">Diagram 2 - evidence folders the reports cite. Counts of mentions across all text reports: <code>sources/workflows</code> 861, <code>eval_programs</code> 428, <code>/tmp/mimosa_run_</code> 356, <code>run_notes</code> 318, <code>runs_capsule</code> 109 (my computation, substring count, 2026-09-28). Reports that cite <code>sources/{core,evaluators,benchmark_evaluation}/*.py</code> paths: <code>verifier_system_report.md</code> 18, <code>chemistry_10_alignement_claims_vs_gold.html</code> 7, <code>gold_feedback_mode_design_2026-09-28.md</code> 2.</p>
 </div>
 <div class="panel"><span class="br"></span>
 <h2>Chart &mdash; size of each top-level report</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="Bar chart of report sizes in KB">
+<svg class="diagram" viewBox="0 0 900 326" role="img" aria-label="Bar chart of report sizes in KB">
   <defs>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
@@ -166,11 +177,14 @@
   <text class="box-sub" x="300" y="280" text-anchor="end">chemistry_mode_matrix.html</text>
   <rect x="310" y="268" width="9" height="15" fill="rgba(0,229,255,0.18)" stroke="#00E5FF"/>
   <text class="edge-label" x="325" y="280">43 KB</text>
+  <text class="box-sub" x="300" y="306" text-anchor="end">gold_feedback_mode_design_2026-09-28.md</text>
+  <rect x="310" y="294" width="5" height="15" fill="rgba(125,249,199,0.18)" stroke="#7DF9C7"/>
+  <text class="edge-label" x="321" y="306">21 KB</text>
 
-  <text class="box-sub" x="310" y="296">horizontal bar = file size in KB, linear scale, max 2400 KB</text>
+  <text class="box-sub" x="310" y="322">horizontal bar = file size in KB, linear scale, max 2400 KB</text>
 </svg>
 </div>
-<p class="figcap">Chart - file sizes from <code>ls -l audits/</code>, 2026-10-02 (my computation). Sizes scale linearly; the largest file is 56 times the smallest.</p>
+<p class="figcap">Chart - file sizes from <code>ls -l audits/</code>, 2026-09-28 (my computation, KB = 1 024 bytes). Sizes scale linearly; the largest file is 112 times the smallest (the new 21 KB design report).</p>
 </div>
 <div class="panel"><span class="br"></span>
 <h2>Reports &mdash; size, question, link</h2>
@@ -187,18 +201,20 @@
 <tr><td class="sym"><code class="path">sab_verifier_gap_data.json</code></td><td class="size">175 KB</td><td>Census of 102 tasks: grader bars, verifier coverage, verdicts</td><td><a href="../../audits/sab_verifier_gap_data.json">open</a></td></tr>
 <tr><td class="sym"><code class="path">sab_verifier_gap_report.html</code></td><td class="size">251 KB</td><td>Where do the Mimosa verifier and the SAB graders diverge?</td><td><a href="../../audits/sab_verifier_gap_report.html">open</a></td></tr>
 <tr><td class="sym"><code class="path">verifier_system_report.md</code></td><td class="size">82 KB</td><td>How does the verifier work, stage by stage?</td><td><a href="../../audits/verifier_system_report.md">open</a></td></tr>
+<tr><td class="sym"><code class="path">gold_feedback_mode_design_2026-09-28.md</code> <span class="chip warn">oracle - leaks gold</span></td><td class="size">21 KB</td><td>How to feed grader verdicts into the mutation gradient?</td><td><a href="../../audits/gold_feedback_mode_design_2026-09-28.md">open</a> &middot; <a href="mod_evaluators_gold_feedback.html">code</a></td></tr>
 <tr><td class="sym"><code class="path">chemistry_gradient_detailled_steering_transitions/</code></td><td class="size">1.7 MB &#183; 11 files</td><td>Between two generations, what did the loop do?</td><td><a href="../../audits/chemistry_gradient_detailled_steering_transitions/index.html">open</a></td></tr>
 <tr><td class="sym"><code class="path">explainers_per_task/</code></td><td class="size">236 KB &#183; 6 files</td><td>Why did this one task pass or fail SR?</td><td><a href="../../audits/explainers_per_task/compound_filter_iterative_sr_explainer.html">open</a></td></tr>
 <tr><td class="sym"><code class="path">reward_signal_analysis/</code></td><td class="size">1.0 MB &#183; 8 files</td><td>Does reward track the ground-truth ablation metrics?</td><td><a href="../../audits/reward_signal_analysis/reward_vs_groundtruth_publication.png">open</a></td></tr>
 </tbody>
 </table>
-<p class="sub">AGENTS.md: audit reports are single-file offline HTML in <code>audits/</code>. Checked on 2026-10-02: no report has an <code>src=</code> or <code>href=</code> to an external asset; two reports quote an external URL as plain text only.</p>
-<p class="sub">Related clone pages: <a href="data_runs.html">data_runs.html</a> (the runtime folders these reports quote) and <a href="flow_verification.html">flow_verification.html</a> (how the verifier runs).</p>
-<p class="sub">35 files, 8.4 MB total, dates 2026-09-06 to 2026-09-23 (my computation from <code>ls -l</code> and <code>du</code>).</p>
+<p class="sub">AGENTS.md: audit reports are single-file offline HTML in <code>audits/</code>. Checked on 2026-09-28: no report has an <code>src=</code> or <code>href=</code> to an external asset; two reports quote an external URL as plain text only. The new design report is Markdown, not HTML.</p>
+<p class="sub">Related clone pages: <a href="data_runs.html">data_runs.html</a> (the runtime folders these reports quote), <a href="flow_verification.html">flow_verification.html</a> (how the verifier runs) and <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> (the oracle-mode code the design report led to).</p>
+<p class="sub">36 files (plus one <code>.DS_Store</code>), 8.5 MB total, dates 2026-09-06 to 2026-09-28 (my computation from <code>find</code>, <code>ls -l</code> and <code>du -sh</code>). <code>audits/</code> is git-ignored (<code>.gitignore</code> line 2), so <code>git</code> does not track these files.</p>
 
 <p class="note say"><code>audits/</code> is read-only evidence: AGENTS.md says never modify, move, or delete anything inside an audit folder.</p>
+<p class="note">Amber note: the gold-feedback design report cites line numbers of the tree it read; the working tree has changed since (for example the 2048-char gradient clip it lists as a trap is gone from <code>sources/core/variation_engine.py</code>).</p>
 <p class="note">Amber note: every report is a dated snapshot; the <code>/tmp/mimosa_run_*</code> workspaces it quotes are volatile and may already be gone.</p>
-<p class="note flag">Red note: <code class="path">audits/reward_signal_analysis/analyze_reward_correlations.py</code> reads <code>../../run_iterative_1/*.json</code>, a path that no longer exists; the campaign records now live under <code>run_notes/</code>.</p>
+<p class="note flag">Red note: all three scripts in <code class="path">audits/reward_signal_analysis/</code> read <code>../../run_iterative_1/*.json</code>, a path that no longer exists; the campaign records now live under <code>run_notes/</code>.</p>
 </div>
 <div class="panel"><span class="br"></span>
 <h2>Full file list</h2>
@@ -228,6 +244,17 @@ reward_vs_groundtruth_correlations.png  224 KB
 reward_vs_groundtruth_publication.png/.pdf  385 KB / 72 KB</pre>
 <p class="sub">Scripts write the PNG and PDF charts. Chart set last written 2026-09-06.</p>
 </div></details>
+<details><summary>gold_feedback_mode_design_2026-09-28.md &mdash; 9 sections, 259 lines</summary><div class="dbody">
+<pre>TL;DR                    recommends --verifier_kind gold = gradient-only oracle
+1 Verifier plumbing      what the engine reads from state_result.json
+2 Ablation grading path  CsvEvaluationMode._evaluate_snapshot_ablations
+3 E33 TRUMAN format      gold-gradient text format to reuse
+4 Design options         (a) gradient-only, (b) full oracle, (c) one-step E43
+5 Recommended design     option (a) implementation sketch
+6 E43 one-step protocol  option (c), offline gold arm
+7 Risks                  8 Feasibility (148 arena uuids)   9 Gaps</pre>
+<p class="sub">Header lines 6-8: any run in this mode is contaminated by the gold reference; its SR/VER/CBS must never be reported as a Mimosa score. Code: <a href="../../sources/evaluators/gold_feedback/evaluator.py">sources/evaluators/gold_feedback/evaluator.py</a> (<code>GoldFeedbackEvaluator</code>), default <code>gold_feedback_reward = False</code> in <code>config.py</code>, i.e. option (a). The report writes the class as <code>CSVMode</code>; the code name is <code>CsvEvaluationMode</code>.</p>
+</div></details>
 <details><summary>sab_verifier_gap_data.json &mdash; top-level keys</summary><div class="dbody">
 <pre>_provenance      date, mimosa_commit 7e8463b, csv, method, report
 tasks            102 entries: verdict, raw scout note
@@ -238,9 +265,9 @@ scout_assignment 102 entries</pre>
 </div></details>
 </div>
 <footer>
-<p>Sources read: <code>audits/</code> listing and sizes (<code>ls -R</code>, <code>ls -l</code>, <code>du -sh</code>), <code>&lt;title&gt;</code> and first heading or TL;DR of every HTML report, full text of <code class="path">audits/verifier_system_report.md</code> headings and TL;DR, top-level keys of <code class="path">audits/sab_verifier_gap_data.json</code>, first lines of the three scripts in <code class="path">audits/reward_signal_analysis/</code>, <code>AGENTS.md</code>, <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>.</p>
-<p class="skips">Skipped: report bodies of the big HTML files (only title, heading, TL;DR read - Tier C method) &#183; <code>evolution_index_vs_metrics.pdf</code> and <code>reward_vs_groundtruth_publication.pdf</code> (binary, no text read; PNG twins listed instead) &#183; <code class="path">audits/.DS_Store</code> (macOS system file) &#183; per-task transition HTML bodies (same five-block template, described once) &#183; chemical-correctness verdicts (out of scope; reports say the same).</p>
-<p>Working tree had uncommitted changes at build time (<code>git status --porcelain</code> lists modified files such as <code class="path">docs/DEVELOPER_GUIDE.md</code>); this page describes the tree as found on disk. Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+<p>Sources read: <code>audits/</code> listing and sizes (<code>find</code>, <code>ls -lR</code>, <code>du -sh</code>, 2026-09-28), <code>&lt;title&gt;</code> and first heading or TL;DR of every HTML report, headings and TL;DR of <code class="path">audits/verifier_system_report.md</code> and <code class="path">audits/gold_feedback_mode_design_2026-09-28.md</code>, top-level keys of <code class="path">audits/sab_verifier_gap_data.json</code>, first lines of the three scripts in <code class="path">audits/reward_signal_analysis/</code>, <code>AGENTS.md</code>, <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>; for the design report cross-check: <code class="path">config.py</code> (<code>gold_feedback_reward</code>), <code class="path">main.py</code> (<code>--verifier_kind</code> choices), <code>git diff HEAD -- sources/core/variation_engine.py</code>.</p>
+<p class="skips">Skipped: report bodies of the big HTML files (only title, heading, TL;DR read - Tier C method) &#183; body of the gold-feedback design report beyond headings, TL;DR and header (its code is mapped on <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>) &#183; <code>evolution_index_vs_metrics.pdf</code> and <code>reward_vs_groundtruth_publication.pdf</code> (binary, no text read; PNG twins listed instead) &#183; <code class="path">audits/.DS_Store</code> (macOS system file) &#183; per-task transition HTML bodies (same five-block template, described once) &#183; chemical-correctness verdicts (out of scope; reports say the same).</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28. <code>audits/</code> is git-ignored, so its content is not tied to a commit; counts are a snapshot taken on 2026-09-28.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

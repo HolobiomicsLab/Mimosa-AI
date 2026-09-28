@@ -49,7 +49,9 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `verifier_kind` | `str` | `hybrid` | Verifier channel: `hybrid` (E19/E19b) or `legacy` (deprecated multi-source). |
+| `verifier_kind` | `str` | `hybrid` | Verifier channel: `hybrid` (E19/E19b), `legacy` (deprecated multi-source) or `gold` (ORACLE / BENCHMARK-LEAKING control: benchmark-grader feedback as gradient; research only, never report its scores — see [Gold feedback (oracle) mode](../concepts/evaluation-pipeline.md#gold-feedback-oracle-mode)). |
+| `gold_feedback_reward` | `bool` | `false` | `verifier_kind=gold` only: full oracle — the reward also comes from the benchmark grader (SR → 1.0, VER → 0.5·CBS, else 0.0). Default = gradient-only oracle. JSON strings `"false"`/`"0"` parse as false. |
+| `gold_feedback_timeout_s` | `int` | `1800` | `verifier_kind=gold` only: wall-clock cap (s) on benchmark grading per generation (`0` disables it); on timeout the grade is censored and the hybrid gradient is used. |
 | `hybrid_verifier_num_claims` | `int` | `10` | Target key-claim count per task (extraction accepts ±2). |
 | `hybrid_verifier_refinement_rounds` | `int` | `2` | Max replacement claims per generation for dead (non-discriminative) claims. |
 | `hybrid_verifier_scorer_timeout_s` | `int` | `60` | Per scorer-subprocess timeout (seconds). |

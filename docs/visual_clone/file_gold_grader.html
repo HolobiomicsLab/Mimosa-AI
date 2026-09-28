@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>grader.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; grader.py">
+<div class="wrap">
+
+<h1 class="hud">grader.py</h1>
+<p class="intro">This 253-line file resolves the benchmark task row, copies the generation workspace to a private <code>mimosa_gold_*</code> temp dir and grades the copy with the shared <code>grade_directory</code>. A harness error or a run over the wall-clock cap becomes a censored <code>excluded</code> result, so the verifier never crashes. Its only caller is <a href="file_gold_evaluator.html">GoldFeedbackEvaluator</a>.</p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new, uncommitted</span></p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; functions and calls: task row in, private copy graded, grade dict out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 490" role="img" aria-label="grader.py: GoldFeedbackEvaluator calls resolve_task_context, make_private_copy, grade_private_copy and discard_private_copy; grade_private_copy calls _grade_once which calls the shared grade_directory, then CapsuleEvaluator and the ExecutionSandbox">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="g1" href="../../config.py">
+    <title>Runtime-only fields, never serialized; csv_mode._set_gold_feedback_task sets them per task</title>
+    <rect x="20" y="20" width="210" height="104" rx="2" fill="rgba(230,251,255,0.06)" stroke="#E6FBFF"/>
+    <text class="box-label" x="125" y="44" text-anchor="middle">config (runtime only)</text>
+    <text class="box-sub" x="125" y="62" text-anchor="middle">gold_feedback_task_row</text>
+    <text class="box-sub" x="125" y="80" text-anchor="middle">gold_feedback_sab_loader</text>
+    <text class="box-sub" x="125" y="98" text-anchor="middle">config.py L119 L120</text>
+    <text class="box-sub" x="125" y="116" text-anchor="middle">set: csv_mode.py L1019</text>
+  </a>
+  <a class="box" id="g2" href="file_gold_evaluator.html">
+    <title>The only caller: GoldFeedbackEvaluator.evaluate and its _grade helper</title>
+    <rect x="20" y="190" width="210" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="214" text-anchor="middle">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="125" y="232" text-anchor="middle">evaluator.py (gold)</text>
+    <text class="box-sub" x="125" y="250" text-anchor="middle">evaluate L152</text>
+    <text class="box-sub" x="125" y="268" text-anchor="middle">_grade L258</text>
+    <text class="box-sub" x="125" y="286" text-anchor="middle">timeout_s = config cap</text>
+    <text class="box-sub" x="222" y="203" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <a class="box" id="g3" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>Reads the task row and loader from the config; returns (context, None) or (None, reason)</title>
+    <rect x="270" y="20" width="230" height="90" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="385" y="44" text-anchor="middle">resolve_task_context</text>
+    <text class="box-sub" x="385" y="62" text-anchor="middle">L45 &#183; needs 2 row keys L27</text>
+    <text class="box-sub" x="385" y="80" text-anchor="middle">no row: reason names</text>
+    <text class="box-sub" x="385" y="98" text-anchor="middle">--science_agent_bench</text>
+  </a>
+  <a class="box" id="g4" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>Dataclass with the CSV row and the ScienceAgentBenchLoader</title>
+    <rect x="540" y="20" width="230" height="80" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="655" y="44" text-anchor="middle">TaskContext</text>
+    <text class="box-sub" x="655" y="62" text-anchor="middle">@dataclass L32</text>
+    <text class="box-sub" x="655" y="80" text-anchor="middle">row: dict &#183; sab_loader</text>
+  </a>
+  <a class="box" id="g5" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>Copies the live workspace into a fresh mimosa_gold_* temp dir; raises if missing</title>
+    <rect x="270" y="140" width="230" height="90" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="385" y="164" text-anchor="middle">make_private_copy</text>
+    <text class="box-sub" x="385" y="182" text-anchor="middle">L78 &#183; mkdtemp L93</text>
+    <text class="box-sub" x="385" y="200" text-anchor="middle">copytree L96</text>
+    <text class="box-sub" x="385" y="218" text-anchor="middle">FileNotFoundError L92</text>
+  </a>
+  <a class="box" id="g6" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>Grades the copy, inline or in a daemon worker with a wall-clock cap; never raises</title>
+    <rect x="540" y="130" width="230" height="120" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="655" y="154" text-anchor="middle">grade_private_copy</text>
+    <text class="box-sub" x="655" y="172" text-anchor="middle">L192 &#183; grade_fn default</text>
+    <text class="box-sub" x="655" y="190" text-anchor="middle">= grade_directory L195</text>
+    <text class="box-sub" x="655" y="208" text-anchor="middle">inline if cap &lt;= 0 L221</text>
+    <text class="box-sub" x="655" y="226" text-anchor="middle">worker thread L236</text>
+    <text class="box-sub" x="762" y="143" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <a class="box" id="g7" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>_grade_once wraps one grade_fn call; any exception becomes the _censored excluded dict</title>
+    <rect x="540" y="280" width="230" height="86" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="655" y="304" text-anchor="middle">_grade_once &#183; _censored</text>
+    <text class="box-sub" x="655" y="322" text-anchor="middle">L165 &#183; L180</text>
+    <text class="box-sub" x="655" y="340" text-anchor="middle">exception to status excluded</text>
+  </a>
+  <a class="box" id="g8" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>Lock-protected flags: exactly one side deletes the private copy</title>
+    <rect x="540" y="392" width="230" height="86" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="655" y="416" text-anchor="middle">CopyHandoff</text>
+    <text class="box-sub" x="655" y="434" text-anchor="middle">L116 &#183; threading.Lock</text>
+    <text class="box-sub" x="655" y="452" text-anchor="middle">worker_done L137</text>
+    <text class="box-sub" x="655" y="470" text-anchor="middle">caller_reclaims L150</text>
+  </a>
+  <a class="box" id="g9" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>Deletes the parent mimosa_gold_* dir; ignores other paths</title>
+    <rect x="270" y="392" width="230" height="80" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="385" y="416" text-anchor="middle">discard_private_copy</text>
+    <text class="box-sub" x="385" y="434" text-anchor="middle">L103 &#183; rmtree L113</text>
+    <text class="box-sub" x="385" y="452" text-anchor="middle">only mimosa_gold_* L112</text>
+  </a>
+  <a class="box" id="g10" href="../../sources/benchmark_evaluation/snapshot_grading.py">
+    <title>Shared helper: also used by csv_mode._evaluate_snapshot_ablations L906</title>
+    <rect x="810" y="140" width="270" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="945" y="164" text-anchor="middle">grade_directory</text>
+    <text class="box-sub" x="945" y="182" text-anchor="middle">snapshot_grading.py L24</text>
+    <text class="box-sub" x="945" y="200" text-anchor="middle">shared with ablations</text>
+    <text class="box-sub" x="945" y="218" text-anchor="middle">csv_mode.py L906</text>
+  </a>
+  <a class="box" id="g11" href="area_benchmark_evaluation.html">
+    <title>CapsuleEvaluator.evaluate_all runs VER (900 s), SR (300 s) and CBS in the ExecutionSandbox</title>
+    <rect x="810" y="270" width="270" height="90" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="945" y="294" text-anchor="middle">CapsuleEvaluator &#8594; Sandbox</text>
+    <text class="box-sub" x="945" y="312" text-anchor="middle">evaluate_all L85</text>
+    <text class="box-sub" x="945" y="330" text-anchor="middle">VER 900 s L200 &#183; SR 300 s L221</text>
+    <text class="box-sub" x="945" y="348" text-anchor="middle">capsule_evaluator.py</text>
+  </a>
+  <g class="box" id="g12">
+    <title>Returned dict: VER, VER_message, SR, SR_message, CBS, cost, status, plus wall_s</title>
+    <rect x="810" y="20" width="270" height="106" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="945" y="44" text-anchor="middle">returns grade dict</text>
+    <text class="box-sub" x="945" y="62" text-anchor="middle">VER &#183; SR &#183; CBS &#183; messages</text>
+    <text class="box-sub" x="945" y="80" text-anchor="middle">status evaluated | excluded</text>
+    <text class="box-sub" x="945" y="98" text-anchor="middle">+ wall_s L223 L252</text>
+    <text class="box-sub" x="945" y="116" text-anchor="middle">+ copy_owned_by_worker L251</text>
+  </g>
+  <path class="edge dashed-edge" data-from="g1" data-to="g3" d="M230,62 H270" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="250" y="54" text-anchor="middle">row + loader</text>
+  <path class="edge" data-from="g2" data-to="g3" d="M230,215 C250,215 250,95 270,95" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="252" y="160" text-anchor="start">L170</text>
+  <path class="edge" data-from="g2" data-to="g5" d="M230,240 C255,240 250,200 270,200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="255" y="236" text-anchor="start">L178</text>
+  <path class="edge" data-from="g2" data-to="g6" d="M230,300 C400,305 480,205 540,205" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="296" text-anchor="middle">L261</text>
+  <path class="edge" data-from="g2" data-to="g9" d="M125,300 V432 H270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="140" y="448" text-anchor="start">finally L214</text>
+  <path class="edge" data-from="g3" data-to="g4" d="M500,62 H540" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="54" text-anchor="middle">builds</text>
+  <path class="edge" data-from="g6" data-to="g7" d="M655,250 V280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="668" y="270" text-anchor="start">calls</text>
+  <path class="edge" data-from="g6" data-to="g8" d="M540,235 C515,235 515,430 540,430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="512" y="340" text-anchor="end">uses</text>
+  <path class="edge" data-from="g7" data-to="g10" d="M770,322 C790,322 790,190 810,190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="792" y="250" text-anchor="start">grade_fn(copy)</text>
+  <path class="edge" data-from="g10" data-to="g11" d="M945,230 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="958" y="256" text-anchor="start">evaluate_all</text>
+  <path class="edge" data-from="g6" data-to="g12" d="M770,160 C790,160 790,70 810,70" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="800" y="124" text-anchor="end">grade + wall_s</text>
+  <path class="edge" data-from="g8" data-to="g9" d="M540,432 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="520" y="424" text-anchor="middle">worker deletes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the whole file (253 lines, 6 functions, 2 classes). Grading is not in this file: <code>grader.py::grade_private_copy</code> L192 calls <code>snapshot_grading.py::grade_directory</code> L24, the same helper that <code>csv_mode.py::CsvEvaluationMode._evaluate_snapshot_ablations</code> calls at L906. <code>gold_hybrid_config</code> is <b>not</b> in this file: it is <code>evaluator.py::gold_hybrid_config</code> L61 (see <a href="file_gold_evaluator.html">file_gold_evaluator.html</a>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; control: the wall-clock cap and who deletes the private copy</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 410" role="img" aria-label="grade_private_copy control flow: without a cap the grade runs inline; with a cap a daemon worker runs it, the caller joins with a timeout, and CopyHandoff decides under a lock whether the caller keeps the result or the abandoned worker deletes the copy">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-label" x="20" y="22">caller thread (grade_private_copy)</text>
+  <g class="box" id="t1">
+    <title>timeout_s None or 0 or less disables the cap</title>
+    <rect x="20" y="34" width="240" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="140" y="58" text-anchor="middle">timeout_s &gt; 0 ?</text>
+    <text class="box-sub" x="140" y="76" text-anchor="middle">L221</text>
+  </g>
+  <g class="box" id="t2">
+    <title>No thread: one _grade_once call, then wall_s</title>
+    <rect x="20" y="130" width="240" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="140" y="154" text-anchor="middle">grade inline</text>
+    <text class="box-sub" x="140" y="172" text-anchor="middle">L222 &#183; no worker</text>
+  </g>
+  <g class="box" id="t3">
+    <title>Daemon thread named gold-feedback-grader runs _work</title>
+    <rect x="300" y="34" width="240" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="420" y="58" text-anchor="middle">start daemon worker</text>
+    <text class="box-sub" x="420" y="76" text-anchor="middle">L236 &#183; gold-feedback-grader</text>
+  </g>
+  <g class="box" id="t4">
+    <title>Caller waits at most timeout_s seconds</title>
+    <rect x="300" y="130" width="240" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="420" y="154" text-anchor="middle">worker.join(timeout_s)</text>
+    <text class="box-sub" x="420" y="172" text-anchor="middle">L238</text>
+  </g>
+  <g class="box" id="t5">
+    <title>Ownership decided under the CopyHandoff lock</title>
+    <rect x="300" y="226" width="240" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="420" y="250" text-anchor="middle">caller_reclaims() ?</text>
+    <text class="box-sub" x="420" y="268" text-anchor="middle">L239 &#183; CopyHandoff L150</text>
+  </g>
+  <g class="box" id="t6">
+    <title>Worker already done: its result is valid, the caller keeps the copy</title>
+    <rect x="20" y="322" width="240" height="72" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="140" y="346" text-anchor="middle">keep worker result</text>
+    <text class="box-sub" x="140" y="364" text-anchor="middle">L242 &#183; caller owns copy</text>
+    <text class="box-sub" x="140" y="382" text-anchor="middle">evaluator deletes L214</text>
+  </g>
+  <g class="box" id="t7">
+    <title>Worker abandoned: excluded grade with infra_error, copy now owned by the worker</title>
+    <rect x="300" y="322" width="240" height="72" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="420" y="346" text-anchor="middle">censored excluded</text>
+    <text class="box-sub" x="420" y="364" text-anchor="middle">L248 &#183; wall-clock cap</text>
+    <text class="box-sub" x="420" y="382" text-anchor="middle">copy_owned_by_worker L251</text>
+  </g>
+  <text class="box-label" x="640" y="22">worker thread (_work, L229)</text>
+  <g class="box" id="t8">
+    <title>One grading call; an exception becomes a censored result</title>
+    <rect x="640" y="34" width="260" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="58" text-anchor="middle">_grade_once</text>
+    <text class="box-sub" x="770" y="76" text-anchor="middle">L231 &#183; try, L175 except</text>
+  </g>
+  <g class="box" id="t9">
+    <title>finally block: the worker reports it has ended</title>
+    <rect x="640" y="130" width="260" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="770" y="154" text-anchor="middle">worker_done() ?</text>
+    <text class="box-sub" x="770" y="172" text-anchor="middle">L233 &#183; CopyHandoff L137</text>
+  </g>
+  <g class="box" id="t10">
+    <title>Caller gave up earlier, so the worker removes the copy itself</title>
+    <rect x="640" y="226" width="260" height="62" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="770" y="250" text-anchor="middle">worker deletes copy</text>
+    <text class="box-sub" x="770" y="268" text-anchor="middle">discard_private_copy L234</text>
+  </g>
+  <g class="box" id="t11">
+    <title>Caller still waiting or not yet decided: the worker only sets done</title>
+    <rect x="920" y="130" width="160" height="62" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1000" y="154" text-anchor="middle">set done, exit</text>
+    <text class="box-sub" x="1000" y="172" text-anchor="middle">L147 L148</text>
+  </g>
+  <path class="edge" data-from="t1" data-to="t2" d="M140,96 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="154" y="118" text-anchor="start">no</text>
+  <path class="edge" data-from="t1" data-to="t3" d="M260,65 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="280" y="57" text-anchor="middle">yes</text>
+  <path class="edge" data-from="t3" data-to="t4" d="M420,96 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t4" data-to="t5" d="M420,192 V226" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t5" data-to="t6" d="M300,257 C200,257 140,290 140,322" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="210" y="282" text-anchor="middle">True</text>
+  <path class="edge" data-from="t5" data-to="t7" d="M420,288 V322" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="434" y="310" text-anchor="start">False</text>
+  <path class="edge dashed-edge" data-from="t3" data-to="t8" d="M540,50 H640" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="590" y="42" text-anchor="middle">runs _work</text>
+  <path class="edge" data-from="t8" data-to="t9" d="M770,96 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t9" data-to="t10" d="M770,192 V226" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="784" y="214" text-anchor="start">True</text>
+  <path class="edge" data-from="t9" data-to="t11" d="M900,161 H920" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="910" y="124" text-anchor="middle">False</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>grader.py::CopyHandoff</code> makes the two decisions under one <code>threading.Lock</code> (L133), so exactly one side calls <code>discard_private_copy</code>. Gap stated in the docstring (L125&#8211;L129): if the interpreter exits while an abandoned daemon worker runs, its <code>mimosa_gold_*</code> copy stays in the system temp dir.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; files: one read, one temp copy written and then deleted</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 260" role="img" aria-label="grader.py file flow: the live workspace is read by make_private_copy, copied into a mimosa_gold temp dir, the sandbox writes pred_results into the copy, and discard_private_copy deletes it">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="f1">
+    <title>The agents workspace of the generation; read, never written</title>
+    <rect x="20" y="40" width="210" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="64" text-anchor="middle">live workspace</text>
+    <text class="box-sub" x="125" y="82" text-anchor="middle">config.workspace_dir</text>
+    <text class="box-sub" x="125" y="100" text-anchor="middle">read only</text>
+  </g>
+  <a class="box" id="f2" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>shutil.copytree with ignore_dangling_symlinks; on error the temp root is removed</title>
+    <rect x="270" y="40" width="210" height="80" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="64" text-anchor="middle">make_private_copy</text>
+    <text class="box-sub" x="375" y="82" text-anchor="middle">copytree L96</text>
+    <text class="box-sub" x="375" y="100" text-anchor="middle">cleanup on error L98</text>
+  </a>
+  <g class="box" id="f3">
+    <title>Private copy under tempfile.mkdtemp(prefix=mimosa_gold_)</title>
+    <rect x="520" y="40" width="240" height="80" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="640" y="64" text-anchor="middle">&lt;tmp&gt;/mimosa_gold_*/workspace</text>
+    <text class="box-sub" x="640" y="82" text-anchor="middle">mkdtemp L93 &#183; dest L94</text>
+    <text class="box-sub" x="640" y="100" text-anchor="middle">graded directory</text>
+  </g>
+  <a class="box" id="f4" href="area_benchmark_evaluation.html">
+    <title>ExecutionSandbox.run_generated_code copies pred_results back into the graded directory</title>
+    <rect x="800" y="40" width="280" height="80" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="940" y="64" text-anchor="middle">sandbox copy-back</text>
+    <text class="box-sub" x="940" y="82" text-anchor="middle">execution_sandbox.py L799-L805</text>
+    <text class="box-sub" x="940" y="100" text-anchor="middle">writes pred_results/ in copy</text>
+  </a>
+  <a class="box" id="f5" href="../../sources/evaluators/gold_feedback/grader.py">
+    <title>Removes the whole mimosa_gold_* root; no-op for other paths or None</title>
+    <rect x="520" y="170" width="240" height="70" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="640" y="194" text-anchor="middle">discard_private_copy</text>
+    <text class="box-sub" x="640" y="212" text-anchor="middle">rmtree(root) L113</text>
+  </a>
+  <path class="edge dashed-edge" data-from="f1" data-to="f2" d="M230,80 H270" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="250" y="72" text-anchor="middle">read</text>
+  <path class="edge dashed-edge" data-from="f2" data-to="f3" d="M480,80 H520" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="500" y="72" text-anchor="middle">writes</text>
+  <path class="edge dashed-edge" data-from="f4" data-to="f3" d="M800,100 H760" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="780" y="136" text-anchor="middle">pred_results/</text>
+  <path class="edge dashed-edge" data-from="f5" data-to="f3" d="M640,170 V120" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="654" y="150" text-anchor="start">deletes</text>
+  <text class="box-sub" x="20" y="200">The copy exists because the sandbox writes into the graded directory;</text>
+  <text class="box-sub" x="20" y="218">grading the live workspace would change what the next generation sees.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the module docstring (L7&#8211;L9) states the reason; the copy-back code is <code>execution_sandbox.py::ExecutionSandbox.run_generated_code</code> L705, copy at L799&#8211;L805. Test <code>test_grades_a_private_copy_and_never_touches_the_live_workspace</code> checks the live tree is byte-equal after grading.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>config</td><td class="sym">gold_feedback_task_row</td><td>getattr in resolve_task_context; config.py L119</td><td>benchmark CSV row; none means no grading</td><td class="size">L59</td></tr>
+<tr><td>config</td><td class="sym">gold_feedback_sab_loader</td><td>getattr; config.py L120</td><td>loader; else new ScienceAgentBenchLoader()</td><td class="size">L68 L74</td></tr>
+<tr><td>config</td><td class="sym">gold_feedback_timeout_s</td><td>read by evaluator.py L135, passed as timeout_s</td><td>wall-clock cap, default 1800 s, 0 = off</td><td class="size">L195 L221</td></tr>
+<tr><td>reads</td><td class="sym">row keys</td><td><code>_REQUIRED_ROW_KEYS</code></td><td>gold_program_name, eval_script_name must be set</td><td class="size">L27 L65</td></tr>
+<tr><td>reads</td><td class="sym">workspace dir</td><td>make_private_copy argument</td><td>copied, never modified</td><td class="size">L90 L96</td></tr>
+<tr><td>writes</td><td class="sym">&lt;tmp&gt;/mimosa_gold_*/workspace</td><td>tempfile.mkdtemp + shutil.copytree</td><td>private graded copy</td><td class="size">L93 L96</td></tr>
+<tr><td>deletes</td><td class="sym">mimosa_gold_* root</td><td>shutil.rmtree, ignore_errors</td><td>after grading, or by the abandoned worker</td><td class="size">L98 L113</td></tr>
+<tr><td>logs</td><td class="sym">_logger.error</td><td>harness error, cap exceeded</td><td><code>[GOLD FEEDBACK]</code> prefix</td><td class="size">L176 L244</td></tr>
+<tr><td>returns</td><td class="sym">grade dict</td><td>grade_directory result or _censored</td><td>plus wall_s, maybe copy_owned_by_worker</td><td class="size">L223 L251 L252</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: every grade here comes from the benchmark gold reference, so any value it returns is an oracle signal, not an honest verifier score.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Symbol inventory</h2>
+<details><summary>2 constants, 2 classes, 6 functions &mdash; signatures</summary><div class="dbody">
+<pre>_REQUIRED_ROW_KEYS = ("gold_program_name", "eval_script_name")          L27
+_logger = logging.getLogger(__name__)                                   L28
+
+@dataclass class TaskContext: row: dict; sab_loader: Any                 L32
+resolve_task_context(config) -&gt; tuple[TaskContext | None, str | None]   L45
+make_private_copy(workspace: str | Path) -&gt; Path                        L78   raises FileNotFoundError L92
+discard_private_copy(copy_dir: str | Path | None) -&gt; None               L103  only a mimosa_gold_* parent
+class CopyHandoff                                                       L116
+    __init__(self) -&gt; None                                              L131  _lock, _done, _abandoned
+    worker_done(self) -&gt; bool                                           L137  True = worker must delete
+    caller_reclaims(self) -&gt; bool                                       L150  True = caller keeps copy
+_grade_once(copy_dir, context, grade_fn) -&gt; dict[str, Any]              L165  exception -&gt; _censored
+_censored(reason: str) -&gt; dict[str, Any]                                L180  VER/SR/CBS None, status excluded
+grade_private_copy(copy_dir, context, grade_fn=grade_directory,
+                   timeout_s: float | None = None) -&gt; dict[str, Any]    L192  never raises
+    inner _work() -&gt; None                                               L229  worker body</pre>
+<p>Imports: <code>grade_directory</code> from <code>sources.benchmark_evaluation.snapshot_grading</code> L25; lazy <code>ScienceAgentBenchLoader</code> L70&#8211;L72. Stdlib only otherwise: <code>logging</code>, <code>shutil</code>, <code>tempfile</code>, <code>threading</code>, <code>time</code>.</p>
+<p>Not in this file: <code>gold_hybrid_config</code> (shallow config copy with a <code>_gold</code> registry dir) is <code>sources/evaluators/gold_feedback/evaluator.py</code> L61.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_gold_evaluator.html">gold_feedback/evaluator.py</a></td><td>imports 5 names; calls all four public functions</td><td class="sym">L34&#8211;L40 L170 L178 L214 L261</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/snapshot_grading.py">snapshot_grading.py</a></td><td>callee: <code>grade_directory</code>, default <code>grade_fn</code></td><td class="sym">L24</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/csv_mode.py">csv_mode.py</a></td><td>sets the runtime row and loader; also calls <code>grade_directory</code></td><td class="sym">L1019 L1020 L906</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Test in tests/gold_feedback_test.py</th><th>What it checks</th><th>Path</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_copy_handoff_ownership_is_exclusive</a></td><td>both orders of worker_done / caller_reclaims</td><td>direct</td><td class="size">L1059</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_worker_finishing_in_race_window_keeps_result</a></td><td>late join keeps result; caller owns copy</td><td>direct</td><td class="size">L1072</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_zero_timeout_grades_inline_without_thread</a></td><td>cap 0 grades inline, no Thread</td><td>via evaluator</td><td class="size">L1114</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_grading_timeout_is_censored_and_copy_cleaned_by_worker</a></td><td>0.2 s cap: censored; worker deletes copy</td><td>via evaluator</td><td class="size">L828</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_grades_a_private_copy_and_never_touches_the_live_workspace</a></td><td>copy is mimosa_gold_*; live tree unchanged</td><td>via evaluator</td><td class="size">L576</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_copy_removed_even_when_hybrid_raises</a></td><td>spy on make_private_copy; copy removed</td><td>via evaluator</td><td class="size">L591</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_env_failure_is_censored_and_uses_hybrid_gradient</a></td><td>grader exception becomes censored</td><td>via evaluator</td><td class="size">L533</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_no_task_context_falls_back_to_hybrid_gradient</a></td><td>no row: nothing graded</td><td>via evaluator</td><td class="size">L486</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_incomplete_task_row_is_no_context</a></td><td>missing gold_program_name: no context</td><td>via evaluator</td><td class="size">L503</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_grade_directory_builds_capsule_evaluator_call</a></td><td>shared helper: call args and key order</td><td>callee</td><td class="size">L648</td></tr>
+</tbody>
+</table>
+<p>See also: <a href="mod_evaluators_gold_feedback.html">gold_feedback package page</a>, <a href="file_gold_init.html">file_gold_init.html</a>, <a href="file_gold_evaluator.html">file_gold_evaluator.html</a>, <a href="file_gold_format.html">file_gold_format.html</a>, <a href="file_gold_reward.html">file_gold_reward.html</a>, <a href="file_gold_leak.html">file_gold_leak.html</a>, <a href="area_benchmark_evaluation.html">benchmark evaluation area</a> and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/gold_feedback/grader.py</code> (253 lines, whole file), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (L34&#8211;L40, L61, L135, L170&#8211;L262), <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code> (82 lines), <code class="path">sources/benchmark_evaluation/capsule_evaluator.py</code> (L85, L200, L221), <code class="path">sources/benchmark_evaluation/execution_sandbox.py</code> (L705, L799&#8211;L805), <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (L906, L1001&#8211;L1021), <code class="path">config.py</code> (L110&#8211;L120), <code class="path">tests/gold_feedback_test.py</code> (test names by grep). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the internals of <code>CapsuleEvaluator</code> and <code>ExecutionSandbox</code> beyond the lines above, because <a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a> covers them; secret files (<code>.env</code>, <code>token.json</code>, <code>credentials.json</code>) were not opened; no pytest run, by the build rules. The file is new and uncommitted (untracked in <code>git status</code>).</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

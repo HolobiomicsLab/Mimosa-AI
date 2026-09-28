@@ -76,8 +76,23 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument(
         "--verifier_kind",
         type=str,
-        choices=["hybrid", "legacy"],
-        help="Verifier channel: 'hybrid' (E19/E19b, default) or 'legacy' (deprecated multi-source verifier)",
+        choices=["hybrid", "legacy", "gold"],
+        help="Verifier channel: 'hybrid' (E19/E19b, default), 'legacy' (deprecated multi-source verifier) "
+        "or 'gold' (ORACLE / BENCHMARK-LEAKING research control: benchmark grader feedback as gradient; "
+        "needs --science_agent_bench; never report its scores)",
+    )
+    parser.add_argument(
+        "--gold_feedback_reward",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="verifier_kind=gold only: also take the reward from the benchmark grader "
+        "(full oracle). Default off = gradient-only oracle (reward stays hybrid)",
+    )
+    parser.add_argument(
+        "--gold_feedback_timeout_s",
+        type=int,
+        help="verifier_kind=gold only: wall-clock cap (s) on benchmark grading per "
+        "generation (default 1800; 0 disables the cap); on timeout the grade is censored",
     )
     parser.add_argument("--hybrid_verifier_num_claims", type=int, help="Override target key-claim count for the hybrid verifier")
     parser.add_argument("--hybrid_verifier_refinement_rounds", type=int, help="Override max replacement claims per generation (hybrid verifier)")
@@ -130,6 +145,11 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.runner_default_python_version = args.runner_default_python_version
     if getattr(args, "verifier_kind", None):
         config.verifier_kind = args.verifier_kind
+    if getattr(args, "gold_feedback_reward", None) is not None:
+        config.gold_feedback_reward = args.gold_feedback_reward
+    if getattr(args, "gold_feedback_timeout_s", None) is not None:
+        # 0 (or negative) disables the cap.
+        config.gold_feedback_timeout_s = args.gold_feedback_timeout_s
     if getattr(args, "hybrid_verifier_num_claims", None):
         config.hybrid_verifier_num_claims = args.hybrid_verifier_num_claims
     if getattr(args, "hybrid_verifier_refinement_rounds", None):
@@ -162,6 +182,30 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.planner_human_approve = True
     if args.max_evolve_iterations:
         config.max_learning_evolve_iterations = args.max_evolve_iterations
+
+def warn_gold_feedback_mode(args: argparse.Namespace, config: Config) -> bool:
+    """Print the leakage warning when the gold (oracle) verifier is selected.
+
+    Args:
+        args: Parsed CLI arguments (``science_agent_bench`` is checked).
+        config: Run config after overrides.
+
+    Returns:
+        True when ``verifier_kind == "gold"`` (warning printed), else False.
+    """
+    if str(getattr(config, "verifier_kind", "")).lower() != "gold":
+        return False
+    from sources.evaluators.gold_feedback import LEAK_WARNING
+
+    print_warn(LEAK_WARNING)
+    if getattr(config, "gold_feedback_reward", False):
+        print_warn("gold_feedback_reward=True: FULL ORACLE — the reward also comes from the benchmark grader.")
+    if not getattr(args, "science_agent_bench", False):
+        print_warn(
+            "verifier_kind=gold outside --science_agent_bench: no benchmark task row exists, "
+            "so every generation falls back to the hybrid verifier gradient."
+        )
+    return True
 
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
@@ -401,6 +445,7 @@ async def main():
     # ── Normal (argument-driven) execution path ───────────────────────────
     # Apply CLI argument overrides (these override config file values)
     apply_config_overrides(args, config)
+    warn_gold_feedback_mode(args, config)
 
     validate_environment()
 

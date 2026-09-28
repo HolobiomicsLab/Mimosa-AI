@@ -20,6 +20,7 @@ from typing import Any
 
 from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
+from sources.benchmark_evaluation.snapshot_grading import grade_directory
 from sources.cli.pretty_print import (
     print_err,
     print_info,
@@ -495,6 +496,19 @@ class CsvEvaluationMode:
                 "ablations": current_task_data.get('ablations', []),
             }
 
+        if self._gold_mode():
+            # Oracle control: stamp the leak so this note is never read as a
+            # Mimosa benchmark score.
+            from sources.evaluators.gold_feedback import LEAK_WARNING
+
+            notes["verifier_kind"] = "gold"
+            notes["oracle_feedback"] = True
+            notes["gold_feedback_reward"] = bool(
+                getattr(self.config, "gold_feedback_reward", False)
+            )
+            notes["benchmark_leak_warning"] = LEAK_WARNING
+            print_warn(LEAK_WARNING)
+
         notes_file = self.run_notes_dir / f"{capsule_name}.json"
         notes_file.parent.mkdir(parents=True, exist_ok=True)
         with open(notes_file, 'w', encoding='utf-8') as f:
@@ -710,7 +724,9 @@ EXPECTED OUTPUT:
             )
 
             eval_results = evaluator.evaluate_all()
-            evaluator.save_results()
+            results_path = evaluator.save_results()
+            if self._gold_mode():
+                self._stamp_gold_capsule_results(results_path)
 
             if eval_results.get('status') == 'excluded':
                 infra_error = eval_results.get('infra_error')
@@ -884,48 +900,43 @@ EXPECTED OUTPUT:
                 continue
 
             try:
-                evaluator = CapsuleEvaluator(
-                    capsule_path=snapshot,
-                    task_data=row,
+                # Shared with the gold-feedback verifier (snapshot_grading).
+                # CapsuleEvaluator is passed by this module's name so the
+                # existing `csv_mode.CapsuleEvaluator` patch point still works.
+                grade = grade_directory(
+                    snapshot,
+                    task_row=row,
                     sab_loader=sab_loader,
                     api_cost=iter_cost,
+                    evaluator_cls=CapsuleEvaluator,
                 )
-                eval_results = evaluator.evaluate_all()
                 # No save_results(): keep the /tmp snapshot pristine.
 
-                if eval_results.get('status') == 'excluded':
+                if grade["status"] == "excluded":
+                    infra_error = grade.pop("infra_error")
                     entry = {
                         "evolution_index": idx,
                         "uuid": uuid,
-                        "VER": None,
-                        "SR": None,
-                        "CBS": None,
-                        "cost": eval_results.get('cost', iter_cost),
-                        "status": "excluded",
+                        **grade,
                         "source": "snapshot",
-                        "infra_error": eval_results.get('infra_error'),
+                        "infra_error": infra_error,
                     }
                     self.logger.warning(
                         f"[ABLATION] idx={idx} uuid={uuid} EXCLUDED (infra): "
-                        f"{eval_results.get('infra_error')}"
+                        f"{infra_error}"
                     )
                 else:
                     entry = {
                         "evolution_index": idx,
                         "uuid": uuid,
-                        "VER": eval_results['VER'][0],
-                        "VER_message": eval_results['VER'][1],
-                        "SR": eval_results['SR'][0],
-                        "SR_message": eval_results['SR'][1],
-                        "CBS": eval_results['CBS'],
-                        "cost": iter_cost,
-                        "status": "evaluated",
+                        **grade,
                         "source": "snapshot",
                     }
                     self.logger.info(
                         f"[ABLATION] idx={idx} uuid={uuid}: "
                         f"VER={entry['VER']}, SR={entry['SR']}, CBS={entry['CBS']:.3f}"
                     )
+
                 ablations.append(entry)
             except Exception as e:
                 # A harness fault on one snapshot must not abort the ablation
@@ -953,6 +964,61 @@ EXPECTED OUTPUT:
         print_info(f"🧪 Ablations (index, SR): {sr_curve}")
         self.logger.info(f"[ABLATION] Session {session_id} SR curve: {sr_curve}")
         return ablations
+
+    def _gold_mode(self) -> bool:
+        """True when this evaluation runs the gold-feedback (oracle) verifier."""
+        config = getattr(self, "config", None)
+        return str(getattr(config, "verifier_kind", "")).lower() == "gold"
+
+    def _stamp_gold_capsule_results(self, results_path: Any) -> None:
+        """Add leak markers to a capsule's ``evaluation_results.json``.
+
+        The grading contract is untouched: VER/SR/CBS and messages stay as
+        CapsuleEvaluator wrote them; only marker keys are added, so the file
+        can never be mistaken for an honest benchmark result.
+
+        Args:
+            results_path: Path returned by ``CapsuleEvaluator.save_results``.
+        """
+        from sources.evaluators.gold_feedback import LEAK_WARNING
+
+        try:
+            path = Path(results_path)
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["oracle_feedback"] = True
+            data["verifier_kind"] = "gold"
+            data["gold_feedback_reward"] = bool(
+                getattr(self.config, "gold_feedback_reward", False)
+            )
+            data["benchmark_leak_warning"] = LEAK_WARNING
+            path.write_text(
+                json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+            )
+        except Exception as e:  # noqa: BLE001 — marker is best effort, logged
+            self.logger.error(f"[GOLD FEEDBACK] could not stamp {results_path}: {e}")
+
+    @staticmethod
+    def _set_gold_feedback_task(config: Any, row: dict, sab_loader: Any) -> bool:
+        """Give the gold-feedback (oracle) verifier its benchmark task context.
+
+        Only acts when ``config.verifier_kind == "gold"``; every other
+        verifier is untouched. The gold verifier reads these runtime-only
+        fields at evaluate time to grade each generation with the benchmark
+        grader. ORACLE / BENCHMARK-LEAKING mode: research control only.
+
+        Args:
+            config: The config the task's EvolutionEngine evaluates with.
+            row: The benchmark CSV row of the task.
+            sab_loader: The ScienceAgentBenchLoader of this evaluation.
+
+        Returns:
+            True when the context was set, False otherwise.
+        """
+        if str(getattr(config, "verifier_kind", "")).lower() != "gold":
+            return False
+        config.gold_feedback_task_row = dict(row) if row else None
+        config.gold_feedback_sab_loader = sab_loader
+        return True
 
     def _create_isolated_config(self, task_id: str) -> Any:
         """
@@ -1129,6 +1195,9 @@ EXPECTED OUTPUT:
 
             # Create isolated config and instances for this task
             isolated_config = self._create_isolated_config(task_id)
+            # Oracle control only (verifier_kind="gold"): hand the task row to
+            # the gold-feedback verifier; a no-op for every other verifier.
+            self._set_gold_feedback_task(isolated_config, row, sab_loader)
             workspace_subfolder = f"worker_{task_id}"
 
             try:
@@ -1454,6 +1523,8 @@ EXPECTED OUTPUT:
 
                         if dataset_type == "science_agent_bench" and sab_loader:
                             await self.sab_files_transfer(sab_loader, file_transfer, row)
+                            # Oracle control only (verifier_kind="gold"); no-op otherwise.
+                            self._set_gold_feedback_task(self.config, row, sab_loader)
                             runs = await self.evolve.start_workflow_evolution(goal=goal,
                                                             judge=True,
                                                             enable_evolution=learning,
@@ -1606,6 +1677,10 @@ EXPECTED OUTPUT:
 
     def _print_final_summary(self) -> None:
         """Print a summary of all autonomous executions."""
+        if self._gold_mode():
+            from sources.evaluators.gold_feedback import LEAK_WARNING
+
+            print_warn(f"{LEAK_WARNING} (summary below is an ORACLE control)")
         rows, current_runs, sab_runs = self._build_summary_rows()
 
         # Recompute the values needed for the cli-notes side-effect below.

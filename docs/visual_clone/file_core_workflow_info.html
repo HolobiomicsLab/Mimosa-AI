@@ -12,14 +12,14 @@
 <div class="wrap">
 
 <h1 class="hud">workflow_info.py</h1>
-<p class="intro"><code>WorkflowInfo</code> is a read-only accessor for the artefacts of one workflow folder. It loads <code>state_result.json</code>, the genotype script, <code>evaluation.txt</code> and <code>textual_gradient.txt</code> when a property is first read. Writer of the folder: the workflow runner; readers: parent selection, the planner, variation and the evaluators.</p>
+<p class="intro"><code>WorkflowInfo</code> is a read-only accessor for the artefacts of one workflow folder. It loads <code>state_result.json</code>, the genotype script, <code>evaluation.txt</code> and <code>textual_gradient.txt</code> when a property is first read. Since <code>4020790</code> it also tells callers if a reward is a fallback, and a module function tells if a folder was graded by the gold (oracle) verifier.</p>
 
 <div id="legend" data-auto></div>
 
 <div class="panel"><span class="br"></span>
 <h2>Main diagram - one folder, read as properties</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1180 400" role="img" aria-label="WorkflowInfo reads a workflow folder and returns cached property values">
+<svg class="diagram" viewBox="0 0 1180 520" role="img" aria-label="WorkflowInfo reads a workflow folder and returns cached property values">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -35,26 +35,27 @@
 
   <g class="box" id="b1">
     <title>One workflow folder on disk: sources/workflows/&lt;uuid&gt;/</title>
-    <rect x="20" y="120" width="200" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <rect x="20" y="120" width="200" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="120" y="146" text-anchor="middle">workflow folder</text>
     <text class="box-sub" x="120" y="166" text-anchor="middle">state_result.json</text>
     <text class="box-sub" x="120" y="182" text-anchor="middle">workflow_genotype_&lt;uuid&gt;.py</text>
     <text class="box-sub" x="120" y="198" text-anchor="middle">original_task_&lt;uuid&gt;.txt</text>
     <text class="box-sub" x="120" y="214" text-anchor="middle">evaluation.txt</text>
     <text class="box-sub" x="120" y="230" text-anchor="middle">textual_gradient.txt</text>
+    <text class="box-sub" x="120" y="246" text-anchor="middle">gold_feedback.json (oracle only)</text>
   </g>
 
   <a class="box" id="b2" href="../../sources/core/workflow_info.py">
-    <title>WorkflowInfo.__init__ binds the uuid and folder path, reads nothing (lines 15-29).</title>
-    <rect x="270" y="140" width="200" height="70" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
-    <text class="box-label" x="370" y="168" text-anchor="middle">WorkflowInfo</text>
-    <text class="box-sub" x="370" y="186" text-anchor="middle">__init__(uuid, folder)</text>
-    <text class="box-sub" x="370" y="202" text-anchor="middle">clears five cache slots</text>
+    <title>WorkflowInfo.__init__ binds the uuid and folder path, reads nothing (lines 49-63).</title>
+    <rect x="270" y="150" width="200" height="70" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="370" y="178" text-anchor="middle">WorkflowInfo</text>
+    <text class="box-sub" x="370" y="196" text-anchor="middle">__init__(uuid, folder)</text>
+    <text class="box-sub" x="370" y="212" text-anchor="middle">clears five cache slots</text>
   </a>
 
   <g class="box" id="b3">
-    <title>load_state_result (line 182) and load_code (line 203) are called on first read.</title>
-    <rect x="520" y="40" width="220" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <title>load_state_result (line 257) and load_code (line 278) are called on first read.</title>
+    <rect x="520" y="40" width="220" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="630" y="66" text-anchor="middle">load_state_result()</text>
     <text class="box-sub" x="630" y="84" text-anchor="middle">load_code()</text>
     <text class="box-sub" x="630" y="102" text-anchor="middle">json + text reads</text>
@@ -63,7 +64,7 @@
 
   <g class="box" id="b4">
     <title>goal, state_result, code, overall_score cache the first result.</title>
-    <rect x="790" y="40" width="220" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <rect x="790" y="40" width="220" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="900" y="66" text-anchor="middle">cached properties</text>
     <text class="box-sub" x="900" y="84" text-anchor="middle">goal, state_result</text>
     <text class="box-sub" x="900" y="102" text-anchor="middle">code, overall_score</text>
@@ -71,81 +72,100 @@
 
   <g class="box" id="b5">
     <title>answers, success, is_success and judge_evaluation call load_state_result or read evaluation.txt on every access.</title>
-    <rect x="790" y="170" width="220" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <rect x="790" y="170" width="220" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="900" y="196" text-anchor="middle">fresh readers</text>
     <text class="box-sub" x="900" y="214" text-anchor="middle">answers, success, is_success</text>
     <text class="box-sub" x="900" y="232" text-anchor="middle">judge_evaluation</text>
   </g>
 
   <g class="box" id="b6">
-    <title>original_task (line 40) reads the sidecar file, else _extract_original_from_wrapped(goal) (line 62).</title>
-    <rect x="520" y="170" width="220" height="90" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="630" y="196" text-anchor="middle">original_task()</text>
+    <title>original_task (line 74) reads the sidecar file, else _extract_original_from_wrapped(goal) (line 96).</title>
+    <rect x="520" y="170" width="220" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="630" y="196" text-anchor="middle">original_task</text>
     <text class="box-sub" x="630" y="214" text-anchor="middle">_extract_original_from_wrapped()</text>
-    <text class="box-sub" x="630" y="232" text-anchor="middle">strips task wrapper</text>
+    <text class="box-sub" x="630" y="232" text-anchor="middle">else strips wrapper of self.goal</text>
+  </g>
+
+  <g class="box" id="b10">
+    <title>_selected_evaluation (line 176) returns the first dict block among generic, verifier, scenario, else an empty dict.</title>
+    <rect x="520" y="300" width="220" height="80" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="630" y="326" text-anchor="middle">_selected_evaluation()</text>
+    <text class="box-sub" x="630" y="344" text-anchor="middle">generic &gt; verifier &gt; scenario</text>
+    <text class="box-sub" x="630" y="362" text-anchor="middle">new in 4020790</text>
   </g>
 
   <g class="box" id="b7">
-    <title>calculate_overall_score (line 222) picks one evaluator block; overall_score_uncapped (line 129) reads the verifier block.</title>
-    <rect x="520" y="300" width="220" height="80" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="630" y="326" text-anchor="middle">calculate_overall_score()</text>
-    <text class="box-sub" x="630" y="344" text-anchor="middle">overall_score_uncapped</text>
-    <text class="box-sub" x="630" y="362" text-anchor="middle">generic &gt; verifier &gt; scenario</text>
+    <title>calculate_overall_score (line 297) and reward_is_fallback (line 200) read the same block; overall_score_uncapped (line 163) reads the verifier block.</title>
+    <rect x="790" y="300" width="220" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="900" y="324" text-anchor="middle">score and fallback flag</text>
+    <text class="box-sub" x="900" y="342" text-anchor="middle">calculate_overall_score()</text>
+    <text class="box-sub" x="900" y="358" text-anchor="middle">reward_is_fallback</text>
+    <text class="box-sub" x="900" y="374" text-anchor="middle">overall_score_uncapped</text>
   </g>
 
   <g class="box" id="b8">
-    <title>is_valid (line 250) checks two paths; __str__ (line 256) builds a one-line summary.</title>
-    <rect x="790" y="300" width="220" height="80" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="900" y="326" text-anchor="middle">is_valid(), __str__()</text>
-    <text class="box-sub" x="900" y="344" text-anchor="middle">checks two files exist</text>
+    <title>is_valid (line 319) checks two paths; __str__ (line 325) builds a one-line summary.</title>
+    <rect x="790" y="420" width="220" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="900" y="444" text-anchor="middle">is_valid(), __str__()</text>
+    <text class="box-sub" x="900" y="462" text-anchor="middle">checks two files exist</text>
   </g>
 
-  <a class="box" id="b9" href="file_core_workflow_selection.html">
-    <title>Callers: parent selection, the planner cache lookup, variation_engine and evaluators/base.</title>
-    <rect x="1060" y="130" width="105" height="110" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="1112" y="176" text-anchor="middle">callers</text>
-    <text class="box-sub" x="1112" y="194" text-anchor="middle">selection,</text>
-    <text class="box-sub" x="1112" y="210" text-anchor="middle">planner,</text>
-    <text class="box-sub" x="1112" y="226" text-anchor="middle">evaluators</text>
+  <a class="box" id="b11" href="mod_evaluators_gold_feedback.html">
+    <title>Module level (lines 13-38): FALLBACK_REWARD_KINDS, ORACLE_SIDECAR and is_oracle_generation(folder, state_result=None).</title>
+    <rect x="20" y="390" width="200" height="100" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-sub" x="120" y="408" text-anchor="middle" fill="#7DF9C7" letter-spacing="1.5">ORACLE</text>
+    <text class="box-label" x="120" y="428" text-anchor="middle">is_oracle_generation()</text>
+    <text class="box-sub" x="120" y="446" text-anchor="middle">FALLBACK_REWARD_KINDS</text>
+    <text class="box-sub" x="120" y="462" text-anchor="middle">ORACLE_SIDECAR</text>
+    <text class="box-sub" x="120" y="478" text-anchor="middle">uncommitted, lines 13-38</text>
   </a>
 
-  <path class="edge dashed-edge" data-from="b1" data-to="b2" d="M220,180 H270" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="245" y="172" text-anchor="middle">paths only</text>
-  <path class="edge" data-from="b2" data-to="b3" d="M470,168 H500 V85 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="500" y="130" text-anchor="middle">first read</text>
-  <path class="edge dashed-edge" data-from="b3" data-to="b1" d="M540,40 V20 H120 V120" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <a class="box" id="b9" href="file_core_workflow_selection.html">
+    <title>Callers: parent selection, the planner cache lookup, the evolution engine, variation_engine, evaluators/base and the gold evaluator.</title>
+    <rect x="1060" y="130" width="105" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1112" y="170" text-anchor="middle">callers</text>
+    <text class="box-sub" x="1112" y="188" text-anchor="middle">selection,</text>
+    <text class="box-sub" x="1112" y="204" text-anchor="middle">engine, planner,</text>
+    <text class="box-sub" x="1112" y="220" text-anchor="middle">evaluators</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="b1" data-to="b2" d="M220,185 H270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="245" y="177" text-anchor="middle">paths only</text>
+  <path class="edge" data-from="b2" data-to="b3" d="M470,170 H495 V85 H520" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="492" y="140" text-anchor="end">first read</text>
+  <path class="edge dashed-edge" data-from="b3" data-to="b1" d="M540,40 V20 H120 V120" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
   <text class="edge-label" x="330" y="14" text-anchor="middle">state_result.json</text>
-  <path class="edge" data-from="b3" data-to="b4" d="M740,85 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="b3" data-to="b4" d="M740,85 H790" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="765" y="77" text-anchor="middle">fills caches</text>
-  <path class="edge" data-from="b5" data-to="b3" d="M830,170 V140 H640 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="735" y="162" text-anchor="middle">load_state_result()</text>
-  <path class="edge dashed-edge" data-from="b5" data-to="b1" d="M860,260 V278 H240 V240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="560" y="274" text-anchor="middle">evaluation.txt</text>
-  <path class="edge" data-from="b6" data-to="b4" d="M740,200 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="765" y="192" text-anchor="middle">reads self.goal</text>
-  <path class="edge dashed-edge" data-from="b6" data-to="b1" d="M520,215 H460 V255 H230 V240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="350" y="250" text-anchor="middle">original_task_&lt;uuid&gt;.txt</text>
-  <path class="edge" data-from="b4" data-to="b7" d="M880,130 V150 H630 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="880" y="146" text-anchor="middle">overall_score</text>
-  <path class="edge" data-from="b7" data-to="b3" d="M630,300 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="660" y="290" text-anchor="middle">load_state_result()</text>
-  <path class="edge dashed-edge" data-from="b8" data-to="b1" d="M900,300 V280 H260 V240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="700" y="290" text-anchor="middle">Path.exists()</text>
-  <path class="edge" data-from="b4" data-to="b9" d="M1010,85 H1035 V150 H1060" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="b5" data-to="b3" d="M830,170 V150 H700 V130" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="765" y="146" text-anchor="middle">reloads</text>
+  <path class="edge dashed-edge" data-from="b5" data-to="b1" d="M860,260 V285 H200 V270" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="420" y="280" text-anchor="middle">evaluation.txt</text>
+  <path class="edge dashed-edge" data-from="b6" data-to="b1" d="M520,240 H222" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="370" y="236" text-anchor="middle">original_task file</text>
+  <path class="edge" data-from="b7" data-to="b10" d="M790,340 H742" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="766" y="332" text-anchor="middle">same block</text>
+  <path class="edge" data-from="b10" data-to="b3" d="M520,350 H505 V120 H520" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="370" text-anchor="end">load_state_result()</text>
+  <path class="edge dashed-edge" data-from="b11" data-to="b1" d="M80,390 V272" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="88" y="330" text-anchor="start">sidecar exists?</text>
+  <path class="edge" data-from="b4" data-to="b9" d="M1010,85 H1035 V150 H1060" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="1050" y="70" text-anchor="middle">goal, code, score</text>
-  <path class="edge" data-from="b5" data-to="b9" d="M1010,215 H1060" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="1035" y="245" text-anchor="middle">answers,</text>
-  <text class="edge-label" x="1035" y="258" text-anchor="middle">is_success</text>
+  <path class="edge" data-from="b5" data-to="b9" d="M1010,215 H1060" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1035" y="207" text-anchor="middle">answers</text>
+  <path class="edge" data-from="b7" data-to="b9" d="M1010,345 H1100 V242" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1040" y="337" text-anchor="start">flag bool</text>
+  <path class="edge" data-from="b11" data-to="b9" d="M220,470 H240 V505 H1130 V242" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="660" y="500" text-anchor="middle">True if oracle generation</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - the file's whole job. Entry point: <code>WorkflowInfo.__init__</code> (<code class="path">sources/core/workflow_info.py:15</code>) binds paths and reads nothing; every value crosses a property that reads a file on first use. Solid arrows are real calls, dashed arrows are file reads.</p>
-<p class="note say">One place reads the folder itself: <code>judge_evaluation</code> opens <code>evaluation.txt</code> on every access and is not cached, unlike <code>goal</code>, <code>code</code> and <code>overall_score</code>.</p>
+<p class="figcap">Diagram 1 - 11 boxes. Entry point: <code>WorkflowInfo.__init__</code> (<code class="path">sources/core/workflow_info.py:49</code>) binds paths and reads nothing; every value crosses a property that reads a file on first use. Solid arrows are calls, dashed arrows are file reads; the <code>self.goal</code> fallback of <code>original_task</code> is written in its box, not drawn. The ORACLE box is module level: <code>workflow_selection.py</code> and <code>gold_feedback/evaluator.py</code> call it.</p>
+<p class="note say"><code>calculate_overall_score</code> and <code>reward_is_fallback</code> both go through <code>_selected_evaluation</code>, so the score and its fallback flag always come from the same evaluation block.</p>
 </div>
-
 <div class="panel"><span class="br"></span>
 <h2>Data flow - what goes in, what comes out</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="Data flow in and out of WorkflowInfo">
+<svg class="diagram" viewBox="0 0 940 320" role="img" aria-label="Data flow in and out of WorkflowInfo">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -160,291 +180,331 @@
   </defs>
 
   <g class="box" id="d1">
-    <title>Two constructor arguments (line 15): the uuid and the folder path.</title>
-    <rect x="20" y="90" width="200" height="80" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <title>Two constructor arguments (line 49): the uuid and the folder path.</title>
+    <rect x="20" y="90" width="200" height="80" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="120" y="118" text-anchor="middle">constructor input</text>
     <text class="box-sub" x="120" y="136" text-anchor="middle">uuid: str</text>
-    <text class="box-sub" x="120" y="152" text-anchor="middle">workflow_folder: Path</text>
+    <text class="box-sub" x="120" y="152" text-anchor="middle">workflow_folder: Path | str</text>
   </g>
 
   <g class="box" id="d2">
     <title>Files read from the folder, one per line of the box; no file is written by this module.</title>
-    <rect x="290" y="50" width="250" height="160" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="415" y="76" text-anchor="middle">files read</text>
-    <text class="box-sub" x="415" y="98" text-anchor="middle">state_result.json (line 189)</text>
-    <text class="box-sub" x="415" y="116" text-anchor="middle">workflow_genotype_&lt;uuid&gt;.py (line 210)</text>
-    <text class="box-sub" x="415" y="134" text-anchor="middle">original_task_&lt;uuid&gt;.txt (line 49)</text>
-    <text class="box-sub" x="415" y="152" text-anchor="middle">evaluation.txt (line 162)</text>
-    <text class="box-sub" x="415" y="170" text-anchor="middle">textual_gradient.txt (line 174)</text>
+    <rect x="290" y="30" width="250" height="180" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="415" y="56" text-anchor="middle">files read</text>
+    <text class="box-sub" x="415" y="78" text-anchor="middle">state_result.json (line 264)</text>
+    <text class="box-sub" x="415" y="96" text-anchor="middle">workflow_genotype_&lt;uuid&gt;.py (line 285)</text>
+    <text class="box-sub" x="415" y="114" text-anchor="middle">original_task_&lt;uuid&gt;.txt (line 83)</text>
+    <text class="box-sub" x="415" y="132" text-anchor="middle">evaluation.txt (line 229)</text>
+    <text class="box-sub" x="415" y="150" text-anchor="middle">textual_gradient.txt (line 249)</text>
+    <text class="box-sub" x="415" y="168" text-anchor="middle">gold_feedback.json, exists() only (line 32)</text>
     <text class="box-sub" x="415" y="192" text-anchor="middle">config fields read: none</text>
   </g>
 
   <g class="box" id="d3">
     <title>The accessor object itself.</title>
-    <rect x="610" y="90" width="150" height="80" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <rect x="610" y="90" width="150" height="80" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="685" y="126" text-anchor="middle">WorkflowInfo</text>
     <text class="box-sub" x="685" y="144" text-anchor="middle">lazy property reads</text>
   </g>
 
   <g class="box" id="d4">
     <title>The values returned to callers.</title>
-    <rect x="610" y="195" width="310" height="85" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <rect x="610" y="195" width="310" height="105" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="765" y="219" text-anchor="middle">values out</text>
     <text class="box-sub" x="765" y="237" text-anchor="middle">goal: str, code: str, answers: list</text>
     <text class="box-sub" x="765" y="253" text-anchor="middle">state_result: dict, is_valid: bool</text>
     <text class="box-sub" x="765" y="269" text-anchor="middle">overall_score: float</text>
+    <text class="box-sub" x="765" y="285" text-anchor="middle">reward_is_fallback: bool (new)</text>
   </g>
 
   <g class="box" id="d5">
     <title>No state key is written and no file is written; the module has no open(...,"w") call.</title>
-    <rect x="30" y="215" width="440" height="60" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
-    <text class="box-label" x="50" y="240">writes: none</text>
-    <text class="box-sub" x="50" y="260">no state key written, no file opened for writing, no config field read (imports at lines 1-5)</text>
+    <rect x="30" y="235" width="520" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="50" y="260">writes: none</text>
+    <text class="box-sub" x="50" y="280">no state key written, no file opened for writing, no config field read (imports at lines 1-5)</text>
   </g>
 
-  <path class="edge" data-from="d1" data-to="d3" d="M220,130 H520 V120 H610" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="330" y="122" text-anchor="middle">constructs</text>
-  <path class="edge dashed-edge" data-from="d2" data-to="d3" d="M540,130 H610" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="d1" data-to="d3" d="M220,130 H255 V222 H640 V172" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="219" text-anchor="middle">constructs</text>
+  <path class="edge dashed-edge" data-from="d2" data-to="d3" d="M540,130 H610" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
   <text class="edge-label" x="575" y="122" text-anchor="middle">parses</text>
-  <path class="edge" data-from="d3" data-to="d4" d="M685,170 V195" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d3" data-to="d4" d="M685,170 V195" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="735" y="188" text-anchor="middle">properties</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - inputs, files and returned values. The three <code>load_*</code> and property paths are the only readers; the amber box states the negative result of the write check.</p>
+<p class="figcap">Diagram 2 - inputs, files and returned values. The <code>load_*</code> methods, the properties and <code>is_oracle_generation</code> are the only readers; the dashed bottom box states the negative result of the write check.</p>
 </div>
-
 <div class="panel"><span class="br"></span>
-<h2>Control logic - the cache test and the score rule</h2>
+<h2>Control logic - the cache test and the oracle test</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 980 300" role="img" aria-label="Decision tree for the cached goal property and for calculate_overall_score">
+<svg class="diagram" viewBox="0 0 980 420" role="img" aria-label="Decision tree for the cached properties, the uncached readers and is_oracle_generation">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
     </marker>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur stdDeviation="2.5" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-
   <text class="box-sub" x="20" y="18">lane A - goal, state_result, code, overall_score (cache hit test)</text>
-
   <g class="box" id="c1">
-    <title>Property read, for example wf.goal (line 33).</title>
-    <rect x="20" y="40" width="120" height="60" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="80" y="66" text-anchor="middle">property read</text>
-    <text class="box-sub" x="80" y="84" text-anchor="middle">wf.goal</text>
+    <title>Property read, for example wf.goal (line 66).</title>
+    <rect x="20" y="40" width="120" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="80" y="62" text-anchor="middle">property read</text>
+    <text class="box-sub" x="80" y="80" text-anchor="middle">wf.goal</text>
   </g>
-
   <g class="box" id="c2">
-    <title>Cache test, for example "if self._goal is None" at line 35.</title>
-    <rect x="190" y="40" width="150" height="60" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="265" y="66" text-anchor="middle">cache slot is None?</text>
-    <text class="box-sub" x="265" y="84" text-anchor="middle">line 34, 89, 117, 124</text>
+    <title>Cache test, for example "if self._goal is None" at line 68.</title>
+    <rect x="190" y="40" width="150" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="265" y="62" text-anchor="middle">cache slot is None?</text>
+    <text class="box-sub" x="265" y="80" text-anchor="middle">lines 68, 123, 151, 158</text>
   </g>
-
   <g class="box" id="c3">
     <title>Cache hit returns the stored value without touching disk.</title>
-    <rect x="390" y="40" width="140" height="60" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="460" y="66" text-anchor="middle">return cached</text>
-    <text class="box-sub" x="460" y="84" text-anchor="middle">no disk read</text>
+    <rect x="390" y="40" width="140" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="62" text-anchor="middle">return cached</text>
+    <text class="box-sub" x="460" y="80" text-anchor="middle">no disk read</text>
   </g>
-
   <g class="box" id="c4">
-    <title>Cache miss calls the loader: load_state_result (line 182) or load_code (line 203).</title>
-    <rect x="190" y="140" width="180" height="60" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="280" y="166" text-anchor="middle">call loader</text>
-    <text class="box-sub" x="280" y="184" text-anchor="middle">load_state_result()</text>
+    <title>Cache miss calls the loader: load_state_result (line 257) or load_code (line 278).</title>
+    <rect x="190" y="140" width="180" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="280" y="162" text-anchor="middle">call loader</text>
+    <text class="box-sub" x="280" y="180" text-anchor="middle">load_state_result()</text>
   </g>
-
   <g class="box" id="c5">
     <title>Missing, empty and unparsable json all return {}; a read error prints and returns {}.</title>
-    <rect x="420" y="140" width="170" height="60" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
-    <text class="box-label" x="505" y="166" text-anchor="middle">file exists and parses?</text>
-    <text class="box-sub" x="505" y="184" text-anchor="middle">lines 190-201</text>
+    <rect x="420" y="140" width="170" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="505" y="162" text-anchor="middle">file exists and parses?</text>
+    <text class="box-sub" x="505" y="180" text-anchor="middle">lines 265-276</text>
   </g>
-
   <g class="box" id="c6">
     <title>Fallback value when the json is absent or broken.</title>
-    <rect x="640" y="140" width="140" height="60" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
-    <text class="box-label" x="710" y="166" text-anchor="middle">return {} or ""</text>
-    <text class="box-sub" x="710" y="184" text-anchor="middle">no raise</text>
+    <rect x="640" y="140" width="140" height="60" rx="18" fill="none" stroke="#8FB8C9"/>
+    <text class="box-label" x="710" y="162" text-anchor="middle">return {} or ""</text>
+    <text class="box-sub" x="710" y="180" text-anchor="middle">no raise</text>
   </g>
-
   <g class="box" id="c7">
     <title>Value is stored back into the cache slot, then returned.</title>
-    <rect x="640" y="40" width="190" height="60" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="735" y="66" text-anchor="middle">store in cache, return</text>
-    <text class="box-sub" x="735" y="84" text-anchor="middle">_goal, _state_result, _code</text>
+    <rect x="640" y="40" width="190" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="735" y="62" text-anchor="middle">store in cache, return</text>
+    <text class="box-sub" x="735" y="80" text-anchor="middle">_goal, _state_result, _code</text>
   </g>
-
   <text class="box-sub" x="20" y="232">lane B - answers, success, is_success, judge_evaluation skip the cache</text>
   <g class="box" id="c8">
     <title>These four properties call load_state_result() again, or read evaluation.txt directly.</title>
-    <rect x="20" y="242" width="420" height="50" rx="6" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <rect x="20" y="242" width="420" height="50" rx="12" fill="none" stroke="#8FB8C9"/>
     <text class="box-label" x="230" y="264" text-anchor="middle">no cache slot</text>
-    <text class="box-sub" x="230" y="282" text-anchor="middle">lines 96, 104, 110, and judge_evaluation at line 143</text>
+    <text class="box-sub" x="230" y="282" text-anchor="middle">lines 130, 138, 144, and judge_evaluation at line 218</text>
   </g>
   <g class="box" id="c9">
-    <title>is_success reads the last element of the success list (line 112).</title>
-    <rect x="500" y="242" width="440" height="50" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <title>is_success reads the last element of the success list (lines 145-146).</title>
+    <rect x="500" y="242" width="440" height="50" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="720" y="264" text-anchor="middle">is_success = state["success"][-1]</text>
     <text class="box-sub" x="720" y="282" text-anchor="middle">defaults to [False] when the state is not a dict</text>
   </g>
-
-  <path class="edge" data-from="c1" data-to="c2" d="M140,70 H190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="box-sub" x="20" y="322">lane C - is_oracle_generation(folder, state_result=None), module function (line 20)</text>
+  <g class="box" id="o1">
+    <title>The sidecar name is ORACLE_SIDECAR (line 17); the gold-feedback evaluator writes it.</title>
+    <rect x="20" y="332" width="260" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="354" text-anchor="middle">gold_feedback.json exists?</text>
+    <text class="box-sub" x="150" y="372" text-anchor="middle">line 32, returns True</text>
+  </g>
+  <g class="box" id="o2">
+    <title>Without a parsed state_result the function only checks the sidecar.</title>
+    <rect x="340" y="332" width="280" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="480" y="354" text-anchor="middle">state_result is a dict?</text>
+    <text class="box-sub" x="480" y="372" text-anchor="middle">else return False (line 38)</text>
+  </g>
+  <g class="box" id="o3">
+    <title>Any other value (missing, 1, "true") returns False.</title>
+    <rect x="680" y="332" width="280" height="60" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="820" y="354" text-anchor="middle">evaluation.verifier.oracle is True</text>
+    <text class="box-sub" x="820" y="372" text-anchor="middle">lines 35-37, strict "is True"</text>
+  </g>
+  <path class="edge" data-from="c1" data-to="c2" d="M140,70 H190" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="165" y="62" text-anchor="middle">checks</text>
-  <path class="edge" data-from="c2" data-to="c3" d="M340,70 H390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="c3" d="M340,70 H390" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="365" y="62" text-anchor="middle">no: cached</text>
-  <path class="edge" data-from="c2" data-to="c4" d="M265,100 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c2" data-to="c4" d="M265,100 V140" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="300" y="126" text-anchor="middle">yes: miss</text>
-  <path class="edge" data-from="c4" data-to="c5" d="M370,170 H420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c4" data-to="c5" d="M370,170 H420" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="395" y="162" text-anchor="middle">reads</text>
-  <path class="edge" data-from="c5" data-to="c6" d="M590,170 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c5" data-to="c6" d="M590,170 H640" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="615" y="162" text-anchor="middle">no</text>
-  <path class="edge" data-from="c5" data-to="c7" d="M505,140 V100" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="540" y="126" text-anchor="middle">yes</text>
-  <path class="edge" data-from="c8" data-to="c9" d="M440,267 H500" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="c5" data-to="c7" d="M505,140 V120 H735 V100" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="134" text-anchor="middle">yes</text>
+  <path class="edge" data-from="c8" data-to="c9" d="M440,267 H500" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="470" y="259" text-anchor="middle">is_success</text>
+  <path class="edge" data-from="o1" data-to="o2" d="M280,362 H340" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="310" y="354" text-anchor="middle">no</text>
+  <path class="edge" data-from="o2" data-to="o3" d="M620,362 H680" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="650" y="354" text-anchor="middle">yes</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - lane A is the cached-property rule, lane B is the four uncached readers. Conditions are quoted from the file (<code class="path">sources/core/workflow_info.py:34</code>, <code class="path">:190-201</code>, <code class="path">:112</code>).</p>
+<p class="figcap">Diagram 3 - 12 boxes. Lane A is the cached-property rule, lane B is the four uncached readers, lane C is the new oracle test. Conditions are quoted from <code class="path">sources/core/workflow_info.py:68</code>, <code class="path">:265-276</code>, <code class="path">:145-146</code> and <code class="path">:31-38</code>.</p>
 </div>
-
 <div class="panel"><span class="br"></span>
-<h2>Control logic - score selection and gradient fallback</h2>
+<h2>Control logic - score block, fallback flag and gradient fallback</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 980 340" role="img" aria-label="Priority order for the score and the gradient fallback">
+<svg class="diagram" viewBox="0 0 980 450" role="img" aria-label="Priority order for the score block, the fallback flag, the gradient fallback and the uncapped score">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
     </marker>
     <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
       <feGaussianBlur stdDeviation="2.5" result="b"/>
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-
-  <text class="box-sub" x="20" y="18">lane A - calculate_overall_score (line 210)</text>
+  <text class="box-sub" x="20" y="18">lane A - calculate_overall_score (line 297) through _selected_evaluation (line 176)</text>
   <g class="box" id="s1">
-    <title>The score property calls calculate_overall_score on first use.</title>
-    <rect x="20" y="30" width="150" height="56" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="95" y="54" text-anchor="middle">read state_result</text>
-    <text class="box-sub" x="95" y="72" text-anchor="middle">line 232</text>
+    <title>Empty state_result or a non-dict evaluation returns an empty dict.</title>
+    <rect x="20" y="30" width="190" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="115" y="52" text-anchor="middle">_selected_evaluation()</text>
+    <text class="box-sub" x="115" y="70" text-anchor="middle">state_result, lines 187-192</text>
   </g>
   <g class="box" id="s2">
-    <title>Empty state or empty evaluation returns 0.0.</title>
-    <rect x="220" y="30" width="170" height="56" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
-    <text class="box-label" x="305" y="54" text-anchor="middle">evaluation block empty?</text>
-    <text class="box-sub" x="305" y="72" text-anchor="middle">lines 233-236</text>
+    <title>The first key whose value is a dict wins (lines 193-196); else {} (line 197).</title>
+    <rect x="260" y="30" width="200" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="360" y="52" text-anchor="middle">first dict block</text>
+    <text class="box-sub" x="360" y="70" text-anchor="middle">generic, verifier, scenario</text>
   </g>
   <g class="box" id="s3">
-    <title>First key present wins: generic, else verifier, else scenario (lines 240-245).</title>
-    <rect x="440" y="30" width="240" height="56" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="560" y="54" text-anchor="middle">generic, elif verifier, elif scenario</text>
-    <text class="box-sub" x="560" y="72" text-anchor="middle">one score appended</text>
+    <title>generic and verifier persist overall_score; scenario uses score.</title>
+    <rect x="510" y="30" width="200" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="610" y="52" text-anchor="middle">overall_score, else score</text>
+    <text class="box-sub" x="610" y="70" text-anchor="middle">line 314</text>
   </g>
   <g class="box" id="s4">
-    <title>A missing key inside the block appends 0 (lines 246-247).</title>
-    <rect x="730" y="30" width="230" height="56" rx="6" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
-    <text class="box-label" x="845" y="54" text-anchor="middle">mean(scores), else 0.0</text>
-    <text class="box-sub" x="845" y="72" text-anchor="middle">missing key becomes 0</text>
+    <title>Empty block, None value or a bad value returns 0.0 (lines 310-317).</title>
+    <rect x="760" y="30" width="200" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="860" y="52" text-anchor="middle">float(value), else 0.0</text>
+    <text class="box-sub" x="860" y="70" text-anchor="middle">TypeError, ValueError: 0.0</text>
   </g>
-
-  <text class="box-sub" x="20" y="130">lane B - abstracted_textual_gradient (line 159)</text>
+  <text class="box-sub" x="20" y="120">lane B - reward_is_fallback (line 200); FALLBACK_REWARD_KINDS is uncommitted</text>
+  <g class="box" id="f1">
+    <title>Line 215 reads the block that also backs overall_score.</title>
+    <rect x="20" y="132" width="300" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="170" y="154" text-anchor="middle">reward_fallback of same block</text>
+    <text class="box-sub" x="170" y="172" text-anchor="middle">_selected_evaluation().get(...)</text>
+  </g>
+  <g class="box" id="f2">
+    <title>Line 13. short_circuit is absent on purpose: it is a measured 0.0.</title>
+    <rect x="380" y="132" width="330" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="545" y="154" text-anchor="middle">in FALLBACK_REWARD_KINDS?</text>
+    <text class="box-sub" x="545" y="172" text-anchor="middle">{"mean_claim", "oracle_censored"}</text>
+  </g>
+  <text class="box-sub" x="20" y="222">lane C - abstracted_textual_gradient (line 241)</text>
   <g class="box" id="g1">
     <title>verifier.abstracted_textual_gradient is preferred when it is a non-empty string.</title>
-    <rect x="20" y="142" width="230" height="56" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="135" y="166" text-anchor="middle">state verifier text set?</text>
-    <text class="box-sub" x="135" y="184" text-anchor="middle">lines 168-173</text>
+    <rect x="20" y="234" width="230" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="256" text-anchor="middle">state verifier text set?</text>
+    <text class="box-sub" x="135" y="274" text-anchor="middle">lines 243-248</text>
   </g>
   <g class="box" id="g2">
-    <title>Fallback: the sidecar textual_gradient.txt in the workflow folder (lines 174-177).</title>
-    <rect x="300" y="142" width="200" height="56" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="400" y="166" text-anchor="middle">sidecar file exists?</text>
-    <text class="box-sub" x="400" y="184" text-anchor="middle">read_text(encoding="utf-8")</text>
+    <title>Fallback: the sidecar textual_gradient.txt in the workflow folder (lines 249-254).</title>
+    <rect x="300" y="234" width="200" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="400" y="256" text-anchor="middle">sidecar file exists?</text>
+    <text class="box-sub" x="400" y="274" text-anchor="middle">read_text(encoding="utf-8")</text>
   </g>
   <g class="box" id="g3">
-    <title>Both sources absent returns the empty string.</title>
-    <rect x="550" y="142" width="180" height="56" rx="6" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
-    <text class="box-label" x="640" y="166" text-anchor="middle">return ""</text>
-    <text class="box-sub" x="640" y="184" text-anchor="middle">no gradient</text>
+    <title>Both sources absent returns the empty string (line 255).</title>
+    <rect x="550" y="234" width="180" height="56" rx="18" fill="none" stroke="#8FB8C9"/>
+    <text class="box-label" x="640" y="256" text-anchor="middle">return ""</text>
+    <text class="box-sub" x="640" y="274" text-anchor="middle">no gradient</text>
   </g>
-
-  <text class="box-sub" x="20" y="240">lane C - overall_score_uncapped (line 126)</text>
+  <text class="box-sub" x="20" y="330">lane D - overall_score_uncapped (line 163)</text>
   <g class="box" id="u1">
     <title>If the verifier block has no uncapped key the capped score is returned instead.</title>
-    <rect x="20" y="252" width="240" height="56" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="140" y="276" text-anchor="middle">key in verifier block?</text>
-    <text class="box-sub" x="140" y="294" text-anchor="middle">lines 136-139</text>
+    <rect x="20" y="342" width="240" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="364" text-anchor="middle">key in verifier block?</text>
+    <text class="box-sub" x="140" y="382" text-anchor="middle">lines 170-172</text>
   </g>
   <g class="box" id="u2">
-    <title>Present: max(0.0, stored value). Absent: fall back to overall_score.</title>
-    <rect x="310" y="252" width="300" height="56" rx="6" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="460" y="276" text-anchor="middle">max(0.0, value) else overall_score</text>
-    <text class="box-sub" x="460" y="294" text-anchor="middle">used by parent-draw weighting</text>
+    <title>Present: max(0.0, stored value) (line 174). Absent: overall_score.</title>
+    <rect x="310" y="342" width="300" height="56" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="460" y="364" text-anchor="middle">max(0.0, value) else overall_score</text>
+    <text class="box-sub" x="460" y="382" text-anchor="middle">used by parent-draw weighting</text>
   </g>
-
-  <path class="edge" data-from="s1" data-to="s2" d="M170,58 H220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="195" y="50" text-anchor="middle">yes</text>
-  <path class="edge" data-from="s2" data-to="s3" d="M390,58 H440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="415" y="50" text-anchor="middle">no</text>
-  <path class="edge" data-from="s3" data-to="s4" d="M680,58 H730" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="705" y="50" text-anchor="middle">returns</text>
-  <path class="edge" data-from="g1" data-to="g2" d="M250,170 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="275" y="162" text-anchor="middle">no</text>
-  <path class="edge" data-from="g2" data-to="g3" d="M500,170 H550" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="525" y="162" text-anchor="middle">no</text>
-  <path class="edge" data-from="u1" data-to="u2" d="M260,280 H310" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="285" y="272" text-anchor="middle">either</text>
+  <path class="edge" data-from="s1" data-to="s2" d="M210,58 H260" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="235" y="50" text-anchor="middle">dict</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M460,58 H510" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="485" y="50" text-anchor="middle">block</text>
+  <path class="edge" data-from="s3" data-to="s4" d="M710,58 H760" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="735" y="50" text-anchor="middle">value</text>
+  <path class="edge" data-from="f1" data-to="f2" d="M320,160 H380" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="350" y="152" text-anchor="middle">value</text>
+  <path class="edge" data-from="g1" data-to="g2" d="M250,262 H300" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="275" y="254" text-anchor="middle">no</text>
+  <path class="edge" data-from="g2" data-to="g3" d="M500,262 H550" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="525" y="254" text-anchor="middle">no</text>
+  <path class="edge" data-from="u1" data-to="u2" d="M260,370 H310" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="285" y="362" text-anchor="middle">either</text>
 </svg>
 </div>
-<p class="figcap">Diagram 4 - three decision rules, quoted from <code class="path">sources/core/workflow_info.py:233-247</code>, <code class="path">:168-177</code> and <code class="path">:136-139</code>. The evaluator priority is the only place where one of three evaluator blocks is chosen.</p>
+<p class="figcap">Diagram 4 - 11 boxes, four decision rules quoted from <code class="path">sources/core/workflow_info.py:176-215</code>, <code class="path">:241-255</code>, <code class="path">:163-174</code> and <code class="path">:297-317</code>. Lanes A and B read the same block, so the score and its flag cannot come from two evaluators.</p>
+<p class="note">Changed in <code>4020790</code>: the old <code>calculate_overall_score</code> tested key presence (<code>"generic" in evaluation</code>) and appended <code>0</code> on any error; the new one takes the first block that is a <code>dict</code>. <code>overall_score_uncapped</code> still reads the <code>verifier</code> block directly, not the selected block.</p>
 </div>
-
 <div class="panel"><span class="br"></span>
 <h2>What it reads and writes</h2>
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td>file</td><td class="sym">state_result.json</td><td class="sym">folder / state_result.json (line 189)</td><td>goal, answers, success list, evaluation blocks.</td></tr>
-<tr><td>file</td><td class="sym">workflow_genotype_&lt;uuid&gt;.py</td><td class="sym">folder / f"workflow_genotype_{uuid}.py" (line 198)</td><td>genotype source text for the code property.</td></tr>
-<tr><td>file</td><td class="sym">original_task_&lt;uuid&gt;.txt</td><td class="sym">folder / f"original_task_{uuid}.txt" (line 44)</td><td>unwrapped task for similarity matching.</td></tr>
-<tr><td>file</td><td class="sym">evaluation.txt</td><td class="sym">folder / "evaluation.txt" (line 147)</td><td>claim verdict text, returned as a string.</td></tr>
-<tr><td>file</td><td class="sym">textual_gradient.txt</td><td class="sym">folder / "textual_gradient.txt" (line 176)</td><td>fallback gradient when the state block lacks one.</td></tr>
+<tr><td>file</td><td class="sym">state_result.json</td><td class="sym">folder / state_result.json (line 264)</td><td>goal, answers, success list, evaluation blocks.</td></tr>
+<tr><td>file</td><td class="sym">workflow_genotype_&lt;uuid&gt;.py</td><td class="sym">folder / f"workflow_genotype_{uuid}.py" (line 285)</td><td>genotype source text for the code property.</td></tr>
+<tr><td>file</td><td class="sym">original_task_&lt;uuid&gt;.txt</td><td class="sym">folder / f"original_task_{uuid}.txt" (line 83)</td><td>unwrapped task for similarity matching.</td></tr>
+<tr><td>file</td><td class="sym">evaluation.txt</td><td class="sym">folder / "evaluation.txt" (line 229)</td><td>claim verdict text, returned as a string.</td></tr>
+<tr><td>file</td><td class="sym">textual_gradient.txt</td><td class="sym">folder / "textual_gradient.txt" (line 249)</td><td>fallback gradient when the state block lacks one.</td></tr>
+<tr><td>file</td><td class="sym">gold_feedback.json <span class="tag">ORACLE</span></td><td class="sym">folder / ORACLE_SIDECAR (line 32)</td><td>existence only: marks a gold-graded generation.</td></tr>
 <tr><td>config field</td><td class="sym">none</td><td class="sym">imports at lines 1-5</td><td>this module never imports Config.</td></tr>
 <tr><td>state key</td><td class="sym">goal, answers, success, evaluation</td><td class="sym">parsed state_result.json</td><td>read only; no key is written.</td></tr>
-<tr><td>state key</td><td class="sym">evaluation.verifier.overall_score_uncapped</td><td class="sym">line 137</td><td>uncapped reward for parent-draw weighting.</td></tr>
+<tr><td>state key</td><td class="sym">evaluation.&lt;block&gt;.reward_fallback</td><td class="sym">line 215</td><td>fallback flag; the hybrid verifier writes it.</td></tr>
+<tr><td>state key</td><td class="sym">evaluation.verifier.oracle</td><td class="sym">line 37</td><td>oracle flag; the gold evaluator writes it.</td></tr>
+<tr><td>state key</td><td class="sym">evaluation.verifier.overall_score_uncapped</td><td class="sym">line 171</td><td>uncapped reward for parent-draw weighting.</td></tr>
 <tr><td>write</td><td class="sym">none</td><td class="sym">whole file</td><td>no open(...,"w") call and no writer method exists.</td></tr>
 </tbody>
 </table>
-<p class="note">Amber: the <code>judge_evaluation</code> annotation says <code>-&gt; dict</code> (line 143) but the body returns a string, <code>{}</code> when the file is missing, or the literal <code>"No evaluation. execution failed."</code> on a read error (lines 150-163). The error message it prints names <code>state_result.json</code>, while it is reading <code>evaluation.txt</code> (line 162).</p>
-<p class="note">Amber: the class docstring says reads are cached per property, but <code>answers</code> (line 94), <code>success</code> (line 102), <code>is_success</code> (line 108) and <code>judge_evaluation</code> (line 143) re-read disk on every access. Only <code>goal</code>, <code>state_result</code>, <code>code</code> and <code>overall_score</code> have cache slots (lines 25-29).</p>
+<p class="note">Amber: the <code>judge_evaluation</code> annotation says <code>-&gt; dict</code> (line 218) but the body returns a string, <code>{}</code> when the file is missing, or the literal <code>"No evaluation. execution failed."</code> on a read error (lines 229-238). The error message it prints names <code>state_result.json</code>, while it is reading <code>evaluation.txt</code> (line 237).</p>
+<p class="note">Amber: the class docstring says reads are cached per property, but <code>answers</code> (line 128), <code>success</code> (line 136), <code>is_success</code> (line 142), <code>judge_evaluation</code> (line 218), <code>reward_is_fallback</code> (line 200) and <code>abstracted_textual_gradient</code> (line 241) re-read disk on every access. Only <code>goal</code>, <code>original_task</code>, <code>state_result</code>, <code>code</code> and <code>overall_score</code> have cache slots (lines 59-63).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Full symbol inventory</h2>
-<details><summary>1 class, 18 members, 19 symbols (line numbers from the file)</summary><div class="dbody">
-<pre>WorkflowInfo                                                    line 7    lazy accessor for one folder
-  __init__(self, uuid: str, workflow_folder: Path | str) -&gt; None  line 15   binds uuid and path, no I/O
-  goal -&gt; str                            [property]             line 32   goal from state_result.json
-  original_task -&gt; str                   [property]             line 40   unwrapped task for matching
-  _extract_original_from_wrapped(self, text: str) -&gt; str         line 62   strips the task wrapper
-  state_result -&gt; dict                   [property]             line 87   cached parsed state file
-  answers -&gt; list                        [property]             line 94   per-step answers, uncached
-  success -&gt; list                        [property]             line 102  per-step success flags, uncached
-  is_success -&gt; bool                     [property]             line 108  last success flag
-  code -&gt; str                            [property]             line 115  cached genotype source
-  overall_score -&gt; float                 [property]             line 122  cached capped score
-  overall_score_uncapped -&gt; float        [property]             line 129  score without the hard-fail cap
-  judge_evaluation -&gt; dict               [property]             line 143  evaluation.txt text, uncached
-  abstracted_textual_gradient -&gt; str     [property]             line 166  gradient text with sidecar fallback
-  load_state_result(self) -&gt; dict                                line 182  parse state_result.json
-  load_code(self) -&gt; str                                         line 203  read the genotype file
-  calculate_overall_score(self) -&gt; float                         line 222  mean of one evaluator block
-  is_valid(self) -&gt; bool                                         line 250  state file and genotype present
-  __str__(self) -&gt; str                                           line 256  one-line summary with score</pre>
-<p>Module-level code: <code>if __name__ == "__main__":</code> at line 266 (three prints plus one <code>WorkflowInfo</code> built on the hardcoded uuid <code>20250926_165556_9e2402c5</code> at line 268). Module-level imports: <code>os</code>, <code>json</code>, <code>re</code>, <code>Path</code>, <code>mean</code> at lines 1-5. <code>os</code> (line 1) is imported and never used.</p>
+<details><summary>2 constants, 1 function, 1 class with 20 members (340 lines)</summary><div class="dbody">
+<pre>FALLBACK_REWARD_KINDS = frozenset({"mean_claim", "oracle_censored"})   line 13   rewards kept out of the capsule argmax
+ORACLE_SIDECAR = "gold_feedback.json"                                   line 17   on-disk oracle marker
+is_oracle_generation(workflow_folder: Path | str,
+    state_result: dict | None = None) -&gt; bool                           line 20   sidecar or verifier.oracle flag
+
+WorkflowInfo                                                    line 41   lazy accessor for one folder
+  __init__(self, uuid: str, workflow_folder: Path | str) -&gt; None  line 49   binds uuid and path, no I/O
+  goal -&gt; str                            [property]             line 66   goal from state_result.json
+  original_task -&gt; str                   [property]             line 74   unwrapped task for matching
+  _extract_original_from_wrapped(self, text: str) -&gt; str         line 96   strips the task wrapper
+  state_result -&gt; dict                   [property]             line 121  cached parsed state file
+  answers -&gt; list                        [property]             line 128  per-step answers, uncached
+  success -&gt; list                        [property]             line 136  per-step success flags, uncached
+  is_success -&gt; bool                     [property]             line 142  last success flag
+  code -&gt; str                            [property]             line 149  cached genotype source
+  overall_score -&gt; float                 [property]             line 156  cached capped score
+  overall_score_uncapped -&gt; float        [property]             line 163  score without the hard-fail cap
+  _selected_evaluation(self) -&gt; dict                             line 176  first dict block (new)
+  reward_is_fallback -&gt; bool             [property]             line 200  fallback flag of that block (new)
+  judge_evaluation -&gt; dict               [property]             line 218  evaluation.txt text, uncached
+  abstracted_textual_gradient -&gt; str     [property]             line 241  gradient text with sidecar fallback
+  load_state_result(self) -&gt; dict                                line 257  parse state_result.json
+  load_code(self) -&gt; str                                         line 278  read the genotype file
+  calculate_overall_score(self) -&gt; float                         line 297  score of the selected block
+  is_valid(self) -&gt; bool                                         line 319  state file and genotype present
+  __str__(self) -&gt; str                                           line 325  one-line summary with score</pre>
+<p>Module-level code: <code>if __name__ == "__main__":</code> at line 335 (three prints plus one <code>WorkflowInfo</code> built on the hardcoded uuid <code>20250926_165556_9e2402c5</code> at line 337). Module-level imports: <code>os</code>, <code>json</code>, <code>re</code>, <code>Path</code>, <code>mean</code> at lines 1-5. <code>os</code> (line 1) is imported and never used.</p>
 </div></details>
 </div>
 
@@ -453,24 +513,25 @@
 <table>
 <thead><tr><th>Importer</th><th>What it calls</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="file_core_workflow_selection.html">sources/core/workflow_selection.py</a></td><td><code>is_valid()</code>, <code>load_state_result()</code>, <code>load_code()</code>, <code>code</code>, <code>overall_score</code></td><td class="sym">lines 10, 106-119, 238</td></tr>
-<tr><td class="sym"><a href="mod_core_variation.html">sources/core/variation_engine.py</a></td><td><code>overall_score</code>, <code>abstracted_textual_gradient</code>, <code>state_result</code></td><td class="sym">lines 14, 395-397, 485-490</td></tr>
-<tr><td class="sym"><a href="mod_core_evolution_engine.html">sources/core/evolution_engine.py</a></td><td><code>overall_score_uncapped</code>, <code>answers</code>, <code>original_task</code>, <code>goal</code></td><td class="sym">lines 41, 146-154, 291, 501, 524-527</td></tr>
+<tr><td class="sym"><a href="file_core_workflow_selection.html">sources/core/workflow_selection.py</a></td><td><code>is_oracle_generation</code>, <code>is_valid()</code>, <code>load_state_result()</code>, <code>load_code()</code>, <code>overall_score</code></td><td class="sym">lines 10, 37, 112-130, 193, 225-227, 258</td></tr>
+<tr><td class="sym"><a href="file_core_variation_engine.html">sources/core/variation_engine.py</a></td><td><code>overall_score</code>, <code>abstracted_textual_gradient</code>, <code>state_result</code></td><td class="sym">lines 14, 395-397, 485-490</td></tr>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">sources/core/evolution_engine.py</a></td><td><code>FALLBACK_REWARD_KINDS</code>, <code>reward_is_fallback</code>, <code>overall_score_uncapped</code>, <code>abstracted_textual_gradient</code>, <code>goal</code>, <code>answers</code></td><td class="sym">lines 42, 94, 245-258, 607, 640-667</td></tr>
+<tr><td class="sym"><a href="file_gold_evaluator.html">sources/evaluators/gold_feedback/evaluator.py</a> <span class="tag">ORACLE</span></td><td><code>is_oracle_generation</code>, <code>state_result</code>, <code>code</code></td><td class="sym">lines 30, 236, 253-254</td></tr>
 <tr><td class="sym"><a href="mod_core_planner.html">sources/core/planner.py</a></td><td><code>is_success</code>, <code>answers</code>, <code>goal</code>, <code>state_result</code>, <code>code</code> on the returned objects</td><td class="sym">lines 751-771, reached through <code>WorkflowSelector</code> only</td></tr>
-<tr><td class="sym"><a href="area_evaluators_legacy.html">sources/evaluators/base.py</a></td><td><code>state_result</code>, <code>code</code>, <code>goal</code>, <code>answers</code></td><td class="sym">lines 18, 171-182, 204-212</td></tr>
+<tr><td class="sym"><a href="area_evaluators_legacy.html">sources/evaluators/base.py</a></td><td><code>state_result</code>, <code>code</code>, <code>goal</code>, <code>answers</code></td><td class="sym">lines 18, 165-177, 205-212</td></tr>
 <tr><td class="sym">sources/utils/evolution_tree.py</td><td><code>overall_score</code></td><td class="sym">lines 27, 120-123</td></tr>
-<tr><td class="sym">sources/utils/archive_projection.py</td><td>import inside a function</td><td class="sym">line 195</td></tr>
-<tr><td class="sym">sources/core/__init__.py</td><td>re-export</td><td class="sym">lines 19, 65</td></tr>
+<tr><td class="sym">sources/utils/archive_projection.py</td><td>import inside a function</td><td class="sym">lines 195, 204</td></tr>
+<tr><td class="sym">sources/core/__init__.py</td><td>re-export of <code>WorkflowInfo</code> only</td><td class="sym">lines 19, 49</td></tr>
 </tbody>
 </table>
-<p>Tests: no test file imports <code>WorkflowInfo</code>. <code class="path">tests/variation_engine_test.py:51</code> defines <code>_FakeWorkflowInfo</code>, a duck-typed stand-in with <code>overall_score</code>, <code>abstracted_textual_gradient</code> and <code>state_result</code>, used at lines 213-299. Tests that write the files this module reads, and therefore exercise it indirectly, are <code class="path">tests/hybrid_verifier_test.py</code> (writes <code>state_result.json</code>, <code>evaluation.txt</code>, <code>textual_gradient.txt</code>) and <code class="path">tests/verifier_importance_test.py</code>.</p>
-<p>Related pages: <a href="file_core_workflow_selection.html">file_core_workflow_selection.html</a> (main consumer), <a href="file_core_workflow_runner.html">file_core_workflow_runner.html</a> (writer of the folder), <a href="area_sources_core.html">area_sources_core.html</a>, <a href="file_index.html">file_index.html</a>.</p>
+<p>Tests: <code class="path">tests/evolution_engine_selection_test.py</code> (added in <code>4020790</code>) builds <code>WorkflowInfo</code> on temp folders and checks <code>reward_is_fallback</code> for mean-claim, pairwise, short-circuit, legacy and mixed-block cases (lines 79-107, 200-210). <code class="path">tests/gold_feedback_test.py</code> (uncommitted) checks <code>reward_is_fallback</code> on gold blocks (lines 381-467) and the oracle skip in <code>WorkflowSelector</code> (line 1001). <code class="path">tests/variation_engine_test.py:51</code> defines <code>_FakeWorkflowInfo</code>, a duck-typed stand-in used at lines 213-299.</p>
+<p>Related pages: <a href="file_core_workflow_selection.html">file_core_workflow_selection.html</a> (main consumer), <a href="file_core_schema.html">file_core_schema.html</a> (<code>IndividualRun.reward_is_fallback</code>), <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> (writer of the oracle marks), <a href="file_core_workflow_runner.html">file_core_workflow_runner.html</a> (writer of the folder), <a href="area_sources_core.html">area_sources_core.html</a>, <a href="file_index.html">file_index.html</a>.</p>
 </div>
 
 <footer>
-<p>Sources: <code class="path">sources/core/workflow_info.py</code> (271 lines, every def and property), <code class="path">sources/core/workflow_selection.py</code> (lines 10, 106-119, 238), <code class="path">sources/core/variation_engine.py</code> (lines 14, 369-397, 485-490), <code class="path">sources/core/evolution_engine.py</code> (lines 41, 118-154, 285-300, 501-527), <code class="path">sources/core/planner.py</code> (lines 740-790), <code class="path">sources/evaluators/base.py</code> (lines 18, 160-215), <code class="path">sources/utils/evolution_tree.py</code> (lines 27, 120-123), <code class="path">sources/utils/archive_projection.py</code> (line 195), <code class="path">sources/core/__init__.py</code> (lines 19, 65), <code class="path">tests/variation_engine_test.py</code> (lines 51-56, 213-299), <code class="path">tests/hybrid_verifier_test.py</code>.</p>
-<p class="skips">Skipped: the bodies of the callers (owned by their own digest pages); <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>tmp/</code> (runtime folders, not read); the <code>__main__</code> smoke block beyond its line number; <code class="path">sources/core/genotype_embedding.py</code> (not called here). Nothing was modified outside <code>docs/visual_clone/</code>.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. The 53 changed paths did not include the three source files of this batch, so every line number above matches <code>HEAD</code>.</p>
+<p>Sources: <code class="path">sources/core/workflow_info.py</code> (340 lines, every def and property), <code class="path">sources/core/workflow_selection.py</code> (lines 10, 85-141, 258), <code class="path">sources/core/variation_engine.py</code> (lines 14, 395-397, 485-490), <code class="path">sources/core/evolution_engine.py</code> (lines 42, 72-178, 607-667), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (lines 30, 225-255), <code class="path">sources/core/planner.py</code> (lines 740-790), <code class="path">sources/evaluators/base.py</code> (lines 18, 147-215), <code class="path">sources/utils/evolution_tree.py</code>, <code class="path">sources/utils/archive_projection.py</code>, <code class="path">sources/core/__init__.py</code>, <code class="path">tests/evolution_engine_selection_test.py</code>, <code class="path">tests/gold_feedback_test.py</code>, <code class="path">tests/variation_engine_test.py</code>; diff <code>git diff 336fe19 -- sources/core/workflow_info.py</code> (+88/-19 lines, 35 of the added lines are uncommitted).</p>
+<p class="skips">Skipped: the bodies of the callers (owned by their own digest pages); <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>tmp/</code> (runtime folders, not read); the <code>__main__</code> smoke block beyond its line number; the tests were read, not run, because this page only maps code. Nothing was modified outside <code>docs/visual_clone/</code>.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28. <code>_selected_evaluation</code> and <code>reward_is_fallback</code> are in <code>4020790</code> (there it tests <code>== "mean_claim"</code>); <code>FALLBACK_REWARD_KINDS</code>, <code>ORACLE_SIDECAR</code> and <code>is_oracle_generation</code> are uncommitted.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

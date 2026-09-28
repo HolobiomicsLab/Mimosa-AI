@@ -52,18 +52,39 @@
     <text class="box-sub" x="557" y="102" text-anchor="middle">workflow_runner.py</text>
   </a>
 
-  <a class="box" id="d1_D" href="mod_evaluators_hybrid_verifier.html">
-    <title>HybridVerifierEvaluator.evaluate scores the workspace.</title>
+  <a class="box" id="d1_D" href="file_eval_evaluator.html">
+    <title>WorkflowEvaluator.evaluate sends the run to the verifier chosen by config.verifier_kind.</title>
     <rect x="705" y="60" width="175" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="792" y="86" text-anchor="middle">score workspace</text>
-    <text class="box-sub" x="792" y="102" text-anchor="middle">hybrid verifier</text>
+    <text class="box-sub" x="792" y="102" text-anchor="middle">verifier_kind branch</text>
+  </a>
+
+  <a class="box" id="d1_H" href="mod_evaluators_hybrid_verifier.html">
+    <title>HybridVerifierEvaluator.evaluate: the default verifier, called inline.</title>
+    <rect x="715" y="140" width="155" height="40" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="792" y="157" text-anchor="middle">hybrid (default)</text>
+    <text class="box-sub" x="792" y="172" text-anchor="middle">inline call</text>
+  </a>
+
+  <a class="box" id="d1_Lg" href="area_evaluators_legacy.html">
+    <title>VerifierEvaluator, the deprecated legacy claims verifier, called inline.</title>
+    <rect x="715" y="190" width="155" height="40" rx="12" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="792" y="207" text-anchor="middle" fill="#4F7486">legacy</text>
+    <text class="box-sub" x="792" y="222" text-anchor="middle">DEPRECATED</text>
+  </a>
+
+  <a class="box" id="d1_Gd" href="mod_evaluators_gold_feedback.html">
+    <title>GoldFeedbackEvaluator reads benchmark gold; the engine calls it in asyncio.to_thread.</title>
+    <rect x="715" y="240" width="155" height="40" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="792" y="257" text-anchor="middle">gold &#183; ORACLE</text>
+    <text class="box-sub" x="792" y="272" text-anchor="middle">asyncio.to_thread</text>
   </a>
 
   <a class="box" id="d1_E" href="mod_evaluators_hybrid_verifier.html">
-    <title>gradient.build_gradient writes the textual gradient and evaluation.txt.</title>
+    <title>hybrid: gradient.build_gradient writes textual_gradient.txt and evaluation.txt; gold swaps in the grader VER/SR text.</title>
     <rect x="705" y="310" width="175" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="792" y="336" text-anchor="middle">write gradient</text>
-    <text class="box-sub" x="792" y="352" text-anchor="middle">gradient.py</text>
+    <text class="box-sub" x="792" y="352" text-anchor="middle">gradient.py | gold format.py</text>
   </a>
 
   <a class="box" id="d1_F" href="mod_core_selection.html">
@@ -94,8 +115,14 @@
   <path class="edge" data-from="d1_C" data-to="d1_D" d="M640,92 H705" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="672" y="84" text-anchor="middle">workspace</text>
 
-  <path class="edge" data-from="d1_D" data-to="d1_E" d="M792,124 V310" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="802" y="215" text-anchor="start">claim scores</text>
+  <path class="edge" data-from="d1_D" data-to="d1_H" d="M792,124 V140" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="d1_D" data-to="d1_Lg" d="M720,124 V132 H700 V210 H715" fill="none" stroke="#4F7486" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge" data-from="d1_D" data-to="d1_Gd" d="M720,124 V132 H700 V260 H715" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="694" y="170" text-anchor="end">verifier_kind</text>
+  <path class="edge dashed-edge" data-from="d1_H" data-to="d1_E" d="M870,160 H888 V342 H880" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="d1_Lg" data-to="d1_E" d="M870,210 H888 V342 H880" fill="none" stroke="#4F7486" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <path class="edge dashed-edge" data-from="d1_Gd" data-to="d1_E" d="M870,260 H888 V342 H880" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="792" y="300" text-anchor="middle">reward, gradient</text>
 
   <path class="edge" data-from="d1_E" data-to="d1_F" d="M705,342 H640" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw2)"/>
   <text class="edge-label" x="672" y="334" text-anchor="middle">gradient</text>
@@ -109,9 +136,10 @@
   <text class="box-sub" x="15" y="440">solid = call | dashed = reads/writes data | one pass round the cycle = one evolve_generation() call</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - the closed loop. The dashed grey <code>gradient text</code> path is the only feedback the mutator receives: it reads <code>WorkflowInfo.abstracted_textual_gradient</code> and never touches the verifier's score vectors.</p>
+<p class="figcap">Diagram 1 - the closed loop, 11 boxes. At the score step <code>WorkflowEvaluator</code> picks the verifier by <code>config.verifier_kind</code> (<code class="path">sources/evaluators/evaluator.py:88-110</code>): <code>"hybrid"</code> (default), <code>"legacy"</code> (deprecated) or <code>"gold"</code>, an ORACLE mode <span class="chip warn">oracle - leaks gold</span>. Only gold runs in <code>asyncio.to_thread</code> (<code class="path">sources/core/evolution_engine.py:921-932</code>). The gradient text is the only feedback the mutator receives: it reads <code>WorkflowInfo.abstracted_textual_gradient</code> and never touches the verifier's score vectors. With gold, that text is the benchmark grader's VER/SR feedback.</p>
 
-<p class="note say">The reward travelling from the verifier to the archive is a scalar; the per-claim scores behind it stay in the verifier, and the mutation prompt sees the gradient text only, cut to 2 048 characters.</p>
+<p class="note say">The reward travelling from the verifier to the archive is a scalar; the per-claim scores behind it stay in the verifier, and the mutation prompt sees the whole gradient text (the 2 048-character cut is gone from the working tree).</p>
+<p class="note">After the last round, <code>_select_best_run</code> picks the capsule run and skips fallback rewards (<a href="file_core_evolution_engine.html">file_core_evolution_engine.html</a>, Diagram 4). Honest runs also skip oracle generations when they build the parent pool (<code>WorkflowSelector.discover_workflows</code>, see <a href="mod_core_selection.html">mod_core_selection.html</a>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -212,57 +240,59 @@
 <table>
 <thead><tr><th>Config field</th><th class="size">Default</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td class="sym"><code>selection_strategy</code><br><span class="sub">config.py:131</span></td><td class="size">qd</td><td>Picks the selection pressure class: qd, novelty, tournament or greedy.</td></tr>
-<tr><td class="sym"><code>learned_score_threshold</code><br><span class="sub">config.py:133</span></td><td class="size">0.9</td><td>Stops evolving when a score reaches this value (checked in <code>evolve_generation</code>).</td></tr>
-<tr><td class="sym"><code>max_learning_evolve_iterations</code><br><span class="sub">config.py:134</span></td><td class="size">16</td><td>Maximum generations per task in <code>--learn</code> mode.</td></tr>
-<tr><td class="sym"><code>novelty_comparison</code><br><span class="sub">config.py:136</span></td><td class="size">archive_knn</td><td>Novelty peers: the archive k-NN, or the last N genotypes.</td></tr>
-<tr><td class="sym"><code>novelty_previous_n</code><br><span class="sub">config.py:137</span></td><td class="size">16</td><td>Window size for the <code>previous_n</code> comparison mode.</td></tr>
-<tr><td class="sym"><code>length_penalty_baseline_chars</code><br><span class="sub">config.py:139</span></td><td class="size">8 000</td><td>Genotype size where the qd_score length penalty starts.</td></tr>
-<tr><td class="sym"><code>length_penalty_lambda</code><br><span class="sub">config.py:140</span></td><td class="size">0.05</td><td>Weight of the length penalty term in <code>qd_score</code>.</td></tr>
-<tr><td class="sym"><code>min_improvement_threshold</code><br><span class="sub">config.py:142</span></td><td class="size">0.01</td><td>Relative reward gain that counts as valid in greedy mode.</td></tr>
-<tr><td class="sym"><code>population_size</code><br><span class="sub">config.py:143</span></td><td class="size">16</td><td>Archive cap; above it the lowest <code>qd_score</code> member is evicted.</td></tr>
-<tr><td class="sym"><code>novelty_k_neighbours</code><br><span class="sub">config.py:144</span></td><td class="size">16</td><td>k for the k-NN cosine-distance novelty.</td></tr>
-<tr><td class="sym"><code>novelty_weight</code><br><span class="sub">config.py:145</span></td><td class="size">0.25</td><td>Weight w of novelty in <code>qd_score</code>.</td></tr>
-<tr><td class="sym"><code>admit_threshold</code><br><span class="sub">config.py:146</span></td><td class="size">0.3</td><td>Minimum <code>qd_score</code> for admission when reward does not improve.</td></tr>
-<tr><td class="sym"><code>initial_population</code><br><span class="sub">config.py:148</span></td><td class="size">2</td><td>Runs before mutation or crossover can start; below it, seeds.</td></tr>
-<tr><td class="sym"><code>crossover_rate</code><br><span class="sub">config.py:149</span></td><td class="size">0.4</td><td>Chance to recombine two parents instead of mutating one.</td></tr>
-<tr><td class="sym"><code>n_parents</code><br><span class="sub">config.py:150</span></td><td class="size">2</td><td>Parents drawn when crossover fires.</td></tr>
-<tr><td class="sym"><code>parent_threshold_similarity</code><br><span class="sub">config.py:152</span></td><td class="size">0.95</td><td>Cold-start goal-similarity floor for candidate parents.</td></tr>
-<tr><td class="sym"><code>parent_threshold_score</code><br><span class="sub">config.py:154</span></td><td class="size">0.01</td><td>Cold-start minimum score for candidate parents.</td></tr>
-<tr><td class="sym"><code>hybrid_verifier_pairwise_mode</code><br><span class="sub">config.py:86</span></td><td class="size">temporal</td><td>Decides each pair at the earliest differing ladder stage.</td></tr>
-<tr><td class="sym"><code>hybrid_verifier_reward</code><br><span class="sub">config.py:94</span></td><td class="size">win_rate</td><td>Reward over pairs: win rate, or Bradley&ndash;Terry strengths.</td></tr>
-<tr><td class="sym"><code>hybrid_verifier_num_claims</code><br><span class="sub">config.py:78</span></td><td class="size">10</td><td>Target key-claim count per task; extraction accepts plus or minus 2.</td></tr>
-<tr><td class="sym"><code>hybrid_verifier_scorer_timeout_s</code><br><span class="sub">config.py:82</span></td><td class="size">60 s</td><td>Timeout for one policy-scorer subprocess.</td></tr>
+<tr><td class="sym"><code>selection_strategy</code><br><span class="sub">config.py:184</span></td><td class="size">qd</td><td>Picks the selection pressure class: qd, novelty, tournament or greedy.</td></tr>
+<tr><td class="sym"><code>learned_score_threshold</code><br><span class="sub">config.py:186</span></td><td class="size">0.9</td><td>Stops evolving when a score reaches this value (checked in <code>evolve_generation</code>).</td></tr>
+<tr><td class="sym"><code>max_learning_evolve_iterations</code><br><span class="sub">config.py:187</span></td><td class="size">16</td><td>Maximum generations per task in <code>--learn</code> mode.</td></tr>
+<tr><td class="sym"><code>novelty_comparison</code><br><span class="sub">config.py:189</span></td><td class="size">archive_knn</td><td>Novelty peers: the archive k-NN, or the last N genotypes.</td></tr>
+<tr><td class="sym"><code>novelty_previous_n</code><br><span class="sub">config.py:190</span></td><td class="size">16</td><td>Window size for the <code>previous_n</code> comparison mode.</td></tr>
+<tr><td class="sym"><code>length_penalty_baseline_chars</code><br><span class="sub">config.py:192</span></td><td class="size">8 000</td><td>Genotype size where the qd_score length penalty starts.</td></tr>
+<tr><td class="sym"><code>length_penalty_lambda</code><br><span class="sub">config.py:193</span></td><td class="size">0.05</td><td>Weight of the length penalty term in <code>qd_score</code>.</td></tr>
+<tr><td class="sym"><code>min_improvement_threshold</code><br><span class="sub">config.py:195</span></td><td class="size">0.01</td><td>Relative reward gain that counts as valid in greedy mode.</td></tr>
+<tr><td class="sym"><code>population_size</code><br><span class="sub">config.py:196</span></td><td class="size">16</td><td>Archive cap; above it the lowest <code>qd_score</code> member is evicted.</td></tr>
+<tr><td class="sym"><code>novelty_k_neighbours</code><br><span class="sub">config.py:197</span></td><td class="size">16</td><td>k for the k-NN cosine-distance novelty.</td></tr>
+<tr><td class="sym"><code>novelty_weight</code><br><span class="sub">config.py:198</span></td><td class="size">0.25</td><td>Weight w of novelty in <code>qd_score</code>.</td></tr>
+<tr><td class="sym"><code>admit_threshold</code><br><span class="sub">config.py:199</span></td><td class="size">0.3</td><td>Minimum <code>qd_score</code> for admission when reward does not improve.</td></tr>
+<tr><td class="sym"><code>initial_population</code><br><span class="sub">config.py:201</span></td><td class="size">2</td><td>Runs before mutation or crossover can start; below it, seeds.</td></tr>
+<tr><td class="sym"><code>crossover_rate</code><br><span class="sub">config.py:202</span></td><td class="size">0.4</td><td>Chance to recombine two parents instead of mutating one.</td></tr>
+<tr><td class="sym"><code>n_parents</code><br><span class="sub">config.py:203</span></td><td class="size">2</td><td>Parents drawn when crossover fires.</td></tr>
+<tr><td class="sym"><code>parent_threshold_similarity</code><br><span class="sub">config.py:205</span></td><td class="size">0.95</td><td>Cold-start goal-similarity floor for candidate parents.</td></tr>
+<tr><td class="sym"><code>parent_threshold_score</code><br><span class="sub">config.py:207</span></td><td class="size">0.01</td><td>Cold-start minimum score for candidate parents.</td></tr>
+<tr><td class="sym"><code>verifier_kind</code><br><span class="sub">config.py:106</span></td><td class="size">hybrid</td><td>Verifier at the score step: hybrid, legacy (deprecated) or gold (ORACLE).</td></tr>
+<tr><td class="sym"><code>gold_feedback_reward</code><br><span class="sub">config.py:110</span></td><td class="size">False</td><td>Gold only: reward also comes from the benchmark grader.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_pairwise_mode</code><br><span class="sub">config.py:130</span></td><td class="size">temporal</td><td>Decides each pair at the earliest differing ladder stage.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_reward</code><br><span class="sub">config.py:138</span></td><td class="size">win_rate</td><td>Reward over pairs: win rate, or Bradley&ndash;Terry strengths.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_num_claims</code><br><span class="sub">config.py:122</span></td><td class="size">10</td><td>Target key-claim count per task; extraction accepts plus or minus 2.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_scorer_timeout_s</code><br><span class="sub">config.py:126</span></td><td class="size">60 s</td><td>Timeout for one policy-scorer subprocess.</td></tr>
 </tbody>
 </table>
 
-<p class="note">Amber note: <code class="path">config_default.json</code> overrides two of these built-in defaults when used as a config file (<code>learned_score_threshold</code> 0.92 and <code>crossover_rate</code> 0.25, lines 64 and 79), so the effective value depends on the config file in use.</p>
-<p class="note flag">Red note: <code class="path">sources/core/selection.py</code>:72 states that greedy is the default mode, but the default in code is <code>SelectionStrategy.QUALITY_DIVERSITY</code> (selection.py:87) and <code>selection_strategy = "qd"</code> (config.py:131).</p>
+<p class="note">Amber note: <code class="path">config_default.json</code> overrides two of these built-in defaults when used as a config file (<code>learned_score_threshold</code> 0.92 and <code>crossover_rate</code> 0.25, lines 66 and 81), so the effective value depends on the config file in use.</p>
+<p class="note flag">Red note: <code class="path">sources/core/selection.py</code>:72 states that greedy is the default mode, but the default in code is <code>SelectionStrategy.QUALITY_DIVERSITY</code> (selection.py:87) and <code>selection_strategy = "qd"</code> (config.py:184).</p>
 
 <details><summary>is the gradient fed whole or summarized?</summary><div class="dbody">
-<p><strong>Stored whole, fed summarized on the mutation path.</strong></p>
+<p><strong>Stored whole, fed whole on both paths.</strong></p>
 <ul>
-<li>The verifier stores the full text under <code>abstracted_textual_gradient</code> in the run's <code>state_result.json</code> (<code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>:492) and writes it to <code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/textual_gradient.txt</code> (<code>HybridVerifierEvaluator._write_artifacts</code>).</li>
-<li><code>WorkflowInfo.abstracted_textual_gradient</code> (<code class="path">sources/core/workflow_info.py</code>:166) reads the state key first, the sidecar file second.</li>
-<li>Mutation path: <code>VariationEngine.mutation_prompt</code> cuts the text to <strong>2 048 characters</strong> and replaces <code>_</code> with a space (<code class="path">sources/core/variation_engine.py</code>:402-407). No other summary is computed.</li>
+<li>The verifier stores the full text under <code>abstracted_textual_gradient</code> in the run's <code>state_result.json</code> (<code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>:631) and writes it to <code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/textual_gradient.txt</code> (<code>HybridVerifierEvaluator._write_artifacts</code>).</li>
+<li><code>WorkflowInfo.abstracted_textual_gradient</code> (<code class="path">sources/core/workflow_info.py</code>:241) reads the state key first, the sidecar file second.</li>
+<li>Mutation path: <code>VariationEngine.mutation_prompt</code> replaces <code>_</code> with a space and sends the rest whole (<code class="path">sources/core/variation_engine.py</code>:402-407). The <code>[:2048]</code> cut at L407 was removed in the uncommitted working tree. No other summary is computed.</li>
 <li>Crossover path: each parent's gradient goes in whole, with no character cap; only the fallback (stderr tail) is cut to the last 1 024 characters (<code class="path">sources/core/variation_engine.py</code>:486-489).</li>
-<li>Measured size: the gradient quoted below is 4 428 characters, so the mutation prompt received roughly the first 46 % of it.</li>
+<li>Measured size: the gradient quoted below is 4 428 characters. At <code>4020790</code> the 2 048 cut kept about 46 % of it; the working tree sends all of it (my computation).</li>
 </ul>
 <blockquote>1: # Hybrid verifier gradient (E19/E19b, temporal ladder) — 20260925_093314_281402bd
-6: Bottom line: reward 0.7222 | win-rate (ties=0.5) 0.722 over
-7: 0 comparisons (0W/0L/0T) | 9 of
-8: 9 claims discriminate the candidates (0 dropped as
-9: non-discriminative) | mean claim score 0.722.
-11: ## 1. ELIMINATION POINT — earliest stage where this generation lost
-12: (none — no rival eliminated this generation at an earlier stage)</blockquote>
-<p>Lines 2-5 and 10 omitted. Path: <code class="path">sources/workflows/20260925_093314_281402bd/textual_gradient.txt</code> &#183; my computation of the length: 4 428 characters.</p>
+7: Bottom line: reward 0.7222 | win-rate (ties=0.5) 0.722 over
+8: 0 comparisons (0W/0L/0T) | 9 of
+9: 9 claims discriminate the candidates (0 dropped as
+10: non-discriminative) | mean claim score 0.722.
+12: ## 1. ELIMINATION POINT — earliest stage where this generation lost
+13: (none — no rival eliminated this generation at an earlier stage)</blockquote>
+<p>Lines 2-6 and 11 omitted. Path: <code class="path">sources/workflows/hp_attempt1/20260925_093314_281402bd/textual_gradient.txt</code> &#183; my computation of the length: 4 428 characters.</p>
 </div></details>
 
 <details><summary>where the raw scores stay inside the verifier</summary><div class="dbody">
 <ul>
-<li>Per-claim score vectors live in the per-task registry <code class="path">hybrid_registry_&lt;16-hex&gt;.json</code> (<code>TaskRegistry.load</code>, <code class="path">sources/evaluators/hybrid_verifier/registry.py</code>:74), written by <code>TaskRegistry.record_generation</code> and read back by <code>TaskRegistry.previous_generations</code> on the next round.</li>
-<li>The LLM-written policy-scorer scripts are stored in that same registry (<code>TaskRegistry.set_scorer</code>, registry.py:207), and the scorer runs as a subprocess with a 60 s timeout (<code>hybrid_verifier_scorer_timeout_s</code>).</li>
-<li>The engine reads only two values from the verifier: the scalar <code>overall_score</code> (<code>WorkflowInfo.overall_score</code>, workflow_info.py:122) and the gradient text. No module in <code class="path">sources/core/</code> imports <code class="path">sources/evaluators/hybrid_verifier/</code>; the engine reaches it only through <code>sources/evaluators/evaluator.py::WorkflowEvaluator.evaluate</code>.</li>
+<li>Per-claim score vectors live in the per-task registry <code class="path">hybrid_registry_&lt;16-hex&gt;.json</code> (<code>TaskRegistry.load</code>, <code class="path">sources/evaluators/hybrid_verifier/registry.py</code>:82), written by <code>TaskRegistry.record_generation</code> and read back by <code>TaskRegistry.previous_generations</code> on the next round.</li>
+<li>The LLM-written policy-scorer scripts are stored in that same registry (<code>TaskRegistry.set_scorer</code>, registry.py:247), and the scorer runs as a subprocess with a 60 s timeout (<code>hybrid_verifier_scorer_timeout_s</code>).</li>
+<li>The engine reads from the verifier: the scalar <code>overall_score</code> (<code>WorkflowInfo.overall_score</code>, workflow_info.py:156), the flag <code>reward_is_fallback</code> (workflow_info.py:200), the gradient text, <code>skipped_reason</code>, and for the capsule pick <code>reward_fallback</code>, <code>reward_source</code>, <code>n_pairs</code>, <code>n_wins</code> (<code>_run_reward_is_fallback</code>). No module in <code class="path">sources/core/</code> imports <code class="path">sources/evaluators/hybrid_verifier/</code>; the engine reaches it only through <code>sources/evaluators/evaluator.py::WorkflowEvaluator.evaluate</code>.</li>
 <li>Inside the verifier, <code>sources/evaluators/hybrid_verifier/aggregation.py::win_rate_reward</code> turns the score vectors into the reward (<code>temporal_winner</code> decides each pair at the earliest differing stage).</li>
 <li>Leak to state clearly: the gradient text itself does contain claim scores and evidence lines (for example <code>score: 1.000</code>). The mutator sees those numbers inside the gradient, but never the scorer code or the score vectors.</li>
 </ul>
@@ -276,7 +306,7 @@
 <div class="card l2">
 <h4><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></h4>
 <p class="role">Drives one generation: runs it, evaluates it, validates the survivor, then builds the next prompt.</p>
-<p class="meta">1 109 lines &#183; class: EvolutionEngine &#183; <code>evolve_generation</code> recurses into the next round</p>
+<p class="meta">1 236 lines &#183; class: EvolutionEngine &#183; <code>evolve_generation</code> recurses into the next round &#183; <code>_select_best_run</code> picks the capsule</p>
 </div>
 
 <div class="card l2">
@@ -299,8 +329,8 @@
 
 <div class="card l2">
 <h4><a href="../../sources/core/workflow_selection.py">sources/core/workflow_selection.py</a></h4>
-<p class="role">Draws parents from the live archive; cold start falls back to a goal-similarity disk scan of stored workflows.</p>
-<p class="meta">396 lines &#183; class: WorkflowSelector &#183; <code>select_parent_workflows</code></p>
+<p class="role">Draws parents from the live archive; cold start falls back to a goal-similarity disk scan. Non-gold runs skip oracle generations.</p>
+<p class="meta">416 lines &#183; class: WorkflowSelector &#183; <code>select_parent_workflows</code></p>
 </div>
 
 <div class="card l2">
@@ -312,13 +342,13 @@
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/gradient.py">sources/evaluators/hybrid_verifier/gradient.py</a></h4>
 <p class="role">Renders the textual gradient and <code>evaluation.txt</code> from measured claim scores, leading with the elimination point.</p>
-<p class="meta">294 lines &#183; <code>build_gradient</code>, <code>build_evaluation_report</code></p>
+<p class="meta">380 lines &#183; <code>build_gradient</code>, <code>build_evaluation_report</code></p>
 </div>
 
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/aggregation.py">sources/evaluators/hybrid_verifier/aggregation.py</a></h4>
 <p class="role">Turns per-claim score vectors into the pairwise reward; <code>temporal_winner</code> decides at the earliest differing stage.</p>
-<p class="meta">434 lines &#183; <code>win_rate_reward</code>, <code>bradley_terry_reward</code>, <code>claim_stats</code></p>
+<p class="meta">454 lines &#183; <code>win_rate_reward</code>, <code>bradley_terry_reward</code>, <code>claim_stats</code></p>
 </div>
 
 </div>
@@ -335,6 +365,7 @@
 <tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json</code></td><td><code>lineage.record_lineage</code></td><td>Parents, <code>evolution_kind</code>, iteration, goal snippet.</td></tr>
 <tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/evaluation.txt</code></td><td><code>_write_artifacts</code></td><td>Per-claim verdicts with stage headers.</td></tr>
 <tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/textual_gradient.txt</code></td><td><code>_write_artifacts</code></td><td>The gradient text quoted above.</td></tr>
+<tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/gold_feedback.json</code>, <code class="path">textual_gradient_hybrid.txt</code></td><td>gold only (ORACLE): <code>GoldFeedbackEvaluator</code></td><td>Grade record; the hybrid gradient kept aside.</td></tr>
 <tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/&lt;uuid&gt;/run_metrics.json</code></td><td><code>run_metrics.write_run_metrics</code></td><td>Score, qd_score, novelty, variation state, cost.</td></tr>
 <tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/qd_archive.jsonl</code></td><td><code>_persist_qd_archive</code></td><td>One QD verdict row per admitted or rejected offspring.</td></tr>
 <tr><td class="sym"><code class="path">sources/workflows/&lt;run&gt;/variation_log.jsonl</code></td><td><code>_persist_variation_log</code></td><td>Mutation scope: <code>from_uuid</code>, kind, agent budget.</td></tr>
@@ -346,9 +377,9 @@
 </div>
 
 <footer>
-<p>Sources read for this page: <code class="path">UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/core/selection.py</code>, <code class="path">sources/core/variation_engine.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/workflow_selection.py</code>, <code class="path">sources/core/lineage.py</code>, <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/utils/run_metrics.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/hybrid_verifier/gradient.py</code>, <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code>, <code class="path">sources/evaluators/hybrid_verifier/registry.py</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, and one real gradient file under <code class="path">sources/workflows/</code>.</p>
-<p class="skips">Skipped: <code class="path">sources/core/factory.py</code>, <code>workflow_factory.py</code>, <code>single_agent_factory.py</code> and <code>schema.py</code> (builder helpers, not the loop) &#183; <code class="path">sources/core/failure_fingerprint.py</code> (written by the verifier, not read by the loop) &#183; <code class="path">sources/core/orchestrator.py</code> in depth (one arrow here; its own flow is <a href="flow_task_run.html">flow_task_run.html</a>) &#183; <code class="path">sources/evaluators/hybrid_verifier/claims.py</code>, <code>layers.py</code>, <code>scorers.py</code>, <code>inventory.py</code>, <code>digest.py</code> (verifier internals; <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>) &#183; <code>sources/evaluators/verifier*.py</code> (deprecated legacy verifier) &#183; <code>webui/</code>, <code>datasets/</code>, <code>logs/</code>, <code>CLA/</code>, lock files and secret files (Tier D) &#183; <code class="path">diversity_experiments/code_reference/selection.py</code> (a frozen copy of selection.py for an experiment, not the runtime loop).</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26. The working tree has uncommitted changes at build time: the flat <code class="path">sources/evaluators/*.py</code> modules are deleted into <code class="path">generic/</code>, <code class="path">scenario/</code> and <code class="path">legacy_verifier/</code>, and <code class="path">config.py</code>, <code class="path">main.py</code>, several <code class="path">sources/evaluators/*</code> files and many <code class="path">docs/</code> files are modified, so every default and line number above was read from the working tree, not from commit <code>336fe19</code>.</p>
+<p>Sources read for this page: <code class="path">UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/core/selection.py</code>, <code class="path">sources/core/variation_engine.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/workflow_selection.py</code>, <code class="path">sources/core/lineage.py</code>, <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/utils/run_metrics.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (entry and artifact writes only), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/hybrid_verifier/gradient.py</code>, <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code>, <code class="path">sources/evaluators/hybrid_verifier/registry.py</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, and one real gradient file under <code class="path">sources/workflows/</code>.</p>
+<p class="skips">Skipped: <code class="path">sources/core/factory.py</code>, <code>workflow_factory.py</code>, <code>single_agent_factory.py</code> and <code>schema.py</code> (builder helpers, not the loop) &#183; <code class="path">sources/core/failure_fingerprint.py</code> (written by the verifier, not read by the loop) &#183; <code class="path">sources/core/orchestrator.py</code> in depth (one arrow here; its own flow is <a href="flow_task_run.html">flow_task_run.html</a>) &#183; <code class="path">sources/evaluators/hybrid_verifier/claims.py</code>, <code>layers.py</code>, <code>scorers.py</code>, <code>inventory.py</code>, <code>digest.py</code> (verifier internals; <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>) &#183; <code>sources/evaluators/legacy_verifier/</code> (deprecated; one box only) &#183; gold grader internals (<a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>) &#183; <code>webui/</code>, <code>datasets/</code>, <code>logs/</code>, <code>CLA/</code>, lock files and secret files (Tier D) &#183; <code class="path">diversity_experiments/code_reference/selection.py</code> (a frozen copy of selection.py for an experiment, not the runtime loop).</p>
+<p>Built at commit <code>4020790</code> + uncommitted working tree, 2026-09-28. Every default and line number above was read from the working tree, not from commit <code>4020790</code>. Changes drawn: the <code>verifier_kind</code> branch at the score step (gold is uncommitted), the removed 2 048-character gradient cut, and the capsule pick <code>_select_best_run</code>.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

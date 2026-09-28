@@ -10,12 +10,12 @@
 <div class="wrap">
 
 <h1 class="hud">Test coverage matrix</h1>
-<p class="intro">This page maps each file in <code>tests/</code> to the module it exercises. Coverage means the test file imports that module, or loads it by path with <code>importlib</code>. The suite runs offline: tests stub or mock the LLM calls (<code>AGENTS.md:163</code>).</p>
+<p class="intro">This page maps each file in <code>tests/</code> to the module it exercises. Coverage means the test file imports that module, or loads it by path with <code>importlib</code>. The suite runs offline: tests stub or mock the LLM calls (<code>AGENTS.md:201-202</code>).</p>
 
 <div id="legend" data-auto></div>
 
 <div class="panel"><span class="br"></span>
-<h2>Where the 45 files in tests/ point</h2>
+<h2>Where the 47 files in tests/ point</h2>
 <div class="canvas">
 <svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="Test file groups and the source folders they cover">
   <defs>
@@ -32,18 +32,18 @@
   </defs>
 
   <a class="box" id="g1" href="area_sources_core.html">
-    <title>11 test files exercise sources/core</title>
+    <title>12 test files exercise sources/core</title>
     <rect x="12" y="16" width="138" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="81" y="44" text-anchor="middle">core</text>
-    <text class="box-sub" x="81" y="62" text-anchor="middle">11 test files</text>
+    <text class="box-sub" x="81" y="62" text-anchor="middle">12 test files</text>
     <text class="box-sub" x="81" y="76" text-anchor="middle">planner, selection, ...</text>
   </a>
   <a class="box" id="g2" href="area_evaluators.html">
-    <title>11 test files exercise sources/evaluators</title>
+    <title>12 test files exercise sources/evaluators, one of them the gold oracle mode</title>
     <rect x="156" y="16" width="138" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="225" y="44" text-anchor="middle">evaluators</text>
-    <text class="box-sub" x="225" y="62" text-anchor="middle">11 test files</text>
-    <text class="box-sub" x="225" y="76" text-anchor="middle">verifier, hybrid_verifier</text>
+    <text class="box-sub" x="225" y="62" text-anchor="middle">12 test files</text>
+    <text class="box-sub" x="225" y="76" text-anchor="middle">hybrid, legacy, gold</text>
   </a>
   <a class="box" id="g3" href="area_utils.html">
     <title>5 test files exercise sources/utils</title>
@@ -71,7 +71,7 @@
     <rect x="732" y="16" width="156" height="70" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="810" y="44" text-anchor="middle">config + main</text>
     <text class="box-sub" x="810" y="62" text-anchor="middle">1 test file</text>
-    <text class="box-sub" x="810" y="76" text-anchor="middle">11 files import config</text>
+    <text class="box-sub" x="810" y="76" text-anchor="middle">12 files import config</text>
   </a>
 
   <g class="box" id="t1">
@@ -101,14 +101,14 @@
   <text class="edge-label" x="733" y="160" text-anchor="middle">config.py, main.py</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - 41 of the 45 files are pytest tests; box 4 groups the <a href="area_security_transparency.html">transparency</a> tests, box 5 groups the <a href="data_modules_prompts.html">template</a> test (one file: <code>smolagent_factory_logprobs_test.py</code>).</p>
+<p class="figcap">Diagram 1 - 43 of the 47 files are pytest tests; box 4 groups the <a href="area_security_transparency.html">transparency</a> tests, box 5 groups the <a href="data_modules_prompts.html">template</a> test (one file: <code>smolagent_factory_logprobs_test.py</code>).</p>
 
 <table>
 <thead><tr><th>Test file</th><th class="size">Lines</th><th>Group</th><th>Modules covered</th><th class="size">Test funcs</th></tr></thead>
 <tbody>
 <tr><td class="sym"><a href="../../tests/archive_projection_test.py">archive_projection_test.py</a></td><td class="size">99</td><td>utils</td><td><a href="area_utils.html"><code class="path">sources/utils/archive_projection.py</code></a></td><td class="size">8</td></tr>
 <tr><td class="sym"><a href="../../tests/astra_exporter_test.py">astra_exporter_test.py</a></td><td class="size">649</td><td>cli + transparency</td><td><a href="area_security_transparency.html"><code>sources/transparency/*</code></a>, <code class="path">core/llm_provider.py</code>, <code class="path">core/evolution_engine.py</code>, <code>config.py</code></td><td class="size">47</td></tr>
-<tr><td class="sym"><a href="../../tests/config_roundtrip_test.py">config_roundtrip_test.py</a></td><td class="size">170</td><td>config + main</td><td><a href="area_entry_config.html"><code>config.py</code></a></td><td class="size">4</td></tr>
+<tr><td class="sym"><a href="../../tests/config_roundtrip_test.py">config_roundtrip_test.py</a></td><td class="size">174</td><td>config + main</td><td><a href="area_entry_config.html"><code>config.py</code></a> (<code>Config</code>, <code>AddressMCP</code>; skips 2 runtime-only gold fields)</td><td class="size">4</td></tr>
 <tr><td class="sym"><a href="../../tests/csv_mode_ablation_index_test.py">csv_mode_ablation_index_test.py</a></td><td class="size">222</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a>, <code class="path">core/schema.py</code></td><td class="size">4</td></tr>
 <tr><td class="sym"><a href="../../tests/csv_mode_cache_restore_test.py">csv_mode_cache_restore_test.py</a></td><td class="size">180</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a></td><td class="size">9</td></tr>
 <tr><td class="sym"><a href="../../tests/csv_mode_logging_test.py">csv_mode_logging_test.py</a></td><td class="size">66</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a></td><td class="size">3</td></tr>
@@ -116,9 +116,11 @@
 <tr><td class="sym"><a href="../../tests/csv_mode_run_notes_fallback_test.py">csv_mode_run_notes_fallback_test.py</a></td><td class="size">280</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/csv_mode.py</code></a>, <code class="path">core/schema.py</code></td><td class="size">4</td></tr>
 <tr><td class="sym"><a href="../../tests/evaluation_cli_test.py">evaluation_cli_test.py</a></td><td class="size">332</td><td>cli + transparency</td><td><a href="area_cli.html"><code class="path">sources/cli/evaluation_cli.py</code></a>, <code>config.py</code></td><td class="size">15</td></tr>
 <tr><td class="sym"><a href="../../tests/evaluator_test.py">evaluator_test.py</a></td><td class="size">95</td><td>evaluators</td><td><a href="area_evaluators.html"><code class="path">evaluators/evaluator.py</code></a>, <code>config.py</code>; DEAD <code class="path">core/dgm.py</code></td><td class="size">2</td></tr>
+<tr><td class="sym"><a href="../../tests/evolution_engine_selection_test.py">evolution_engine_selection_test.py</a></td><td class="size">245</td><td>core</td><td><a href="file_core_evolution_engine.html"><code class="path">core/evolution_engine.py</code></a> <code>_select_best_run</code>, <a href="file_core_workflow_info.html"><code class="path">core/workflow_info.py</code></a>, <code class="path">core/schema.py</code></td><td class="size">15</td></tr>
 <tr><td class="sym"><a href="../../tests/failure_fingerprint_test.py">failure_fingerprint_test.py</a></td><td class="size">156</td><td>core</td><td><a href="area_sources_core.html"><code class="path">sources/core/failure_fingerprint.py</code></a></td><td class="size">12</td></tr>
 <tr><td class="sym"><a href="../../tests/genotype_embedding_chunking_test.py">genotype_embedding_chunking_test.py</a></td><td class="size">198</td><td>core</td><td><a href="area_sources_core.html"><code class="path">sources/core/genotype_embedding.py</code></a></td><td class="size">12</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">hybrid_verifier_test.py</a></td><td class="size">1270</td><td>evaluators</td><td><a href="mod_evaluators_hybrid_verifier.html"><code>evaluators/hybrid_verifier/*</code></a> 7 modules, <code class="path">evaluators/base.py</code>, <code class="path">evaluators/evaluator.py</code>, <code class="path">evaluators/legacy_verifier/*</code> (importable check), <code class="path">core/failure_fingerprint.py</code>, <code>main.py</code></td><td class="size">41</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">gold_feedback_test.py</a></td><td class="size">1173</td><td>evaluators</td><td><a href="mod_evaluators_gold_feedback.html"><code>evaluators/gold_feedback/*</code></a> <span class="chip warn">oracle - leaks gold</span>, <code class="path">benchmark_evaluation/snapshot_grading.py</code>, <code class="path">csv_mode.py</code>, <code class="path">evaluators/evaluator.py</code>, <code class="path">core/evolution_engine.py</code>, <code class="path">core/workflow_selection.py</code>, <code class="path">core/workflow_info.py</code>, <code>main.py</code>, <code>config.py</code> (<a href="#gold-map">map</a>)</td><td class="size">40</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">hybrid_verifier_test.py</a></td><td class="size">2514</td><td>evaluators</td><td><a href="mod_evaluators_hybrid_verifier.html"><code>evaluators/hybrid_verifier/*</code></a> all 9 modules, <code class="path">evaluators/base.py</code>, <code class="path">evaluators/evaluator.py</code>, <code class="path">evaluators/legacy_verifier/*</code> (importable check), <code class="path">core/failure_fingerprint.py</code>, <code class="path">core/llm_provider.py</code>, <code>main.py</code>, <code>config.py</code></td><td class="size">64</td></tr>
 <tr><td class="sym"><a href="../../tests/judge_test.py">judge_test.py</a></td><td class="size">40</td><td>evaluators</td><td><a href="area_entry_config.html"><code>config.py</code></a>; DEAD <code class="path">core/judge.py</code></td><td class="size">1</td></tr>
 <tr><td class="sym"><a href="../../tests/lineage_goal_filter_test.py">lineage_goal_filter_test.py</a></td><td class="size">88</td><td>core</td><td><a href="mod_core_lineage.html"><code class="path">sources/core/lineage.py</code></a> (loaded by path)</td><td class="size">5</td></tr>
 <tr><td class="sym"><a href="../../tests/llm_provider_test.py">llm_provider_test.py</a></td><td class="size">137</td><td>core</td><td><a href="mod_core_tools_llm.html"><code class="path">sources/core/llm_provider.py</code></a></td><td class="size">5</td></tr>
@@ -136,7 +138,7 @@
 <tr><td class="sym"><a href="../../tests/smolagent_factory_logprobs_test.py">smolagent_factory_logprobs_test.py</a></td><td class="size">258</td><td>benchmark + templates</td><td><a href="data_modules_prompts.html"><code class="path">sources/modules/smolagent_factory.py</code></a> (exec&#39;d with stub globals)</td><td class="size">13</td></tr>
 <tr><td class="sym"><a href="../../tests/test_benchmark_eval_error_handling.py">test_benchmark_eval_error_handling.py</a></td><td class="size">325</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/execution_sandbox.py</code></a>, <code>capsule_evaluator.py</code>, <code>science_agent_bench.py</code></td><td class="size">26</td></tr>
 <tr><td class="sym"><a href="../../tests/test_detect_language.py">test_detect_language.py</a></td><td class="size">46</td><td>evaluators</td><td><a href="area_evaluators_legacy.html"><code class="path">evaluators/legacy_verifier/verifier_per_claim.py</code></a></td><td class="size">4</td></tr>
-<tr><td class="sym"><a href="../../tests/test_sandbox_provisioning_pins.py">test_sandbox_provisioning_pins.py</a></td><td class="size">198</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/execution_sandbox.py</code></a></td><td class="size">16</td></tr>
+<tr><td class="sym"><a href="../../tests/test_sandbox_provisioning_pins.py">test_sandbox_provisioning_pins.py</a></td><td class="size">259</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/execution_sandbox.py</code></a> (<code>PINNED_CONSTRAINTS</code>, <code>IMPORT_NAME_REMAP</code>)</td><td class="size">20</td></tr>
 <tr><td class="sym"><a href="../../tests/test_sandbox_source_build_constraints.py">test_sandbox_source_build_constraints.py</a></td><td class="size">182</td><td>benchmark + templates</td><td><a href="area_benchmark_evaluation.html"><code class="path">benchmark_evaluation/execution_sandbox.py</code></a></td><td class="size">5</td></tr>
 <tr><td class="sym"><a href="../../tests/theme_test.py">theme_test.py</a></td><td class="size">127</td><td>cli + transparency</td><td><a href="area_cli.html"><code class="path">sources/cli/theme.py</code></a></td><td class="size">12</td></tr>
 <tr><td class="sym"><a href="../../tests/tools_manager_test.py">tools_manager_test.py</a></td><td class="size">25</td><td>core</td><td><a href="mod_core_tools_llm.html"><code class="path">core/tools_manager.py</code></a>, <code>config.py</code></td><td class="size">1</td></tr>
@@ -153,16 +155,126 @@
 <tr><td class="sym"><a href="../../tests/__init.py">__init.py</a></td><td class="size">0</td><td>helper</td><td>none - empty file, 0 bytes</td><td class="size">0</td></tr>
 </tbody>
 </table>
-<p class="sub">45 rows: 9303 lines and 411 test functions in total (my computation).</p>
+<p class="sub">47 rows: 12030 lines and 493 test functions in total (my computation).</p>
 
 <details><summary>how I counted (and what the count misses)</summary><div class="dbody">
 <p>Method: python <code>ast</code> pass over every <code>.py</code> file for imports, path literals and <code>def test_*</code> names, plus <code>grep -n</code> to confirm each named symbol. <code>lines</code> is the newline count (<code>wc -l</code>).</p>
-<p>Five files do not import their target; they load it by path so that <code class="path">sources/core/__init__.py</code> (litellm, sentence-transformers) never runs: <code>archive_projection_test.py:23</code>, <code>lineage_goal_filter_test.py:19</code>, <code>planner_json_extraction_test.py:29</code>, <code>selection_test.py:16</code>, <code>smolagent_factory_logprobs_test.py:71</code>.</p>
-<p><code>test funcs</code> counts functions, not collected tests: <code>smolagent_factory_logprobs_test.py</code> uses <code>@pytest.mark.parametrize</code>, so pytest collects more items than this column shows.</p>
-<p>Per-file line split of the biggest files: <code>hybrid_verifier_test.py</code> 1270 lines, <code>astra_exporter_test.py</code> 649, <code>verifier_recovery_test.py</code> 415.</p>
+<p>Five files do not import their target; they load it by path so that <code class="path">sources/core/__init__.py</code> (litellm, sentence-transformers) never runs: <code>archive_projection_test.py:20</code>, <code>lineage_goal_filter_test.py:21</code>, <code>planner_json_extraction_test.py:44</code>, <code>selection_test.py:20</code>, <code>smolagent_factory_logprobs_test.py:71</code>.</p>
+<p><code>test funcs</code> counts functions, not collected tests: <code>smolagent_factory_logprobs_test.py</code> and <code>gold_feedback_test.py</code> use <code>@pytest.mark.parametrize</code>, so pytest collects more items than this column shows (<code>gold_feedback_test.py</code>: 40 functions, 49 collected items, 49 passed on 2026-09-28).</p>
+<p>Per-file line split of the biggest files: <code>hybrid_verifier_test.py</code> 2514 lines, <code>gold_feedback_test.py</code> 1173, <code>astra_exporter_test.py</code> 649.</p>
 </div></details>
 
-<p class="note say">Why it matters: the whole suite is offline and needs no API key, MCP server or Toolomics (<code>AGENTS.md:161-165</code>), so it can run in CI without secrets.</p>
+<p class="note say">Why it matters: the whole suite is offline and needs no API key, MCP server or Toolomics (<code>AGENTS.md:198-202</code>), so it can run in CI without secrets.</p>
+</div>
+
+<div class="panel" id="gold-map"><span class="br"></span>
+<h2>New: what gold_feedback_test.py covers <span class="chip warn">oracle - leaks gold</span></h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 360" role="img" aria-label="Modules that gold_feedback_test.py imports and calls">
+  <defs>
+    <marker id="ga" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="gb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow3" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="m1" href="mod_evaluators_gold_feedback.html">
+    <title>gold oracle package: GoldFeedbackEvaluator, CopyHandoff, oracle_reward, format</title>
+    <rect x="12" y="14" width="262" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="143" y="34" text-anchor="middle">gold_feedback/*</text>
+    <text class="box-sub" x="143" y="50" text-anchor="middle">ORACLE</text>
+    <text class="box-sub" x="143" y="64" text-anchor="middle">GoldFeedbackEvaluator, CopyHandoff</text>
+  </a>
+  <a class="box" id="m2" href="file_eval_evaluator.html">
+    <title>WorkflowEvaluator facade picks the gold branch for verifier_kind gold</title>
+    <rect x="12" y="82" width="262" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="143" y="102" text-anchor="middle">evaluators/evaluator.py</text>
+    <text class="box-sub" x="143" y="118" text-anchor="middle">WorkflowEvaluator, kind gold</text>
+  </a>
+  <a class="box" id="m3" href="mod_evaluators_hybrid_verifier.html">
+    <title>inner HybridVerifierEvaluator, stubbed or with its own registry root</title>
+    <rect x="12" y="150" width="262" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="143" y="170" text-anchor="middle">hybrid_verifier/*</text>
+    <text class="box-sub" x="143" y="186" text-anchor="middle">inner verifier, own registry</text>
+  </a>
+  <a class="box" id="m4" href="area_benchmark_evaluation.html">
+    <title>grade_directory builds a CapsuleEvaluator call</title>
+    <rect x="12" y="218" width="262" height="58" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="143" y="238" text-anchor="middle">snapshot_grading.py</text>
+    <text class="box-sub" x="143" y="254" text-anchor="middle">grade_directory</text>
+  </a>
+  <a class="box" id="m5" href="area_benchmark_evaluation.html">
+    <title>CsvEvaluationMode gold task context and capsule leak stamps</title>
+    <rect x="12" y="286" width="262" height="58" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="143" y="306" text-anchor="middle">csv_mode.py</text>
+    <text class="box-sub" x="143" y="322" text-anchor="middle">_set_gold_feedback_task, stamps</text>
+  </a>
+  <a class="box" id="m6" href="file_core_evolution_engine.html">
+    <title>_select_best_run and _evaluate_workflow_phenotype thread use</title>
+    <rect x="626" y="40" width="262" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="757" y="60" text-anchor="middle">evolution_engine.py</text>
+    <text class="box-sub" x="757" y="76" text-anchor="middle">_select_best_run, off-loop eval</text>
+  </a>
+  <a class="box" id="m7" href="file_core_workflow_selection.html">
+    <title>WorkflowSelector drops oracle generations when verifier_kind is not gold</title>
+    <rect x="626" y="112" width="262" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="757" y="132" text-anchor="middle">workflow_selection.py</text>
+    <text class="box-sub" x="757" y="148" text-anchor="middle">WorkflowSelector, LEAK GUARD</text>
+  </a>
+  <a class="box" id="m8" href="file_core_workflow_info.html">
+    <title>WorkflowInfo.reward_is_fallback and IndividualRun records</title>
+    <rect x="626" y="184" width="262" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="757" y="204" text-anchor="middle">workflow_info + schema</text>
+    <text class="box-sub" x="757" y="220" text-anchor="middle">WorkflowInfo, IndividualRun</text>
+  </a>
+  <a class="box" id="m9" href="area_entry_config.html">
+    <title>CLI flags, warn_gold_feedback_mode, gold_feedback_* config fields</title>
+    <rect x="626" y="256" width="262" height="58" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="757" y="276" text-anchor="middle">main.py + config.py</text>
+    <text class="box-sub" x="757" y="292" text-anchor="middle">warn_gold_feedback_mode, Config</text>
+  </a>
+  <a class="box" id="gt" href="../../tests/gold_feedback_test.py">
+    <title>the gold oracle test file, 40 test functions, 49 collected items</title>
+    <rect x="345" y="150" width="210" height="64" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="450" y="170" text-anchor="middle">gold_feedback_test.py</text>
+    <text class="box-sub" x="450" y="186" text-anchor="middle">1173 lines, 40 test funcs</text>
+    <text class="box-sub" x="450" y="200" text-anchor="middle">49 passed (2026-09-28)</text>
+  </a>
+  <path class="edge" data-from="gt" data-to="m1" d="M345,182 L274,43" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#ga)"/>
+  <path class="edge" data-from="gt" data-to="m2" d="M345,182 L274,111" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#ga)"/>
+  <path class="edge" data-from="gt" data-to="m3" d="M345,182 L274,179" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#ga)"/>
+  <path class="edge" data-from="gt" data-to="m4" d="M345,182 L274,247" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#ga)"/>
+  <path class="edge" data-from="gt" data-to="m5" d="M345,182 L274,315" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#ga)"/>
+  <path class="edge" data-from="gt" data-to="m6" d="M555,182 L626,69" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#gb)"/>
+  <path class="edge" data-from="gt" data-to="m7" d="M555,182 L626,141" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#gb)"/>
+  <path class="edge" data-from="gt" data-to="m8" d="M555,182 L626,213" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#gb)"/>
+  <path class="edge" data-from="gt" data-to="m9" d="M555,182 L626,285" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#gb)"/>
+  <text class="edge-label" x="450" y="138" text-anchor="middle">imports and calls</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - the largest new test file (uncommitted) reaches 9 modules in 4 areas. Left: verifier and benchmark code; right: core and entry code. Box symbols come from its imports (<code>gold_feedback_test.py:26-40</code>) and local imports (<code>:227</code>, <code>:859</code>, <code>:1001</code>, <code>:1060</code>, <code>:1130</code>).</p>
+
+<details><summary>new or changed test files since 336fe19, with the symbols they name</summary><div class="dbody">
+<table>
+<thead><tr><th>Test file</th><th>State</th><th>Symbols named (grep-checked)</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">gold_feedback_test.py</a></td><td>new, uncommitted</td><td><code>GoldFeedbackEvaluator</code>, <code>CopyHandoff</code>, <code>gold_hybrid_config</code>, <code>oracle_reward</code>, <code>build_gold_gradient</code>, <code>grade_directory</code>, <code>_select_best_run</code>, <code>WorkflowSelector</code>, <code>warn_gold_feedback_mode</code></td></tr>
+<tr><td class="sym"><a href="../../tests/evolution_engine_selection_test.py">evolution_engine_selection_test.py</a></td><td>new in 4020790</td><td><code>_select_best_run</code>, <code>WorkflowInfo.reward_is_fallback</code>, <code>IndividualRun</code></td></tr>
+<tr><td class="sym"><a href="../../tests/csv_mode_run_notes_fallback_test.py">csv_mode_run_notes_fallback_test.py</a></td><td>new in 4020790</td><td><code>CsvEvaluationMode</code>, <code>IndividualRun</code></td></tr>
+<tr><td class="sym"><a href="../../tests/test_sandbox_provisioning_pins.py">test_sandbox_provisioning_pins.py</a></td><td>new in 4020790; old page row said 198 lines, now 259</td><td><code>ExecutionSandbox</code>, <code>PINNED_CONSTRAINTS</code>, <code>IMPORT_NAME_REMAP</code>, <code>SPECIAL_CASE_INSTALLS</code></td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">hybrid_verifier_test.py</a></td><td>changed, 1270 to 2514 lines</td><td><code>ExecutionGateLayer</code>, <code>GATE_CAPS</code>, <code>VisualEvidenceLayer</code>, <code>ClaimsEvidenceLayer</code>, <code>LayerContext</code>, <code>task_key</code>, <code>LLMConfig</code></td></tr>
+<tr><td class="sym"><a href="../../tests/config_roundtrip_test.py">config_roundtrip_test.py</a></td><td>changed, uncommitted, +4 lines</td><td><code>NOT_PERSISTED</code> adds <code>gold_feedback_task_row</code>, <code>gold_feedback_sab_loader</code></td></tr>
+</tbody>
+</table>
+<p>Six legacy verifier tests also changed by 1 to 8 lines since 336fe19 (<code>git diff --stat</code>); their line and test counts are unchanged.</p>
+</div></details>
+
+<p class="note">The file checks both oracle sub-modes: gradient only (hybrid reward kept) and full oracle reward (<code>--gold_feedback_reward</code>), plus the leak guard in honest runs.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -224,7 +336,7 @@
   <text class="edge-label" x="319" y="192" text-anchor="middle">imports and runs</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - four files in <code>tests/</code> are not tests. <code>__init.py</code> is not drawn: it is empty (0 bytes) and pytest ignores it.</p>
+<p class="figcap">Diagram 3 - four files in <code>tests/</code> are not tests. <code>__init.py</code> is not drawn: it is empty (0 bytes) and pytest ignores it.</p>
 
 <div class="grid2">
 <div class="card steel">
@@ -239,7 +351,7 @@
 </div>
 <div class="card l3">
 <h4><a href="../../tests/brute_gold_eval.py">tests/brute_gold_eval.py</a></h4>
-<p class="role">Gold-solution harness for the benchmark. It does import <code>ExecutionSandbox</code> (<code>:31</code>), but its own docstring says pytest does not collect it (<code>:21</code>).</p>
+<p class="role">Gold-solution harness for the benchmark. It does import <code>ExecutionSandbox</code> (<code>:39</code>), but its own docstring says pytest does not collect it (<code>:21</code>).</p>
 <p class="meta">269 lines &#183; run as <code>python3.12 tests/brute_gold_eval.py</code> (<a href="flow_sab_batch.html">batch flow</a>)</p>
 </div>
 <div class="card steel">
@@ -249,7 +361,7 @@
 </div>
 </div>
 
-<p class="note">Limitation: <code>ls tests/</code> prints 46 entries, but one of them is the <code>__pycache__</code> folder, so this page describes 45 <code>.py</code> files (41 tests plus the 4 above).</p>
+<p class="note">Limitation: <code>ls tests/</code> prints 48 entries, but one of them is the <code>__pycache__</code> folder, so this page describes 47 <code>.py</code> files (43 tests plus the 4 above).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -300,7 +412,7 @@
   <text class="edge-label" x="592" y="182" text-anchor="middle">test body never runs</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - both files name a module that is not in the tree at commit <code>7e8463b</code>; <code>grep -rn "class DarwinMachine" sources/</code> and <code>grep -rn "class WorkflowJudge" sources/</code> return nothing.</p>
+<p class="figcap">Diagram 4 - both files name a module that is not in the tree at <code>4020790</code> + working tree; <code>grep -rn "class DarwinMachine" sources/</code> and <code>grep -rn "class WorkflowJudge" sources/</code> return nothing.</p>
 
 <p class="note flag">Real mismatch: <code>evaluator_test.py</code> and <code>judge_test.py</code> are named as tests, but every test in them is dead - <code>pytest.importorskip</code> skips them before the test body runs.</p>
 
@@ -331,10 +443,11 @@ tests/judge_test.py:16      from sources.core.judge import WorkflowJudge</pre>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">AGENTS.md</code> (Testing section, lines 155-168); <code class="path">UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <code class="path">_clone.js</code>; all 45 <code class="path">tests/*.py</code> files (imports, path literals, <code>def test_*</code> names); <code class="path">sources/core/</code>, <code class="path">sources/utils/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/cli/</code>, <code class="path">sources/benchmark_evaluation/</code>, <code class="path">sources/transparency/</code>, <code class="path">sources/modules/</code> file listings; <code class="path">config.py</code>, <code class="path">main.py</code> symbol greps.</p>
-<p class="skips">Skipped: <code class="path">tests/__pycache__/</code> (43 compiled <code>.pyc</code> files; generated output, not source); test bodies (this page is a coverage matrix, not per-test text); <code>pytest.ini</code>/<code>pyproject.toml</code> collection settings are not repeated here (they live on <a href="area_entry_config.html">area_entry_config.html</a>); <code>datasets/</code> and <code class="path">sources/memory/</code> contents (Tier D / runtime data, on <a href="data_runs.html">data_runs.html</a>); no test was executed - the pytest suite was not run.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26. The working tree has uncommitted changes at build time (<code>git status --porcelain</code> lists modified <code>config.py</code>, <code>main.py</code>, <code>sources/benchmark_evaluation/*</code>, <code>sources/evaluators/*</code> and others, plus the deleted flat evaluator modules), so line numbers may differ from a clean checkout of <code>336fe19</code>.</p>
+<p>Sources read: <code class="path">AGENTS.md</code> (Testing section, lines 196-212); <code class="path">UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <code class="path">_clone.js</code>; all 47 <code class="path">tests/*.py</code> files (imports, path literals, <code>def test_*</code> names); <code class="path">sources/core/</code>, <code class="path">sources/utils/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/cli/</code>, <code class="path">sources/benchmark_evaluation/</code>, <code class="path">sources/transparency/</code>, <code class="path">sources/modules/</code> file listings; <code class="path">config.py</code>, <code class="path">main.py</code> symbol greps.</p>
+<p class="skips">Skipped: <code class="path">tests/__pycache__/</code> (46 compiled <code>.pyc</code> files; generated output, not source); test bodies (this page is a coverage matrix, not per-test text); <code>pytest.ini</code>/<code>pyproject.toml</code> collection settings are not repeated here (they live on <a href="area_entry_config.html">area_entry_config.html</a>); <code>datasets/</code> and <code class="path">sources/memory/</code> contents (Tier D / runtime data, on <a href="data_runs.html">data_runs.html</a>); the full pytest suite was not run; only <code>uv run pytest tests/gold_feedback_test.py -q</code> was run (49 passed).</p>
+<p>Built at <code>4020790</code> + uncommitted working tree, 2026-09-28 (previous build <code>336fe19</code>, 2026-09-26). Uncommitted at build time in <code>tests/</code>: new <code>gold_feedback_test.py</code>, changed <code>config_roundtrip_test.py</code> (<code>git status --short</code>), so line numbers may differ from a clean checkout of <code>4020790</code>.</p>
 <p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
+<p>Updated at <code>4020790</code> + uncommitted working tree, 2026-09-28: added <code>gold_feedback_test.py</code> (diagram 2) and <code>evolution_engine_selection_test.py</code>; re-counted lines and test functions for all 47 files; fixed stale <code>AGENTS.md</code> and path-loading line refs.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

@@ -404,7 +404,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             if textual_gradient and textual_gradient.strip()
             else (run_stderr or fail_msg).strip()
             or "This is a fresh attempt, no execution feedback is available yet. Create the first workflow based on the goal alone."
-        ).replace('_', ' ')[:2048]
+        ).replace('_', ' ')
         # Deterministic search-state observer (no controller arithmetic).
         search_state = self._search_state_block(
             parent_score=score,

@@ -393,6 +393,7 @@ genotype.
 |------------------|-------------------|---------------------------------------|
 | `HybridVerifierEvaluator` | `hybrid_verifier/` | **Default**: hybrid temporal-ladder verifier (claims → policy scorers → pairwise reward) |
 | `VerifierEvaluator` | `verifier.py`     | Legacy multi-source per-claim verifier (deprecated; `verifier_kind="legacy"`) |
+| `GoldFeedbackEvaluator` | `gold_feedback/` | ORACLE / BENCHMARK-LEAKING research control (`verifier_kind="gold"`): hybrid reward + benchmark-grader gradient; never report its scores |
 | `GenericEvaluator`  | `generic.py`     | Legacy 4-criterion LLM judge          |
 | `ScenarioEvaluator` | `scenario.py`    | Rubric / assertion-based scoring      |
 | `Perspicacite grounding` | `grounding.py` | Adapter used by the legacy verifier and `GenericEvaluator` |
@@ -400,7 +401,7 @@ genotype.
 
 The facade is `WorkflowEvaluator` (`evaluator.py`); the evolution engine
 calls it with `evaluator_type="verifier"`, and the backend is chosen by
-`config.verifier_kind` (`hybrid` default | `legacy`).
+`config.verifier_kind` (`hybrid` default | `legacy` | `gold`; unknown values fall back to `hybrid`).
 
 ### 9. Benchmark evaluation — [`sources/evaluation/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluation/)
 

@@ -51,7 +51,7 @@
   </a>
 
   <a class="box" id="d1b1" href="data_runs.html">
-    <title>evolution_engine.py line 672: no parent resolves, so the child is a seed with no parents</title>
+    <title>evolution_engine.py line 785: no parent resolves, so the child is a seed with no parents</title>
     <rect x="16" y="150" width="240" height="56" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
     <text class="box-label" x="136" y="174" text-anchor="middle">reseed: kind seed</text>
     <text class="box-sub" x="136" y="190" text-anchor="middle">parents [] -&gt; new root</text>
@@ -83,7 +83,7 @@
   <text class="edge-label" x="566" y="240" text-anchor="start">reads records</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - one parent link per mutation, one reseed, one failed slot. Chain uuids read from <code class="path">sources/workflows/run_1/</code> (2026-09-19 21:22 to 23:05). Arrows: <code>EvolutionEngine.evolve_generation</code> sets <code>parent_uuids</code> then calls <code>lineage.record_lineage</code> (<code class="path">sources/core/evolution_engine.py</code> lines 506-513, 672-681).</p>
+<p class="figcap">Diagram 1 - one parent link per mutation, one reseed, one failed slot. Chain uuids read from <code class="path">sources/workflows/run_1/</code> (2026-09-19 21:22 to 23:05). Arrows: <code>EvolutionEngine.evolve_generation</code> sets <code>parent_uuids</code> then calls <code>lineage.record_lineage</code> (<code class="path">sources/core/evolution_engine.py</code> lines 612-619, 785-792).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -131,10 +131,10 @@
     <text class="box-sub" x="450" y="190" text-anchor="middle">genotype_&lt;uuid&gt;.py</text>
   </a>
   <a class="box" id="d2c5" href="#card-workflow-info">
-    <title>overall_score is the reward used by selection</title>
+    <title>overall_score is the reward used by selection; reward_is_fallback reads the same evaluation block</title>
     <rect x="517" y="150" width="118" height="56" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
     <text class="box-label" x="576" y="174" text-anchor="middle">overall_score</text>
-    <text class="box-sub" x="576" y="190" text-anchor="middle">mean of scores</text>
+    <text class="box-sub" x="576" y="190" text-anchor="middle">selected block</text>
   </a>
   <a class="box" id="d2c6" href="#card-workflow-info">
     <title>judge_evaluation returns evaluation.txt text</title>
@@ -206,7 +206,7 @@ load_lineage(workflow_dir, uuid) -&gt; dict | None
 scan_all(workflow_dir, goal=None) -&gt; dict[str, dict]</pre>
 <p>Record fields written by <code>record_lineage</code> (lines 66-74): <code>uuid</code>, <code>parents</code> (empties dropped), <code>evolution_kind</code>, <code>iteration</code> (int), <code>created_at</code> (<code>datetime.now().isoformat(timespec="seconds")</code>), <code>goal_snippet</code> (first 240 chars).</p>
 <p>Guards: empty <code>uuid</code> returns <code>None</code>; an unknown <code>kind</code> logs a warning and is coerced to <code>"seed"</code> (lines 56-59); a missing <code>&lt;workflow_dir&gt;/&lt;uuid&gt;/</code> folder returns <code>None</code> without writing (lines 61-64).</p>
-<p>Readers: <code>render_evolution_tree</code> calls <code>scan_all</code> (evolution_tree.py line 150) and <code>WorkflowSelector._count_children_on_disk</code> counts parents per uuid (workflow_selection.py line 252).</p>
+<p>Readers: <code>render_evolution_tree</code> calls <code>scan_all</code> (evolution_tree.py line 150) and <code>WorkflowSelector._count_children_on_disk</code> counts parents per uuid (workflow_selection.py line 272).</p>
 <p>Counted on disk at build time: 1 081 <code>lineage_*.json</code> files, 1 078 <code>goal_*.txt</code> files (my count). A <code>goal=</code> filter keeps only folders whose <code>goal_&lt;uuid&gt;.txt</code> matches after trimming; folders without that file are dropped.</p>
 </div></details>
 </div>
@@ -214,7 +214,7 @@ scan_all(workflow_dir, goal=None) -&gt; dict[str, dict]</pre>
 <div class="card l2" id="card-workflow-info">
 <h4><a href="../../sources/core/workflow_info.py">sources/core/workflow_info.py</a></h4>
 <p class="role">Lazy, cached accessor for one workflow folder. Returns goal, state, code, score, gradient and judge text; disk I/O happens on the first property read.</p>
-<p class="meta">271 lines &#183; class: WorkflowInfo &#183; caches: _goal, _state_result, _code, _overall_score, _original_task &#183; reader: selection, variation, evaluators, evolution_tree</p>
+<p class="meta">340 lines &#183; class: WorkflowInfo &#183; function: is_oracle_generation &#183; caches: _goal, _state_result, _code, _overall_score, _original_task &#183; reader: selection, variation, evaluators, evolution_tree</p>
 <details><summary>properties and score rules</summary><div class="dbody">
 <pre>WorkflowInfo(uuid, workflow_folder)
 goal -&gt; str                          reads state_result.json["goal"]
@@ -226,20 +226,23 @@ is_success -&gt; bool                   last item of state_result["success"]
 code -&gt; str                          load_code() reads workflow_genotype_&lt;uuid&gt;.py
 overall_score -&gt; float               calculate_overall_score(), or 0.0
 overall_score_uncapped -&gt; float      evaluation.verifier.overall_score_uncapped, clamped at 0
+reward_is_fallback -&gt; bool           reward_fallback of the selected block in FALLBACK_REWARD_KINDS
 judge_evaluation -&gt; dict             returns evaluation.txt TEXT (or {} when missing)
 abstracted_textual_gradient -&gt; str   evaluation.verifier.abstracted_textual_gradient, else textual_gradient.txt
 is_valid() -&gt; bool                   state_result.json and genotype file both exist</pre>
-<p>Score priority in <code>calculate_overall_score</code> (lines 222-247): first match of <code>generic</code> then <code>verifier</code> then <code>scenario</code>, and the mean of the collected values; <code>0.0</code> when no evaluation block exists.</p>
-<p>Quirk: <code>judge_evaluation</code> is annotated <code>-&gt; dict</code> but returns the stripped text of <code>evaluation.txt</code>, or <code>{}</code> when the file is absent (lines 143-152).</p>
+<p>Score priority in <code>calculate_overall_score</code> (lines 297-317, via <code>_selected_evaluation</code> lines 176-197): the first <code>dict</code> block among <code>generic</code>, <code>verifier</code>, <code>scenario</code>; its <code>overall_score</code> (else <code>score</code>) as float; <code>0.0</code> when no block or a bad value. <code>reward_is_fallback</code> (line 200) reads the same block.</p>
+<p>Module function <code>is_oracle_generation(folder, state_result=None)</code> (line 20) <span class="tag">ORACLE</span> returns True when <code>gold_feedback.json</code> exists or <code>evaluation.verifier.oracle is True</code>; <code>WorkflowSelector.discover_workflows</code> uses it to keep oracle folders out of honest parent pools.</p>
+<p>Quirk: <code>judge_evaluation</code> is annotated <code>-&gt; dict</code> but returns the stripped text of <code>evaluation.txt</code>, or <code>{}</code> when the file is absent (lines 218-238).</p>
 </div></details>
 </div>
 
 <div class="card l2" id="card-schema">
 <h4><a href="../../sources/core/schema.py">sources/core/schema.py</a></h4>
 <p class="role">Dataclasses shared by engine and planner: <code>IndividualRun</code> holds cost, reward, uuid and lineage fields; <code>SelectionLog</code> holds one QD verdict; <code>Plan</code>, <code>PlanStep</code>, <code>Task</code> serve the planner.</p>
-<p class="meta">163 lines &#183; dataclasses: SelectionLog, IndividualRun, PlanStep, Plan, Task &#183; enums: TaskStatus, TaskComplexity &#183; readers: planner.py, evolution_engine.py</p>
+<p class="meta">169 lines &#183; dataclasses: SelectionLog, IndividualRun, PlanStep, Plan, Task &#183; enums: TaskStatus, TaskComplexity &#183; readers: planner.py, evolution_engine.py</p>
 <details><summary>fields that matter for identity</summary><div class="dbody">
-<pre>IndividualRun(goal, prompt, cost=0.0, reward=0.0, reward_uncapped=0.0, max_depth=3,
+<pre>IndividualRun(goal, prompt, cost=0.0, reward=0.0, reward_uncapped=0.0,
+              reward_is_fallback=False, max_depth=3,
               iteration_count=0, current_uuid=None, answers=None, state_result=None,
               code=None, selection_log=None,
               parent_uuids=[], evolution_kind="seed")
@@ -249,7 +252,7 @@ Task(name, description, run_id=0, evolve_runs=[], final_answers=[], cost=0,
      final_uuid=None, workflow_uuid=None, status=TaskStatus.PENDING, ...)
 PlanStep(name, goal_context, task, cost, score, depends_on=[], ...)
 Plan(goal, steps=[])   # validates unique step names and existing dependencies</pre>
-<p><code>IndividualRun.parent_uuids</code> and <code>evolution_kind</code> are set by the engine before the next run and persisted through <code>lineage.record_lineage</code> (comment at schema.py lines 68-70; call at evolution_engine.py lines 506-513). <code>schema.py</code> imports nothing from this area; its readers import it: <code>planner.py</code> line 33 takes <code>IndividualRun, Plan, PlanStep, Task, TaskStatus</code>, and <code>evolution_engine.py</code> line 38 takes <code>IndividualRun, SelectionLog</code>.</p>
+<p><code>IndividualRun.parent_uuids</code> and <code>evolution_kind</code> are set by the engine before the next run and persisted through <code>lineage.record_lineage</code> (comment at schema.py lines 74-76; call at evolution_engine.py lines 612-619). <code>schema.py</code> imports nothing from this area; its readers import it: <code>planner.py</code> line 33 takes <code>IndividualRun, Plan, PlanStep, Task, TaskStatus</code>, and <code>evolution_engine.py</code> line 39 takes <code>IndividualRun, SelectionLog</code>.</p>
 <p>Not on this page: <code>TaskComplexity</code>, and the validation rules of <code>Plan.__post_init__</code> and <code>PlanStep.__post_init__</code> belong to the planner card. See <a href="mod_core_planner.html">mod_core_planner.html</a>.</p>
 </div></details>
 </div>
@@ -257,20 +260,20 @@ Plan(goal, steps=[])   # validates unique step names and existing dependencies</
 
 <div class="panel"><span class="br"></span>
 <h2>Shared state passed to runners</h2>
-<p>The generated script builds its first state from <code>WorkflowState.__annotations__</code> in <code class="path">sources/modules/state_schema.py</code>. That file is not only imported: <code>config.py</code> line 214 stores its path in <code>schema_code_path</code>, and <code>WorkflowFactory.assemble_workflow</code> splices its text into the workflow script (workflow_factory.py line 368).</p>
+<p>The generated script builds its first state from <code>WorkflowState.__annotations__</code> in <code class="path">sources/modules/state_schema.py</code>. That file is not only imported: <code>config.py</code> line 267 stores its path in <code>schema_code_path</code>, and <code>WorkflowFactory.assemble_workflow</code> splices its text into the workflow script (workflow_factory.py line 368).</p>
 <table>
 <thead><tr><th>Key</th><th>Type</th><th>Written by</th><th>Read by</th></tr></thead>
 <tbody>
 <tr><td class="sym">workflow_uuid</td><td class="sym">str</td><td>WorkflowFactory.assemble_workflow (workflow_factory.py:322)</td><td>SmolAgentFactory.run_cached (smolagent_factory.py:420)</td></tr>
 <tr><td class="sym">model_id</td><td class="sym">str</td><td>WorkflowFactory.assemble_workflow (workflow_factory.py:322)</td><td>unknown (no reader found in sources/)</td></tr>
-<tr><td class="sym">goal</td><td class="sym">str</td><td>WorkflowFactory.assemble_workflow (workflow_factory.py:322)</td><td>WorkflowInfo.goal (workflow_info.py:32)</td></tr>
+<tr><td class="sym">goal</td><td class="sym">str</td><td>WorkflowFactory.assemble_workflow (workflow_factory.py:322)</td><td>WorkflowInfo.goal (workflow_info.py:66)</td></tr>
 <tr><td class="sym">step_name</td><td class="sym">List[str]</td><td>SmolAgentFactory.run (smolagent_factory.py:488)</td><td>master_router (state_schema.py:117, 123)</td></tr>
 <tr><td class="sym">task_prompt</td><td class="sym">List[str]</td><td>SmolAgentFactory.run (smolagent_factory.py:489)</td><td>unknown (append only)</td></tr>
 <tr><td class="sym">actions</td><td class="sym">List[Action]</td><td>SmolAgentFactory.run (smolagent_factory.py:490)</td><td>unknown (append only)</td></tr>
 <tr><td class="sym">observations</td><td class="sym">List[Observation]</td><td>SmolAgentFactory.run (smolagent_factory.py:491)</td><td>unknown (append only)</td></tr>
-<tr><td class="sym">answers</td><td class="sym">List[str]</td><td>SmolAgentFactory.run (smolagent_factory.py:493)</td><td>master_router (state_schema.py:110), WorkflowInfo.answers (:94)</td></tr>
-<tr><td class="sym">success</td><td class="sym">List[bool]</td><td>SmolAgentFactory.run (smolagent_factory.py:492)</td><td>WorkflowInfo.is_success (workflow_info.py:108)</td></tr>
-<tr><td class="sym">evaluation</td><td class="sym">dict</td><td>BaseEvaluator._save_results (base.py:272)</td><td>WorkflowInfo.calculate_overall_score (:222)</td></tr>
+<tr><td class="sym">answers</td><td class="sym">List[str]</td><td>SmolAgentFactory.run (smolagent_factory.py:493)</td><td>master_router (state_schema.py:110), WorkflowInfo.answers (:128)</td></tr>
+<tr><td class="sym">success</td><td class="sym">List[bool]</td><td>SmolAgentFactory.run (smolagent_factory.py:492)</td><td>WorkflowInfo.is_success (workflow_info.py:142)</td></tr>
+<tr><td class="sym">evaluation</td><td class="sym">dict</td><td>BaseEvaluator._save_results (base.py:272)</td><td>WorkflowInfo.calculate_overall_score (:297)</td></tr>
 <tr><td class="sym">single_agent_mode</td><td class="sym">bool</td><td>single_agent_factory.py:292 (initial state)</td><td>unknown (not in WorkflowState)</td></tr>
 </tbody>
 </table>
@@ -281,7 +284,7 @@ Plan(goal, steps=[])   # validates unique step names and existing dependencies</
 <p class="note">Limitation: the comment at <code class="path">sources/core/workflow_factory.py</code> lines 322-324 says cost accounting reads <code>model_id</code> back from <code>state_result.json</code>, but no reader of that key was found by grep at this commit; the cell says <code>unknown</code>.</p>
 
 <h3>How a failed generation enters the lineage</h3>
-<p>When the factory raises an error without an encoded UUID, <code>WorkflowOrchestrator._parse_generation_error</code> returns the literal uuid <code>generation_failed</code> (orchestrator.py line 222). The engine still calls <code>record_lineage</code> with that uuid, the run's parents, its <code>evolution_kind</code> and its iteration (evolution_engine.py lines 506-513). <code>record_lineage</code> writes only when the folder <code>&lt;workflow_dir&gt;/generation_failed/</code> already exists, and that folder is created later in the same iteration by <code>write_run_metrics</code>, which runs <code>folder.mkdir(parents=True, exist_ok=True)</code> (evolution_engine.py line 595; run_metrics.py line 29). So the first failure of a run folder leaves no record, and every later failure overwrites <code>lineage_generation_failed.json</code>. Every failed slot reuses one uuid string, so a run folder keeps one such node, carrying the last failure's parents.</p>
+<p>When the factory raises an error without an encoded UUID, <code>WorkflowOrchestrator._parse_generation_error</code> returns the literal uuid <code>generation_failed</code> (orchestrator.py line 222). The engine still calls <code>record_lineage</code> with that uuid, the run's parents, its <code>evolution_kind</code> and its iteration (evolution_engine.py lines 612-619). <code>record_lineage</code> writes only when the folder <code>&lt;workflow_dir&gt;/generation_failed/</code> already exists, and that folder is created later in the same iteration by <code>write_run_metrics</code>, which runs <code>folder.mkdir(parents=True, exist_ok=True)</code> (evolution_engine.py lines 708, 1201; run_metrics.py line 29). So the first failure of a run folder leaves no record, and every later failure overwrites <code>lineage_generation_failed.json</code>. Every failed slot reuses one uuid string, so a run folder keeps one such node, carrying the last failure's parents.</p>
 <table>
 <thead><tr><th>Run folder</th><th>Kind</th><th class="size">Iteration</th><th>Parents in the record</th></tr></thead>
 <tbody>
@@ -297,9 +300,9 @@ Plan(goal, steps=[])   # validates unique step names and existing dependencies</
 </div>
 
 <footer>
-<p>Sources: <code class="path">sources/core/lineage.py</code> (whole file), <code class="path">sources/core/workflow_info.py</code> (whole file), <code class="path">sources/core/schema.py</code> (whole file), <code class="path">sources/utils/evolution_tree.py</code> (whole file), <code class="path">sources/modules/state_schema.py</code>, <code class="path">sources/modules/smolagent_factory.py</code> (lines 239-260, 415-497), <code class="path">sources/core/workflow_factory.py</code> (lines 280-410, 440-514), <code class="path">sources/core/factory.py</code> (lines 120-205), <code class="path">sources/core/orchestrator.py</code> (lines 160-230, 297-345), <code class="path">sources/core/evolution_engine.py</code> (lines 440-720, 919-969, 990-1090), <code class="path">sources/evaluators/base.py</code> (lines 140-285), <code class="path">sources/core/workflow_selection.py</code> (lines 1-30, 240-257), <code class="path">sources/utils/run_metrics.py</code>, <code class="path">config.py</code> (lines 205-230, 325-330), run notes and workflow folders read only for counts and the failed-slot table.</p>
+<p>Sources: <code class="path">sources/core/lineage.py</code> (whole file), <code class="path">sources/core/workflow_info.py</code> (whole file), <code class="path">sources/core/schema.py</code> (whole file), <code class="path">sources/utils/evolution_tree.py</code> (whole file), <code class="path">sources/modules/state_schema.py</code>, <code class="path">sources/modules/smolagent_factory.py</code> (lines 239-260, 415-497), <code class="path">sources/core/workflow_factory.py</code> (lines 280-410, 440-514), <code class="path">sources/core/factory.py</code> (lines 120-205), <code class="path">sources/core/orchestrator.py</code> (lines 160-230, 297-345), <code class="path">sources/core/evolution_engine.py</code> (lines 590-800, 1097-1205), <code class="path">sources/evaluators/base.py</code> (lines 140-285), <code class="path">sources/core/workflow_selection.py</code> (lines 1-38, 85-141, 261-276), <code class="path">sources/utils/run_metrics.py</code>, <code class="path">config.py</code> (<code>schema_code_path</code>, lines 267-268, 378-380), run notes and workflow folders read only for counts and the failed-slot table.</p>
 <p class="skips">Skipped: <code class="path">sources/workflows/**</code> opened only for lineage, run_metrics and goal files (runtime data, Tier D) - <code class="path">sources/memory/**</code>, <code class="path">tmp/**</code>, <code class="path">run_notes/**</code> only searched for uuid counts (Tier D, except the two cited keys) - <code class="path">sources/core/planner.py</code> and <code class="path">sources/utils/planner_visualization.py</code> only cited as readers of schema.py (link to the planner page) - <code class="path">sources/core/genotype_embedding.py</code> and <code class="path">sources/core/failure_fingerprint.py</code> not read (embedding and fingerprint live on other pages; the fingerprint writes <code>evaluation.verifier.failure_fingerprint</code> only) - <code class="path">sources/core/single_agent_factory.py</code> read only at line 292 for <code>single_agent_mode</code> - <code class="path">sources/utils/pricing.py</code>, <code class="path">sources/transparency/astra_exporter.py</code> searched by grep only, no identity facts found - <code class="path">docs/**</code>, <code class="path">datasets/**</code>, <code class="path">webui/**</code>, <code class="path">.venv/**</code>, <code class="path">node_modules/**</code> skipped per UPDATE_VISUAL_CLONE.md section 4.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (<code>config.py</code>, <code>README.md</code>, <code>docs/**</code> and others modified); the commit hash is the checkout HEAD, not a clean state.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28. Since <code>7e8463b</code>, <code>workflow_info.py</code>, <code>schema.py</code> and <code>workflow_selection.py</code> changed (fallback flag, oracle test); <code>lineage.py</code> did not. Line numbers in those files and in <code>evolution_engine.py</code> were re-derived. On-disk counts on this page were not recounted.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

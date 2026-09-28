@@ -7,7 +7,7 @@ sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config import Config
 from sources.core.selection import PopulationMember, SelectionPressure
-from sources.core.workflow_info import WorkflowInfo
+from sources.core.workflow_info import WorkflowInfo, is_oracle_generation
 from sources.core.lineage import scan_all as _scan_lineage
 
 
@@ -96,6 +96,12 @@ class WorkflowSelector:
             print(f"Workflows directory {self.workflows_folder} does not exist.")
             return workflows
 
+        # Leak guard: genotypes evolved under the benchmark-leaking gold
+        # (oracle) verifier are only reusable by another gold run.
+        allow_oracle = (
+            str(getattr(self.config, "verifier_kind", "")).lower() == "gold"
+        )
+        skipped_oracle = 0
         for workflow_folder in self.workflows_folder.iterdir():
             if not workflow_folder.is_dir():
                 continue
@@ -109,7 +115,12 @@ class WorkflowSelector:
                 continue
 
             # Check if state_result is empty
-            if not workflow_info.load_state_result():
+            state_result = workflow_info.load_state_result()
+            if not state_result:
+                continue
+
+            if not allow_oracle and is_oracle_generation(workflow_folder, state_result):
+                skipped_oracle += 1
                 continue
 
             workflow_info.load_code()
@@ -118,6 +129,15 @@ class WorkflowSelector:
 
             workflows[uuid] = workflow_info
 
+        if skipped_oracle:
+            logger.warning(
+                "[LEAK GUARD] %d generation(s) in %s were evaluated by the "
+                "benchmark-leaking gold (oracle) verifier; they are skipped "
+                "for this non-gold run. Keep oracle runs in a separate "
+                "workflow_dir.",
+                skipped_oracle,
+                self.workflows_folder,
+            )
         return workflows
 
     def cosine_similarity(self, a: str, b: str) -> float:

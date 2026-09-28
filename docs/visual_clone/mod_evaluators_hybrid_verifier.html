@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">hybrid_verifier &mdash; default verifier package</h1>
-<p class="intro">Ten Python files turn one task goal into 8&ndash;12 stage-tagged claims, write a deterministic scorer per claim, and score each generation with a pairwise win-rate. The reward drives the <a href="flow_verification.html">verification flow</a>; the package sits under the wider <a href="area_evaluators.html">evaluators area</a>.</p>
+<p class="intro">Ten Python files turn one task goal into 8&ndash;12 stage-tagged claims, write a deterministic scorer per claim, and score each generation with a pairwise win-rate. The reward drives the <a href="flow_verification.html">verification flow</a>; the package sits under the wider <a href="area_evaluators.html">evaluators area</a>. Two classes build <code>HybridVerifierEvaluator</code>: <code>WorkflowEvaluator</code> (default channel) and, in <code>gold</code> mode, <a href="mod_evaluators_gold_feedback.html"><code>GoldFeedbackEvaluator</code></a> as an inner verifier.</p>
 
 <div id="legend" data-auto></div>
 
@@ -250,7 +250,7 @@
 
 <div class="panel"><span class="br"></span>
 <h2>File cards</h2>
-<p class="sub">10 files, 4 459 lines total (<code>wc -l</code>). Role line max 25 words; signatures behind the fold.</p>
+<p class="sub">10 files, 4 727 lines total (<code>wc -l</code>). Role line max 25 words; signatures behind the fold.</p>
 
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a></h4>
@@ -303,7 +303,7 @@ outcome_report(claims, generations) -&gt; str
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/layers.py">sources/evaluators/hybrid_verifier/layers.py</a></h4>
 <p class="role">Defines the <code>EvidenceLayer</code> protocol and the default <code>ClaimsEvidenceLayer</code>: claim lifecycle, scorer build and repair, parallel scoring paths.</p>
-<p class="meta">1037 lines &#183; 6 classes: <code>LayerScore</code>, <code>LayerContext</code>, <code>EvidenceLayer</code> (Protocol), <code>ClaimsEvidenceLayer</code>, <code>VisualEvidenceLayer</code>, <code>ExecutionGateLayer</code> &#183; floor: <code>MAX_CLAIMS_TOTAL = 14</code></p>
+<p class="meta">1049 lines &#183; 6 classes: <code>LayerScore</code>, <code>LayerContext</code>, <code>EvidenceLayer</code> (Protocol), <code>ClaimsEvidenceLayer</code>, <code>VisualEvidenceLayer</code>, <code>ExecutionGateLayer</code> &#183; floor: <code>MAX_CLAIMS_TOTAL = 14</code></p>
 <details><summary>signatures and hooks</summary><div class="dbody">
 <pre>LayerScore(claim_id, statement, score: float | None, evidence="", category="other", meta={})
 LayerContext(uuid, goal, workspace, registry, generation_index)
@@ -328,7 +328,7 @@ ExecutionGateLayer.collect(context) / revise(...) -&gt; list[LayerScore]  # both
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/scorers.py">sources/evaluators/hybrid_verifier/scorers.py</a></h4>
 <p class="role">Builds the scorer prompts, screens scripts statically, wraps them with the launcher constants and parses the single JSON output line.</p>
-<p class="meta">309 lines &#183; 7 functions, 2 dataclasses &#183; <code>MAX_CODE_ATTEMPTS = 3</code> (1 build + 2 repairs)</p>
+<p class="meta">411 lines &#183; 9 functions, 2 dataclasses &#183; <code>MAX_CODE_ATTEMPTS = 3</code> (1 build + 2 repairs)</p>
 <details><summary>signatures, allow-list and banned APIs</summary><div class="dbody">
 <pre>scorer_prompt(goal, claim, union_inventory, digests_block="") -&gt; str
 repair_prompt(feedback, prev_code) -&gt; str
@@ -347,7 +347,7 @@ ScorerAttempt(attempt, parse=None, static_violations=[], executed=False, ok=Fals
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/aggregation.py">sources/evaluators/hybrid_verifier/aggregation.py</a></h4>
 <p class="role">Zero-variance filter, five pairwise modes, temporal elimination, win-rate and Bradley&ndash;Terry rewards; no intra-package imports.</p>
-<p class="meta">445 lines &#183; 7 public functions, 6 constants &#183; <code>PASS_THRESHOLD = 0.5</code>, <code>MIN_OBS_FOR_VARIANCE = 2</code></p>
+<p class="meta">454 lines &#183; 7 public functions, 6 constants &#183; <code>PASS_THRESHOLD = 0.5</code>, <code>MIN_OBS_FOR_VARIANCE = 2</code></p>
 <details><summary>signatures and modes</summary><div class="dbody">
 <pre>claim_stats(observed) -&gt; dict            # dropped when all_fail or zero_variance
 decisive(now, prev, claim_ids) -&gt; tuple[int, float, int]   # (d, dm, k)
@@ -364,7 +364,7 @@ mean_claim_score(now, claim_ids) -&gt; float</pre>
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/registry.py">sources/evaluators/hybrid_verifier/registry.py</a></h4>
 <p class="role">Per-task JSON cache: claims with cached scorer scripts, digests, generation score vectors, union inventory, replacement counts.</p>
-<p class="meta">304 lines &#183; class: <code>TaskRegistry</code> &#183; file: <code>hybrid_registry_&lt;16 hex&gt;.json</code> &#183; <code>REGISTRY_VERSION = "hybrid-v1-e19b-20260924"</code></p>
+<p class="meta">355 lines &#183; class: <code>TaskRegistry</code> &#183; file: <code>hybrid_registry_&lt;16 hex&gt;.json</code> &#183; <code>REGISTRY_VERSION = "hybrid-v1-e19b-20260924"</code></p>
 <details><summary>signatures and keys</summary><div class="dbody">
 <pre>task_key(goal: str) -&gt; str                      # sha256(goal + REGISTRY_VERSION)[:16]
 TaskRegistry.load(root, goal, logger=None) -&gt; TaskRegistry
@@ -385,7 +385,7 @@ TaskRegistry.merge_inventory(current) / n_workspaces</pre>
 <div class="card l4">
 <h4><a href="../../sources/evaluators/hybrid_verifier/gradient.py">sources/evaluators/hybrid_verifier/gradient.py</a></h4>
 <p class="role">Assembles the gradient: elimination point first, then stage losses, wins, all claim scores, transcript, dropped claims; renders the report.</p>
-<p class="meta">286 lines &#183; 3 functions, no classes &#183; transcript cap 4 000 characters</p>
+<p class="meta">380 lines &#183; 4 functions, no classes &#183; transcript cap 4 000 characters</p>
 <details><summary>signatures and gradient sections</summary><div class="dbody">
 <pre>build_gradient(uuid, goal, now_scores, evidence, claims, surviving, pair_records,
     reward, win_rate, mean_score, dead_claims, exec_facts=None,
@@ -475,7 +475,7 @@ from .registry import TaskRegistry</pre>
 
 <div class="panel"><span class="br"></span>
 <h2>Scorer screen: allowed imports and banned APIs</h2>
-<p class="intro">Quoted from <code class="path">sources/evaluators/hybrid_verifier/scorers.py</code>, lines 27&ndash;106 (<code>ALLOWED_IMPORTS</code> L27, <code>_BANNED_SNIPPETS</code> L64, <code>_EXTRA_BANNED</code> L84, <code>_EXTRA_BANNED_RE</code> L100, <code>_WRITE_MODE_OPEN_RE</code> L106).</p>
+<p class="intro">Quoted from <code class="path">sources/evaluators/hybrid_verifier/scorers.py</code>, lines 30&ndash;109 (<code>ALLOWED_IMPORTS</code> L30, <code>_BANNED_SNIPPETS</code> L67, <code>_EXTRA_BANNED</code> L87, <code>_EXTRA_BANNED_RE</code> L103, <code>_WRITE_MODE_OPEN_RE</code> L109).</p>
 <details><summary>verbatim allow-list and banned lists</summary><div class="dbody">
 <blockquote>ALLOWED_IMPORTS: frozenset[str] = frozenset(
     {
@@ -503,20 +503,20 @@ _EXTRA_BANNED_RE: tuple[re.Pattern[str], ...] = (
     re.compile(r"\bpickle\.dump\s*\("),
 )
 _WRITE_MODE_OPEN_RE = re.compile(r"open\([^)]*['\"][waxb+]['\"]")</blockquote>
-<p>Quoted text is re-wrapped to one line per group; the tuples are verbatim in content and order. Names and line numbers as above. <code>static_violations(code)</code> (L237) walks the imports through <code>ALLOWED_IMPORTS</code>, scans <code>_BANNED_SNIPPETS + _EXTRA_BANNED</code> as plain substrings, applies the two regexes, and flags a write-mode <code>open(...)</code>.</p>
+<p>Quoted text is re-wrapped to one line per group; the tuples are verbatim in content and order. Names and line numbers as above. <code>static_violations(code)</code> (L333) walks the imports through <code>ALLOWED_IMPORTS</code>, scans <code>_BANNED_SNIPPETS + _EXTRA_BANNED</code> as plain substrings, applies the two regexes, and flags a write-mode <code>open(...)</code>.</p>
 <p>The screen is text matching only: a rule can fail the screen on a substring match; a script that builds a banned name at runtime is not caught. <code>_EXTRA_BANNED_RE</code> uses an open-paren so <code>json.dumps</code> stays allowed.</p>
 <p>Covered by <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a>: <code>test_static_violations_catches_write_and_network_apis</code>.</p>
 </div></details>
 
 <p class="note">Amber: scorer scripts are LLM-written code that runs as plain host subprocesses (<code>sys.executable</code>, cwd = the scored workspace), not inside the SmolAgents AST sandbox, so the static screen above is the only guard.</p>
-<p class="note">Amber: <code>evaluator.py::HybridVerifierEvaluator.__init__</code> reads <code>getattr(config, "temp_dir", None)</code>, but <code>Config</code> defines <code>runner_temp_dir</code> and has no <code>temp_dir</code>, so the per-task registry always lands in <code>workflow_dir/_verifier_tmp</code>.</p>
+<p class="note">Amber: <code>evaluator.py::HybridVerifierEvaluator.__init__</code> reads <code>getattr(config, "temp_dir", None)</code>, but <code>Config</code> defines <code>runner_temp_dir</code> and has no <code>temp_dir</code>, so the per-task registry lands in <code>workflow_dir/_verifier_tmp</code>. Exception: in <code>gold</code> mode <code>gold_feedback/evaluator.py::gold_hybrid_config</code> passes a config copy whose <code>temp_dir</code> is that path plus <code>_gold</code>, so the inner hybrid keeps a separate registry.</p>
 <p class="note say">Why it matters: the same cached scorer script grades every generation of a task, so a reward difference means an artifact difference, not a measurement difference.</p>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code>, <code class="path">aggregation.py</code>, <code class="path">claims.py</code>, <code class="path">digest.py</code>, <code class="path">evaluator.py</code>, <code class="path">gradient.py</code>, <code class="path">inventory.py</code>, <code class="path">layers.py</code>, <code class="path">registry.py</code>, <code class="path">scorers.py</code>; <code class="path">config.py</code> (hybrid_verifier_* fields, L78&ndash;94), <code class="path">config_default.json</code> (L16&ndash;21), <code class="path">sources/evaluators/evaluator.py</code> (L21, L95: facade picks the class by <code>verifier_kind</code>), <code class="path">sources/evaluators/base.py</code> (<code>BaseEvaluator</code> L89, <code>_save_results</code> L227), <code class="path">sources/core/workflow_runner.py</code> (L310 <code>execute</code> runs a plain subprocess), <code class="path">tests/hybrid_verifier_test.py</code>, <code class="path">docs/concepts/evaluation-pipeline.md</code> (L190&ndash;275, checked against the code). Line counts from <code>wc -l</code>. Text budget and colours per UPDATE_VISUAL_CLONE.md sections 6&ndash;7.</p>
+<p>Sources read: <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code>, <code class="path">aggregation.py</code>, <code class="path">claims.py</code>, <code class="path">digest.py</code>, <code class="path">evaluator.py</code>, <code class="path">gradient.py</code>, <code class="path">inventory.py</code>, <code class="path">layers.py</code>, <code class="path">registry.py</code>, <code class="path">scorers.py</code>; <code class="path">config.py</code> (hybrid_verifier_* fields, L122&ndash;148), <code class="path">config_default.json</code> (L18&ndash;23), <code class="path">sources/evaluators/evaluator.py</code> (L21, L107: facade picks the class by <code>verifier_kind</code>), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (<code>gold_hybrid_config</code>, inner hybrid), <code class="path">sources/evaluators/base.py</code> (<code>BaseEvaluator</code> L89, <code>_save_results</code> L227), <code class="path">sources/core/workflow_runner.py</code> (L310 <code>execute</code> runs a plain subprocess), <code class="path">tests/hybrid_verifier_test.py</code>, <code class="path">docs/concepts/evaluation-pipeline.md</code> (L190&ndash;275, checked against the code). Line counts from <code>wc -l</code>. Text budget and colours per UPDATE_VISUAL_CLONE.md sections 6&ndash;7.</p>
 <p class="skips">Skipped: <code>sources/evaluators/*.py</code> at the folder root (<code>base.py</code>, <code>verifier*.py</code>, <code>generic.py</code>, <code>scenario.py</code>, <code>grounding.py</code>, <code>bs_detection.py</code>) &mdash; outside this page's scope; they belong to <a href="area_evaluators.html">area_evaluators.html</a> and <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>. Not opened: <code>experiments_verifiers/</code> harnesses referenced in docstrings (outside scope, Tier B). No pytest run and no application run, by the build rules. Diagrams 1 and 2 link <a href="flow_verification.html">flow_verification.html</a> and <a href="area_evaluators.html">area_evaluators.html</a>, which other workers build.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26. The hybrid_verifier package is committed at this commit (9 modules plus <code>__init__.py</code>).</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26; line counts, scorer line refs, callers and the registry note re-checked at <code>4020790</code> + uncommitted working tree, 2026-09-28. The file card bodies were not re-read in that pass.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

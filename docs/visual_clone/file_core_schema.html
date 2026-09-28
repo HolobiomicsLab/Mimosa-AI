@@ -47,39 +47,39 @@
     <title>sources/core/evolution_engine.py builds run records</title>
     <rect x="20" y="340" width="180" height="60" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="110" y="364" text-anchor="middle">EvolutionEngine</text>
-    <text class="box-sub" x="110" y="382" text-anchor="middle">evolution_engine.py:405, 567</text>
+    <text class="box-sub" x="110" y="382" text-anchor="middle">engine: 246, 515, 680, 794</text>
   </g>
 
   <g class="box" id="b1">
-    <title>PlanStep, lines 83-109, 11 fields</title>
+    <title>PlanStep, lines 89-115, 10 fields plus __post_init__</title>
     <rect x="280" y="30" width="240" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="400" y="54" text-anchor="middle">PlanStep</text>
-    <text class="box-sub" x="400" y="72" text-anchor="middle">lines 83-109, 11 fields</text>
+    <text class="box-sub" x="400" y="72" text-anchor="middle">lines 89-115, 10 fields</text>
     <text class="box-sub" x="400" y="86" text-anchor="middle">status default PENDING</text>
   </g>
 
   <g class="box" id="b2">
-    <title>Plan, lines 111-140</title>
+    <title>Plan, lines 117-146</title>
     <rect x="280" y="130" width="240" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="400" y="154" text-anchor="middle">Plan</text>
-    <text class="box-sub" x="400" y="172" text-anchor="middle">lines 111-140</text>
+    <text class="box-sub" x="400" y="172" text-anchor="middle">lines 117-146</text>
     <text class="box-sub" x="400" y="186" text-anchor="middle">goal + list of PlanStep</text>
   </g>
 
   <g class="box" id="b3">
-    <title>Task, lines 142-163</title>
+    <title>Task, lines 148-169</title>
     <rect x="280" y="230" width="240" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="400" y="254" text-anchor="middle">Task</text>
-    <text class="box-sub" x="400" y="272" text-anchor="middle">lines 142-163</text>
+    <text class="box-sub" x="400" y="272" text-anchor="middle">lines 148-169</text>
     <text class="box-sub" x="400" y="286" text-anchor="middle">planner task record</text>
   </g>
 
   <g class="box" id="b4">
-    <title>IndividualRun, lines 42-81</title>
+    <title>IndividualRun, lines 42-87, 22 fields; reward_is_fallback (line 59) is new in 4020790</title>
     <rect x="280" y="330" width="240" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="400" y="354" text-anchor="middle">IndividualRun</text>
-    <text class="box-sub" x="400" y="372" text-anchor="middle">lines 42-81</text>
-    <text class="box-sub" x="400" y="386" text-anchor="middle">one evolved workflow run</text>
+    <text class="box-sub" x="400" y="372" text-anchor="middle">lines 42-87, 22 fields</text>
+    <text class="box-sub" x="400" y="386" text-anchor="middle">+ reward_is_fallback (59)</text>
   </g>
 
   <g class="box" id="b5">
@@ -91,27 +91,27 @@
   </g>
 
   <g class="box" id="c1">
-    <title>PlanStep.__post_init__, lines 97-109</title>
+    <title>PlanStep.__post_init__, lines 103-115</title>
     <rect x="600" y="30" width="260" height="64" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
     <text class="box-label" x="730" y="54" text-anchor="middle">PlanStep.__post_init__</text>
     <text class="box-sub" x="730" y="72" text-anchor="middle">raises ValueError on bad input</text>
-    <text class="box-sub" x="730" y="86" text-anchor="middle">lines 97-109</text>
+    <text class="box-sub" x="730" y="86" text-anchor="middle">lines 103-115</text>
   </g>
 
   <g class="box" id="c2">
-    <title>Plan.__post_init__, lines 117-140</title>
+    <title>Plan.__post_init__, lines 123-146</title>
     <rect x="600" y="130" width="260" height="64" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
     <text class="box-label" x="730" y="154" text-anchor="middle">Plan.__post_init__</text>
     <text class="box-sub" x="730" y="172" text-anchor="middle">unique names, deps exist</text>
-    <text class="box-sub" x="730" y="186" text-anchor="middle">lines 117-140</text>
+    <text class="box-sub" x="730" y="186" text-anchor="middle">lines 123-146</text>
   </g>
 
   <g class="box" id="c3">
-    <title>Printing helpers, lines 36 and 74</title>
+    <title>Printing helpers, lines 36 and 80</title>
     <rect x="600" y="230" width="260" height="64" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
     <text class="box-label" x="730" y="254" text-anchor="middle">__str__ methods</text>
     <text class="box-sub" x="730" y="272" text-anchor="middle">SelectionLog.__str__ line 36</text>
-    <text class="box-sub" x="730" y="286" text-anchor="middle">IndividualRun.__str__ line 74</text>
+    <text class="box-sub" x="730" y="286" text-anchor="middle">IndividualRun.__str__ line 80</text>
   </g>
 
   <g class="box" id="c4">
@@ -161,6 +161,88 @@
 </div>
 
 <div class="panel"><span class="br"></span>
+<h2 id="fallback">Diagram 1b - the new <code>reward_is_fallback</code> field, end to end</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 300" role="img" aria-label="Where IndividualRun.reward_is_fallback is set and read">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="r1">
+    <title>The hybrid verifier writes "mean_claim" or "short_circuit"; gold mode can write "oracle_censored".</title>
+    <rect x="20" y="40" width="220" height="80" rx="2" fill="none" stroke="#8FB8C9"/>
+    <text class="box-label" x="130" y="62" text-anchor="middle">state_result evaluation block</text>
+    <text class="box-sub" x="130" y="80" text-anchor="middle">reward_fallback key</text>
+    <text class="box-sub" x="130" y="96" text-anchor="middle">written by the verifier</text>
+  </g>
+  <a class="box" id="r2" href="file_core_workflow_info.html">
+    <title>Reads the same block as overall_score.</title>
+    <rect x="290" y="40" width="230" height="80" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405" y="62" text-anchor="middle">WorkflowInfo.reward_is_fallback</text>
+    <text class="box-sub" x="405" y="80" text-anchor="middle">in FALLBACK_REWARD_KINDS?</text>
+    <text class="box-sub" x="405" y="96" text-anchor="middle">workflow_info.py:200</text>
+  </a>
+  <a class="box" id="r3" href="mod_core_evolution_engine.html">
+    <title>Set once, right after evaluation, together with reward and reward_uncapped.</title>
+    <rect x="570" y="40" width="230" height="80" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="62" text-anchor="middle">engine sets the field</text>
+    <text class="box-sub" x="685" y="80" text-anchor="middle">runs[-1].reward_is_fallback</text>
+    <text class="box-sub" x="685" y="96" text-anchor="middle">evolution_engine.py:642</text>
+  </a>
+  <g class="box" id="r4">
+    <title>The only field added to schema.py since 336fe19.</title>
+    <rect x="850" y="40" width="300" height="80" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1000" y="62" text-anchor="middle">IndividualRun.reward_is_fallback</text>
+    <text class="box-sub" x="1000" y="80" text-anchor="middle">bool = False</text>
+    <text class="box-sub" x="1000" y="96" text-anchor="middle">schema.py:59, new in 4020790</text>
+  </g>
+  <a class="box" id="r5" href="mod_core_evolution_engine.html">
+    <title>Disk wins over the field; a zero-pair reward next to real pairwise siblings also counts as fallback.</title>
+    <rect x="570" y="180" width="230" height="80" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="202" text-anchor="middle">_run_reward_is_fallback()</text>
+    <text class="box-sub" x="685" y="220" text-anchor="middle">re-checks state_result</text>
+    <text class="box-sub" x="685" y="236" text-anchor="middle">evolution_engine.py:72</text>
+  </a>
+  <a class="box" id="r6" href="mod_core_evolution_engine.html">
+    <title>If all runs are fallbacks the best fallback ships; a measured fallback beats an all-zero pool.</title>
+    <rect x="850" y="180" width="300" height="80" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1000" y="202" text-anchor="middle">_select_best_run()</text>
+    <text class="box-sub" x="1000" y="220" text-anchor="middle">capsule argmax without fallbacks</text>
+    <text class="box-sub" x="1000" y="236" text-anchor="middle">evolution_engine.py:136, call 539</text>
+  </a>
+  <g class="box" id="r7">
+    <title>Written per iteration by _build_run_metrics_snapshot.</title>
+    <rect x="290" y="180" width="230" height="80" rx="2" fill="none" stroke="#8FB8C9"/>
+    <text class="box-label" x="405" y="202" text-anchor="middle">run_metrics.json</text>
+    <text class="box-sub" x="405" y="220" text-anchor="middle">key reward_is_fallback</text>
+    <text class="box-sub" x="405" y="236" text-anchor="middle">evolution_engine.py:1140</text>
+  </g>
+  <path class="edge dashed-edge" data-from="r1" data-to="r2" d="M240,80 H290" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="265" y="72" text-anchor="middle">reward_fallback</text>
+  <path class="edge" data-from="r2" data-to="r3" d="M520,80 H570" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="545" y="72" text-anchor="middle">bool</text>
+  <path class="edge" data-from="r3" data-to="r4" d="M800,80 H850" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="825" y="72" text-anchor="middle">sets</text>
+  <path class="edge" data-from="r4" data-to="r5" d="M1000,120 V150 H685 V180" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1008" y="140" text-anchor="start">run field</text>
+  <path class="edge" data-from="r5" data-to="r6" d="M800,220 H850" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="825" y="212" text-anchor="middle">excluded runs</text>
+  <path class="edge dashed-edge" data-from="r4" data-to="r7" d="M900,120 V140 H405 V180" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="560" y="135" text-anchor="middle">bool</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1b - 7 boxes. The field exists so first-generation fallback rewards (a mean claim score, not a pairwise win) cannot win the capsule argmax. The oracle skip is elsewhere: it filters the parent pool in <a href="file_core_workflow_selection.html#filters">workflow_selection.py</a>, and <code>_select_best_run</code> has no oracle test.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
 <h2>Diagram 2 - what goes in and what comes out</h2>
 <div class="canvas">
 <svg class="diagram" viewBox="0 0 1180 420" role="img" aria-label="schema.py data flow">
@@ -192,7 +274,7 @@
     <text class="box-label" x="145" y="194" text-anchor="middle">enum members</text>
     <text class="box-sub" x="145" y="214" text-anchor="middle">TaskStatus.PENDING, .RUNNING,</text>
     <text class="box-sub" x="145" y="230" text-anchor="middle">.COMPLETED, .FAILED, .SKIPPED</text>
-    <text class="box-sub" x="145" y="244" text-anchor="middle">used as field defaults (95, 158)</text>
+    <text class="box-sub" x="145" y="244" text-anchor="middle">used as field defaults (101, 164)</text>
   </g>
 
   <g class="box" id="i3">
@@ -227,15 +309,15 @@
     <text class="box-label" x="1010" y="174" text-anchor="middle">read by</text>
     <text class="box-sub" x="1010" y="194" text-anchor="middle">planner_visualization.py:10</text>
     <text class="box-sub" x="1010" y="210" text-anchor="middle">mock_data.py:13, planner.py:33</text>
-    <text class="box-sub" x="1010" y="226" text-anchor="middle">evolution_engine.py:38</text>
+    <text class="box-sub" x="1010" y="226" text-anchor="middle">evolution_engine.py:39</text>
   </g>
 
   <g class="box" id="o3">
     <title>IndividualRun fields reach the task record on disk</title>
     <rect x="860" y="270" width="300" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="1010" y="294" text-anchor="middle">field values written</text>
-    <text class="box-sub" x="1010" y="314" text-anchor="middle">reward, cost, answers,</text>
-    <text class="box-sub" x="1010" y="330" text-anchor="middle">current_uuid, evolution_kind</text>
+    <text class="box-sub" x="1010" y="314" text-anchor="middle">reward, reward_is_fallback, cost,</text>
+    <text class="box-sub" x="1010" y="330" text-anchor="middle">answers, current_uuid, evolution_kind</text>
     <text class="box-sub" x="1010" y="346" text-anchor="middle">writer lives outside this file</text>
   </g>
 
@@ -274,68 +356,68 @@
   </defs>
 
   <g class="box" id="e1">
-    <title>PlanStep.__post_init__, lines 97-109</title>
+    <title>PlanStep.__post_init__, lines 103-115</title>
     <rect x="30" y="30" width="260" height="70" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="160" y="58" text-anchor="middle">PlanStep.__post_init__</text>
     <text class="box-sub" x="160" y="78" text-anchor="middle">three checks, in order</text>
-    <text class="box-sub" x="160" y="92" text-anchor="middle">lines 97-109</text>
+    <text class="box-sub" x="160" y="92" text-anchor="middle">lines 103-115</text>
   </g>
 
   <g class="box" id="e2">
-    <title>Line 105</title>
-    <rect x="360" y="30" width="420" height="56" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <title>Line 111</title>
+    <rect x="360" y="30" width="420" height="56" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-sub" x="376" y="54">if not self.name -&gt; raise</text>
-    <text class="box-sub" x="376" y="72">"Plan step name cannot be empty"  (105)</text>
+    <text class="box-sub" x="376" y="72">"Plan step name cannot be empty"  (111)</text>
   </g>
 
   <g class="box" id="e3">
-    <title>Line 107</title>
-    <rect x="360" y="110" width="420" height="56" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <title>Line 113</title>
+    <rect x="360" y="110" width="420" height="56" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-sub" x="376" y="134">if not self.task -&gt; raise</text>
-    <text class="box-sub" x="376" y="152">"Plan step task cannot be empty"  (107)</text>
+    <text class="box-sub" x="376" y="152">"Plan step task cannot be empty"  (113)</text>
   </g>
 
   <g class="box" id="e4">
-    <title>Line 109</title>
-    <rect x="360" y="190" width="420" height="56" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <title>Line 115</title>
+    <rect x="360" y="190" width="420" height="56" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-sub" x="376" y="214">if self.complexity not in [c.value for c in TaskComplexity] -&gt; raise</text>
-    <text class="box-sub" x="376" y="232">f"Invalid complexity: {self.complexity}"  (109)</text>
+    <text class="box-sub" x="376" y="232">f"Invalid complexity: {self.complexity}"  (115)</text>
   </g>
 
   <g class="box" id="e5">
-    <title>Plan.__post_init__, lines 117-140</title>
+    <title>Plan.__post_init__, lines 123-146</title>
     <rect x="30" y="330" width="260" height="70" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="160" y="358" text-anchor="middle">Plan.__post_init__</text>
     <text class="box-sub" x="160" y="378" text-anchor="middle">four checks, in order</text>
-    <text class="box-sub" x="160" y="392" text-anchor="middle">lines 117-140</text>
+    <text class="box-sub" x="160" y="392" text-anchor="middle">lines 123-146</text>
   </g>
 
   <g class="box" id="e6">
-    <title>Lines 126 and 128</title>
-    <rect x="360" y="270" width="420" height="56" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
-    <text class="box-sub" x="376" y="294">if not self.goal -&gt; raise "Plan goal cannot be empty"  (126)</text>
-    <text class="box-sub" x="376" y="312">if not self.steps -&gt; raise "Plan must contain at least one step"  (128)</text>
+    <title>Lines 132 and 134</title>
+    <rect x="360" y="270" width="420" height="56" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-sub" x="376" y="294">if not self.goal -&gt; raise "Plan goal cannot be empty"  (132)</text>
+    <text class="box-sub" x="376" y="312">if not self.steps -&gt; raise "Plan must contain at least one step"  (134)</text>
   </g>
 
   <g class="box" id="e7">
-    <title>Line 133</title>
-    <rect x="360" y="350" width="420" height="56" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <title>Line 139</title>
+    <rect x="360" y="350" width="420" height="56" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-sub" x="376" y="374">if len(step_names) != len(set(step_names)) -&gt; raise</text>
-    <text class="box-sub" x="376" y="392">"Plan step names must be unique"  (133)</text>
+    <text class="box-sub" x="376" y="392">"Plan step names must be unique"  (139)</text>
   </g>
 
   <g class="box" id="e8">
-    <title>Lines 136-139, the only loop in the file</title>
-    <rect x="360" y="430" width="420" height="56" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <title>Lines 142-145, the only loop in the file</title>
+    <rect x="360" y="430" width="420" height="56" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-sub" x="376" y="454">for step in self.steps: for dep in step.depends_on:</text>
-    <text class="box-sub" x="376" y="472">if dep not in step_names -&gt; raise (136-139)</text>
+    <text class="box-sub" x="376" y="472">if dep not in step_names -&gt; raise (142-145)</text>
   </g>
 
   <g class="box" id="e9">
     <title>Task, IndividualRun and SelectionLog have no __post_init__</title>
     <rect x="840" y="270" width="310" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="995" y="300" text-anchor="middle">no validation</text>
-    <text class="box-sub" x="995" y="320" text-anchor="middle">Task (142-163), IndividualRun (42-81)</text>
+    <text class="box-sub" x="995" y="320" text-anchor="middle">Task (148-169), IndividualRun (42-87)</text>
     <text class="box-sub" x="995" y="336" text-anchor="middle">and SelectionLog (24-40) accept</text>
     <text class="box-sub" x="995" y="352" text-anchor="middle">any value at construction time</text>
   </g>
@@ -350,12 +432,12 @@
   <text class="edge-label" x="580" y="344">then</text>
   <path class="edge" data-from="e7" data-to="e8" d="M570,406 V430" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="580" y="424">then</text>
-  <text class="box-sub" x="30" y="540">task/complexity defaults: PlanStep.status = TaskStatus.PENDING (95), PlanStep.complexity = "medium" (94), Task.status = TaskStatus.PENDING (158)</text>
-  <text class="box-sub" x="30" y="562">IndividualRun.evolution_kind accepts "seed" | "mutation" | "crossover" as a plain string, with no check (72)</text>
+  <text class="box-sub" x="30" y="540">task/complexity defaults: PlanStep.status = TaskStatus.PENDING (101), PlanStep.complexity = "medium" (100), Task.status = TaskStatus.PENDING (164)</text>
+  <text class="box-sub" x="30" y="562">IndividualRun.evolution_kind accepts "seed" | "mutation" | "crossover" as a plain string, with no check (78)</text>
   <text class="box-sub" x="30" y="584">TaskComplexity has three members (LOW, MEDIUM, HIGH) but only "medium" is named as a default anywhere in this file</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - red = a raise that stops construction, amber = the loop over step dependencies. All messages are quoted verbatim with their line number.</p>
+<p class="figcap">Diagram 3 - square boxes = a raise that stops construction; the last one is the loop over step dependencies. All messages are quoted verbatim with their line number.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -366,23 +448,24 @@
 <tr><td>import</td><td class="sym">dataclass, field</td><td class="sym">schema.py:5</td><td>Marks the five record types.</td></tr>
 <tr><td>import</td><td class="sym">Enum</td><td class="sym">schema.py:6</td><td>Base class of both enums.</td></tr>
 <tr><td>import</td><td class="sym">datetime</td><td class="sym">schema.py:7</td><td>Type of <code>SelectionLog.timestamp</code>.</td></tr>
-<tr><td>field</td><td class="sym">name, goal_context, task, cost, score</td><td class="sym">PlanStep, lines 86-90</td><td>Required, no default.</td></tr>
-<tr><td>field</td><td class="sym">depends_on, required_inputs, expected_outputs</td><td class="sym">PlanStep, lines 91-93</td><td>Default to an empty list.</td></tr>
-<tr><td>field</td><td class="sym">complexity, status</td><td class="sym">PlanStep, lines 94-95</td><td>Defaults <code>"medium"</code> and <code>TaskStatus.PENDING</code>.</td></tr>
-<tr><td>field</td><td class="sym">goal, steps</td><td class="sym">Plan, lines 114-115</td><td>The goal text and its step list.</td></tr>
-<tr><td>field</td><td class="sym">name, description, run_id, evolve_runs</td><td class="sym">Task, lines 150-153</td><td>Identity and the runs produced for it.</td></tr>
-<tr><td>field</td><td class="sym">final_answers, cost, final_uuid, workflow_uuid</td><td class="sym">Task, lines 154-157</td><td>Last run result and its identifiers.</td></tr>
-<tr><td>field</td><td class="sym">status, depends_on, required_inputs, expected_outputs, complexity, produced_outputs</td><td class="sym">Task, lines 158-163</td><td>Lifecycle and file checks.</td></tr>
+<tr><td>field</td><td class="sym">name, goal_context, task, cost, score</td><td class="sym">PlanStep, lines 92-96</td><td>Required, no default.</td></tr>
+<tr><td>field</td><td class="sym">depends_on, required_inputs, expected_outputs</td><td class="sym">PlanStep, lines 97-99</td><td>Default to an empty list.</td></tr>
+<tr><td>field</td><td class="sym">complexity, status</td><td class="sym">PlanStep, lines 100-101</td><td>Defaults <code>"medium"</code> and <code>TaskStatus.PENDING</code>.</td></tr>
+<tr><td>field</td><td class="sym">goal, steps</td><td class="sym">Plan, lines 120-121</td><td>The goal text and its step list.</td></tr>
+<tr><td>field</td><td class="sym">name, description, run_id, evolve_runs</td><td class="sym">Task, lines 156-159</td><td>Identity and the runs produced for it.</td></tr>
+<tr><td>field</td><td class="sym">final_answers, cost, final_uuid, workflow_uuid</td><td class="sym">Task, lines 160-163</td><td>Last run result and its identifiers.</td></tr>
+<tr><td>field</td><td class="sym">status, depends_on, required_inputs, expected_outputs, complexity, produced_outputs</td><td class="sym">Task, lines 164-169</td><td>Lifecycle and file checks.</td></tr>
 <tr><td>field</td><td class="sym">goal, prompt, cost, reward, reward_uncapped</td><td class="sym">IndividualRun, lines 49-53</td><td>Task text and the verifier signal.</td></tr>
-<tr><td>field</td><td class="sym">max_depth, iteration_count, judge, current_uuid, template_uuid</td><td class="sym">IndividualRun, lines 54-58</td><td>Run configuration and identity.</td></tr>
-<tr><td>field</td><td class="sym">workflow_template, scenario_rubric, eval_type, answers, state_result, plot</td><td class="sym">IndividualRun, lines 59-64</td><td>Output payload of one run.</td></tr>
-<tr><td>field</td><td class="sym">original_task, code, selection_log</td><td class="sym">IndividualRun, lines 65-67</td><td>Similarity key, genotype, verdict link.</td></tr>
-<tr><td>field</td><td class="sym">parent_uuids, evolution_kind</td><td class="sym">IndividualRun, lines 71-72</td><td>Lineage edges and the operator used.</td></tr>
+<tr><td>field</td><td class="sym">reward_is_fallback: bool = False</td><td class="sym">IndividualRun, line 59</td><td>True: reward is a fallback, kept out of capsule argmax.</td></tr>
+<tr><td>field</td><td class="sym">max_depth, iteration_count, judge, current_uuid, template_uuid</td><td class="sym">IndividualRun, lines 60-64</td><td>Run configuration and identity.</td></tr>
+<tr><td>field</td><td class="sym">workflow_template, scenario_rubric, eval_type, answers, state_result, plot</td><td class="sym">IndividualRun, lines 65-70</td><td>Output payload of one run.</td></tr>
+<tr><td>field</td><td class="sym">original_task, code, selection_log</td><td class="sym">IndividualRun, lines 71-73</td><td>Similarity key, genotype, verdict link.</td></tr>
+<tr><td>field</td><td class="sym">parent_uuids, evolution_kind</td><td class="sym">IndividualRun, lines 77-78</td><td>Lineage edges and the operator used.</td></tr>
 <tr><td>field</td><td class="sym">from_iteration, to_iteration, improvement_type, delta_reward, is_validated</td><td class="sym">SelectionLog, lines 27-31</td><td>The selection comparison.</td></tr>
 <tr><td>field</td><td class="sym">confidence, admit_rejected, timestamp</td><td class="sym">SelectionLog, lines 32-34</td><td>Confidence, admission outcome, wall clock.</td></tr>
 <tr><td>enum member</td><td class="sym">PENDING, RUNNING, COMPLETED, FAILED, SKIPPED</td><td class="sym">TaskStatus, lines 11-15</td><td>Values used as <code>status</code>.</td></tr>
 <tr><td>enum member</td><td class="sym">LOW, MEDIUM, HIGH</td><td class="sym">TaskComplexity, lines 19-21</td><td>Checked by <code>PlanStep.__post_init__</code>.</td></tr>
-<tr><td>raised error</td><td class="sym">ValueError, seven messages</td><td class="sym">schema.py:105, 107, 109, 126, 128, 133, 139</td><td>Stop construction with a named reason.</td></tr>
+<tr><td>raised error</td><td class="sym">ValueError, seven messages</td><td class="sym">schema.py:111, 113, 115, 132, 134, 139, 145</td><td>Stop construction with a named reason.</td></tr>
 <tr><td>file read</td><td class="sym">none</td><td class="sym">unknown</td><td>No path is opened for reading.</td></tr>
 <tr><td>file write</td><td class="sym">none</td><td class="sym">unknown</td><td>No path is opened for writing.</td></tr>
 </tbody>
@@ -422,60 +505,61 @@ class IndividualRun:                                          line 43
     cost: float = 0.0                                         line 51
     reward: float = 0.0                                       line 52
     reward_uncapped: float = 0.0                              line 53
-    max_depth: int = 3                                        line 54
-    iteration_count: int = 0                                  line 55
-    judge: bool = False                                       line 56
-    current_uuid: str | None = None                           line 57
-    template_uuid: str | None = None                          line 58
-    workflow_template: str | None = None                      line 59
-    scenario_rubric: str | None = None                        line 60
-    eval_type: str | None = None                              line 61
-    answers: list[str] | None = None                          line 62
-    state_result: dict | None = None                          line 63
-    plot: str | None = ""                                     line 64
-    original_task: str | None = None                          line 65
-    code: str | None = None                                   line 66
-    selection_log: "SelectionLog | None" = None               line 67
-    parent_uuids: list[str] = field(default_factory=list)     line 71
-    evolution_kind: str = "seed"                              line 72
-    __str__(self) -&gt; str                                       line 74
+    reward_is_fallback: bool = False                          line 59
+    max_depth: int = 3                                        line 60
+    iteration_count: int = 0                                  line 61
+    judge: bool = False                                       line 62
+    current_uuid: str | None = None                           line 63
+    template_uuid: str | None = None                          line 64
+    workflow_template: str | None = None                      line 65
+    scenario_rubric: str | None = None                        line 66
+    eval_type: str | None = None                              line 67
+    answers: list[str] | None = None                          line 68
+    state_result: dict | None = None                          line 69
+    plot: str | None = ""                                     line 70
+    original_task: str | None = None                          line 71
+    code: str | None = None                                   line 72
+    selection_log: "SelectionLog | None" = None               line 73
+    parent_uuids: list[str] = field(default_factory=list)     line 77
+    evolution_kind: str = "seed"                              line 78
+    __str__(self) -&gt; str                                       line 80
 
 @dataclass
-class PlanStep:                                               line 84
-    name: str                                                 line 86
-    goal_context: str                                         line 87
-    task: str                                                 line 88
-    cost: int                                                 line 89
-    score: float                                              line 90
-    depends_on: list[str] = field(default_factory=list)       line 91
-    required_inputs: list[str] = field(default_factory=list)   line 92
-    expected_outputs: list[str] = field(default_factory=list)  line 93
-    complexity: str = "medium"                                line 94
-    status: TaskStatus = TaskStatus.PENDING                   line 95
-    __post_init__(self) -&gt; None                                line 97
+class PlanStep:                                               line 90
+    name: str                                                 line 92
+    goal_context: str                                         line 93
+    task: str                                                 line 94
+    cost: int                                                 line 95
+    score: float                                              line 96
+    depends_on: list[str] = field(default_factory=list)       line 97
+    required_inputs: list[str] = field(default_factory=list)   line 98
+    expected_outputs: list[str] = field(default_factory=list)  line 99
+    complexity: str = "medium"                                line 100
+    status: TaskStatus = TaskStatus.PENDING                   line 101
+    __post_init__(self) -&gt; None                                line 103
 
 @dataclass
-class Plan:                                                   line 112
-    goal: str                                                 line 114
-    steps: list[PlanStep] = field(default_factory=list)       line 115
-    __post_init__(self) -&gt; None                                line 117
+class Plan:                                                   line 118
+    goal: str                                                 line 120
+    steps: list[PlanStep] = field(default_factory=list)       line 121
+    __post_init__(self) -&gt; None                                line 123
 
 @dataclass
-class Task:                                                   line 143
-    name: str                                                 line 150
-    description: str                                          line 151
-    run_id: int = 0                                           line 152
-    evolve_runs: list[IndividualRun] = field(default_factory=list)   line 153
-    final_answers: list[str] = field(default_factory=list)    line 154
-    cost: float = 0                                           line 155
-    final_uuid: str | None = None                             line 156
-    workflow_uuid: str | None = None                          line 157
-    status: TaskStatus = TaskStatus.PENDING                   line 158
-    depends_on: list[str] = field(default_factory=list)       line 159
-    required_inputs: list[str] = field(default_factory=list)   line 160
-    expected_outputs: list[str] = field(default_factory=list)  line 161
-    complexity: str = "medium"                                line 162
-    produced_outputs: list[str] = field(default_factory=list)  line 163</pre>
+class Task:                                                   line 149
+    name: str                                                 line 156
+    description: str                                          line 157
+    run_id: int = 0                                           line 158
+    evolve_runs: list[IndividualRun] = field(default_factory=list)   line 159
+    final_answers: list[str] = field(default_factory=list)    line 160
+    cost: float = 0                                           line 161
+    final_uuid: str | None = None                             line 162
+    workflow_uuid: str | None = None                          line 163
+    status: TaskStatus = TaskStatus.PENDING                   line 164
+    depends_on: list[str] = field(default_factory=list)       line 165
+    required_inputs: list[str] = field(default_factory=list)   line 166
+    expected_outputs: list[str] = field(default_factory=list)  line 167
+    complexity: str = "medium"                                line 168
+    produced_outputs: list[str] = field(default_factory=list)  line 169</pre>
 <table>
 <thead><tr><th>Symbol</th><th>Role (8 words max)</th></tr></thead>
 <tbody>
@@ -500,9 +584,9 @@ class Task:                                                   line 143
 <table>
 <thead><tr><th>Who</th><th>Line</th><th>Symbols imported</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/core/__init__.py">sources/core/__init__.py</a></td><td class="sym">10-16, 43</td><td>Re-exports the package-level names.</td></tr>
+<tr><td class="sym"><a href="../../sources/core/__init__.py">sources/core/__init__.py</a></td><td class="sym">10-18, 41-47</td><td>Re-exports the package-level names.</td></tr>
 <tr><td class="sym"><a href="../../sources/core/planner.py">sources/core/planner.py</a></td><td class="sym">33</td><td><code>IndividualRun, Plan, PlanStep, Task, TaskStatus</code></td></tr>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td class="sym">38, 567</td><td><code>IndividualRun, SelectionLog</code>; builds a SelectionLog</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td class="sym">39, 515, 642, 680, 794</td><td><code>IndividualRun, SelectionLog</code>; builds runs, sets <code>reward_is_fallback</code>, builds a SelectionLog</td></tr>
 <tr><td class="sym"><a href="../../sources/utils/planner_visualization.py">sources/utils/planner_visualization.py</a></td><td class="sym">10, 293</td><td><code>Task, TaskStatus, Plan</code>; reads task states each frame</td></tr>
 <tr><td class="sym"><a href="../../sources/utils/mock_data.py">sources/utils/mock_data.py</a></td><td class="sym">13-20</td><td>Six types, to generate demo objects</td></tr>
 <tr><td class="sym"><a href="../../tests/planner_test.py">tests/planner_test.py</a></td><td class="sym">14, 26, 35</td><td><code>PlanStep, Task, TaskStatus</code>; builds fixtures</td></tr>
@@ -515,9 +599,9 @@ class Task:                                                   line 143
 </div>
 
 <footer>
-<p>Sources: <a href="../../sources/core/schema.py">sources/core/schema.py</a> (163 lines, read in full), <a href="../../config.py">config.py</a> (not imported here, checked), importers listed above, docs/visual_clone/_reference.html, _clone.css.</p>
+<p>Sources: <a href="../../sources/core/schema.py">sources/core/schema.py</a> (169 lines, read in full; <code>git diff 336fe19</code>: +6 lines, all in <code>4020790</code>), <a href="../../config.py">config.py</a> (not imported here, checked), importers listed above, docs/visual_clone/_reference.html, _clone.css.</p>
 <p class="skips">Skipped: <code>sources/core/__pycache__</code> - build artifacts. Bodies of <code>planner.py</code>, <code>evolution_engine.py</code>, <code>planner_visualization.py</code> - read only at the import lines. <code>sources/utils/mock_data.py</code> body - demo data only. No <code>__init__</code> method exists in this file, so nothing was skipped there.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28. <code>schema.py</code> has no uncommitted change; the 6 new lines (54-59) moved every later line by 6.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

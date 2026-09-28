@@ -25,6 +25,10 @@ NOT_PERSISTED = {
     # Derived at runtime by precheck rather than authored by the user.
     "openrouter_provider_by_model",
     "openrouter_quantizations_by_model",
+    # Runtime-only benchmark context for verifier_kind="gold", set per task
+    # by csv_mode (a CSV row and a loader object — never authored).
+    "gold_feedback_task_row",
+    "gold_feedback_sab_loader",
 }
 
 # Known gaps, tracked in issue #182. Remove entries here as they are fixed;

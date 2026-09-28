@@ -2,6 +2,7 @@
 Neuroevolution-inspired, LLM driven evolution of Multi-Agents workflows.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -38,7 +39,7 @@ from .orchestrator import WorkflowOrchestrator
 from .schema import IndividualRun, SelectionLog
 from .selection import SelectionPressure
 from .variation_engine import VariationEngine
-from .workflow_info import WorkflowInfo
+from .workflow_info import FALLBACK_REWARD_KINDS, WorkflowInfo
 from .workflow_selection import WorkflowSelector
 
 
@@ -73,7 +74,9 @@ def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRu
 
     Three signals, in order of trust:
 
-    1. ``state_result.evaluation.verifier.reward_fallback == "mean_claim"``
+    1. ``state_result.evaluation.verifier.reward_fallback`` in
+       ``FALLBACK_REWARD_KINDS`` (``"mean_claim"``, or ``"oracle_censored"``
+       for a censored full-oracle gold-feedback generation)
        — the ground truth the verifier persisted next to the score. When
        it contradicts ``run.reward_is_fallback`` the disk wins and a
        warning is logged: the engine assigns the flag once, right after
@@ -88,17 +91,23 @@ def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRu
        incomparable, so it is treated as a fallback with a warning.
     """
     verifier = _verifier_block(run)
-    if verifier.get("reward_fallback") == "mean_claim":
+    if verifier.get("reward_fallback") in FALLBACK_REWARD_KINDS:
         if not run.reward_is_fallback:
             logging.getLogger(__name__).warning(
                 "[SELECT] run %s reward_is_fallback was False but its "
-                "state_result records reward_fallback=mean_claim; using "
+                "state_result records reward_fallback=%s; using "
                 "the persisted record (fallback excluded from the argmax)",
                 run.current_uuid,
+                verifier.get("reward_fallback"),
             )
         return True
     if run.reward_is_fallback:
         return True
+    if verifier.get("reward_source") == "benchmark_grader":
+        # Full-oracle gold feedback: the reward IS the benchmark grade, a
+        # real measurement on the oracle scale; the hybrid pairwise
+        # counters it keeps (n_pairs=0 at gen 0) say nothing about it.
+        return False
     n_pairs = _scalar(verifier.get("n_pairs"))
     n_wins = _scalar(verifier.get("n_wins"))
     has_real_pairwise = any(
@@ -909,10 +918,23 @@ class EvolutionEngine:
         logger = logging.getLogger(__name__)
         print_phase("WORKFLOW EVALUATION PHASE")
         eval_start = time.time()
-        eval_result = self.judge.evaluate(uuid=uuid,
-                                          agent_answers=agent_answers,
-                                          evaluator_type="verifier",
-                                          scenario_rubric=scenario_rubric)
+        if getattr(self.judge, "verifier_kind", None) == "gold":
+            # Gold-feedback (oracle) control only: its benchmark grading
+            # (VER re-run + SR eval, minutes) runs in a worker thread so
+            # concurrent CSV workers keep their event loop. Every other
+            # verifier keeps the synchronous call below unchanged.
+            eval_result = await asyncio.to_thread(
+                self.judge.evaluate,
+                uuid=uuid,
+                agent_answers=agent_answers,
+                evaluator_type="verifier",
+                scenario_rubric=scenario_rubric,
+            )
+        else:
+            eval_result = self.judge.evaluate(uuid=uuid,
+                                              agent_answers=agent_answers,
+                                              evaluator_type="verifier",
+                                              scenario_rubric=scenario_rubric)
         eval_type = eval_result['evaluation_type']
         eval_time = time.time() - eval_start
         logger.info(f"[WORKFLOW EVALUATION] {uuid}:\n{json.dumps(eval_result, indent=2)}")

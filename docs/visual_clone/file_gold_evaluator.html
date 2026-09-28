@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gold_feedback/evaluator.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; evaluator.py">
+<div class="wrap">
+
+<h1 class="hud">evaluator.py</h1>
+<p class="intro">This 470-line file holds <code>GoldFeedbackEvaluator</code>, the verifier the facade builds when <code>config.verifier_kind = "gold"</code>. It runs an inner <code>HybridVerifierEvaluator</code>, grades a private copy of the workspace with the benchmark grader, and replaces the steering text with the grader feedback; with <code>gold_feedback_reward = True</code> it also replaces the reward. Package view: <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>.</p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip warn">uncommitted at 4020790</span></p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; the file&rsquo;s job: one uuid in, gold keys and five artifacts out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 570" role="img" aria-label="evaluator.py: the class, the helper function, what it calls and what it writes">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="c1" href="file_eval_evaluator.html">
+    <title>WorkflowEvaluator.evaluate calls verifier_evaluator.evaluate(uuid) (evaluator.py L174)</title>
+    <rect x="20" y="40" width="180" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="61" text-anchor="middle">WorkflowEvaluator</text>
+    <text class="box-sub" x="110" y="79" text-anchor="middle">facade &#183; L174</text>
+    <text class="box-sub" x="110" y="97" text-anchor="middle">evaluate(uuid)</text>
+  </a>
+  <a class="box" id="c2" href="area_entry_config.html">
+    <title>Config fields read by __init__ and, at evaluate time, by grader.resolve_task_context</title>
+    <rect x="20" y="150" width="180" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="174" text-anchor="middle">config</text>
+    <text class="box-sub" x="110" y="192" text-anchor="middle">workflow_dir</text>
+    <text class="box-sub" x="110" y="210" text-anchor="middle">workspace_dir</text>
+    <text class="box-sub" x="110" y="228" text-anchor="middle">gold_feedback_reward</text>
+    <text class="box-sub" x="110" y="246" text-anchor="middle">gold_feedback_timeout_s</text>
+    <text class="box-sub" x="110" y="264" text-anchor="middle">gold_feedback_task_row</text>
+  </a>
+  <a class="box" id="c12" href="file_core_workflow_info.html">
+    <title>WorkflowInfo (in _has_generation) and is_oracle_generation (in _warn_mixed_workflow_dir)</title>
+    <rect x="20" y="320" width="180" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="346" text-anchor="middle">workflow_info.py</text>
+    <text class="box-sub" x="110" y="364" text-anchor="middle">WorkflowInfo</text>
+    <text class="box-sub" x="110" y="382" text-anchor="middle">is_oracle_generation</text>
+  </a>
+  <a class="box" id="c3" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>gold_hybrid_config(config) L61: copy.copy of the config with temp_dir = base + "_gold"</title>
+    <rect x="250" y="40" width="230" height="56" rx="28" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="365" y="63" text-anchor="middle">gold_hybrid_config</text>
+    <text class="box-sub" x="365" y="81" text-anchor="middle">L61 &#183; temp_dir + "_gold"</text>
+  </a>
+  <a class="box" id="c4" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>class GoldFeedbackEvaluator L86: duck-types the verifier interface evaluate(uuid) -&gt; dict</title>
+    <rect x="250" y="125" width="260" height="300" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="380" y="150" text-anchor="middle">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="504" y="138" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+    <text class="box-sub" x="380" y="168" text-anchor="middle">class &#183; L86 &#183; no base class</text>
+    <text class="box-sub" x="268" y="196">__init__ &#183; L97</text>
+    <text class="box-sub" x="268" y="220">reward_source (property) &#183; L144</text>
+    <text class="box-sub" x="268" y="244">evaluate(uuid) &#183; L152</text>
+    <text class="box-sub" x="268" y="268">_warn_mixed_workflow_dir &#183; L224</text>
+    <text class="box-sub" x="268" y="292">_has_generation &#183; L250</text>
+    <text class="box-sub" x="268" y="316">_grade &#183; L258</text>
+    <text class="box-sub" x="268" y="340">_verifier_block &#183; L266</text>
+    <text class="box-sub" x="268" y="364">_apply &#183; L284</text>
+    <text class="box-sub" x="268" y="388">_persist &#183; L403</text>
+  </a>
+  <a class="box" id="c5" href="mod_evaluators_hybrid_verifier.html">
+    <title>Inner HybridVerifierEvaluator, built in __init__ when hybrid is None; injectable for tests</title>
+    <rect x="580" y="20" width="200" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="680" y="41" text-anchor="middle">HybridVerifierEvaluator</text>
+    <text class="box-sub" x="680" y="59" text-anchor="middle">inner verifier</text>
+    <text class="box-sub" x="680" y="77" text-anchor="middle">reward + gradient</text>
+  </a>
+  <a class="box" id="c6" href="file_gold_grader.html">
+    <title>resolve_task_context, make_private_copy, grade_private_copy, discard_private_copy</title>
+    <rect x="580" y="110" width="200" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="680" y="136" text-anchor="middle">grader.py</text>
+    <text class="box-sub" x="680" y="154" text-anchor="middle">task context &#183; copy</text>
+    <text class="box-sub" x="680" y="172" text-anchor="middle">grade_private_copy</text>
+    <text class="box-sub" x="774" y="122" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="c7" href="file_gold_format.html">
+    <title>fmt.classify, fmt.is_uninformative, fmt.build_gold_gradient, fmt.censored_note</title>
+    <rect x="580" y="210" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="680" y="240" text-anchor="middle">format.py</text>
+    <text class="box-sub" x="680" y="258" text-anchor="middle">classify &#183; build_gold_gradient</text>
+    <text class="box-sub" x="774" y="222" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="c8" href="file_gold_reward.html">
+    <title>oracle_reward(grade), only when gold_feedback_reward is True</title>
+    <rect x="580" y="300" width="200" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="680" y="325" text-anchor="middle">reward.py</text>
+    <text class="box-sub" x="680" y="343" text-anchor="middle">oracle_reward</text>
+    <text class="box-sub" x="774" y="312" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="c9" href="file_gold_leak.html">
+    <title>LEAK_WARNING and leak_banner for logs, evaluation.txt and sidecars</title>
+    <rect x="580" y="380" width="200" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="680" y="405" text-anchor="middle">leak.py</text>
+    <text class="box-sub" x="680" y="423" text-anchor="middle">LEAK_WARNING &#183; banner</text>
+  </a>
+  <a class="box" id="c10" href="file_eval_evaluator.html">
+    <title>Return value: the hybrid result dict updated with the gold keys</title>
+    <rect x="580" y="470" width="200" height="70" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="680" y="491" text-anchor="middle">result dict</text>
+    <text class="box-sub" x="680" y="509" text-anchor="middle">hybrid keys + gold keys</text>
+    <text class="box-sub" x="680" y="527" text-anchor="middle">to the facade</text>
+  </a>
+  <a class="box" id="c11" href="data_runs.html">
+    <title>Five artifacts written by _persist in sources/workflows/&lt;run&gt;/&lt;uuid&gt;/</title>
+    <rect x="820" y="455" width="260" height="90" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="950" y="477" text-anchor="middle">workflow folder</text>
+    <text class="box-sub" x="950" y="495" text-anchor="middle">state_result: verifier + gold_oracle</text>
+    <text class="box-sub" x="950" y="513" text-anchor="middle">textual_gradient(_hybrid).txt</text>
+    <text class="box-sub" x="950" y="531" text-anchor="middle">gold_feedback.json &#183; evaluation.txt</text>
+  </a>
+
+  <path class="edge" data-from="c1" data-to="c4" d="M200,75 C225,75 225,200 250,200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="205" y="128" text-anchor="start">evaluate(uuid)</text>
+  <path class="edge dashed-edge" data-from="c2" data-to="c4" d="M200,235 H250" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="225" y="227" text-anchor="middle">reads</text>
+  <path class="edge" data-from="c4" data-to="c3" d="M365,125 V96" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="372" y="115" text-anchor="start">calls</text>
+  <path class="edge" data-from="c12" data-to="c4" d="M200,360 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="352" text-anchor="middle">calls</text>
+  <path class="edge" data-from="c3" data-to="c5" d="M480,55 H580" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="530" y="47" text-anchor="middle">config copy</text>
+  <path class="edge" data-from="c4" data-to="c5" d="M510,150 C545,150 545,75 580,75" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="548" y="108" text-anchor="middle">evaluate(uuid)</text>
+  <path class="edge" data-from="c4" data-to="c6" d="M510,175 C545,175 545,150 580,150" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <path class="edge" data-from="c4" data-to="c7" d="M510,245 H580" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="545" y="238" text-anchor="middle">grade dict</text>
+  <path class="edge" data-from="c4" data-to="c8" d="M510,300 C545,300 545,330 580,330" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="548" y="312" text-anchor="middle">full oracle</text>
+  <path class="edge dotted-edge" data-from="c4" data-to="c9" d="M510,330 C545,330 545,410 580,410" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge" data-from="c4" data-to="c10" d="M380,425 V505 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="388" y="470" text-anchor="start">returns</text>
+  <path class="edge dashed-edge" data-from="c4" data-to="c11" d="M460,425 V558 H950 V545" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="700" y="553" text-anchor="middle">_persist writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>12 boxes</code>. Rounded = class, pill = function, grey dashed = outside the package, steel = data. <code>gold_hybrid_config</code> lives in this file (L61), not in <code>grader.py</code>; <code>__init__</code> calls it only when no <code>hybrid</code> is injected (L119&ndash;L124). <code>_save_results</code> is borrowed from <code>BaseEvaluator</code> as a class attribute (L95); the class does not subclass it.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; control logic: four checks pick one of five statuses</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 510" role="img" aria-label="evaluate: four checks decide one of five statuses, which choose the gradient and the reward">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="q1" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>resolve_task_context(config) returns (None, reason) when gold_feedback_task_row is unset or lacks gold_program_name / eval_script_name</title>
+    <rect x="40" y="30" width="260" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="57" text-anchor="middle">task context?</text>
+    <text class="box-sub" x="170" y="75" text-anchor="middle">resolve_task_context &#183; L170</text>
+  </a>
+  <a class="box" id="q2" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>No code or no state_result, or hybrid skipped_reason in _SHORT_CIRCUIT_REASONS (L50)</title>
+    <rect x="40" y="130" width="260" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="157" text-anchor="middle">generation to grade?</text>
+    <text class="box-sub" x="170" y="175" text-anchor="middle">_has_generation + skipped_reason</text>
+  </a>
+  <a class="box" id="q3" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>Copy made before hybrid.evaluate; an exception sets copy_error</title>
+    <rect x="40" y="230" width="260" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="257" text-anchor="middle">private copy made?</text>
+    <text class="box-sub" x="170" y="275" text-anchor="middle">make_private_copy &#183; L178</text>
+  </a>
+  <a class="box" id="q4" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>grade_private_copy returns status evaluated or excluded (fault or timeout)</title>
+    <rect x="40" y="330" width="260" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="170" y="357" text-anchor="middle">grade status?</text>
+    <text class="box-sub" x="170" y="375" text-anchor="middle">_grade &#183; cap gold_feedback_timeout_s</text>
+  </a>
+  <a class="box" id="t1" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>STATUS_NO_TASK L45</title>
+    <rect x="400" y="30" width="300" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="550" y="57" text-anchor="middle">no_task_context</text>
+    <text class="box-sub" x="550" y="75" text-anchor="middle">gradient: hybrid, unchanged</text>
+  </a>
+  <a class="box" id="t2" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>STATUS_SHORT_CIRCUIT L46</title>
+    <rect x="400" y="130" width="300" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="550" y="157" text-anchor="middle">skipped_short_circuit</text>
+    <text class="box-sub" x="550" y="175" text-anchor="middle">gradient: hybrid, unchanged</text>
+  </a>
+  <a class="box" id="t3" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>STATUS_COPY_FAILED L48</title>
+    <rect x="400" y="230" width="300" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="550" y="257" text-anchor="middle">censored_copy_failed</text>
+    <text class="box-sub" x="550" y="275" text-anchor="middle">gradient: censored_note + hybrid</text>
+  </a>
+  <a class="box" id="t4" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>STATUS_CENSORED L47</title>
+    <rect x="400" y="330" width="300" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="550" y="357" text-anchor="middle">censored_infra</text>
+    <text class="box-sub" x="550" y="375" text-anchor="middle">gradient: censored_note + hybrid</text>
+  </a>
+  <a class="box" id="t5" href="../../sources/evaluators/gold_feedback/evaluator.py">
+    <title>STATUS_GOLD L44</title>
+    <rect x="400" y="430" width="300" height="64" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="550" y="457" text-anchor="middle">gold</text>
+    <text class="box-sub" x="550" y="475" text-anchor="middle">gradient: build_gold_gradient</text>
+  </a>
+  <a class="box" id="t6" href="file_gold_reward.html">
+    <title>_apply L345-L386: reward chosen by mode and status</title>
+    <rect x="790" y="130" width="290" height="190" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="935" y="175" text-anchor="middle">reward per status</text>
+    <text class="box-sub" x="935" y="193" text-anchor="middle">gradient-only: hybrid, always</text>
+    <text class="box-sub" x="935" y="211" text-anchor="middle">full oracle + gold:</text>
+    <text class="box-sub" x="935" y="229" text-anchor="middle">oracle_reward(grade)</text>
+    <text class="box-sub" x="935" y="247" text-anchor="middle">full oracle + censored:</text>
+    <text class="box-sub" x="935" y="265" text-anchor="middle">0.0, oracle_censored</text>
+    <text class="box-sub" x="935" y="283" text-anchor="middle">other statuses: hybrid</text>
+    <text class="box-sub" x="1074" y="142" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+
+  <path class="edge" data-from="q1" data-to="t1" d="M300,62 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="350" y="56" text-anchor="middle">no</text>
+  <path class="edge" data-from="q1" data-to="q2" d="M170,94 V130" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="178" y="116" text-anchor="start">yes</text>
+  <path class="edge" data-from="q2" data-to="t2" d="M300,162 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="350" y="156" text-anchor="middle">no</text>
+  <path class="edge" data-from="q2" data-to="q3" d="M170,194 V230" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="178" y="216" text-anchor="start">yes</text>
+  <path class="edge" data-from="q3" data-to="t3" d="M300,262 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="350" y="256" text-anchor="middle">no</text>
+  <path class="edge" data-from="q3" data-to="q4" d="M170,294 V330" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="178" y="316" text-anchor="start">yes</text>
+  <path class="edge" data-from="q4" data-to="t4" d="M300,362 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="350" y="356" text-anchor="middle">excluded</text>
+  <path class="edge" data-from="q4" data-to="t5" d="M170,394 V462 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="178" y="440" text-anchor="start">evaluated</text>
+  <path class="edge dashed-edge" data-from="t5" data-to="t6" d="M700,462 C760,462 760,300 790,290" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="752" y="420" text-anchor="middle">_apply</text>
+  <text class="box-sub" x="40" y="505">hybrid.evaluate(uuid) runs in every branch (L183); only the text and the reward differ</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>10 boxes</code>. Checks in code order (L170&ndash;L209). The <code>finally</code> block (L210&ndash;L214) deletes the private copy unless the grade carries <code>copy_owned_by_worker</code> (timed-out worker). A censored generation in full-oracle mode keeps its hybrid values in <code>hybrid_overall_score</code>, <code>hybrid_overall_score_uncapped</code>, <code>hybrid_reward_fallback</code>.</p>
+<p class="note say">Why it matters: the copy is made before the hybrid runs, because <code>ExecutionSandbox.run_generated_code</code> writes <code>pred_results/</code> back into the directory it grades; the live workspace stays untouched.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>config</td><td class="sym">workflow_dir</td><td><code>__init__</code></td><td>generation folders, mixed-dir scan</td><td class="size">L126</td></tr>
+<tr><td>config</td><td class="sym">workspace_dir</td><td><code>__init__</code> (after argument, hybrid)</td><td>workspace to copy and grade</td><td class="size">L127&#8211;L132</td></tr>
+<tr><td>config</td><td class="sym">gold_feedback_reward</td><td><code>__init__</code>, default False</td><td>sets <code>full_oracle</code></td><td class="size">L134</td></tr>
+<tr><td>config</td><td class="sym">gold_feedback_timeout_s</td><td><code>__init__</code>, default 1800</td><td>grading cap; 0 = no cap</td><td class="size">L135</td></tr>
+<tr><td>config</td><td class="sym">gold_feedback_task_row, _sab_loader</td><td>via <code>resolve_task_context</code></td><td>benchmark task context</td><td class="size">L170</td></tr>
+<tr><td>config</td><td class="sym">temp_dir</td><td><code>gold_hybrid_config</code></td><td>base of the gold registry dir (not a Config field)</td><td class="size">L78&#8211;L83</td></tr>
+<tr><td>reads</td><td class="sym">&lt;uuid&gt;/state_result.json</td><td><code>_verifier_block</code></td><td>hybrid <code>evaluation.verifier</code> block</td><td class="size">L270&#8211;L276</td></tr>
+<tr><td>reads</td><td class="sym">&lt;uuid&gt;/evaluation.txt</td><td><code>_persist</code></td><td>hybrid report kept under the banner</td><td class="size">L442&#8211;L449</td></tr>
+<tr><td>writes</td><td class="sym">state_result.json</td><td><code>_save_results(block, uuid, "verifier")</code></td><td>updated verifier block</td><td class="size">L414</td></tr>
+<tr><td>writes</td><td class="sym">state_result.json</td><td><code>_save_results(..., "gold_oracle")</code></td><td>warning, summary, messages (20 000 chars max)</td><td class="size">L415&#8211;L423</td></tr>
+<tr><td>writes</td><td class="sym">textual_gradient.txt</td><td><code>_persist</code></td><td>the gradient the next mutation reads</td><td class="size">L431</td></tr>
+<tr><td>writes</td><td class="sym">textual_gradient_hybrid.txt</td><td><code>_persist</code></td><td>the replaced hybrid gradient</td><td class="size">L432&#8211;L434</td></tr>
+<tr><td>writes</td><td class="sym">gold_feedback.json</td><td><code>_persist</code></td><td>warning + summary + full grade; the leak marker</td><td class="size">L435&#8211;L441</td></tr>
+<tr><td>writes</td><td class="sym">evaluation.txt</td><td><code>_persist</code></td><td>leak banner + status line on top</td><td class="size">L466</td></tr>
+<tr><td>writes</td><td class="sym">mimosa_gold_*/workspace</td><td>via <code>make_private_copy</code></td><td>temporary copy, deleted after grading</td><td class="size">L178, L214</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>1 class (9 methods + 1 borrowed), 1 function, 10 constants &mdash; signatures</summary><div class="dbody">
+<pre>STATUS_GOLD = "gold"                                   L44
+STATUS_NO_TASK = "no_task_context"                     L45
+STATUS_SHORT_CIRCUIT = "skipped_short_circuit"         L46
+STATUS_CENSORED = "censored_infra"                     L47
+STATUS_COPY_FAILED = "censored_copy_failed"            L48
+_SHORT_CIRCUIT_REASONS = {"workflow_generation_or_execution_failed", "no_goal_recorded"}  L50
+_MSG_KEEP = 20000                                      L51
+_REPORT_MARKER = "---- hybrid verifier report (unchanged) ----\n"  L52
+CENSORED_ORACLE_REWARD = 0.0                           L57
+GOLD_REGISTRY_SUFFIX = "_gold"                         L58
+
+gold_hybrid_config(config: Any) -&gt; Any                                    L61
+class GoldFeedbackEvaluator:                                              L86
+    _save_results = BaseEvaluator._save_results                           L95
+    __init__(config, workspace_dir=None, hybrid=None, grade_fn=None) -&gt; None   L97
+    reward_source -&gt; str        # property: benchmark_grader | hybrid_verifier  L144
+    evaluate(uuid: str) -&gt; dict[str, Any]                                 L152
+    _warn_mixed_workflow_dir() -&gt; int                                     L224
+    _has_generation(uuid: str) -&gt; bool                                    L250
+    _grade(copy_dir: Path, context: TaskContext) -&gt; dict[str, Any]        L258
+    _verifier_block(uuid, hybrid_result) -&gt; dict[str, Any]                L266
+    _apply(uuid, hybrid_result, block, hybrid_gradient, status, reason,
+           grade, context) -&gt; dict[str, Any]                              L284
+    _persist(uuid, block, gradient, hybrid_gradient, summary, grade) -&gt; None   L403</pre>
+<p>Keys <code>_apply</code> adds to the verifier block (L335&ndash;L386): <code>verifier_kind</code>, <code>oracle</code>, <code>benchmark_leak</code>, <code>gold_feedback_warning</code>, <code>hybrid_textual_gradient</code>, <code>abstracted_textual_gradient</code>, <code>abstractec_textual_gradient</code>, <code>gold_feedback</code>, <code>reward_source</code>; full oracle also <code>overall_score</code>, <code>overall_score_uncapped</code>, <code>reward_fallback</code>, <code>hybrid_overall_score</code>, <code>hybrid_overall_score_uncapped</code>, <code>hybrid_reward_fallback</code>, and <code>reward_censored</code> when censored.</p>
+<p><code>gold_feedback</code> summary keys: <code>status</code>, <code>reason</code>, <code>kind</code>, <code>uninformative</code>, <code>reward_source</code>, <code>gradient_source</code>, <code>instance_id</code>; with a grade also <code>VER</code>, <code>SR</code>, <code>CBS</code>, <code>grade_status</code>, <code>infra_error</code>, <code>wall_s</code>; full oracle without a grade adds <code>reward_fallback_reason</code>.</p>
+<p>Imports: <code>WorkflowInfo</code>, <code>is_oracle_generation</code> (<code>sources/core/workflow_info.py</code>), <code>BaseEvaluator</code>, <code>EvaluatorError</code> (<code>sources/evaluators/base.py</code>), <code>format as fmt</code>, 5 names from <code>grader</code>, <code>LEAK_WARNING</code>, <code>leak_banner</code>, <code>oracle_reward</code> (L30&ndash;L42). <code>HybridVerifierEvaluator</code> is imported lazily inside <code>__init__</code> (L120).</p>
+</div></details>
+<p class="note">Amber: <code>evaluate</code> raises <code>EvaluatorError</code> only for an empty or non-string uuid, or when the inner hybrid raises it; grading faults never raise, they become <code>censored_*</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td><code>WorkflowEvaluator.__init__</code> builds it for <code>verifier_kind == "gold"</code>; <code>evaluate</code> calls it</td><td class="sym">L97&#8211;L105, L174</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td><code>_evaluate_workflow_phenotype</code> runs the facade call in <code>asyncio.to_thread</code> for gold only</td><td class="sym">L921&#8211;L932</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td><code>_run_reward_is_fallback</code>: <code>reward_source == "benchmark_grader"</code> is not a fallback; <code>oracle_censored</code> is</td><td class="sym">L94, L106</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/__init__.py">gold_feedback/__init__.py</a></td><td>re-exports <code>GoldFeedbackEvaluator</code></td><td class="sym">L20</td></tr>
+</tbody>
+</table>
+<p><a href="../../tests/gold_feedback_test.py">tests/gold_feedback_test.py</a> builds this class with a fake hybrid and a fake grader (<code>_setup</code>, L162). 21 tests exercise it (my count).</p>
+<details><summary>the 21 tests</summary><div class="dbody">
+<ul>
+<li><code>test_facade_selects_gold</code> (L280)</li>
+<li><code>test_gradient_only_keeps_hybrid_reward_and_swaps_gradient</code> (L378)</li>
+<li><code>test_full_oracle_reward_comes_from_grader</code> (L428)</li>
+<li><code>test_full_oracle_censored_reward_is_neutral</code> (L446)</li>
+<li><code>test_full_oracle_without_task_context_keeps_hybrid_reward</code> (L475)</li>
+<li><code>test_no_task_context_falls_back_to_hybrid_gradient</code> (L486)</li>
+<li><code>test_incomplete_task_row_is_no_context</code> (L503)</li>
+<li><code>test_env_failure_is_censored_and_uses_hybrid_gradient</code> (L533)</li>
+<li><code>test_uninformative_verdict_is_flagged</code> (L549)</li>
+<li><code>test_short_circuit_run_is_not_graded</code> (L561)</li>
+<li><code>test_grades_a_private_copy_and_never_touches_the_live_workspace</code> (L576)</li>
+<li><code>test_copy_removed_even_when_hybrid_raises</code> (L591)</li>
+<li><code>test_grading_timeout_is_censored_and_copy_cleaned_by_worker</code> (L828)</li>
+<li><code>test_full_oracle_gen0_grade_is_not_a_fallback_in_capsule_argmax</code> (L908)</li>
+<li><code>test_full_oracle_censored_gen_is_excluded_from_capsule_argmax</code> (L932)</li>
+<li><code>test_gradient_only_censored_gen_is_not_flagged</code> (L971)</li>
+<li><code>test_evaluation_banner_not_stacked_on_reevaluation</code> (L990)</li>
+<li><code>test_gold_init_warns_on_mixed_workflow_dir</code> (L1028)</li>
+<li><code>test_zero_timeout_grades_inline_without_thread</code> (L1114)</li>
+<li><code>test_inner_hybrid_gets_isolated_registry</code> (L1129)</li>
+<li><code>test_real_hybrid_registry_root_is_separate</code> (L1156)</li>
+</ul>
+</div></details>
+<p>See also: <a href="file_gold_grader.html">file_gold_grader.html</a>, <a href="file_gold_format.html">file_gold_format.html</a>, <a href="file_gold_reward.html">file_gold_reward.html</a>, <a href="file_gold_leak.html">file_gold_leak.html</a>, <a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a> (the inner verifier), <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (470 lines, whole file), <code class="path">grader.py</code>, <code class="path">format.py</code>, <code class="path">reward.py</code>, <code class="path">leak.py</code>, <code class="path">sources/evaluators/evaluator.py</code> (L88&ndash;L110, L174), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code> (L227&ndash;L229, L433), <code class="path">sources/core/evolution_engine.py</code> (L72&ndash;L110, L903&ndash;L938), <code class="path">sources/core/workflow_info.py</code> (L13&ndash;L38), <code class="path">tests/gold_feedback_test.py</code>.</p>
+<p class="skips">Skipped: the internals of <code>grader.py</code>, <code>format.py</code>, <code>reward.py</code>, <code>leak.py</code> &mdash; each has its own digest page; the inner hybrid verifier &mdash; see <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>; no pytest run and no application run, by the build rules.</p>
+<p>Built at <code>4020790 + uncommitted working tree, 2026-09-28</code>. The file is untracked (uncommitted) at this build.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

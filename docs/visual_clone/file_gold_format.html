@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>format.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; format.py">
+<div class="wrap">
+
+<h1 class="hud">format.py</h1>
+<p class="intro">This 268-line file turns one benchmark grade into the gold textual gradient: the execution outcome first, then the grader verdict against the gold reference, at most 2000 chars. It also writes the short note used when grading is censored. It is pure text work; <a href="file_gold_evaluator.html">GoldFeedbackEvaluator</a> stores the result.</p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new, uncommitted</span></p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; functions and calls: grade dict in, one gradient string out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 490" role="img" aria-label="format.py: GoldFeedbackEvaluator passes the grade to build_gold_gradient, which calls classify, decisive_error_line, is_uninformative, _figure_block and clip, and returns a gradient of at most 2000 chars; censored_note builds the censored note">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="m1">
+    <title>Normalised grade from grade_directory with status evaluated</title>
+    <rect x="20" y="50" width="200" height="96" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="74" text-anchor="middle">grade dict</text>
+    <text class="box-sub" x="120" y="92" text-anchor="middle">VER &#183; VER_message</text>
+    <text class="box-sub" x="120" y="110" text-anchor="middle">SR &#183; SR_message &#183; CBS</text>
+    <text class="box-sub" x="120" y="128" text-anchor="middle">from grade_directory</text>
+  </g>
+  <a class="box" id="m2" href="file_gold_evaluator.html">
+    <title>GoldFeedbackEvaluator._apply calls classify L299, is_uninformative L305, build_gold_gradient L306, censored_note L308</title>
+    <rect x="20" y="190" width="200" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="214" text-anchor="middle">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="120" y="232" text-anchor="middle">evaluator.py _apply L284</text>
+    <text class="box-sub" x="120" y="250" text-anchor="middle">build L306</text>
+    <text class="box-sub" x="120" y="268" text-anchor="middle">censored_note L308</text>
+    <text class="box-sub" x="120" y="286" text-anchor="middle">also classify L299,</text>
+    <text class="box-sub" x="120" y="304" text-anchor="middle">is_uninformative L305</text>
+    <text class="box-sub" x="212" y="203" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <a class="box" id="m3" href="../../sources/evaluators/gold_feedback/format.py">
+    <title>Main entry: decisive content first, hard cap max_chars</title>
+    <rect x="260" y="50" width="230" height="130" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="74" text-anchor="middle">build_gold_gradient</text>
+    <text class="box-sub" x="375" y="92" text-anchor="middle">L180 &#183; max_chars 2000</text>
+    <text class="box-sub" x="375" y="110" text-anchor="middle">exec_failure branch L200</text>
+    <text class="box-sub" x="375" y="128" text-anchor="middle">other kinds L223</text>
+    <text class="box-sub" x="375" y="146" text-anchor="middle">hard cap L248</text>
+    <text class="box-sub" x="375" y="164" text-anchor="middle">also parse_critiques L232</text>
+    <text class="box-sub" x="482" y="63" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <a class="box" id="m4" href="../../sources/evaluators/gold_feedback/format.py">
+    <title>Returns one of 5 feedback kinds</title>
+    <rect x="530" y="50" width="230" height="76" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="645" y="74" text-anchor="middle">classify</text>
+    <text class="box-sub" x="645" y="92" text-anchor="middle">L109 &#183; 5 kinds L24-L28</text>
+  </a>
+  <a class="box" id="m5" href="../../sources/evaluators/gold_feedback/format.py">
+    <title>ast.literal_eval of the SR message; a non-empty list of str is the figure judge</title>
+    <rect x="800" y="50" width="280" height="76" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="940" y="74" text-anchor="middle">parse_critiques</text>
+    <text class="box-sub" x="940" y="92" text-anchor="middle">L43 &#183; literal_eval L57</text>
+  </a>
+  <a class="box" id="m6" href="../../sources/evaluators/gold_feedback/format.py">
+    <title>Last line that looks like a raised exception, else a timeout or missing-output line</title>
+    <rect x="530" y="140" width="230" height="66" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="645" y="164" text-anchor="middle">decisive_error_line</text>
+    <text class="box-sub" x="645" y="182" text-anchor="middle">L88 &#183; _ERROR_LINE L35</text>
+  </a>
+  <a class="box" id="m7" href="../../sources/evaluators/gold_feedback/format.py">
+    <title>Empty, N/A, bare booleans, a / b ratios, no result tuple</title>
+    <rect x="530" y="220" width="230" height="66" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="645" y="244" text-anchor="middle">is_uninformative</text>
+    <text class="box-sub" x="645" y="262" text-anchor="middle">L65 &#183; _RATIO L39</text>
+  </a>
+  <a class="box" id="m8" href="../../sources/evaluators/gold_feedback/format.py">
+    <title>Score lines of every critique first, then bodies in equal shares</title>
+    <rect x="530" y="300" width="230" height="66" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="645" y="324" text-anchor="middle">_figure_block</text>
+    <text class="box-sub" x="645" y="342" text-anchor="middle">L159 &#183; _SCORE_LINE L40</text>
+  </a>
+  <a class="box" id="m9" href="../../sources/evaluators/gold_feedback/format.py">
+    <title>Keeps head and tail with a clipped marker</title>
+    <rect x="530" y="390" width="230" height="70" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="645" y="414" text-anchor="middle">clip</text>
+    <text class="box-sub" x="645" y="432" text-anchor="middle">L134 &#183; head_share 0.6</text>
+    <text class="box-sub" x="645" y="450" text-anchor="middle">raw cut if keep &lt; 20 L152</text>
+  </a>
+  <a class="box" id="m10" href="../../sources/evaluators/gold_feedback/format.py">
+    <title>Short note above the hybrid gradient when the grade is censored</title>
+    <rect x="260" y="390" width="230" height="80" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="414" text-anchor="middle">censored_note</text>
+    <text class="box-sub" x="375" y="432" text-anchor="middle">L254 &#183; reason &lt;= 300 chars</text>
+    <text class="box-sub" x="375" y="450" text-anchor="middle">censored generations</text>
+  </a>
+  <g class="box" id="m11">
+    <title>Returned string; evaluator.py writes it to textual_gradient.txt and state_result.json</title>
+    <rect x="800" y="160" width="280" height="110" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="940" y="184" text-anchor="middle">returns gradient text</text>
+    <text class="box-sub" x="940" y="202" text-anchor="middle">&lt;= MAX_GRADIENT_CHARS 2000</text>
+    <text class="box-sub" x="940" y="220" text-anchor="middle">execution outcome first</text>
+    <text class="box-sub" x="940" y="238" text-anchor="middle">no ORACLE label in text</text>
+    <text class="box-sub" x="940" y="256" text-anchor="middle">written by evaluator.py L431</text>
+  </g>
+  <g class="box" id="m12">
+    <title>Module constants: the cap, the 5 kind names, 2 fixed notes, 3 regexes</title>
+    <rect x="800" y="300" width="280" height="100" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="940" y="324" text-anchor="middle">constants</text>
+    <text class="box-sub" x="940" y="342" text-anchor="middle">MAX_GRADIENT_CHARS = 2000 L22</text>
+    <text class="box-sub" x="940" y="360" text-anchor="middle">EXEC_FAILURE .. PROG_CHECK_SUCCESS</text>
+    <text class="box-sub" x="940" y="378" text-anchor="middle">_UNINFORMATIVE_NOTE L30</text>
+    <text class="box-sub" x="940" y="396" text-anchor="middle">_NOT_GRADED L31</text>
+  </g>
+  <path class="edge dashed-edge" data-from="m1" data-to="m3" d="M220,98 H260" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="240" y="90" text-anchor="middle">grade</text>
+  <path class="edge" data-from="m2" data-to="m3" d="M220,230 C240,230 240,160 260,160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="242" y="205" text-anchor="start">L306</text>
+  <path class="edge" data-from="m2" data-to="m10" d="M120,320 V430 H260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="134" y="410" text-anchor="start">L308</text>
+  <path class="edge" data-from="m3" data-to="m4" d="M490,88 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="80" text-anchor="middle">L195</text>
+  <path class="edge" data-from="m4" data-to="m5" d="M760,88 H800" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="780" y="80" text-anchor="middle">L122</text>
+  <path class="edge" data-from="m3" data-to="m6" d="M490,125 C510,125 510,173 530,173" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="m3" data-to="m7" d="M490,145 C512,145 512,253 530,253" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="m3" data-to="m8" d="M490,165 C514,165 514,333 530,333" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="500" y="300" text-anchor="end">L232</text>
+  <path class="edge" data-from="m8" data-to="m9" d="M645,366 V390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="658" y="382" text-anchor="start">L171</text>
+  <path class="edge" data-from="m10" data-to="m9" d="M490,430 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="510" y="422" text-anchor="middle">L266</text>
+  <path class="edge" data-from="m3" data-to="m11" d="M375,50 V20 H1090 V215 H1080" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="720" y="14" text-anchor="middle">gradient text</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the whole file (268 lines, 8 functions, 11 constants). It is pure text work: no file, no config, no logger. <code>build_gold_gradient</code> also calls <code>clip</code> directly (L206, L221, L241, L244). The format is adapted from <a href="../../experiments_verifiers/harness/e33_truman.py">e33_truman.py</a>::<code>gold_gradient_text</code> L144 (docstring L3&#8211;L4).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; control: classify picks the kind, the kind picks the text layout</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 440" role="img" aria-label="format.py control: classify tests VER, then a critique list, then an eval-script error, then SR; exec_failure has its own text layout, the other kinds share one, and a hard cap cuts the text to max_chars">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="k1">
+    <title>VER false or None</title>
+    <rect x="20" y="30" width="220" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="130" y="54" text-anchor="middle">VER is falsy ?</text>
+    <text class="box-sub" x="130" y="72" text-anchor="middle">L119</text>
+  </g>
+  <g class="box" id="k2">
+    <title>Script re-run failed; SR message is never quoted</title>
+    <rect x="20" y="130" width="220" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="130" y="154" text-anchor="middle">exec_failure</text>
+    <text class="box-sub" x="130" y="172" text-anchor="middle">L120</text>
+  </g>
+  <g class="box" id="k3">
+    <title>The SR message parses as a list of critique strings</title>
+    <rect x="290" y="30" width="240" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="410" y="54" text-anchor="middle">SR msg critique list ?</text>
+    <text class="box-sub" x="410" y="72" text-anchor="middle">L122 parse_critiques</text>
+  </g>
+  <g class="box" id="k4">
+    <title>Visual judge path</title>
+    <rect x="290" y="130" width="240" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="410" y="154" text-anchor="middle">figure_judge</text>
+    <text class="box-sub" x="410" y="172" text-anchor="middle">L123</text>
+  </g>
+  <g class="box" id="k5">
+    <title>SR false and message starts with Eval script failed, Evaluation error or Evaluation timeout</title>
+    <rect x="580" y="30" width="250" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="705" y="54" text-anchor="middle">SR false + eval error ?</text>
+    <text class="box-sub" x="705" y="72" text-anchor="middle">L125-L129</text>
+  </g>
+  <g class="box" id="k6">
+    <title>The grader program itself failed on the deliverable</title>
+    <rect x="580" y="130" width="250" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="705" y="154" text-anchor="middle">eval_script_error</text>
+    <text class="box-sub" x="705" y="172" text-anchor="middle">L130</text>
+  </g>
+  <g class="box" id="k7">
+    <title>Final test on SR</title>
+    <rect x="880" y="30" width="200" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="980" y="54" text-anchor="middle">SR true ?</text>
+    <text class="box-sub" x="980" y="72" text-anchor="middle">L131</text>
+  </g>
+  <g class="box" id="k8">
+    <title>Grader verdict PASS</title>
+    <rect x="880" y="130" width="95" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="927.5" y="154" text-anchor="middle">success</text>
+    <text class="box-sub" x="927.5" y="172" text-anchor="middle">prog_check</text>
+  </g>
+  <g class="box" id="k9">
+    <title>Grader verdict FAIL</title>
+    <rect x="985" y="130" width="95" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="1032.5" y="154" text-anchor="middle">fail</text>
+    <text class="box-sub" x="1032.5" y="172" text-anchor="middle">prog_check</text>
+  </g>
+  <g class="box" id="k10">
+    <title>exec_failure text: FAILED header, decisive error, note, traceback excerpt (head 0.2), then Not graded</title>
+    <rect x="20" y="240" width="510" height="100" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="275" y="264" text-anchor="middle">exec_failure text, in order</text>
+    <text class="box-sub" x="275" y="282" text-anchor="middle">## Execution outcome: FAILED L202</text>
+    <text class="box-sub" x="275" y="300" text-anchor="middle">Decisive error (&lt;= 400 chars) L206 &#183; note L208</text>
+    <text class="box-sub" x="275" y="318" text-anchor="middle">verbatim excerpt, head_share 0.2 L221</text>
+    <text class="box-sub" x="275" y="336" text-anchor="middle">## Grader verdict + Not graded L209-L211</text>
+  </g>
+  <g class="box" id="k11">
+    <title>Other kinds: OK header, PASS or FAIL verdict, then the body for the kind</title>
+    <rect x="580" y="240" width="500" height="100" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="830" y="264" text-anchor="middle">other kinds text, in order</text>
+    <text class="box-sub" x="830" y="282" text-anchor="middle">## Execution outcome: OK L225 &#183; verdict L228</text>
+    <text class="box-sub" x="830" y="300" text-anchor="middle">figure: _figure_block L232</text>
+    <text class="box-sub" x="830" y="318" text-anchor="middle">eval error: decisive line L237 + excerpt L241</text>
+    <text class="box-sub" x="830" y="336" text-anchor="middle">else verbatim, head_share 0.7 L244</text>
+  </g>
+  <g class="box" id="k12">
+    <title>If the joined text is still too long, cut and add the clipped marker</title>
+    <rect x="300" y="370" width="500" height="52" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="550" y="394" text-anchor="middle">hard cap: text[:max_chars] + marker</text>
+    <text class="box-sub" x="550" y="412" text-anchor="middle">L248-L250</text>
+  </g>
+  <path class="edge" data-from="k1" data-to="k2" d="M130,88 V130" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="144" y="114" text-anchor="start">yes</text>
+  <path class="edge" data-from="k1" data-to="k3" d="M240,59 H290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="265" y="51" text-anchor="middle">no</text>
+  <path class="edge" data-from="k3" data-to="k4" d="M410,88 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="424" y="114" text-anchor="start">yes</text>
+  <path class="edge" data-from="k3" data-to="k5" d="M530,59 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="555" y="51" text-anchor="middle">no</text>
+  <path class="edge" data-from="k5" data-to="k6" d="M705,88 V130" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="719" y="114" text-anchor="start">yes</text>
+  <path class="edge" data-from="k5" data-to="k7" d="M830,59 H880" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="855" y="51" text-anchor="middle">no</text>
+  <path class="edge" data-from="k7" data-to="k8" d="M930,88 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="944" y="114" text-anchor="start">yes</text>
+  <path class="edge" data-from="k7" data-to="k9" d="M1030,88 V130" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="1044" y="114" text-anchor="start">no</text>
+  <path class="edge dashed-edge" data-from="k2" data-to="k10" d="M130,188 V240" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dashed-edge" data-from="k10" data-to="k12" d="M275,340 C275,360 300,380 300,396" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <path class="edge dashed-edge" data-from="k11" data-to="k12" d="M830,340 C830,360 800,380 800,396" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; red = failure kinds and the cut. Budgets are computed before each verbatim block (L213&#8211;L217, L230), so the decisive lines come first and the cap at L248 cuts only the tail. The <code>2048</code>-char clip in <code>variation_engine.py::VariationEngine.mutation_prompt</code> (L407) is removed in the working tree; this 2000-char cap is now the only cap on <code>build_gold_gradient</code> output.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">grade["VER"], ["SR"]</td><td>classify, build_gold_gradient</td><td>pick the feedback kind and verdict</td><td class="size">L119 L125 L227</td></tr>
+<tr><td>reads</td><td class="sym">VER_message, SR_message</td><td>build_gold_gradient</td><td>decisive line and verbatim excerpt</td><td class="size">L196 L197</td></tr>
+<tr><td>reads</td><td class="sym">max_chars</td><td>argument, default MAX_GRADIENT_CHARS</td><td>hard length cap</td><td class="size">L22 L181 L248</td></tr>
+<tr><td>reads</td><td class="sym">reason</td><td>censored_note argument</td><td>infra reason, clipped to 300 chars</td><td class="size">L254 L266</td></tr>
+<tr><td>config</td><td class="sym">none</td><td>no config import</td><td>budget is a constant</td><td class="size">&#8212;</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td>no open(), no logger</td><td>evaluator.py writes the text</td><td class="size">&#8212;</td></tr>
+<tr><td>returns</td><td class="sym">str</td><td>build_gold_gradient, censored_note, clip</td><td>gradient text, note, clipped text</td><td class="size">L251 L264 L156</td></tr>
+<tr><td>returns</td><td class="sym">kind str</td><td>classify</td><td>one of the 5 kind constants</td><td class="size">L24&#8211;L28</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: in gold mode this text replaces <code>abstracted_textual_gradient</code>, so the mutator is steered by the benchmark grader against the gold reference.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Symbol inventory</h2>
+<details><summary>11 constants, 8 functions &mdash; signatures</summary><div class="dbody">
+<pre>MAX_GRADIENT_CHARS = 2000                                     L22
+EXEC_FAILURE = "exec_failure"                                 L24
+FIGURE_JUDGE = "figure_judge"                                 L25
+EVAL_SCRIPT_ERROR = "eval_script_error"                       L26
+PROG_CHECK_FAIL = "prog_check_fail"                           L27
+PROG_CHECK_SUCCESS = "prog_check_success"                     L28
+_UNINFORMATIVE_NOTE                                           L30   "Note: the grader gave no detail beyond pass/fail."
+_NOT_GRADED                                                   L31   SR false because the re-run failed
+_ERROR_LINE (regex)                                           L35   *Error / Exception / Exit / Interrupt / Fault lines
+_RATIO (regex)                                                L39   bare "a / b"
+_SCORE_LINE (regex)                                           L40   "[FINAL SCORE]" lines
+
+parse_critiques(message: Any) -&gt; list[str] | None             L43
+is_uninformative(message: Any) -&gt; bool                        L65
+decisive_error_line(text: str) -&gt; str | None                  L88
+classify(grade: dict[str, Any]) -&gt; str                        L109
+clip(text: str, budget: int, head_share: float = 0.6) -&gt; str  L134
+_figure_block(critiques: list[str], budget: int) -&gt; list[str] L159
+build_gold_gradient(grade: dict[str, Any],
+                    max_chars: int = MAX_GRADIENT_CHARS) -&gt; str L180
+censored_note(reason: str, max_chars: int = 300) -&gt; str       L254</pre>
+<p>Imports: <code>ast</code>, <code>re</code>, <code>typing.Any</code> only. The docstring (L11&#8211;L13) says no oracle label goes into the text; the oracle flags live in <code>state_result.json</code>, <code>evaluation.txt</code> and the logs.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_gold_evaluator.html">gold_feedback/evaluator.py</a></td><td><code>from . import format as fmt</code>; 4 calls in <code>_apply</code></td><td class="sym">L33 L299 L305 L306 L308</td></tr>
+<tr><td class="sym"><a href="file_gold_init.html">gold_feedback/__init__.py</a></td><td>re-exports <code>MAX_GRADIENT_CHARS</code>, <code>build_gold_gradient</code></td><td class="sym">L21</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Test in tests/gold_feedback_test.py</th><th>What it checks</th><th>Path</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_exec_failure_puts_decisive_error_first_and_fits</a></td><td>decisive error on line 2; SR placeholder dropped</td><td>direct</td><td class="size">L303</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_figure_judge_lists_all_scores_before_bodies</a></td><td>3 score lines before bodies; figure_judge</td><td>direct</td><td class="size">L324</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_programmatic_message_is_verbatim</a></td><td>dict-like SR message quoted as is</td><td>direct</td><td class="size">L336</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_uninformative_messages_get_explicit_note</a></td><td>4 uninformative messages get the note</td><td>direct</td><td class="size">L347</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_eval_script_crash_and_huge_messages_are_compacted</a></td><td>eval_script_error; 50000 chars fit; cap 300</td><td>direct</td><td class="size">L354</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_timeout_is_decisive</a></td><td>timeout line used as decisive error</td><td>direct</td><td class="size">L368</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_gradient_only_keeps_hybrid_reward_and_swaps_gradient</a></td><td>gold text in state_result and sidecar</td><td>via evaluator</td><td class="size">L378</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_env_failure_is_censored_and_uses_hybrid_gradient</a></td><td>censored_note prefix, hybrid text after</td><td>via evaluator</td><td class="size">L533</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_uninformative_verdict_is_flagged</a></td><td>N/A sets uninformative flag</td><td>via evaluator</td><td class="size">L549</td></tr>
+</tbody>
+</table>
+<p class="note">Not named by any test: <code>clip</code>, <code>decisive_error_line</code>, <code>parse_critiques</code>, <code>_figure_block</code>, <code>censored_note</code>; they run inside the tests above.</p>
+<p>See also: <a href="mod_evaluators_gold_feedback.html">gold_feedback package page</a>, <a href="file_gold_grader.html">file_gold_grader.html</a>, <a href="file_gold_reward.html">file_gold_reward.html</a>, <a href="file_gold_leak.html">file_gold_leak.html</a>, <a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a> (the honest gradient it replaces), <a href="file_core_variation_engine.html">file_core_variation_engine.html</a> (the reader) and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/gold_feedback/format.py</code> (268 lines, whole file), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (L33, L284&#8211;L310, L431), <code class="path">sources/evaluators/gold_feedback/__init__.py</code> (L21), <code class="path">sources/core/variation_engine.py</code> (L396&#8211;L407, <code>git diff HEAD</code>), <code class="path">experiments_verifiers/harness/e33_truman.py</code> (L144, name only), <code class="path">tests/gold_feedback_test.py</code> (test names by grep). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the body of <code>e33_truman.py::gold_gradient_text</code>, because the port is quoted from the docstring and not compared line by line; the exact text of every fixed note (quoted by name only); secret files were not opened; no pytest run, by the build rules. The file is new and uncommitted.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

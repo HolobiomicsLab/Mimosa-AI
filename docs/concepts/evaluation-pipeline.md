@@ -321,7 +321,7 @@ above and stays as-is beside custom layers.
 
 | Knob | Default | What it controls |
 | ---- | ------- | ---------------- |
-| `verifier_kind` | `hybrid` | `hybrid` (default) or `legacy` (deprecated multi-source per-claim verifier) |
+| `verifier_kind` | `hybrid` | `hybrid` (default), `legacy` (deprecated multi-source per-claim verifier) or `gold` (oracle control — leaks the benchmark, see [Gold feedback (oracle) mode](#gold-feedback-oracle-mode)) |
 | `hybrid_verifier_num_claims` | `10` | target key-claim count per task (extraction accepts ±2) |
 | `hybrid_verifier_refinement_rounds` | `2` | max replacement claims per generation for dead claims |
 | `hybrid_verifier_scorer_timeout_s` | `60` | per scorer-subprocess timeout (seconds) |
@@ -344,6 +344,126 @@ offline + live E19 / E19b / E19c experiments (2026-09-23..25,
 channel (E19b v2: gold-relevance 0.672, hallucination 0.252; ~$0.38
 per full tournament). Determinism and symmetry are by construction —
 the same cached scorer scripts grade every generation.
+
+## Gold feedback (oracle) mode
+
+> **ORACLE / BENCHMARK-LEAKING MODE.** `verifier_kind = "gold"` feeds the
+> benchmark grader's own verdict — computed against the gold reference —
+> back into evolution. A run that uses it is contaminated by the
+> benchmark. Use it only as an upper-bound research control (E43 causal
+> feedback experiment). **Never report its VER / SR / CBS as a Mimosa
+> benchmark score**, and keep its `workflow_dir` separate from honest runs
+> (the workflow selector ranks every genotype in `workflow_dir`).
+
+Package: `sources/evaluators/gold_feedback/` (`GoldFeedbackEvaluator`).
+It is a composition, not a new verifier:
+
+- An inner `HybridVerifierEvaluator` runs as usual. In the default
+  **gradient-only** mode it still makes the reward, the QD score, the
+  early stop and the capsule selection.
+- The generation's workspace is copied into a private temp dir
+  (`mimosa_gold_*`) **before** the hybrid runs. The copy is graded with the
+  same machinery as the per-generation snapshot ablations:
+  `sources/benchmark_evaluation/snapshot_grading.grade_directory` →
+  `CapsuleEvaluator` (VER re-execution 900 s, SR eval program 300 s,
+  CodeBERT CBS). The sandbox copies `pred_results/` back into the graded
+  directory, so the live workspace and the `/tmp` snapshot are never
+  touched. The copy is deleted afterwards.
+- Only the steering text is replaced: `abstracted_textual_gradient` (and
+  its typo twin) in `state_result.json` `evaluation.verifier`, and the
+  `textual_gradient.txt` sidecar. The engine consumes it unchanged.
+
+**Gradient format** (E33 'TRUMAN' order, `gold_feedback/format.py`): the
+execution outcome first (decisive error line, then a tail-heavy verbatim
+excerpt of `VER_message`), then the grader verdict verbatim
+(`SR_message`; for the figure judge the `[FINAL SCORE]` line of every
+critique first, then the critiques). The text is compacted to at most
+2000 characters, decisive content first. No oracle label is put in the
+text (it would change the directive LLM's behaviour); the labels live in
+the metadata below.
+
+**Full oracle** — `gold_feedback_reward = True` (`--gold_feedback_reward`):
+the reward also comes from the grader: SR true → 1.0, VER true → 0.5·CBS,
+else 0.0 (`reward_fallback` is cleared; the hybrid values stay in
+`hybrid_overall_score*`). This changes selection **and** steering, so it
+is not a gradient-only experiment.
+
+**Task context.** The grader needs the benchmark task row (eval program,
+gold program, expected outputs). `CsvEvaluationMode` puts it on the config
+per task (`gold_feedback_task_row`, `gold_feedback_sab_loader`, runtime
+only, never serialized) — only when `verifier_kind == "gold"`.
+
+**Edge cases** (recorded in `evaluation.verifier.gold_feedback.status`):
+
+| Case | Status | Gradient |
+| ---- | ------ | -------- |
+| grader verdict available | `gold` | gold text |
+| no task row (plain `--task` / `--goal` runs) | `no_task_context` | hybrid gradient unchanged; reason logged |
+| hybrid short-circuit (no code / no state) | `skipped_short_circuit` | hybrid gradient (nothing to grade) |
+| grading environment failure (sandbox build, provisioning gap, missing `OPENAI_API_KEY` for the figure judge, harness exception) | `censored_infra` | one-line "result censored" note + hybrid gradient |
+| workspace copy failed | `censored_copy_failed` | same as above |
+| uninformative message (`N/A`, empty, bare `a / b`, no result tuple) | `gold` + `uninformative: true` | gold text + "the grader gave no detail beyond pass/fail" |
+
+In full-oracle mode every non-`gold` status keeps the hybrid reward and
+records `reward_fallback_reason`. Censored generations (`censored_infra`,
+`censored_copy_failed`) are different: their hybrid win-rate is on a
+different scale from the oracle rewards of graded siblings, so they get
+`overall_score = overall_score_uncapped = 0.0` ("no oracle measurement"),
+`reward_censored: true`, `reward_source: "oracle_censored"` and
+`reward_fallback = "oracle_censored"`; the hybrid values stay in
+`hybrid_overall_score`, `hybrid_overall_score_uncapped` and
+`hybrid_reward_fallback`. So a censored generation cannot trigger the early
+stop (`learned_score_threshold`), is not admitted to the QD archive
+(`admit_threshold`), and is skipped by the capsule argmax like a
+`mean_claim` fallback. Degenerate case: if every generation of a task is
+censored, all rewards are 0.0, evolution has no reward signal and the
+capsule is the last generation. `no_task_context` and short-circuit
+generations keep the hybrid reward (a no-context run is all hybrid). Grader
+rewards (`reward_source = "benchmark_grader"`) are never treated as
+fallbacks, even at generation 0 where the hybrid recorded no pairs.
+
+**Wall-clock cap.** `gold_feedback_timeout_s` (default 1800,
+`--gold_feedback_timeout_s`; `0` disables the cap) caps the grading of one
+generation. On timeout the grade is censored (`censored_infra`) and the
+hybrid gradient is used; the abandoned grader thread still ends at the
+sandbox's own VER/SR timeouts and then deletes its private copy (ownership
+is decided under a lock, so exactly one side deletes it). Known gap: the
+worker is a daemon thread, so if the process exits while an abandoned
+worker runs, its `mimosa_gold_*` copy stays in the system temp dir. In gold mode the engine
+runs the whole verifier call in a worker thread (`asyncio.to_thread`), so
+concurrent CSV workers keep their event loop; every other verifier keeps
+the synchronous call.
+
+**Registry isolation.** The inner hybrid verifier gets its own per-task
+registry root: `<temp_dir or workflow_dir/_verifier_tmp>_gold` (a shallow
+config copy; the run config is not modified). Honest runs sharing the
+same `workflow_dir` and goal therefore never compute win-rates against
+gold-steered generations, and the gold run starts its own claims/scorers.
+
+**Leak guard.** Honest runs' `WorkflowSelector` skips every generation
+whose folder holds `gold_feedback.json` or whose
+`evaluation.verifier.oracle` is true, with a `[LEAK GUARD]` warning; only a
+gold run may reuse them. A gold run warns at start-up when its
+`workflow_dir` already holds non-oracle generations. The capsule
+`evaluation_results.json` of a gold run gets `oracle_feedback`,
+`verifier_kind`, `gold_feedback_reward` and `benchmark_leak_warning` keys
+(the graded VER/SR/CBS fields are unchanged), and the final CSV summary
+prints the warning.
+
+**Leak markers.** `state_result.json` `evaluation.verifier` gets
+`verifier_kind: "gold"`, `oracle: true`, `benchmark_leak: true`,
+`gold_feedback_warning`, `reward_source`, `hybrid_textual_gradient` and a
+`gold_feedback` summary; a separate `evaluation.gold_oracle` block keeps
+the verbatim grader messages (ignored by the reward code). Sidecars:
+`textual_gradient_hybrid.txt`, `gold_feedback.json`, and a warning banner
+on top of `evaluation.txt`. Run notes get `oracle_feedback: true`,
+`verifier_kind`, `gold_feedback_reward` and `benchmark_leak_warning`.
+Logs print the warning at start-up and on every generation.
+
+**Cost.** Each generation is graded twice (hybrid + benchmark): up to
+900 s + 300 s more wall-clock (capped by `gold_feedback_timeout_s`), the
+shared sandbox venv build on the first call, and one GPT-4o `n=3` call per
+figure task.
 
 ## Legacy multi-source verifier (deprecated)
 
@@ -600,6 +720,7 @@ The default verifier channel is `HybridVerifierEvaluator`; switch with
 | Backend             | File                                                                                                                                            | Use                                       |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `HybridVerifierEvaluator` | [`hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/)                             | **Default** — E19/E19b temporal claim ladder + policy scorers + pairwise reward.  |
+| `GoldFeedbackEvaluator` | [`gold_feedback/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/gold_feedback/) | **Oracle control, leaks the benchmark** (`verifier_kind="gold"`): hybrid reward + benchmark-grader gradient. Research only. |
 | `VerifierEvaluator` | [`verifier.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/verifier.py)                                       | Deprecated multi-source per-claim (`verifier_kind="legacy"`). |
 | `GenericEvaluator`  | [`generic.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/generic.py)                                         | Legacy 4-criterion LLM judge.             |
 | `ScenarioEvaluator` | [`scenario.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/scenario.py)                                       | Rubric / assertion-based scoring.         |

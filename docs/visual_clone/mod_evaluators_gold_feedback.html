@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gold_feedback - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview > sources/evaluators > gold_feedback">
+<div class="wrap">
+
+<h1 class="hud">gold_feedback &mdash; ORACLE verifier control</h1>
+<p class="intro">Six files wrap the <a href="mod_evaluators_hybrid_verifier.html">hybrid verifier</a> with the benchmark grader, selected by <code>--verifier_kind gold</code>. The grader&rsquo;s VER/SR messages replace the textual gradient; with <code>gold_feedback_reward</code> the grader also gives the reward. This mode reads the benchmark gold, so its scores must never be reported.</p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip warn">uncommitted at 4020790</span> <span class="chip unknown">research control (E43)</span></p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; package files and the outside boxes they call</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 580" role="img" aria-label="gold_feedback package: six files and the outside boxes they call">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="o1" href="file_eval_evaluator.html">
+    <title>WorkflowEvaluator.__init__ builds GoldFeedbackEvaluator when verifier_kind is gold (evaluator.py L97-L105)</title>
+    <rect x="20" y="40" width="200" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="66" text-anchor="middle">WorkflowEvaluator facade</text>
+    <text class="box-sub" x="120" y="84" text-anchor="middle">evaluators/evaluator.py</text>
+    <text class="box-sub" x="120" y="102" text-anchor="middle">verifier_kind == "gold"</text>
+  </a>
+  <a class="box" id="o2" href="area_entry_config.html">
+    <title>Config fields: gold_feedback_reward (False), gold_feedback_timeout_s (1800), runtime gold_feedback_task_row and gold_feedback_sab_loader</title>
+    <rect x="20" y="225" width="200" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="243" text-anchor="middle">config fields</text>
+    <text class="box-sub" x="120" y="261" text-anchor="middle">gold_feedback_reward</text>
+    <text class="box-sub" x="120" y="279" text-anchor="middle">gold_feedback_timeout_s</text>
+    <text class="box-sub" x="120" y="297" text-anchor="middle">gold_feedback_task_row</text>
+    <text class="box-sub" x="120" y="315" text-anchor="middle">gold_feedback_sab_loader</text>
+  </a>
+  <a class="box" id="o3" href="area_benchmark_evaluation.html#f-csv-mode">
+    <title>CsvEvaluationMode._set_gold_feedback_task puts the CSV row and the loader on the config per task</title>
+    <rect x="20" y="440" width="200" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="462" text-anchor="middle">CsvEvaluationMode</text>
+    <text class="box-sub" x="120" y="480" text-anchor="middle">csv_mode.py</text>
+    <text class="box-sub" x="120" y="498" text-anchor="middle">_set_gold_feedback_task</text>
+    <text class="box-sub" x="120" y="516" text-anchor="middle">row + sab_loader</text>
+  </a>
+  <a class="box" id="p1" href="file_gold_init.html">
+    <title>__init__.py re-exports GoldFeedbackEvaluator, LEAK_WARNING, MAX_GRADIENT_CHARS, build_gold_gradient</title>
+    <rect x="290" y="40" width="230" height="78" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="405" y="65" text-anchor="middle">__init__.py</text>
+    <text class="box-sub" x="405" y="83" text-anchor="middle">re-exports 4 names</text>
+    <text class="box-sub" x="405" y="101" text-anchor="middle">29 lines</text>
+  </a>
+  <a class="box" id="p2" href="file_gold_evaluator.html">
+    <title>GoldFeedbackEvaluator.evaluate runs the inner hybrid, grades a private copy, swaps the gradient</title>
+    <rect x="290" y="200" width="230" height="140" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="405" y="238" text-anchor="middle">evaluator.py</text>
+    <text class="box-sub" x="405" y="256" text-anchor="middle">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="405" y="274" text-anchor="middle">evaluate(uuid) &#183; _apply</text>
+    <text class="box-sub" x="405" y="292" text-anchor="middle">_persist &#183; gold_hybrid_config</text>
+    <text class="box-sub" x="405" y="310" text-anchor="middle">470 lines</text>
+    <text class="box-sub" x="514" y="212" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="o4" href="mod_evaluators_hybrid_verifier.html">
+    <title>Inner HybridVerifierEvaluator, built with gold_hybrid_config (own registry dir _verifier_tmp_gold)</title>
+    <rect x="290" y="440" width="230" height="90" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="405" y="462" text-anchor="middle">HybridVerifierEvaluator</text>
+    <text class="box-sub" x="405" y="480" text-anchor="middle">hybrid_verifier package</text>
+    <text class="box-sub" x="405" y="498" text-anchor="middle">reward + hybrid gradient</text>
+    <text class="box-sub" x="405" y="516" text-anchor="middle">registry: _verifier_tmp_gold</text>
+  </a>
+  <a class="box" id="p3" href="file_gold_grader.html">
+    <title>Task context, private workspace copy, timed grading call, censored result on any fault</title>
+    <rect x="620" y="40" width="220" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="730" y="62" text-anchor="middle">grader.py</text>
+    <text class="box-sub" x="730" y="80" text-anchor="middle">resolve_task_context</text>
+    <text class="box-sub" x="730" y="98" text-anchor="middle">make_private_copy &#183; CopyHandoff</text>
+    <text class="box-sub" x="730" y="116" text-anchor="middle">grade_private_copy &#183; 253 lines</text>
+    <text class="box-sub" x="834" y="52" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="p4" href="file_gold_format.html">
+    <title>Turns the grade dict into the gold gradient text, decisive part first, max 2000 chars</title>
+    <rect x="620" y="180" width="220" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="730" y="202" text-anchor="middle">format.py</text>
+    <text class="box-sub" x="730" y="220" text-anchor="middle">classify &#183; build_gold_gradient</text>
+    <text class="box-sub" x="730" y="238" text-anchor="middle">censored_note</text>
+    <text class="box-sub" x="730" y="256" text-anchor="middle">&#8804; 2000 chars &#183; 268 lines</text>
+    <text class="box-sub" x="834" y="192" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="p5" href="file_gold_reward.html">
+    <title>oracle_reward: SR true 1.0, VER true 0.5 x CBS, else 0.0</title>
+    <rect x="620" y="320" width="220" height="78" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="730" y="345" text-anchor="middle">reward.py</text>
+    <text class="box-sub" x="730" y="363" text-anchor="middle">oracle_reward(grade)</text>
+    <text class="box-sub" x="730" y="381" text-anchor="middle">full oracle only &#183; 26 lines</text>
+    <text class="box-sub" x="834" y="332" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="p6" href="file_gold_leak.html">
+    <title>LEAK_WARNING text and leak_banner(width=78)</title>
+    <rect x="620" y="455" width="220" height="78" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="730" y="480" text-anchor="middle">leak.py</text>
+    <text class="box-sub" x="730" y="498" text-anchor="middle">LEAK_WARNING &#183; leak_banner</text>
+    <text class="box-sub" x="730" y="516" text-anchor="middle">29 lines</text>
+  </a>
+  <a class="box" id="o5" href="../../sources/benchmark_evaluation/snapshot_grading.py">
+    <title>snapshot_grading.py::grade_directory builds CapsuleEvaluator and normalises the result; shared with the ablation loop</title>
+    <rect x="900" y="40" width="200" height="90" rx="14" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1000" y="62" text-anchor="middle">grade_directory</text>
+    <text class="box-sub" x="1000" y="80" text-anchor="middle">snapshot_grading.py</text>
+    <text class="box-sub" x="1000" y="98" text-anchor="middle">82 lines &#183; no copy</text>
+    <text class="box-sub" x="1000" y="116" text-anchor="middle">normalised VER/SR/CBS</text>
+  </a>
+  <a class="box" id="o6" href="area_benchmark_evaluation.html#f-capsule-evaluator">
+    <title>CapsuleEvaluator.evaluate_all: VER re-run 900 s, SR eval program 300 s, CodeBERT CBS; ExecutionSandbox copies pred_results/ back into the graded dir</title>
+    <rect x="900" y="200" width="200" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1000" y="218" text-anchor="middle">CapsuleEvaluator</text>
+    <text class="box-sub" x="1000" y="236" text-anchor="middle">&#8594; ExecutionSandbox</text>
+    <text class="box-sub" x="1000" y="254" text-anchor="middle">VER re-run 900 s</text>
+    <text class="box-sub" x="1000" y="272" text-anchor="middle">SR eval 300 s &#183; CBS</text>
+    <text class="box-sub" x="1000" y="290" text-anchor="middle">writes pred_results/ back</text>
+  </a>
+
+  <path class="edge" data-from="o1" data-to="p2" d="M220,80 C255,80 255,230 290,230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="252" y="150" text-anchor="middle">builds, evaluate(uuid)</text>
+  <path class="edge dashed-edge" data-from="o2" data-to="p2" d="M220,275 H290" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="255" y="268" text-anchor="middle">reads</text>
+  <path class="edge dashed-edge" data-from="o3" data-to="o2" d="M120,440 V325" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="128" y="388" text-anchor="start">sets task row</text>
+  <path class="edge dotted-edge" data-from="p1" data-to="p2" d="M405,118 V200" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="413" y="164" text-anchor="start">re-exports</text>
+  <path class="edge" data-from="p2" data-to="o4" d="M405,340 V440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="413" y="395" text-anchor="start">hybrid.evaluate(uuid)</text>
+  <path class="edge" data-from="p2" data-to="p3" d="M520,215 C570,215 570,85 620,85" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="575" y="140" text-anchor="middle">copy + grade</text>
+  <path class="edge" data-from="p2" data-to="p4" d="M520,245 C570,245 570,225 620,225" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="572" y="228" text-anchor="middle">grade dict</text>
+  <path class="edge" data-from="p2" data-to="p5" d="M520,300 C570,300 570,359 620,359" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+  <text class="edge-label" x="572" y="318" text-anchor="middle">full oracle only</text>
+  <path class="edge dotted-edge" data-from="p2" data-to="p6" d="M520,330 C570,330 570,494 620,494" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="575" y="430" text-anchor="middle">imports</text>
+  <path class="edge" data-from="p3" data-to="o5" d="M840,85 H900" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="870" y="76" text-anchor="middle">grade_fn(copy)</text>
+  <path class="edge" data-from="o5" data-to="o6" d="M1000,130 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="1008" y="170" text-anchor="start">evaluate_all()</text>
+  <path class="edge" data-from="o3" data-to="o5" d="M120,530 V565 H1110 V85 H1100" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="700" y="558" text-anchor="middle">ablations call grade_directory too</text>
+  <text class="box-sub" x="20" y="20">grey dashed = outside this package &#183; ORACLE = reads the benchmark gold</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>12 boxes</code>: 6 package files (mint) + 6 outside boxes (grey dashed). Solid = call, dashed = reads/writes, dotted = import only. <code>evaluator.py</code> also imports <code>WorkflowInfo</code>, <code>is_oracle_generation</code> (<a href="file_core_workflow_info.html">workflow_info.py</a>) and <code>BaseEvaluator</code>, <code>EvaluatorError</code> (<code>sources/evaluators/base.py</code>). <code>__init__.py</code> re-exports from <code>evaluator</code>, <code>format</code> and <code>leak</code>; only two re-export edges are drawn. The bottom edge: <code>CsvEvaluationMode._evaluate_snapshot_ablations</code> calls the same <code>grade_directory</code> for its per-generation ablations.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; one gold-mode generation, in time order</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1180 760" role="img" aria-label="Sequence of one gold-mode generation across eight lanes">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="s1" href="file_core_evolution_engine.html">
+    <title>EvolutionEngine._evaluate_workflow_phenotype calls the judge</title>
+    <rect x="17" y="22" width="136" height="50" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="85" y="51" text-anchor="middle">EvolutionEngine</text>
+  </a>
+  <path d="M 85,72 V 744" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="s2" href="file_eval_evaluator.html">
+    <title>Facade: WorkflowEvaluator.evaluate routes evaluator_type verifier</title>
+    <rect x="162" y="22" width="136" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="230" y="51" text-anchor="middle">WorkflowEvaluator</text>
+  </a>
+  <path d="M 230,72 V 744" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="s3" href="file_gold_evaluator.html">
+    <title>GoldFeedbackEvaluator.evaluate, the oracle control</title>
+    <rect x="307" y="22" width="136" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="375" y="42" text-anchor="middle">GoldFeedback</text>
+    <text class="box-sub" x="375" y="60" text-anchor="middle">Evaluator</text>
+  </a>
+  <path d="M 375,72 V 744" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="s4" href="mod_evaluators_hybrid_verifier.html">
+    <title>Inner HybridVerifierEvaluator, unchanged</title>
+    <rect x="452" y="22" width="136" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="520" y="42" text-anchor="middle">HybridVerifier</text>
+    <text class="box-sub" x="520" y="60" text-anchor="middle">inner</text>
+  </a>
+  <path d="M 520,72 V 744" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="s5" href="file_gold_grader.html">
+    <title>Task context, private copy, timed grading</title>
+    <rect x="597" y="22" width="136" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="665" y="51" text-anchor="middle">grader.py</text>
+  </a>
+  <path d="M 665,72 V 744" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="s6" href="area_benchmark_evaluation.html#f-execution-sandbox">
+    <title>snapshot_grading.grade_directory, CapsuleEvaluator, ExecutionSandbox</title>
+    <rect x="742" y="22" width="136" height="50" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="810" y="42" text-anchor="middle">grade_directory</text>
+    <text class="box-sub" x="810" y="60" text-anchor="middle">+ sandbox</text>
+  </a>
+  <path d="M 810,72 V 744" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="s7" href="file_gold_format.html">
+    <title>Gold gradient text builder</title>
+    <rect x="887" y="22" width="136" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="955" y="51" text-anchor="middle">format.py</text>
+  </a>
+  <path d="M 955,72 V 744" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <a class="box" id="s8" href="data_runs.html">
+    <title>sources/workflows/&lt;run&gt;/&lt;uuid&gt;/ on disk</title>
+    <rect x="1032" y="22" width="136" height="50" rx="12" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="1100" y="51" text-anchor="middle">workflow folder</text>
+  </a>
+  <path d="M 1100,72 V 744" fill="none" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="3 5"/>
+  <g>
+    <title>evolution_engine.py::EvolutionEngine._evaluate_workflow_phenotype: asyncio.to_thread only when judge.verifier_kind == "gold"</title>
+    <path class="edge" data-from="s1" data-to="s2" d="M 85,100 H 226" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="157.5" y="94" text-anchor="middle">1 evaluate, to_thread</text>
+  </g>
+  <g>
+    <title>evaluator.py::WorkflowEvaluator.evaluate calls verifier_evaluator.evaluate(uuid)</title>
+    <path class="edge" data-from="s2" data-to="s3" d="M 230,138 H 371" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="302.5" y="132" text-anchor="middle">2 evaluate(uuid)</text>
+  </g>
+  <g>
+    <title>grader.py::resolve_task_context reads config.gold_feedback_task_row; None + reason when unset</title>
+    <path class="edge" data-from="s3" data-to="s5" d="M 375,176 H 661" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="520.0" y="170" text-anchor="middle">3 resolve_task_context</text>
+  </g>
+  <g>
+    <title>grader.py::make_private_copy copies the workspace to mimosa_gold_*/workspace BEFORE the hybrid runs</title>
+    <path class="edge" data-from="s3" data-to="s5" d="M 375,214 H 661" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="520.0" y="208" text-anchor="middle">4 make_private_copy</text>
+  </g>
+  <g>
+    <title>HybridVerifierEvaluator.evaluate: reward, hybrid gradient</title>
+    <path class="edge" data-from="s3" data-to="s4" d="M 375,252 H 516" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="447.5" y="246" text-anchor="middle">5 hybrid.evaluate(uuid)</text>
+  </g>
+  <g>
+    <title>hybrid writes state_result.json evaluation.verifier, evaluation.txt, textual_gradient.txt</title>
+    <path class="edge dashed-edge" data-from="s4" data-to="s8" d="M 520,290 H 1096" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+    <text class="edge-label" x="810.0" y="284" text-anchor="middle">6 writes verifier block</text>
+  </g>
+  <g>
+    <title>GoldFeedbackEvaluator._verifier_block reads evaluation.verifier from state_result.json</title>
+    <path class="edge dashed-edge" data-from="s8" data-to="s3" d="M 1100,328 H 379" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+    <text class="edge-label" x="737.5" y="322" text-anchor="middle">7 _verifier_block reads</text>
+  </g>
+  <g>
+    <title>grader.py::grade_private_copy, daemon thread, cap gold_feedback_timeout_s (default 1800 s)</title>
+    <path class="edge" data-from="s3" data-to="s5" d="M 375,366 H 661" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="520.0" y="360" text-anchor="middle">8 grade_private_copy, 1800 s</text>
+  </g>
+  <g>
+    <title>snapshot_grading.py::grade_directory builds CapsuleEvaluator and calls evaluate_all</title>
+    <path class="edge" data-from="s5" data-to="s6" d="M 665,404 H 806" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="737.5" y="398" text-anchor="middle">9 grade_directory(copy)</text>
+  </g>
+  <g>
+    <title>normalised grade dict, status evaluated or excluded</title>
+    <path class="edge dashed-edge" data-from="s6" data-to="s5" d="M 810,442 H 669" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+    <text class="edge-label" x="737.5" y="436" text-anchor="middle">10 VER/SR/CBS, messages</text>
+  </g>
+  <g>
+    <title>harness error or timeout becomes a censored excluded grade</title>
+    <path class="edge dashed-edge" data-from="s5" data-to="s3" d="M 665,480 H 379" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+    <text class="edge-label" x="520.0" y="474" text-anchor="middle">11 grade or excluded</text>
+  </g>
+  <g>
+    <title>grader.py::discard_private_copy in finally, unless the abandoned worker owns the copy</title>
+    <path class="edge" data-from="s3" data-to="s5" d="M 375,518 H 661" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="520.0" y="512" text-anchor="middle">12 discard_private_copy</text>
+  </g>
+  <g>
+    <title>format.py::classify and build_gold_gradient, max 2000 chars</title>
+    <path class="edge" data-from="s3" data-to="s7" d="M 375,556 H 951" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+    <text class="edge-label" x="665.0" y="550" text-anchor="middle">13 build_gold_gradient</text>
+  </g>
+  <g>
+    <title>reward.py::oracle_reward only when gold_feedback_reward is True</title>
+    <path class="edge" data-from="s3" data-to="s3" d="M 375,588 h 40 v 14 h -38" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwM)"/>
+    <text class="edge-label" x="421" y="598" text-anchor="start">14 full oracle: reward</text>
+  </g>
+  <g>
+    <title>GoldFeedbackEvaluator._persist writes state_result blocks, textual_gradient.txt, textual_gradient_hybrid.txt, gold_feedback.json, evaluation.txt banner</title>
+    <path class="edge dashed-edge" data-from="s3" data-to="s8" d="M 375,632 H 1096" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+    <text class="edge-label" x="737.5" y="626" text-anchor="middle">15 _persist artifacts</text>
+  </g>
+  <g>
+    <title>result dict returns through the facade to the engine</title>
+    <path class="edge dashed-edge" data-from="s3" data-to="s1" d="M 375,670 H 89" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+    <text class="edge-label" x="230.0" y="664" text-anchor="middle">16 result dict</text>
+  </g>
+  <g>
+    <title>next generation: WorkflowInfo.abstracted_textual_gradient feeds VariationEngine</title>
+    <path class="edge dashed-edge" data-from="s8" data-to="s1" d="M 1100,708 H 89" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+    <text class="edge-label" x="592.5" y="702" text-anchor="middle">17 mutation reads gradient</text>
+  </g>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>8 lanes</code>, 17 steps. The private copy (step 4) is made before the hybrid runs, because the sandbox writes <code>pred_results/</code> back into the directory it grades. Step 14 runs only with <code>gold_feedback_reward = True</code>. Hover an arrow for its symbol.</p>
+<details><summary>step table: symbol per step</summary><div class="dbody">
+<table>
+<thead><tr><th class="size">#</th><th>Step</th><th>Symbol</th></tr></thead>
+<tbody>
+<tr><td class="size">1</td><td>evaluate, to_thread</td><td class="sym">evolution_engine.py::EvolutionEngine._evaluate_workflow_phenotype</td></tr>
+<tr><td class="size">2</td><td>evaluate(uuid)</td><td class="sym">evaluator.py::WorkflowEvaluator.evaluate</td></tr>
+<tr><td class="size">3</td><td>resolve_task_context</td><td class="sym">grader.py::resolve_task_context</td></tr>
+<tr><td class="size">4</td><td>make_private_copy</td><td class="sym">grader.py::make_private_copy</td></tr>
+<tr><td class="size">5</td><td>hybrid.evaluate(uuid)</td><td class="sym">hybrid_verifier/evaluator.py::HybridVerifierEvaluator.evaluate</td></tr>
+<tr><td class="size">6</td><td>writes verifier block</td><td class="sym">hybrid_verifier/evaluator.py::HybridVerifierEvaluator._write_artifacts</td></tr>
+<tr><td class="size">7</td><td>_verifier_block reads</td><td class="sym">gold_feedback/evaluator.py::GoldFeedbackEvaluator._verifier_block</td></tr>
+<tr><td class="size">8</td><td>grade_private_copy, 1800 s</td><td class="sym">grader.py::grade_private_copy</td></tr>
+<tr><td class="size">9</td><td>grade_directory(copy)</td><td class="sym">snapshot_grading.py::grade_directory</td></tr>
+<tr><td class="size">10</td><td>VER, SR, CBS, messages</td><td class="sym">capsule_evaluator.py::CapsuleEvaluator.evaluate_all</td></tr>
+<tr><td class="size">11</td><td>grade or excluded</td><td class="sym">grader.py::_grade_once / _censored</td></tr>
+<tr><td class="size">12</td><td>discard_private_copy</td><td class="sym">grader.py::discard_private_copy</td></tr>
+<tr><td class="size">13</td><td>build_gold_gradient</td><td class="sym">format.py::build_gold_gradient</td></tr>
+<tr><td class="size">14</td><td>full oracle: reward</td><td class="sym">reward.py::oracle_reward</td></tr>
+<tr><td class="size">15</td><td>_persist artifacts</td><td class="sym">gold_feedback/evaluator.py::GoldFeedbackEvaluator._persist</td></tr>
+<tr><td class="size">16</td><td>result dict</td><td class="sym">evaluator.py::WorkflowEvaluator.evaluate (return)</td></tr>
+<tr><td class="size">17</td><td>mutation reads gradient</td><td class="sym">workflow_info.py::WorkflowInfo.abstracted_textual_gradient</td></tr>
+</tbody>
+</table>
+<p>Step 1: <code>asyncio.to_thread</code> is used only when <code>judge.verifier_kind == "gold"</code>; every other verifier keeps the synchronous call. Step 8: with <code>gold_feedback_timeout_s &lt;= 0</code> the grading runs inline, without a thread.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; what the gold mode replaces</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 960 400" role="img" aria-label="What the gold mode replaces: steering text and reward per mode">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <text class="box-label" x="20" y="100">verifier_kind = hybrid</text>
+  <text class="box-sub" x="20" y="118">default, honest</text>
+  <text class="box-label" x="20" y="220">verifier_kind = gold</text>
+  <text class="box-sub" x="20" y="238">gradient-only oracle</text>
+  <text class="box-label" x="20" y="340">+ gold_feedback_reward</text>
+  <text class="box-sub" x="20" y="358">full oracle</text>
+  <text class="box-label" x="370" y="40" text-anchor="middle">STEERING TEXT</text>
+  <text class="box-label" x="780" y="40" text-anchor="middle">REWARD</text>
+  <a class="box" id="r1" href="file_hybrid_gradient.html">
+    <title>hybrid_verifier/gradient.py::build_gradient writes abstracted_textual_gradient</title>
+    <rect x="230" y="60" width="280" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="86" text-anchor="middle">hybrid gradient</text>
+    <text class="box-sub" x="370" y="104" text-anchor="middle">gradient.py::build_gradient</text>
+    <text class="box-sub" x="370" y="122" text-anchor="middle">claims, stages, evidence</text>
+  </a>
+  <a class="box" id="r2" href="file_hybrid_aggregation.html">
+    <title>aggregation.py::win_rate_reward over the task previous generations</title>
+    <rect x="640" y="60" width="280" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780" y="86" text-anchor="middle">hybrid win-rate</text>
+    <text class="box-sub" x="780" y="104" text-anchor="middle">aggregation.py::win_rate_reward</text>
+    <text class="box-sub" x="780" y="122" text-anchor="middle">vs previous generations</text>
+  </a>
+  <a class="box" id="r3" href="file_gold_format.html">
+    <title>Grader VER/SR messages in the E33 format; the hybrid text is kept in textual_gradient_hybrid.txt</title>
+    <rect x="230" y="180" width="280" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="206" text-anchor="middle">grader feedback</text>
+    <text class="box-sub" x="370" y="224" text-anchor="middle">format.py::build_gold_gradient</text>
+    <text class="box-sub" x="370" y="242" text-anchor="middle">&#8804; 2000 chars</text>
+    <text class="box-sub" x="504" y="192" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="r4" href="file_gold_evaluator.html">
+    <title>Gradient-only mode keeps the hybrid overall_score; reward_source = hybrid_verifier</title>
+    <rect x="640" y="180" width="280" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780" y="206" text-anchor="middle">hybrid win-rate, kept</text>
+    <text class="box-sub" x="780" y="224" text-anchor="middle">reward_source = hybrid_verifier</text>
+    <text class="box-sub" x="780" y="242" text-anchor="middle">no change</text>
+  </a>
+  <a class="box" id="r5" href="file_gold_format.html">
+    <title>Same gold gradient as the gradient-only mode</title>
+    <rect x="230" y="300" width="280" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="370" y="326" text-anchor="middle">grader feedback</text>
+    <text class="box-sub" x="370" y="344" text-anchor="middle">format.py::build_gold_gradient</text>
+    <text class="box-sub" x="370" y="362" text-anchor="middle">same as row 2</text>
+    <text class="box-sub" x="504" y="312" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <a class="box" id="r6" href="file_gold_reward.html">
+    <title>oracle_reward: SR 1.0, VER 0.5 x CBS, else 0.0; censored grade gives 0.0 with reward_fallback oracle_censored</title>
+    <rect x="640" y="300" width="280" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780" y="326" text-anchor="middle">grader reward</text>
+    <text class="box-sub" x="780" y="344" text-anchor="middle">SR 1.0 &#183; VER 0.5&#215;CBS &#183; else 0.0</text>
+    <text class="box-sub" x="780" y="362" text-anchor="middle">censored: 0.0, oracle_censored</text>
+    <text class="box-sub" x="914" y="312" text-anchor="end" letter-spacing="1.5">ORACLE</text>
+  </a>
+  <path class="edge dashed-edge" data-from="r1" data-to="r3" d="M370,140 V180" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="378" y="165" text-anchor="start">replaced by</text>
+  <path class="edge dashed-edge" data-from="r4" data-to="r6" d="M780,260 V300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="788" y="285" text-anchor="start">replaced by</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>6 boxes</code>. Row 2 swaps only the steering text: <code>abstracted_textual_gradient</code> (+ the typo twin <code>abstractec_textual_gradient</code>) and <code>textual_gradient.txt</code>. The gradient text carries no oracle label (<code>format.py</code> docstring); the flags live in <code>state_result.json</code>, <code>evaluation.txt</code> and the logs.</p>
+<table>
+<thead><tr><th>status</th><th>When</th><th>Gradient</th><th>Reward (full oracle)</th></tr></thead>
+<tbody>
+<tr><td class="sym">gold</td><td>graded, status <code>evaluated</code></td><td>grader feedback</td><td><code>oracle_reward(grade)</code></td></tr>
+<tr><td class="sym">censored_infra</td><td>grader returned <code>excluded</code> (fault, timeout)</td><td>censored note + hybrid gradient</td><td>0.0, <code>oracle_censored</code></td></tr>
+<tr><td class="sym">censored_copy_failed</td><td><code>make_private_copy</code> raised</td><td>censored note + hybrid gradient</td><td>0.0, <code>oracle_censored</code></td></tr>
+<tr><td class="sym">no_task_context</td><td>no <code>gold_feedback_task_row</code> (not a SAB run)</td><td>hybrid gradient</td><td>hybrid reward stands</td></tr>
+<tr><td class="sym">skipped_short_circuit</td><td>no code or no state_result</td><td>hybrid gradient</td><td>hybrid reward stands</td></tr>
+</tbody>
+</table>
+<p class="sub">Status constants: <code>evaluator.py</code> L44&ndash;L48. In gradient-only mode the reward is always the hybrid one.</p>
+<p class="note say">Why it matters: <code>oracle_censored</code> is in <code>workflow_info.py::FALLBACK_REWARD_KINDS</code>, so a censored generation cannot win the capsule argmax, reach the 0.9 early stop, or enter the QD archive.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 4 &mdash; leak guards</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1130 540" role="img" aria-label="Leak guards: where the warning text goes and what keeps oracle generations out of honest runs">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwM" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <a class="box" id="g1" href="file_gold_leak.html">
+    <title>leak.py::LEAK_WARNING, the shared warning text; leak_banner frames it with two 78-char rule lines</title>
+    <rect x="20" y="215" width="190" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="115" y="241" text-anchor="middle">LEAK_WARNING</text>
+    <text class="box-sub" x="115" y="259" text-anchor="middle">leak.py</text>
+    <text class="box-sub" x="115" y="277" text-anchor="middle">+ leak_banner(78)</text>
+  </a>
+  <a class="box" id="g2" href="area_entry_config.html">
+    <title>main.py::warn_gold_feedback_mode prints the warning after apply_config_overrides; extra lines for full oracle and no --science_agent_bench</title>
+    <rect x="290" y="20" width="250" height="70" rx="14" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="415" y="50" text-anchor="middle">warn_gold_feedback_mode</text>
+    <text class="box-sub" x="415" y="68" text-anchor="middle">main.py &#183; CLI start</text>
+  </a>
+  <a class="box" id="g3" href="area_benchmark_evaluation.html#f-csv-mode">
+    <title>CsvEvaluationMode._save_run_notes adds verifier_kind, oracle_feedback, gold_feedback_reward, benchmark_leak_warning to the run note</title>
+    <rect x="290" y="110" width="250" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="415" y="140" text-anchor="middle">run-note stamp</text>
+    <text class="box-sub" x="415" y="158" text-anchor="middle">csv_mode::_save_run_notes</text>
+  </a>
+  <a class="box" id="g4" href="area_benchmark_evaluation.html#f-csv-mode">
+    <title>CsvEvaluationMode._stamp_gold_capsule_results adds the same four marker keys to the capsule evaluation_results.json</title>
+    <rect x="290" y="200" width="250" height="70" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="415" y="230" text-anchor="middle">capsule stamp</text>
+    <text class="box-sub" x="415" y="248" text-anchor="middle">_stamp_gold_capsule_results</text>
+  </a>
+  <a class="box" id="g5" href="area_benchmark_evaluation.html#f-csv-mode">
+    <title>CsvEvaluationMode._print_final_summary prints the warning above the summary table</title>
+    <rect x="290" y="290" width="250" height="70" rx="14" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="415" y="320" text-anchor="middle">final summary warning</text>
+    <text class="box-sub" x="415" y="338" text-anchor="middle">csv_mode::_print_final_summary</text>
+  </a>
+  <a class="box" id="g6" href="file_gold_evaluator.html">
+    <title>GoldFeedbackEvaluator._persist: evaluation.txt banner, gold_feedback.json, oracle / benchmark_leak flags in evaluation.verifier</title>
+    <rect x="290" y="380" width="250" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="415" y="406" text-anchor="middle">generation artifacts</text>
+    <text class="box-sub" x="415" y="424" text-anchor="middle">_persist: evaluation.txt banner</text>
+    <text class="box-sub" x="415" y="442" text-anchor="middle">gold_feedback.json &#183; oracle flag</text>
+  </a>
+  <a class="box" id="g7" href="file_core_workflow_info.html">
+    <title>workflow_info.py::is_oracle_generation: True if gold_feedback.json exists or evaluation.verifier.oracle is True</title>
+    <rect x="620" y="380" width="220" height="80" rx="14" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="730" y="406" text-anchor="middle">is_oracle_generation</text>
+    <text class="box-sub" x="730" y="424" text-anchor="middle">workflow_info.py</text>
+    <text class="box-sub" x="730" y="442" text-anchor="middle">sidecar or oracle flag</text>
+  </a>
+  <a class="box" id="g8" href="file_core_workflow_selection.html">
+    <title>WorkflowSelector.discover_workflows skips oracle generations unless verifier_kind is gold, and logs a LEAK GUARD warning</title>
+    <rect x="900" y="330" width="210" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1005" y="356" text-anchor="middle">WorkflowSelector skip</text>
+    <text class="box-sub" x="1005" y="374" text-anchor="middle">non-gold runs only</text>
+    <text class="box-sub" x="1005" y="392" text-anchor="middle">workflow_selection.py</text>
+  </a>
+  <a class="box" id="g9" href="file_gold_evaluator.html">
+    <title>GoldFeedbackEvaluator._warn_mixed_workflow_dir warns when workflow_dir already holds honest generations</title>
+    <rect x="900" y="440" width="210" height="80" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1005" y="466" text-anchor="middle">mixed-dir warning</text>
+    <text class="box-sub" x="1005" y="484" text-anchor="middle">_warn_mixed_workflow_dir</text>
+    <text class="box-sub" x="1005" y="502" text-anchor="middle">at __init__</text>
+  </a>
+  <a class="box" id="g10" href="file_gold_evaluator.html">
+    <title>gold_hybrid_config gives the inner hybrid temp_dir = &lt;base&gt;_gold, so gold scores never enter the honest registry</title>
+    <rect x="620" y="110" width="220" height="80" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="730" y="136" text-anchor="middle">separate hybrid registry</text>
+    <text class="box-sub" x="730" y="154" text-anchor="middle">gold_hybrid_config</text>
+    <text class="box-sub" x="730" y="172" text-anchor="middle">_verifier_tmp_gold</text>
+  </a>
+  <path class="edge dotted-edge" data-from="g1" data-to="g2" d="M210,240 C250,240 250,55 290,55" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="g1" data-to="g3" d="M210,250 C250,250 250,145 290,145" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="g1" data-to="g4" d="M210,255 C250,255 250,235 290,235" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="250" y="228" text-anchor="middle">text</text>
+  <path class="edge dotted-edge" data-from="g1" data-to="g5" d="M210,265 C250,265 250,325 290,325" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dotted-edge" data-from="g1" data-to="g6" d="M210,280 C250,280 250,420 290,420" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dashed-edge" data-from="g6" data-to="g7" d="M540,420 H620" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="580" y="412" text-anchor="middle">gold_feedback.json</text>
+  <path class="edge" data-from="g7" data-to="g8" d="M840,410 C870,410 870,370 900,370" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="866" y="362" text-anchor="middle">skips</text>
+  <path class="edge" data-from="g7" data-to="g9" d="M840,430 C870,430 870,480 900,480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="872" y="500" text-anchor="middle">counts honest</text>
+  <text class="box-sub" x="20" y="520">dotted = imports LEAK_WARNING &#183; grey dashed = outside this package</text>
+</svg>
+</div>
+<p class="figcap">Diagram 4 &mdash; <code>10 boxes</code>. Five places print or stamp <code>LEAK_WARNING</code>; three mechanisms keep oracle genotypes and scores out of honest runs (selector skip, separate hybrid registry, mixed-dir warning). Line refs: <code>main.py</code> L186, L448; <code>csv_mode.py</code> L499&ndash;L510, L727&ndash;L729, L973, L1680; <code>workflow_selection.py</code> L99&ndash;L140; <code>workflow_info.py</code> L17&ndash;L38.</p>
+<p class="note">Amber: the guards are markers and warnings, not a block. A gold run in a shared <code>workflow_dir</code> still starts; only the selector skip filters its genotypes for later honest runs.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Files</h2>
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/__init__.py">__init__.py</a></td><td>docstring + re-exports</td><td class="size">29</td><td class="sym">__all__ (4 names)</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/evaluator.py">evaluator.py</a></td><td>hybrid + grader composition, gradient swap, artifacts</td><td class="size">470</td><td class="sym">GoldFeedbackEvaluator, gold_hybrid_config</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/grader.py">grader.py</a></td><td>task context, private copy, timed grading</td><td class="size">253</td><td class="sym">TaskContext, CopyHandoff, grade_private_copy</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/format.py">format.py</a></td><td>grade dict to gradient text, max 2000 chars</td><td class="size">268</td><td class="sym">classify, build_gold_gradient, censored_note</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/reward.py">reward.py</a></td><td>full-oracle reward in [0, 1]</td><td class="size">26</td><td class="sym">oracle_reward</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/gold_feedback/leak.py">leak.py</a></td><td>shared leakage warning text</td><td class="size">29</td><td class="sym">LEAK_WARNING, leak_banner</td></tr>
+</tbody>
+</table>
+<p class="sub">6 files, 1 075 lines (<code>wc -l</code>, working tree). Outside helper: <a href="../../sources/benchmark_evaluation/snapshot_grading.py">snapshot_grading.py</a>, 82 lines, one function <code>grade_directory</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>File cards</h2>
+
+<div class="card l4">
+<h4><a href="file_gold_evaluator.html">evaluator.py</a> <span class="tag">ORACLE</span></h4>
+<p class="role">Runs the inner hybrid, grades a private workspace copy, replaces the gradient, optionally the reward, and writes five artifacts per generation.</p>
+<p class="meta">470 lines &#183; class <code>GoldFeedbackEvaluator</code> &#183; function <code>gold_hybrid_config</code> &#183; <a href="../../sources/evaluators/gold_feedback/evaluator.py">source</a></p>
+<details><summary>key signatures and artifacts</summary><div class="dbody">
+<pre>gold_hybrid_config(config) -&gt; Any                              L61
+GoldFeedbackEvaluator.__init__(config, workspace_dir=None, hybrid=None, grade_fn=None)  L97
+GoldFeedbackEvaluator.reward_source -&gt; str   # property        L144
+GoldFeedbackEvaluator.evaluate(uuid: str) -&gt; dict[str, Any]    L152
+GoldFeedbackEvaluator._apply(...) -&gt; dict                      L284
+GoldFeedbackEvaluator._persist(...) -&gt; None                    L403</pre>
+<p>Writes per generation: <code>state_result.json</code> keys <code>evaluation.verifier</code> and <code>evaluation.gold_oracle</code>, <code>textual_gradient.txt</code>, <code>textual_gradient_hybrid.txt</code>, <code>gold_feedback.json</code>, and a banner at the top of <code>evaluation.txt</code>.</p>
+</div></details>
+</div>
+
+<div class="card l4">
+<h4><a href="file_gold_grader.html">grader.py</a> <span class="tag">ORACLE</span></h4>
+<p class="role">Reads the task row from the config, copies the workspace to <code>mimosa_gold_*</code>, grades it under a wall-clock cap; every fault becomes <code>excluded</code>.</p>
+<p class="meta">253 lines &#183; classes <code>TaskContext</code>, <code>CopyHandoff</code> &#183; 6 functions &#183; <a href="../../sources/evaluators/gold_feedback/grader.py">source</a></p>
+<details><summary>key signatures</summary><div class="dbody">
+<pre>resolve_task_context(config) -&gt; tuple[TaskContext | None, str | None]   L45
+make_private_copy(workspace) -&gt; Path                                    L78
+discard_private_copy(copy_dir) -&gt; None                                  L103
+CopyHandoff.worker_done() / caller_reclaims() -&gt; bool                   L137, L150
+grade_private_copy(copy_dir, context, grade_fn=grade_directory, timeout_s=None) -&gt; dict  L192</pre>
+<p>Required row keys: <code>gold_program_name</code>, <code>eval_script_name</code> (<code>_REQUIRED_ROW_KEYS</code> L27). Grading itself goes through <code>snapshot_grading.grade_directory</code>.</p>
+</div></details>
+</div>
+
+<div class="card l4">
+<h4><a href="file_gold_format.html">format.py</a> <span class="tag">ORACLE</span></h4>
+<p class="role">Classifies the grade into five kinds and builds the gold gradient: execution outcome first, then the grader verdict verbatim, at most 2000 characters.</p>
+<p class="meta">268 lines &#183; 8 functions &#183; <code>MAX_GRADIENT_CHARS = 2000</code> &#183; <a href="../../sources/evaluators/gold_feedback/format.py">source</a></p>
+<details><summary>kinds and signatures</summary><div class="dbody">
+<pre>classify(grade) -&gt; str        # exec_failure | figure_judge | eval_script_error
+                              # | prog_check_fail | prog_check_success     L109
+build_gold_gradient(grade, max_chars=MAX_GRADIENT_CHARS) -&gt; str            L180
+censored_note(reason, max_chars=300) -&gt; str                                L254
+parse_critiques, is_uninformative, decisive_error_line, clip, _figure_block</pre>
+<p>Adapted from <code>experiments_verifiers/harness/e33_truman.py</code> (docstring). The 2048-char clip in <code>variation_engine.py</code> is removed in the working tree, so the gradient reaches the mutation prompt unclipped.</p>
+</div></details>
+</div>
+
+<div class="card l4">
+<h4><a href="file_gold_reward.html">reward.py</a> <span class="tag">ORACLE</span></h4>
+<p class="role">Full-oracle reward: SR true gives 1.0, clean re-run gives 0.5 &#215; CBS, failed re-run gives 0.0.</p>
+<p class="meta">26 lines &#183; 1 function <code>oracle_reward(grade) -&gt; float</code> &#183; <a href="../../sources/evaluators/gold_feedback/reward.py">source</a></p>
+</div>
+
+<div class="card l4">
+<h4><a href="file_gold_leak.html">leak.py</a></h4>
+<p class="role">Holds the one warning text every gold artifact, log line and stamp repeats.</p>
+<p class="meta">29 lines &#183; constant <code>LEAK_WARNING</code> &#183; function <code>leak_banner(width=78)</code> &#183; <a href="../../sources/evaluators/gold_feedback/leak.py">source</a></p>
+</div>
+
+<div class="card l4">
+<h4><a href="file_gold_init.html">__init__.py</a></h4>
+<p class="role">Package docstring and four re-exports. Importing it also loads <code>evaluator.py</code>, <code>grader.py</code> and <code>snapshot_grading.py</code>.</p>
+<p class="meta">29 lines &#183; <code>__all__</code>: <code>GoldFeedbackEvaluator</code>, <code>LEAK_WARNING</code>, <code>MAX_GRADIENT_CHARS</code>, <code>build_gold_gradient</code> &#183; <a href="../../sources/evaluators/gold_feedback/__init__.py">source</a></p>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Config fields and CLI flags</h2>
+<table>
+<thead><tr><th>Field</th><th>Default</th><th>Set by</th><th>Read by</th></tr></thead>
+<tbody>
+<tr><td class="sym">verifier_kind</td><td class="sym">"hybrid"</td><td><code>--verifier_kind gold</code> (main.py L79)</td><td><code>WorkflowEvaluator.__init__</code></td></tr>
+<tr><td class="sym">gold_feedback_reward</td><td class="sym">False</td><td><code>--gold_feedback_reward</code> / <code>--no-gold_feedback_reward</code>; JSON via <code>_json_bool</code></td><td><code>GoldFeedbackEvaluator.__init__</code></td></tr>
+<tr><td class="sym">gold_feedback_timeout_s</td><td class="sym">1800</td><td><code>--gold_feedback_timeout_s</code>; 0 disables the cap</td><td><code>GoldFeedbackEvaluator.__init__</code></td></tr>
+<tr><td class="sym">gold_feedback_task_row</td><td class="sym">None</td><td><code>CsvEvaluationMode._set_gold_feedback_task</code> (runtime only)</td><td><code>grader.resolve_task_context</code></td></tr>
+<tr><td class="sym">gold_feedback_sab_loader</td><td class="sym">None</td><td>same (runtime only)</td><td><code>grader.resolve_task_context</code></td></tr>
+</tbody>
+</table>
+<p class="sub">Defaults: <code>config.py</code> L110&ndash;L120. <code>jsonify</code> writes the first two gold fields (L439&ndash;L440); the runtime fields are never serialized. <code>config_default.json</code> L16&ndash;L17 holds both gold keys (the file is git-ignored by <code>config_*.json</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Tests</h2>
+<p><a href="../../tests/gold_feedback_test.py">tests/gold_feedback_test.py</a> &mdash; 1 173 lines, 40 test functions, offline: a fake hybrid and a fake grader replace the real ones. See <a href="area_tests.html">area_tests.html</a>.</p>
+<details><summary>test groups (my grouping by what each test calls)</summary><div class="dbody">
+<table>
+<thead><tr><th>Target</th><th class="size">Tests</th><th>Examples</th></tr></thead>
+<tbody>
+<tr><td class="sym">evaluator.py</td><td class="size">20</td><td><code>test_gradient_only_keeps_hybrid_reward_and_swaps_gradient</code>, <code>test_inner_hybrid_gets_isolated_registry</code></td></tr>
+<tr><td class="sym">format.py</td><td class="size">6</td><td><code>test_exec_failure_puts_decisive_error_first_and_fits</code></td></tr>
+<tr><td class="sym">grader.py</td><td class="size">2 direct</td><td><code>test_copy_handoff_ownership_is_exclusive</code>, <code>test_worker_finishing_in_race_window_keeps_result</code></td></tr>
+<tr><td class="sym">snapshot_grading / csv_mode</td><td class="size">4</td><td><code>test_grade_directory_builds_capsule_evaluator_call</code>, <code>test_capsule_results_get_leak_markers</code></td></tr>
+<tr><td class="sym">engine / selector</td><td class="size">4</td><td><code>test_only_gold_evaluation_runs_off_the_event_loop</code>, <code>test_selector_skips_oracle_generations_in_honest_runs</code></td></tr>
+<tr><td class="sym">config / CLI / facade</td><td class="size">6</td><td><code>test_config_bool_strings_and_timeout_knob</code>, <code>test_facade_selects_gold</code></td></tr>
+</tbody>
+</table>
+<p>Counts are my computation from test bodies; some tests touch two targets, so rows overlap and do not sum to 40.</p>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/gold_feedback/*.py</code> (all 6, whole files), <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>, <code class="path">sources/evaluators/evaluator.py</code> (L88&ndash;L110, L174), <code class="path">config.py</code>, <code class="path">main.py</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code>, <code class="path">capsule_evaluator.py</code> (L200, L221), <code class="path">execution_sandbox.py</code> (L799&ndash;L806), <code class="path">sources/core/evolution_engine.py</code>, <code class="path">workflow_info.py</code>, <code class="path">workflow_selection.py</code>, <code class="path">variation_engine.py</code> (<code>git diff HEAD</code>), <code class="path">tests/gold_feedback_test.py</code>, <code class="path">audits/gold_feedback_mode_design_2026-09-28.md</code> (intent only). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: E43 experiment design and results &mdash; not in the code, see the audit report; the visual-judge path of the SAB grader &mdash; covered by <a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a>; no pytest run and no application run, by the build rules. Whether any gold run exists on disk: unknown (not checked; Tier D folders).</p>
+<p>Built at <code>4020790 + uncommitted working tree, 2026-09-28</code>. The whole <code>gold_feedback</code> package is uncommitted (untracked) at this build.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

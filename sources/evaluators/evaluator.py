@@ -44,7 +44,10 @@ class WorkflowEvaluator:
     Facade over GenericEvaluator, ScenarioEvaluator and the verifier
     channel. The verifier defaults to the hybrid E19/E19b evaluator
     (``HybridVerifierEvaluator``); ``config.verifier_kind = "legacy"``
-    selects the deprecated multi-source ``VerifierEvaluator`` instead.
+    selects the deprecated multi-source ``VerifierEvaluator`` instead, and
+    ``"gold"`` the benchmark-leaking oracle control
+    (``GoldFeedbackEvaluator``, research only). Unknown values fall back to
+    the hybrid verifier.
     """
 
     def __init__(
@@ -89,6 +92,15 @@ class WorkflowEvaluator:
                 from .legacy_verifier import VerifierEvaluator
 
                 self.verifier_evaluator = VerifierEvaluator(
+                    config, workspace_dir=verifier_workspace_dir
+                )
+            elif verifier_kind == "gold":
+                # ORACLE / BENCHMARK-LEAKING control (research only): hybrid
+                # reward + benchmark-grader gradient. Imported lazily so the
+                # default path never loads it.
+                from .gold_feedback import GoldFeedbackEvaluator
+
+                self.verifier_evaluator = GoldFeedbackEvaluator(
                     config, workspace_dir=verifier_workspace_dir
                 )
             else:

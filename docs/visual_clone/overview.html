@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">Mimosa-AI, whole system</h1>
-<p class="intro">For each task Mimosa synthesizes a workflow as plain Python, runs it in a sandbox, verifies the run with the hybrid temporal-ladder verifier, and evolves the workflow across generations. Five layers carry that loop; the verifier's gradient text steers the next mutation. Start here, then open a flow page or an area page.</p>
+<p class="intro">For each task Mimosa synthesizes a workflow as plain Python, runs it in a sandbox, verifies the run with the verifier that <code>verifier_kind</code> selects (default: hybrid temporal-ladder), and evolves the workflow across generations. Five layers carry that loop; the verifier's gradient text steers the next mutation. Start here, then open a flow page or an area page.</p>
 
 <div id="legend" data-auto></div>
 
@@ -70,11 +70,12 @@
     <text class="box-sub" x="195" y="374" text-anchor="middle">sources/core/workflow_runner.py</text>
   </a>
 
-  <a class="box" id="verifier" href="mod_evaluators_hybrid_verifier.html">
-    <title>Layer 4 - hybrid temporal-ladder verifier</title>
+  <a class="box" id="verifier" href="area_evaluators.html">
+    <title>Layer 4 - WorkflowEvaluator builds one verifier from config.verifier_kind</title>
     <rect x="60" y="470" width="270" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="195" y="496" text-anchor="middle">L4 HybridVerifier</text>
-    <text class="box-sub" x="195" y="514" text-anchor="middle">sources/evaluators/hybrid_verifier/</text>
+    <text class="box-label" x="195" y="490" text-anchor="middle">L4 Verifier (verifier_kind)</text>
+    <text class="box-sub" x="195" y="507" text-anchor="middle">hybrid = default</text>
+    <text class="box-sub" x="195" y="523" text-anchor="middle">legacy DEPRECATED | gold ORACLE</text>
   </a>
 
   <a class="box" id="tools" href="mod_core_tools_llm.html">
@@ -97,8 +98,21 @@
   <path class="edge" data-from="runner" data-to="verifier" d="M195,396 V470" fill="none" stroke="url(#hud)" stroke-width="2" marker-end="url(#arwG)"/>
   <text class="edge-label" x="203" y="438">workspace + run log</text>
 
-  <path class="edge dashed-edge" data-from="verifier" data-to="engine" d="M330,503 H362 V209 H330" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw7)"/>
-  <text class="edge-label" x="368" y="360" transform="rotate(90 368 360)" text-anchor="middle">abstracted_textual_gradient</text>
+  <path class="edge dashed-edge" data-from="verifier" data-to="engine" d="M60,503 H34 V209 H60" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw7)"/>
+  <text class="edge-label" x="26" y="356" transform="rotate(-90 26 356)" text-anchor="middle">abstracted_textual_gradient</text>
+
+
+  <!-- ===== benchmark gold: read only in gold (oracle) mode ===== -->
+  <a class="box" id="gold" href="mod_evaluators_gold_feedback.html">
+    <title>Benchmark eval programs, gold results and gold programs; read only when verifier_kind is gold</title>
+    <rect x="400" y="400" width="190" height="64" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <ellipse cx="495" cy="400" rx="95" ry="8" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="495" y="424" text-anchor="middle">benchmark gold</text>
+    <text class="box-sub" x="495" y="440" text-anchor="middle">datasets/ScienceAgentBench/</text>
+    <text class="box-sub" x="495" y="455" text-anchor="middle">ORACLE - gold mode only</text>
+  </a>
+  <path class="edge dashed-edge" data-from="gold" data-to="verifier" d="M400,432 H350 V484 H330" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="358" y="480">VER/SR grade</text>
 
   <!-- ===== external services (dashed, no fill) ===== -->
   <g class="box" id="toolomics"><title>External MCP tool platform</title>
@@ -149,13 +163,13 @@
   </g>
   <path class="edge dashed-edge" data-from="runner" data-to="wfdir" d="M130,396 V590" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arwE)"/>
   <text class="edge-label" x="8" y="560">writes</text>
-  <path class="edge dashed-edge" data-from="runner" data-to="tmpdir" d="M260,396 V560 H700 V590" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge dashed-edge" data-from="runner" data-to="tmpdir" d="M320,396 V560 H700 V590" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arwE)"/>
   <text class="edge-label" x="440" y="556">writes run outputs</text>
   <path class="edge dashed-edge" data-from="verifier" data-to="caps" d="M290,530 H480 V590" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arwE)"/>
   <text class="edge-label" x="330" y="523">snapshot</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - L0. Solid arrows are calls inside the loop; dashed arrows read or write files or call external services. Every box links to its page.</p>
+<p class="figcap">Diagram 1 - L0. Solid arrows are calls inside the loop; dashed arrows read or write files or call external services. Linked boxes open their page; the five unlinked boxes are external services and runtime folders. <span class="chip warn">oracle - leaks gold</span> the benchmark gold box feeds L4 only when <code>verifier_kind = "gold"</code>.</p>
 
 <table>
 <thead><tr><th>Layer</th><th>Box</th><th>Entry symbol</th><th>What it returns or writes</th></tr></thead>
@@ -164,10 +178,13 @@
 <tr><td>L1</td><td class="sym">ToolManager</td><td class="sym"><a href="../../sources/core/tools_manager.py">tools_manager.py</a></td><td>Discovered MCP tool descriptions.</td></tr>
 <tr><td>L2</td><td class="sym">EvolutionEngine</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py::EvolutionEngine</a></td><td>Workflow source, then the next generation.</td></tr>
 <tr><td>L3</td><td class="sym">WorkflowRunner</td><td class="sym"><a href="../../sources/core/workflow_runner.py">workflow_runner.py::WorkflowRunner</a></td><td>Temp workspace, run log, state result.</td></tr>
-<tr><td>L4</td><td class="sym">HybridVerifierEvaluator</td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py::HybridVerifierEvaluator</a></td><td>Reward 0-1 and the gradient text.</td></tr>
+<tr><td>L4</td><td class="sym">WorkflowEvaluator</td><td class="sym"><a href="../../sources/evaluators/evaluator.py">evaluator.py::WorkflowEvaluator</a></td><td>Builds one verifier from <code>verifier_kind</code>.</td></tr>
+<tr><td>L4 hybrid</td><td class="sym">HybridVerifierEvaluator</td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py::HybridVerifierEvaluator</a></td><td>Default. Reward 0-1 and the gradient text.</td></tr>
+<tr><td>L4 legacy</td><td class="sym">VerifierEvaluator <span class="tag dep">DEPRECATED</span></td><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier.py">legacy_verifier/verifier.py::VerifierEvaluator</a></td><td>Old per-claim verifier, only when <code>legacy</code>.</td></tr>
+<tr><td>L4 gold</td><td class="sym">GoldFeedbackEvaluator <span class="tag">ORACLE</span></td><td class="sym"><a href="../../sources/evaluators/gold_feedback/evaluator.py">gold_feedback/evaluator.py::GoldFeedbackEvaluator</a></td><td>Hybrid reward, benchmark-grader gradient; research control only.</td></tr>
 </tbody>
 </table>
-<p class="note say">The default verifier is <code>verifier_kind = hybrid</code> (config_default.json); the older claims verifier is deprecated since 2026-09-24 (AGENTS.md).</p>
+<p class="note say">The default verifier is <code>verifier_kind = "hybrid"</code> (<code>config.py</code>; the local <code>config_default.json</code> agrees); <code>legacy</code> is deprecated since 2026-09-24 (AGENTS.md); <code>gold</code> leaks the benchmark and <code>main.py::warn_gold_feedback_mode</code> prints a warning.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -230,32 +247,35 @@
 
 <div class="panel"><span class="br"></span>
 <h2>The loop in numbers</h2>
-<details open><summary>defaults from config_default.json (56 keys)</summary><div class="dbody">
+<details open><summary>defaults: config.py vs the local config_default.json (58 keys, untracked)</summary><div class="dbody">
 <table>
-<thead><tr><th>Field</th><th class="size">Default</th><th>Effect</th></tr></thead>
+<thead><tr><th>Field</th><th class="size">config.py</th><th class="size">config_default.json</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td class="sym">max_learning_evolve_iterations</td><td class="size">16</td><td>Generation budget with <code>--learn</code>.</td></tr>
-<tr><td class="sym">population_size</td><td class="size">16</td><td>Archive capacity for the QD search.</td></tr>
-<tr><td class="sym">novelty_weight</td><td class="size">0.25</td><td>Weight <code>w</code> in <code>(1-w)*quality + w*novelty</code>.</td></tr>
-<tr><td class="sym">novelty_k_neighbours</td><td class="size">16</td><td>k for k-NN cosine distance.</td></tr>
-<tr><td class="sym">crossover_rate</td><td class="size">0.25</td><td>Chance of crossover instead of mutation.</td></tr>
-<tr><td class="sym">learned_score_threshold</td><td class="size">0.92</td><td>Early stop when the score reaches it.</td></tr>
-<tr><td class="sym">verifier_kind</td><td class="size">hybrid</td><td>Selects the verifier implementation.</td></tr>
-<tr><td class="sym">hybrid_verifier_num_claims</td><td class="size">10</td><td>Target claim count per task.</td></tr>
-<tr><td class="sym">hybrid_verifier_pairwise_mode</td><td class="size">temporal</td><td>Ladder aggregation mode.</td></tr>
-<tr><td class="sym">hybrid_verifier_reward</td><td class="size">win_rate</td><td>Reward kind.</td></tr>
-<tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="size">60</td><td>Policy scorer subprocess timeout.</td></tr>
-<tr><td class="sym">runner_default_timeout</td><td class="size">10800</td><td>Sandbox wall clock per workflow, in seconds.</td></tr>
-<tr><td class="sym">runner_default_python_version</td><td class="size">3.12</td><td>Sandbox interpreter.</td></tr>
-<tr><td class="sym">selection_strategy</td><td class="size">unknown</td><td>See <a href="mod_core_selection.html">mod_core_selection.html</a>.</td></tr>
+<tr><td class="sym">max_learning_evolve_iterations</td><td class="size">16</td><td class="size">16</td><td>Generation budget with <code>--learn</code>.</td></tr>
+<tr><td class="sym">population_size</td><td class="size">16</td><td class="size">16</td><td>Archive capacity for the QD search.</td></tr>
+<tr><td class="sym">novelty_weight</td><td class="size">0.25</td><td class="size">0.25</td><td>Weight <code>w</code> in <code>(1-w)*quality + w*novelty</code>.</td></tr>
+<tr><td class="sym">novelty_k_neighbours</td><td class="size">16</td><td class="size">16</td><td>k for k-NN cosine distance.</td></tr>
+<tr><td class="sym">crossover_rate</td><td class="size">0.4</td><td class="size">0.25</td><td>Chance of crossover instead of mutation.</td></tr>
+<tr><td class="sym">learned_score_threshold</td><td class="size">0.9</td><td class="size">0.92</td><td>Early stop when the score reaches it.</td></tr>
+<tr><td class="sym">selection_strategy</td><td class="size">qd</td><td class="size">qd</td><td>See <a href="mod_core_selection.html">mod_core_selection.html</a>.</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="size">hybrid</td><td class="size">hybrid</td><td>Verifier: <code>hybrid</code>, <code>legacy</code> or <code>gold</code>.</td></tr>
+<tr><td class="sym">gold_feedback_reward</td><td class="size">False</td><td class="size">false</td><td>gold only: grader reward too (full oracle).</td></tr>
+<tr><td class="sym">gold_feedback_timeout_s</td><td class="size">1800</td><td class="size">1800</td><td>gold only: grading cap per generation, in seconds.</td></tr>
+<tr><td class="sym">hybrid_verifier_num_claims</td><td class="size">10</td><td class="size">16</td><td>Target claim count per task.</td></tr>
+<tr><td class="sym">hybrid_verifier_pairwise_mode</td><td class="size">temporal</td><td class="size">temporal</td><td>Ladder aggregation mode.</td></tr>
+<tr><td class="sym">hybrid_verifier_reward</td><td class="size">win_rate</td><td class="size">win_rate</td><td>Reward kind.</td></tr>
+<tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="size">60</td><td class="size">120</td><td>Policy scorer subprocess timeout, in seconds.</td></tr>
+<tr><td class="sym">runner_default_timeout</td><td class="size">10800</td><td class="size">10800</td><td>Sandbox wall clock per workflow, in seconds.</td></tr>
+<tr><td class="sym">runner_default_python_version</td><td class="size">3.12</td><td class="size">3.12</td><td>Sandbox interpreter.</td></tr>
 </tbody>
 </table>
+<p>Values read on 2026-09-28 with <code>uv run python</code> on <code>Config()</code> and <code>json.load</code> (my computation). <code>config_default.json</code> is not tracked by git, so another checkout may differ. A JSON file passed with <code>--config</code> wins over <code>config.py</code>.</p>
 </div></details>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Docs that disagree with the code</h2>
-<p class="intro">Found while reading the code for this clone, at commit <code>7e8463b</code>. Each row names the file that proves it.</p>
+<p class="intro">Found while reading the code for this clone, at commit <code>7e8463b</code>; config rows re-checked at 4020790 + uncommitted working tree, 2026-09-28. Each row names the file that proves it.</p>
 <table>
 <thead><tr><th>Document says</th><th>Code does</th><th>Proof</th></tr></thead>
 <tbody>
@@ -264,15 +284,17 @@
 <tr><td>AGENTS.md audit step 5: join <code>ablations</code> to generations by <code>uuid</code>.</td><td><code>ablations[i].uuid</code>: 8-character suffix (632 of 1166); <code>evolution_index</code> wrong in 125 of 207.</td><td class="sym"><a href="../../run_notes">run_notes/**/*.json</a></td></tr>
 <tr><td>AGENTS.md: <code>check_package.py</code> does pre-flight CVE blocklisting (litellm 1.82.8).</td><td>Entry commented out; <code>safe_versions</code> empty; nothing calls <code>PackageCheck</code>.</td><td class="sym"><a href="../../sources/security/check_package.py">check_package.py:6-9</a></td></tr>
 <tr><td><code class="path">docs/DEVELOPER_GUIDE.md</code> uses the path <code class="path">sources/evaluation/</code>.</td><td>The folder is <code class="path">sources/benchmark_evaluation/</code>.</td><td class="sym"><a href="../../sources/benchmark_evaluation">sources/benchmark_evaluation/</a></td></tr>
-<tr><td>Docs quote <code>population_size = 20</code>, <code>k = 15</code> and <code>crossover_rate = 0.25</code>.</td><td><code>config.py</code>: 16, 16, 0.4, 0.9. <code>config_default.json</code>: 16, 16, 0.25, 0.92.</td><td class="sym"><a href="../../config.py">config.py:133-152</a>, <a href="../../config_default.json">config_default.json</a></td></tr>
-<tr><td><code>Config.from_json</code> should load every field that <code>jsonify</code> writes.</td><td>It reads neither <code>judge_model</code> nor <code>vision_judge_model</code>; JSON cannot change the judge.</td><td class="sym"><a href="../../config.py">config.py:438-540</a> vs <code>:382-383</code></td></tr>
+<tr><td>Docs quote <code>population_size = 20</code>, <code>k = 15</code> and <code>crossover_rate = 0.25</code>.</td><td><code>config.py</code>: 16, 16, 0.4, 0.9. <code>config_default.json</code>: 16, 16, 0.25, 0.92.</td><td class="sym"><a href="../../config.py">config.py:186-202</a>, <a href="../../config_default.json">config_default.json</a></td></tr>
+<tr><td><code>Config.from_json</code> should load every field that <code>jsonify</code> writes.</td><td>It reads neither <code>judge_model</code> nor <code>vision_judge_model</code>; JSON cannot change the judge.</td><td class="sym"><a href="../../config.py">config.py:495-656</a> vs <code>:435-436</code></td></tr>
+<tr><td>AGENTS.md: <code>config_default.json</code> is the template config to copy.</td><td>The file is not tracked by git: removed in <code>09b57da</code>, ignored by <code>config_*.json</code>.</td><td class="sym"><a href="../../.gitignore">.gitignore</a>, <code>git ls-files</code></td></tr>
+<tr><td><code>config.py</code> comment: <code>legacy</code> is <code class="path">sources/evaluators/verifier.py</code>.</td><td>That file is gone; the facade imports <code class="path">sources/evaluators/legacy_verifier/</code>.</td><td class="sym"><a href="../../config.py">config.py:99-101</a>, <a href="../../sources/evaluators/evaluator.py">evaluator.py:89-95</a></td></tr>
 <tr><td><code class="path">tests/planner_json_extraction_test.py</code> asserts tolerant JSON extraction and a cache-bypassing retry.</td><td>Opens a block only on <code>```json</code>; hardcodes <code>use_cache=True</code>, so those cases fail.</td><td class="sym"><a href="../../sources/core/planner.py">planner.py:188, 295</a></td></tr>
 <tr><td><code>ToolManager.discover_mcp_at_address</code> docstring: per-thread timeout default 2.0.</td><td>The call hardcodes <code>timeout=3.0</code> and never uses the argument.</td><td class="sym"><a href="../../sources/core/tools_manager.py">tools_manager.py</a></td></tr>
 <tr><td><code class="path">docs/usage/transparency.md</code>: <code>uv run memory_explorer.py &lt;uuid&gt;</code>.</td><td>No such file in the repo; the CLI is <code>--memory_cli</code> in <code>main.py</code>.</td><td class="sym"><a href="../../sources/cli/memory_chat_cli.py">memory_chat_cli.py</a></td></tr>
 <tr><td><code class="path">tests/evaluator_test.py</code> and <code class="path">tests/judge_test.py</code> are listed as tests.</td><td>Both skip themselves: they import <code>sources.core.dgm</code> and <code>sources.core.judge</code>, which no longer exist.</td><td class="sym"><a href="../../tests/evaluator_test.py">evaluator_test.py:22</a>, <a href="../../tests/judge_test.py">judge_test.py:12</a></td></tr>
 </tbody>
 </table>
-<p class="note flag">The clone reports what the code does at commit <code>7e8463b</code>. Fixing either side is out of scope here.</p>
+<p class="note flag">The clone reports what the code does at the commits named above. Fixing either side is out of scope here.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -283,6 +305,7 @@
 <tr><td>What runs when I start a task?</td><td class="sym"><a href="flow_task_run.html">flow_task_run.html</a></td></tr>
 <tr><td>How does a workflow change between generations?</td><td class="sym"><a href="flow_evolution_loop.html">flow_evolution_loop.html</a></td></tr>
 <tr><td>How is a run scored?</td><td class="sym"><a href="flow_verification.html">flow_verification.html</a></td></tr>
+<tr><td>What does the gold oracle mode read and change?</td><td class="sym"><a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a></td></tr>
 <tr><td>Which file does what in <code>sources/core</code>?</td><td class="sym"><a href="area_sources_core.html">area_sources_core.html</a></td></tr>
 <tr><td>What does the CLI accept?</td><td class="sym"><a href="area_entry_config.html">area_entry_config.html</a></td></tr>
 <tr><td>What is on disk after a campaign?</td><td class="sym"><a href="data_runs.html">data_runs.html</a></td></tr>
@@ -292,9 +315,10 @@
 </div>
 
 <footer>
-<p>Sources: <code class="path">AGENTS.md</code>, <code class="path">config_default.json</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">main.py</code>.</p>
+<p>Sources: <code class="path">AGENTS.md</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code>, <code class="path">sources/evaluators/gold_feedback/__init__.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code>, <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>, <code class="path">sources/benchmark_evaluation/science_agent_bench.py</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">main.py</code>.</p>
 <p class="skips">Skipped: <code>docs/</code>, <code>datasets/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code>, <code>webui/</code>, <code>.venv/</code>, <code>tmp/</code>, <code>CLA/</code>, lock files and secret files - Tier D in UPDATE_VISUAL_CLONE.md section 4; the runtime folders get a pattern page instead (data_runs.html).</p>
 <p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes at build time.</p>
+<p>Updated at 4020790 + uncommitted working tree, 2026-09-28: L4 box shows the <code>verifier_kind</code> choice, new benchmark-gold box (gold mode only), the gradient arrow moved to the left edge, the L4 table rows, the defaults table and the config line references re-derived. The run_notes counts in the docs table were not re-counted.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">Batch running and grading</h1>
-<p class="intro">This page maps the batch running and grading area: the CSV-driven task loop, the execution sandbox, and the ScienceAgentBench graders. It shows where generated code runs, what isolates it, and which metrics come back. Read it before touching <code>csv_mode.py</code> or the graders.</p>
+<p class="intro">This page maps the batch running and grading area: the CSV-driven task loop, the execution sandbox, and the ScienceAgentBench graders. One helper, <code>grade_directory</code>, grades a folder for two callers: the per-generation ablations and the gold-feedback oracle verifier. Read it before touching <code>csv_mode.py</code>, <code>snapshot_grading.py</code> or the graders.</p>
 
 <div id="legend" data-auto></div>
 
@@ -97,6 +97,13 @@
     <text class="box-sub" x="572" y="350" text-anchor="middle" font-size="9">_evaluate_snapshot_ablations</text>
   </a>
 
+  <a class="box" id="d1b11" href="#f-snapshot-grading">
+    <title>Shared helper: builds CapsuleEvaluator and normalises the result</title>
+    <rect x="255" y="310" width="165" height="56" rx="28" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="337" y="334" text-anchor="middle">grade_directory</text>
+    <text class="box-sub" x="337" y="350" text-anchor="middle">snapshot_grading.py</text>
+  </a>
+
   <a class="box" id="d1b10" href="data_runs.html">
     <title>One JSON per task: metrics, lineage, ablations</title>
     <rect x="725" y="310" width="165" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
@@ -135,11 +142,15 @@
   <text class="edge-label" x="580" y="272">task data</text>
   <path class="edge" data-from="d1b9" data-to="d1b10" d="M655,338 H725" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="690" y="332" text-anchor="middle">ablations</text>
+  <path class="edge" data-from="d1b9" data-to="d1b11" d="M490,338 H420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="455" y="332" text-anchor="middle">snapshot dir</text>
+  <path class="edge" data-from="d1b11" data-to="d1b6" d="M390,310 V268 H530 V226" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="286" text-anchor="middle">evaluate_all</text>
 
   <text class="box-sub" x="20" y="440">solid = call  |  coloured arrows carry results back</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - step symbols: <code>CsvEvaluationMode._generate_task_science_agent_bench</code> builds the prompt, <code>ExecutionSandbox.run_generated_code</code> and <code>ExecutionSandbox.run_eval_script</code> run the two subprocesses; <code>sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode._process_single_task_once</code> holds this order. Concurrent mode (<code>run_concurrent_eval_loop</code>) runs the same steps under an <code>asyncio.Semaphore</code>.</p>
+<p class="figcap">Diagram 1 - 11 boxes. Step symbols: <code>CsvEvaluationMode._generate_task_science_agent_bench</code> builds the prompt, <code>ExecutionSandbox.run_generated_code</code> and <code>ExecutionSandbox.run_eval_script</code> run the two subprocesses; <code>sources/benchmark_evaluation/csv_mode.py::CsvEvaluationMode._process_single_task_once</code> holds this order. Concurrent mode (<code>run_concurrent_eval_loop</code>) runs the same steps under an <code>asyncio.Semaphore</code>. The capsule is graded by a direct <code>CapsuleEvaluator</code> call in <code>_evaluate_with_science_agent_bench</code>; each non-best snapshot goes through <code>grade_directory</code> (Diagram 3).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -222,12 +233,113 @@
 </div>
 
 <div class="panel"><span class="br"></span>
+<h2>Diagram 3 - one grader, two callers</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 340" role="img" aria-label="grade_directory is called by the ablation loop and by the gold-feedback grader">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <text class="box-sub" x="16" y="24">HONEST PATH  &#183;  csv_mode.py, after evolution</text>
+  <text class="box-sub" x="16" y="206">ORACLE PATH  &#183;  gold_feedback, during evolution</text>
+
+  <a class="box" id="d3b1" href="data_runs.html">
+    <title>One /tmp folder per evolution iteration</title>
+    <rect x="16" y="40" width="150" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="91" y="64" text-anchor="middle">/tmp snapshot</text>
+    <text class="box-sub" x="91" y="80" text-anchor="middle" font-size="9">mimosa_run_&lt;sid&gt;_&lt;uuid&gt;</text>
+  </a>
+
+  <a class="box" id="d3b2" href="#f-csv-mode">
+    <title>Grades every snapshot except the best run</title>
+    <rect x="206" y="40" width="170" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="291" y="64" text-anchor="middle">snapshot ablations</text>
+    <text class="box-sub" x="291" y="80" text-anchor="middle" font-size="9">_evaluate_snapshot_ablations</text>
+  </a>
+
+  <a class="box" id="d3b3" href="file_gold_evaluator.html">
+    <title>Oracle verifier: copies the workspace, then grades the copy</title>
+    <rect x="16" y="222" width="150" height="62" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-sub" x="91" y="238" text-anchor="middle" letter-spacing="0.12em">ORACLE</text>
+    <text class="box-label" x="91" y="256" text-anchor="middle" font-size="11">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="91" y="272" text-anchor="middle">evaluate(uuid)</text>
+  </a>
+
+  <a class="box" id="d3b4" href="file_gold_grader.html">
+    <title>Grades the private copy; timeout cap gold_feedback_timeout_s</title>
+    <rect x="206" y="222" width="170" height="62" rx="31" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-sub" x="291" y="238" text-anchor="middle" letter-spacing="0.12em">ORACLE</text>
+    <text class="box-label" x="291" y="256" text-anchor="middle">grade_private_copy</text>
+    <text class="box-sub" x="291" y="272" text-anchor="middle">copy mimosa_gold_*</text>
+  </a>
+
+  <a class="box" id="d3b5" href="#f-snapshot-grading">
+    <title>Builds CapsuleEvaluator, returns a normalised dict</title>
+    <rect x="420" y="130" width="150" height="56" rx="28" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="495" y="154" text-anchor="middle">grade_directory</text>
+    <text class="box-sub" x="495" y="170" text-anchor="middle">snapshot_grading.py</text>
+  </a>
+
+  <a class="box" id="d3b6" href="#f-capsule-evaluator">
+    <title>VER, then SR, then CBS</title>
+    <rect x="610" y="130" width="150" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="685" y="154" text-anchor="middle">CapsuleEvaluator</text>
+    <text class="box-sub" x="685" y="170" text-anchor="middle">evaluate_all</text>
+  </a>
+
+  <a class="box" id="d3b7" href="#f-execution-sandbox">
+    <title>Runs the script and the grader in the Python 3.10 venv</title>
+    <rect x="800" y="130" width="180" height="56" rx="12" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="890" y="154" text-anchor="middle">ExecutionSandbox</text>
+    <text class="box-sub" x="890" y="170" text-anchor="middle">run_generated_code</text>
+  </a>
+
+  <g class="box" id="d3b8">
+    <title>The graded folder: the sandbox replaces its pred_results/</title>
+    <rect x="800" y="252" width="180" height="56" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="890" y="276" text-anchor="middle">graded folder</text>
+    <text class="box-sub" x="890" y="292" text-anchor="middle">pred_results/ rewritten</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="d3b1" data-to="d3b2" d="M166,68 H206" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="186" y="112" text-anchor="middle">path</text>
+  <path class="edge" data-from="d3b2" data-to="d3b5" d="M376,68 H398 V150 H420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="404" y="104" text-anchor="start">dir, row, cost</text>
+  <path class="edge" data-from="d3b3" data-to="d3b4" d="M166,253 H206" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="186" y="302" text-anchor="middle">copy dir</text>
+  <path class="edge" data-from="d3b4" data-to="d3b5" d="M376,253 H398 V168 H420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="404" y="220" text-anchor="start">copy dir, row</text>
+  <path class="edge" data-from="d3b5" data-to="d3b6" d="M570,158 H610" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="590" y="122" text-anchor="middle">builds</text>
+  <path class="edge" data-from="d3b6" data-to="d3b7" d="M760,158 H800" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="780" y="122" text-anchor="middle">2 runs</text>
+  <path class="edge dashed-edge" data-from="d3b7" data-to="d3b8" d="M890,186 V252" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="898" y="224" text-anchor="start">copies back</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - 8 boxes. <code>sources/benchmark_evaluation/snapshot_grading.py::grade_directory</code> is imported by <code>csv_mode.py</code> and by <code>sources/evaluators/gold_feedback/grader.py</code> (default <code>grade_fn</code> of <code>grade_private_copy</code>). It does not call <code>save_results()</code>, but <code>ExecutionSandbox.run_generated_code</code> still replaces <code>pred_results/</code> in the graded folder, so the gold path grades a private copy from <code>make_private_copy</code>. <span class="chip warn">oracle - leaks gold</span> the lower path feeds the benchmark verdict back into evolution; see <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
 <h2>Files in the area</h2>
 <table>
 <thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/benchmark_evaluation/csv_mode.py">csv_mode.py</a></td><td>Drives the per-row loop, writes run notes, records ablations.</td><td class="size">1 826</td><td class="sym">CsvEvaluationMode, TaskContext</td></tr>
-<tr><td class="sym"><a href="../../sources/benchmark_evaluation/execution_sandbox.py">execution_sandbox.py</a></td><td>Builds the Python 3.10 venv; runs the script and the grader.</td><td class="size">1 126</td><td class="sym">ExecutionSandbox, EvalInfraError</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/csv_mode.py">csv_mode.py</a></td><td>Drives the per-row loop, writes run notes, records ablations, stamps gold runs.</td><td class="size">1 901</td><td class="sym">CsvEvaluationMode, TaskContext</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/snapshot_grading.py">snapshot_grading.py</a></td><td>Grades one folder with <code>CapsuleEvaluator</code>; returns a normalised dict.</td><td class="size">82</td><td class="sym">grade_directory</td></tr>
+<tr><td class="sym"><a href="../../sources/benchmark_evaluation/execution_sandbox.py">execution_sandbox.py</a></td><td>Builds the Python 3.10 venv; runs the script and the grader.</td><td class="size">1 154</td><td class="sym">ExecutionSandbox, EvalInfraError</td></tr>
 <tr><td class="sym"><a href="../../sources/benchmark_evaluation/capsule_evaluator.py">capsule_evaluator.py</a></td><td>Returns VER, SR, CBS and cost for one capsule; writes <code>evaluation_results.json</code>.</td><td class="size">372</td><td class="sym">CapsuleEvaluator</td></tr>
 <tr><td class="sym"><a href="../../sources/benchmark_evaluation/science_agent_bench.py">science_agent_bench.py</a></td><td>Resolves dataset, gold program, grader and output paths from one CSV row.</td><td class="size">222</td><td class="sym">ScienceAgentBenchLoader</td></tr>
 <tr><td class="sym"><a href="../../sources/benchmark_evaluation/scenario_loader.py">scenario_loader.py</a></td><td>Loads and validates rubric JSON files; not used for SAB scoring.</td><td class="size">196</td><td class="sym">ScenarioLoader</td></tr>
@@ -239,8 +351,8 @@
 
 <div id="f-csv-mode" class="card l4">
 <h4><a href="../../sources/benchmark_evaluation/csv_mode.py">sources/benchmark_evaluation/csv_mode.py</a></h4>
-<p class="role">Runs one CSV row per task, calls the evaluator, then writes run notes.</p>
-<p class="meta">1 826 lines &#183; class: CsvEvaluationMode, TaskContext &#183; reads: <code>csv_runs_limit</code>, <code>evaluate_snapshot_ablations</code></p>
+<p class="role">Runs one CSV row per task, grades the capsule and the snapshots, then writes run notes. Gold mode adds leak stamps.</p>
+<p class="meta">1 901 lines &#183; class: CsvEvaluationMode, TaskContext &#183; reads: <code>csv_runs_limit</code>, <code>evaluate_snapshot_ablations</code>, <code>verifier_kind</code>, <code>gold_feedback_reward</code></p>
 <details><summary>signatures, loop order and config fields</summary><div class="dbody">
 <pre>CsvEvaluationMode.start_evaluation(dataset_type, dataset_path, learning, single_agent_mode, concurrent, start_row, restore_cache)
 CsvEvaluationMode.run_concurrent_eval_loop(...)          # asyncio.gather + Semaphore
@@ -249,27 +361,49 @@ CsvEvaluationMode._process_single_task_once(task_context, ...) -&gt; dict
 CsvEvaluationMode._generate_task_science_agent_bench(row, workspace_subfolder) -&gt; (str, str, str)
 CsvEvaluationMode._evaluate_with_science_agent_bench(capsule_name, row, runs, sab_loader, execution_data) -&gt; dict
 CsvEvaluationMode._evaluate_snapshot_ablations(session_id, row, runs, sab_loader, execution_data) -&gt; list[dict]
-CsvEvaluationMode._save_run_notes(capsule_name, goal, execution_time, current_execution_data) -&gt; None</pre>
-<p>Order inside <code>_process_single_task_once</code>: build goal, run evolution, copy workspace to capsule, evaluate, ablate, save notes. Blocking work goes through <code>asyncio.to_thread</code>.</p>
-<p>Config fields read: <code>max_concurrent_eval_tasks</code> (default <code>1</code>, config.py:117), <code>evaluate_snapshot_ablations</code> (default <code>True</code>, config.py:123), <code>runs_capsule_dir</code>, <code>workspace_dir</code>, <code>smolagent_model_id</code>.</p>
+CsvEvaluationMode._save_run_notes(capsule_name, goal, execution_time, current_execution_data=None) -&gt; None
+CsvEvaluationMode._gold_mode() -&gt; bool                   # config.verifier_kind == "gold"
+CsvEvaluationMode._stamp_gold_capsule_results(results_path) -&gt; None
+CsvEvaluationMode._set_gold_feedback_task(config, row, sab_loader) -&gt; bool   # staticmethod</pre>
+<p>Order inside <code>_process_single_task_once</code>: <code>_set_gold_feedback_task</code> on the isolated config, build goal, run evolution, copy workspace to capsule, evaluate, ablate, save notes. The sequential loop calls <code>_set_gold_feedback_task(self.config, ...)</code> after the dataset transfer. Blocking work goes through <code>asyncio.to_thread</code>.</p>
+<p>Gold mode (<code>verifier_kind == "gold"</code>) only: <code>_set_gold_feedback_task</code> writes <code>gold_feedback_task_row</code> and <code>gold_feedback_sab_loader</code> on the config; <code>_stamp_gold_capsule_results</code> adds 4 keys to the capsule <code>evaluation_results.json</code>; <code>_save_run_notes</code> adds the same 4 keys to the note; <code>_print_final_summary</code> prints <code>LEAK_WARNING</code>. The 4 keys: <code>oracle_feedback</code>, <code>verifier_kind</code>, <code>gold_feedback_reward</code>, <code>benchmark_leak_warning</code>.</p>
+<p>Run-notes fallback: when <code>current_execution_data</code> is given it always defines the per-task fields, also for an excluded task (<code>VER is None</code>). Only without it does the note copy <code>sab_runs[-1]</code>, with a logged warning. Both loops now pass it.</p>
+<p>Config fields read: <code>max_concurrent_eval_tasks</code> (default <code>1</code>, config.py:170), <code>evaluate_snapshot_ablations</code> (default <code>True</code>, config.py:176), <code>verifier_kind</code> (default <code>"hybrid"</code>, config.py:106), <code>gold_feedback_reward</code> (default <code>False</code>, config.py:110), <code>runs_capsule_dir</code>, <code>workspace_dir</code>, <code>smolagent_model_id</code>.</p>
 <p>Constants: <code>NETWORK_PROBE_INTERVAL_S = 15.0</code>, <code>NETWORK_MAX_WAIT_S = 86400</code>, <code>NETWORK_ROW_MAX_RETRIES = 100</code>, <code>EVAL_LOG_FILE = logs/evaluation_csv_mode.log</code> (10 MiB, 5 backups).</p>
+</div></details>
+</div>
+
+<div id="f-snapshot-grading" class="card l4">
+<h4><a href="../../sources/benchmark_evaluation/snapshot_grading.py">sources/benchmark_evaluation/snapshot_grading.py</a></h4>
+<p class="role">Grades one folder with <code>CapsuleEvaluator</code> and returns one normalised dict. Shared by the ablation loop and the gold grader.</p>
+<p class="meta">82 lines &#183; function: grade_directory &#183; new, uncommitted &#183; calls: <code>CapsuleEvaluator.evaluate_all</code></p>
+<details><summary>signature, return shapes and callers</summary><div class="dbody">
+<pre>grade_directory(directory, task_row, sab_loader, api_cost=0.0, evaluator_cls=None) -&gt; dict
+# evaluated: {VER, VER_message, SR, SR_message, CBS, cost=api_cost, status="evaluated"}
+# excluded:  {VER=None, SR=None, CBS=None, cost, status="excluded", infra_error}</pre>
+<p>Callers: <code>csv_mode.py::CsvEvaluationMode._evaluate_snapshot_ablations</code> (passes <code>evaluator_cls=CapsuleEvaluator</code> so the test patch point <code>csv_mode.CapsuleEvaluator</code> still works) and <code>sources/evaluators/gold_feedback/grader.py::grade_private_copy</code> (via <code>_grade_once</code>). Evaluator exceptions propagate; each caller keeps its own error policy.</p>
+<p>No <code>save_results()</code> call. The sandbox still replaces <code>pred_results/</code> in <em>directory</em>. Tests: <code class="path">tests/gold_feedback_test.py</code> (<code>test_grade_directory_builds_capsule_evaluator_call</code>, <code>test_refactored_ablation_path_matches_pre_refactor_capture</code>).</p>
 </div></details>
 </div>
 
 <div id="f-execution-sandbox" class="card l3">
 <h4><a href="../../sources/benchmark_evaluation/execution_sandbox.py">sources/benchmark_evaluation/execution_sandbox.py</a></h4>
 <p class="role">Builds one shared Python 3.10 venv, then runs the generated script and the grader in temp copies.</p>
-<p class="meta">1 126 lines &#183; classes: ExecutionSandbox, EvalInfraError &#183; venv key: hash of base packages + constraints</p>
+<p class="meta">1 154 lines &#183; classes: ExecutionSandbox, EvalInfraError &#183; venv key: hash of base packages + constraints &#183; 20 pins, 5 remaps</p>
 <details><summary>signatures, pins and isolation facts</summary><div class="dbody">
 <pre>ExecutionSandbox.run_generated_code(script_path, script_name, expected_output, timeout=3600) -&gt; (bool, str)
 ExecutionSandbox.run_eval_script(eval_script_path, visual_judge_path, timeout=600) -&gt; (bool, str)
 ExecutionSandbox.select_generated_script(script_name) -&gt; Path | None
 ExecutionSandbox._create_or_reuse_base_venv() -&gt; Path
+ExecutionSandbox._discover_capsule_dependencies() -&gt; (list[str], list[str])
+ExecutionSandbox._remapped_imports_pipreqs_missed(present) -&gt; list[str]   # AST scan, new in 4020790
+ExecutionSandbox._copy_py_sources_for_analysis(dest) -&gt; None             # recursive *.py, new in 4020790
 ExecutionSandbox._parse_eval_output(output) -&gt; (bool, str)
 ExecutionSandbox.cleanup_shared_venv() -&gt; None   # also registered with atexit</pre>
-<p><code>SANDBOX_PYTHON_VERSION = "3.10"</code>, resolved from <code>$MIMOSA_SANDBOX_PYTHON</code> then <code>python3.10</code> on PATH; a version mismatch raises. <code>PINNED_CONSTRAINTS</code> caps <code>numpy&lt;2.0</code>, <code>pandas&lt;=1.5.3</code>, <code>torch&lt;=2.3.0</code>, <code>rdkit&lt;=2023.09.5</code> and others.</p>
-<p>What it isolates: the dependency set (own venv), the working directory (capsule copied to <code>/tmp/mimosa_sandbox_*/execution</code> or <code>/eval</code>), the GPU (<code>CUDA_VISIBLE_DEVICES=""</code>) and the process group (<code>SIGKILL</code> on timeout). What it does not isolate: the host environment (<code>os.environ.copy()</code>), the network, and the filesystem outside the temp directory.</p>
-<p>Caller timeouts: <code>CapsuleEvaluator</code> passes 900 s for VER and 300 s for the grader.</p>
+<p><code>SANDBOX_PYTHON_VERSION = "3.10"</code>, resolved from <code>$MIMOSA_SANDBOX_PYTHON</code> then <code>python3.10</code> on PATH; a version mismatch raises. <code>PINNED_CONSTRAINTS</code> (20 entries) caps <code>numpy&lt;2.0</code>, <code>pandas&lt;=1.5.3</code>, <code>torch&lt;=2.3.0</code>, <code>rdkit&lt;=2023.09.5</code> and others.</p>
+<p>Provisioning changes committed in <code>4020790</code>: pins <code>deepchem&lt;=2.7.1</code>, <code>torchdata&lt;0.10</code>, <code>tensorflow-probability&lt;=0.24.0</code>; <code>IMPORT_NAME_REMAP</code> adds <code>skgstat -&gt; scikit-gstat</code> and <code>osgeo -&gt; gdal</code>; <code>EXTRA_DEPS</code> adds <code>deepchem -&gt; pyyaml</code> and <code>phonopy -&gt; seekpath</code>. pipreqs now sees nested worker scripts, an AST scan adds remapped imports that pipreqs dropped, and <code>_subprocess_env</code> sets <code>TF_USE_LEGACY_KERAS=1</code>. New pins change <code>_venv_fingerprint</code>, so the next run builds a new venv.</p>
+<p>What it isolates: the dependency set (own venv), the working directory (capsule copied to <code>/tmp/mimosa_sandbox_*/execution</code> or <code>/eval</code>), the GPU (<code>CUDA_VISIBLE_DEVICES=""</code>) and the process group (<code>SIGKILL</code> on timeout). What it does not isolate: the host environment (<code>os.environ.copy()</code>), the network, and the filesystem outside the temp directory. <code>run_generated_code</code> copies <code>pred_results/</code> back into the graded folder.</p>
+<p>Caller timeouts: <code>CapsuleEvaluator</code> passes 900 s for VER and 300 s for the grader. Tests: <code class="path">tests/test_sandbox_provisioning_pins.py</code> (20 tests), <code class="path">tests/test_sandbox_source_build_constraints.py</code>.</p>
 </div></details>
 </div>
 
@@ -284,7 +418,7 @@ CapsuleEvaluator.calculate_codebert_score() -&gt; float
 CapsuleEvaluator.save_results(output_path=None) -&gt; Path
 CapsuleEvaluator._expected_outputs() -&gt; list[str]  # adds literal pred_results/ paths found in the grader</pre>
 <p>Rules: VER runs the generated script; if VER is false, SR is set false without running the grader. If SR is true, CBS is set to <code>1.0</code> without computing it. An <code>EvalInfraError</code> sets <code>status: "excluded"</code> and VER/SR/CBS to <code>None</code>.</p>
-<p><code>evaluation_results.json</code> keys: <code>task_id</code>, <code>timestamp</code>, <code>status</code>, <code>VER</code>, <code>VER_message</code>, <code>SR</code>, <code>SR_message</code>, <code>CBS</code>, <code>cost_usd</code>, <code>summary</code>, plus <code>infra_error</code> or <code>CBS_error</code> when present.</p>
+<p><code>evaluation_results.json</code> keys: <code>task_id</code>, <code>timestamp</code>, <code>status</code>, <code>VER</code>, <code>VER_message</code>, <code>SR</code>, <code>SR_message</code>, <code>CBS</code>, <code>cost_usd</code>, <code>summary</code>, plus <code>infra_error</code> or <code>CBS_error</code> when present. In gold mode <code>CsvEvaluationMode._stamp_gold_capsule_results</code> adds the 4 leak keys after <code>save_results()</code>; the metric keys stay unchanged.</p>
 </div></details>
 </div>
 
@@ -319,10 +453,10 @@ preload_codebert_model() -&gt; tuple | None</pre>
 <tr><td class="sym">eval_plot_trees_count.py</td><td>the full judge response text; pass needs <code>score &gt;= 60</code></td><td>Geographical Information Science</td></tr>
 <tr><td class="sym">mountainLion3_eval.py</td><td><code>land cover: &lt;float&gt;; protected status: &lt;float&gt;</code>; each above 70 %</td><td>Geographical Information Science</td></tr>
 <tr><td class="sym">eval_polynomial_fit.py</td><td><code>N/A</code>; passes only on exact header and row equality</td><td>Geographical Information Science</td></tr>
-<tr><td class="sym">gpt4_visual_judge.py</td><td>three judge responses and the averaged <code>[FINAL SCORE]</code></td><td>not a task; imported by 69 graders</td></tr>
+<tr><td class="sym">gpt4_visual_judge.py</td><td>three judge responses and the averaged <code>[FINAL SCORE]</code>; OpenRouter fallback</td><td>not a task; imported by 69 graders</td></tr>
 </tbody>
 </table>
-<p class="sub">Rows above were read from the grader source; the family column comes from <code class="path">datasets/ScienceAgentBench_backup_full.csv</code> (102 rows). The graded <code class="path">datasets/ScienceAgentBench.csv</code> in this working tree holds only the first 20 of those rows.</p>
+<p class="sub">Rows above were read from the grader source; the family column comes from <code class="path">datasets/ScienceAgentBench_backup_full.csv</code> (102 rows). The graded <code class="path">datasets/ScienceAgentBench.csv</code> in this working tree (uncommitted change) holds 20 of those rows, all Computational Chemistry (<code>instance_id</code> 1, 2, 3, 9, 16 &#8230; 102), byte-equal to the full file (my check).</p>
 
 <div class="note say">An infra failure excludes a task instead of scoring <code>SR = 0</code>, so a broken sandbox never looks like a failed agent.</div>
 
@@ -351,7 +485,7 @@ output_fname  eval_script_name  scoring_rubric_file</pre>
 <pre>CsvEvaluationMode._evaluate_snapshot_ablations -&gt;
   {evolution_index, uuid, VER, VER_message, SR, SR_message,
    CBS, cost, status, source, infra_error?}</pre>
-<p>Source of the rows: <code>/tmp/mimosa_run_&lt;session_id&gt;_&lt;uuid&gt;</code>, one folder per evolution iteration, written by <code>sources/utils/workspace_management.py::WorkspaceManager.save_run_snapshot</code>. <code>_sort_key</code> orders folders by <code>evolution_index</code>, with orphan uuids last.</p>
+<p>Source of the rows: <code>/tmp/mimosa_run_&lt;session_id&gt;_&lt;uuid&gt;</code>, one folder per evolution iteration, written by <code>sources/utils/workspace_management.py::WorkspaceManager.save_run_snapshot</code>. <code>_sort_key</code> orders folders by <code>evolution_index</code>, with orphan uuids last. Each non-best row comes from <code>grade_directory</code> plus <code>evolution_index</code>, <code>uuid</code> and <code>source</code>.</p>
 <p>The best run is not re-graded: its snapshot equals the capsule, so <code>source: "capsule"</code> reuses the capsule metrics. Every other row is <code>source: "snapshot"</code>.</p>
 </div></details>
 <details><summary>run-notes keys written per task</summary><div class="dbody">
@@ -361,7 +495,7 @@ output_fname  eval_script_name  scoring_rubric_file</pre>
  task_cost, max_judge_reward, evolution_iterations, evolved_workflows_uuids,
  evolution_rewards, evolution_costs, evolution_total_cost,
  evolution_avg_reward, evolution_avg_cost, ablations}</pre>
-<p>Path and keys from <code>csv_mode.py::CsvEvaluationMode._save_run_notes</code>.</p>
+<p>Path and keys from <code>csv_mode.py::CsvEvaluationMode._save_run_notes</code>. Gold mode adds 4 keys: <code>verifier_kind</code> (<code>"gold"</code>), <code>oracle_feedback</code> (<code>true</code>), <code>gold_feedback_reward</code>, <code>benchmark_leak_warning</code> (<code>LEAK_WARNING</code> from <code class="path">sources/evaluators/gold_feedback/leak.py</code>). <span class="chip warn">oracle - leaks gold</span></p>
 <p>After the loop, <code>_print_final_summary</code> appends <code>final_results</code> and <code>finished_at</code> to the notes file when the run came from the evaluation CLI.</p>
 </div></details>
 </div>
@@ -404,18 +538,37 @@ output_fname  eval_script_name  scoring_rubric_file</pre>
 <p class="role"><code>LocalTransfer</code> and <code>WorkspaceManager</code> write capsules and snapshots.</p>
 <p class="meta">L1 page</p>
 </div>
+<div class="card l4">
+<h4><a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a></h4>
+<p class="role">ORACLE verifier that calls <code>grade_directory</code> once per generation; see also <a href="file_gold_grader.html">file_gold_grader.html</a>.</p>
+<p class="meta">L2 page &#183; <span class="chip warn">oracle - leaks gold</span></p>
+</div>
 <div class="card ice">
 <h4><a href="area_tests.html">area_tests.html</a></h4>
-<p class="role">Tests that cover this area: <code class="path">tests/test_benchmark_eval_error_handling.py</code>, <code class="path">tests/scenario_rubric_test.py</code>.</p>
+<p class="role">Tests that cover this area; list below.</p>
 <p class="meta">L1 page &#183; coverage matrix</p>
+<details><summary>test files for this area</summary><div class="dbody">
+<pre>tests/test_benchmark_eval_error_handling.py     _parse_eval_output, error paths
+tests/scenario_rubric_test.py                   ScenarioLoader
+tests/csv_mode_ablation_index_test.py           _evaluate_snapshot_ablations index map
+tests/csv_mode_run_notes_fallback_test.py       _save_run_notes fallback (4 tests)
+tests/csv_mode_cache_restore_test.py            run-notes cache restore
+tests/csv_mode_logging_test.py                  EVAL_LOG_FILE handler
+tests/csv_mode_network_retry_test.py            network retry
+tests/test_sandbox_provisioning_pins.py         pins, remaps, AST scan (20 tests)
+tests/test_sandbox_source_build_constraints.py  SOURCE_BUILD_CONSTRAINTS
+tests/gold_feedback_test.py                     grade_directory, _set_gold_feedback_task,
+                                                capsule leak markers</pre>
+<p>No test found that checks the 4 leak keys in the run-notes JSON (my grep for <code>benchmark_leak_warning</code> in <code class="path">tests/</code> finds only the capsule test).</p>
+</div></details>
 </div>
 </div>
 </div>
 
 <footer>
-<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code class="path">sources/benchmark_evaluation/__init__.py</code>, <code>csv_mode.py</code>, <code>execution_sandbox.py</code>, <code>capsule_evaluator.py</code>, <code>science_agent_bench.py</code>, <code>scenario_loader.py</code>, <code>codebert_scorer.py</code>, <code>eval_workflow_generation.py</code>, <code>config.py</code> (lines 110-126), <code>main.py</code> (lines 160-200), <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code>AGENTS.md</code> (evidence map), <code class="path">datasets/ScienceAgentBench/eval_programs/</code> (13 files opened, all 111 scanned for the judge import), <code class="path">datasets/ScienceAgentBench.csv</code>, <code class="path">datasets/ScienceAgentBench_backup_full.csv</code>.</p>
-<p class="skips">Skipped: <code class="path">tests/brute_gold_eval.py</code> (manual gold-scoring helper, not part of the library); <code>datasets/ScienceAgentBench/{datasets,datasets_chemistry,gold_programs,scoring_rubrics}</code> beyond counting (Tier D data, summarized as counts); <code>gold_results/</code> contents (referenced by path only); <code>datasets/*.csv</code> other than the two named (header check only); <code>sources/benchmark_evaluation/__pycache__</code> (compiled); the 98 unopened graders (pattern check only, as noted in the table); <code>experiments_verifiers/</code>, <code>tmp/</code>, <code>.venv/</code> (not this area).</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time.</p>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code class="path">sources/benchmark_evaluation/__init__.py</code>, <code>csv_mode.py</code>, <code>execution_sandbox.py</code>, <code>capsule_evaluator.py</code>, <code>science_agent_bench.py</code>, <code>scenario_loader.py</code>, <code>codebert_scorer.py</code>, <code>eval_workflow_generation.py</code>, <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>, <code class="path">sources/evaluators/gold_feedback/grader.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (<code>evaluate</code> only), <code class="path">sources/evaluators/gold_feedback/leak.py</code>, <code>config.py</code> (lines 100-121, 165-176), <code>main.py</code> (lines 186-254), <code>git diff 336fe19</code> of <code>csv_mode.py</code> and <code>execution_sandbox.py</code>, the test files listed above, <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code>AGENTS.md</code> (evidence map), <code class="path">datasets/ScienceAgentBench/eval_programs/</code> (13 files opened, all 111 scanned for the judge import), <code class="path">datasets/ScienceAgentBench.csv</code>, <code class="path">datasets/ScienceAgentBench_backup_full.csv</code>.</p>
+<p class="skips">Skipped: <code class="path">tests/brute_gold_eval.py</code> (manual gold-scoring helper, not part of the library); <code>datasets/ScienceAgentBench/{datasets,datasets_chemistry,gold_programs,scoring_rubrics}</code> beyond counting (Tier D data, summarized as counts); <code>gold_results/</code> contents (referenced by path only); <code>datasets/*.csv</code> other than the two named (header check only); <code>sources/benchmark_evaluation/__pycache__</code> (compiled); the 98 unopened graders (pattern check only, as noted in the table); <code>experiments_verifiers/</code>, <code>tmp/</code>, <code>.venv/</code> (not this area); the other gold_feedback files (<code>format.py</code>, <code>reward.py</code>, most of <code>evaluator.py</code>) because <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> covers them.</p>
+<p>Built at <code>4020790 + uncommitted working tree, 2026-09-28</code>. Previous build of this page: <code>7e8463b</code>. <code>snapshot_grading.py</code> and the gold-mode code in <code>csv_mode.py</code> are uncommitted; the sandbox changes are in <code>4020790</code>.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

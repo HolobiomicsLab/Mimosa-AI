@@ -7,6 +7,32 @@ from sources.utils import paths
 from sources.utils.pricing import OpenRouterPricingClient
 
 
+def _json_bool(value: Any, default: bool) -> bool:
+    """Parse a JSON config boolean, accepting common string spellings.
+
+    ``bool("false")`` is ``True``; this helper maps ``"false"``, ``"0"``,
+    ``"no"``, ``"off"`` and ``""`` to ``False`` and ``"true"``, ``"1"``,
+    ``"yes"``, ``"on"`` to ``True``. Other types fall back to ``bool()``.
+
+    Args:
+        value: The raw JSON value (``None`` means "absent").
+        default: Returned when *value* is ``None`` or an unknown string.
+
+    Returns:
+        The parsed boolean.
+    """
+    if value is None:
+        return default
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in ("false", "0", "no", "off", ""):
+            return False
+        if text in ("true", "1", "yes", "on"):
+            return True
+        return default
+    return bool(value)
+
+
 @dataclass
 class AddressMCP:
     """Represents an MCP server address with port range."""
@@ -72,8 +98,26 @@ class Config:
         ##############
         # "hybrid" (default) = E19/E19b hybrid verifier
         # (sources/evaluators/hybrid_verifier); "legacy" = the deprecated
-        # multi-source per-claim verifier (sources/evaluators/verifier.py).
+        # multi-source per-claim verifier (sources/evaluators/verifier.py);
+        # "gold" = ORACLE / BENCHMARK-LEAKING control
+        # (sources/evaluators/gold_feedback): hybrid reward, but the textual
+        # gradient is the benchmark grader's own VER/SR feedback. Research
+        # only (E43) — never report benchmark scores from a gold run.
         self.verifier_kind: str = "hybrid"
+        # verifier_kind="gold" only: also take the reward (QD score, early
+        # stop, capsule argmax) from the benchmark grader (full oracle:
+        # SR -> 1.0, VER -> 0.5*CBS, else 0.0). Default False = gradient-only.
+        self.gold_feedback_reward: bool = False
+        # verifier_kind="gold" only: wall-clock cap (seconds) on the
+        # benchmark grading of one generation (VER re-run <= 900 s + SR eval
+        # <= 300 s + CBS). On timeout the grade is censored and the hybrid
+        # gradient is used.
+        self.gold_feedback_timeout_s: int = 1800
+        # Runtime-only benchmark task context for verifier_kind="gold", set
+        # per task by csv_mode (never serialized): the CSV row and the
+        # ScienceAgentBenchLoader used to grade each generation.
+        self.gold_feedback_task_row: dict | None = None
+        self.gold_feedback_sab_loader: Any = None
         # Target key-claim count per task (extraction accepts ±2).
         self.hybrid_verifier_num_claims: int = 10
         # Max replacement claims requested per generation (E19b refinement).
@@ -392,6 +436,8 @@ class Config:
             "vision_judge_model": self.vision_judge_model,
             "capsule_namer_model": self.capsule_namer_model,
             "verifier_kind": self.verifier_kind,
+            "gold_feedback_reward": self.gold_feedback_reward,
+            "gold_feedback_timeout_s": self.gold_feedback_timeout_s,
             "hybrid_verifier_num_claims": self.hybrid_verifier_num_claims,
             "hybrid_verifier_refinement_rounds": self.hybrid_verifier_refinement_rounds,
             "hybrid_verifier_scorer_timeout_s": self.hybrid_verifier_scorer_timeout_s,
@@ -468,6 +514,12 @@ class Config:
             "capsule_namer_model", self.capsule_namer_model
         )
         self.verifier_kind = str(data.get("verifier_kind", self.verifier_kind))
+        self.gold_feedback_reward = _json_bool(
+            data.get("gold_feedback_reward"), self.gold_feedback_reward
+        )
+        self.gold_feedback_timeout_s = int(
+            data.get("gold_feedback_timeout_s", self.gold_feedback_timeout_s)
+        )
         self.hybrid_verifier_num_claims = int(
             data.get("hybrid_verifier_num_claims", self.hybrid_verifier_num_claims)
         )

@@ -261,7 +261,7 @@
   <text class="edge-label" x="580" y="70" text-anchor="middle">appends</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - only the <code>verdict</code> dict crosses to disk. <code>_build_qd_archive_entry</code> (<code>evolution_engine.py:1023</code>) picks 14 of the 19 keys; the archive list dies with the process. Written keys: <code>qd_descriptor</code>, <code>qd_score</code>, <code>quality_norm</code>, <code>novelty_norm</code>, <code>novelty_score</code>, <code>is_valid</code>, <code>admit_rejected</code>, <code>archive_size</code>, <code>evicted_uuid</code>.</p>
+<p class="figcap">Diagram 3 - only the <code>verdict</code> dict crosses to disk. <code>_build_qd_archive_entry</code> (<code>evolution_engine.py:1150</code>) picks 14 of the 19 keys; the archive list dies with the process. Written keys: <code>qd_descriptor</code>, <code>qd_score</code>, <code>quality_norm</code>, <code>novelty_norm</code>, <code>novelty_score</code>, <code>is_valid</code>, <code>admit_rejected</code>, <code>archive_size</code>, <code>evicted_uuid</code>.</p>
 </div>
 
 <div class="panel" id="cards"><span class="br"></span>
@@ -319,7 +319,7 @@ _best_reward(runs) -&gt; float                          # line 741
 _cosine_distance(a, b) -&gt; float                      # line 754
 _length_penalty(chars, baseline_chars) -&gt; float      # line 776
 _genotype_chars(run) -&gt; int                          # line 792</pre>
-<p>Config fields read by the caller (<code>sources/core/evolution_engine.py:95-106</code>): <code>min_improvement_threshold</code>, <code>selection_strategy</code>, <code>population_size</code>, <code>novelty_k_neighbours</code>, <code>novelty_weight</code>, <code>admit_threshold</code>, <code>novelty_comparison</code>, <code>novelty_previous_n</code>, <code>length_penalty_baseline_chars</code>, <code>length_penalty_lambda</code>. <code>crossover_rate</code> reaches <code>select_parents</code> through <code>EvolutionEngine</code>.</p>
+<p>Config fields read by the caller (<code>sources/core/evolution_engine.py:205-216</code>): <code>min_improvement_threshold</code>, <code>selection_strategy</code>, <code>population_size</code>, <code>novelty_k_neighbours</code>, <code>novelty_weight</code>, <code>admit_threshold</code>, <code>novelty_comparison</code>, <code>novelty_previous_n</code>, <code>length_penalty_baseline_chars</code>, <code>length_penalty_lambda</code>. <code>crossover_rate</code> reaches <code>select_parents</code> through <code>EvolutionEngine</code>.</p>
 <p>The module also carries a <code>__main__</code> smoke block (line 799) that asserts the length penalty and the <code>previous_n</code> window; it is not run by the app.</p>
 </div></details>
 </div>
@@ -327,7 +327,7 @@ _genotype_chars(run) -&gt; int                          # line 792</pre>
 <div class="card l2" id="card-ws">
 <h4><a href="../../sources/core/workflow_selection.py">sources/core/workflow_selection.py</a></h4>
 <p class="role">Discovers on-disk workflow folders, ranks them by task similarity and score, and returns the parents the evolution loop mutates.</p>
-<p class="meta">396 lines &#183; classes: <code>WorkflowSelector</code>, <code>_WorkflowScoreAdapter</code> &#183; imports from <code>selection.py</code>: <code>PopulationMember</code>, <code>SelectionPressure</code> &#183; imports <code>WorkflowInfo</code>, <code>lineage.scan_all</code></p>
+<p class="meta">416 lines &#183; classes: <code>WorkflowSelector</code>, <code>_WorkflowScoreAdapter</code> &#183; imports from <code>selection.py</code>: <code>PopulationMember</code>, <code>SelectionPressure</code> &#183; imports <code>WorkflowInfo</code>, <code>lineage.scan_all</code></p>
 <details><summary>signatures - sources/core/workflow_selection.py</summary><div class="dbody">
 <pre>class _WorkflowScoreAdapter                          # line 17
   __slots__ = ("workflow_info", "reward")
@@ -347,8 +347,8 @@ class WorkflowSelector                               # line 40
   _select_from_archive(selection_pressure, n_parents, crossover_rate) -&gt; tuple[list[WorkflowInfo], bool]
   select_parent_workflows(goal, selection_pressure, n_parents=2, crossover_rate=0.1,
                           threshold_similarity=0.8, threshold_score=0.1) -&gt; tuple[list[WorkflowInfo], bool]</pre>
-<p>Two constructor defaults differ from the call site in <code>evolution_engine.py:299-306</code>: there <code>crossover_rate</code> comes from <code>config.crossover_rate</code>, and the thresholds come from <code>parent_threshold_similarity</code> / <code>parent_threshold_score</code>.</p>
-<p><code>discover_workflows</code> skips folders named with <code>single_agent</code>, folders that fail <code>WorkflowInfo.is_valid()</code>, folders with an empty <code>state_result</code>, and folders with no loadable genotype code.</p>
+<p>Two constructor defaults differ from the call site in <code>evolution_engine.py:409-416</code>: there <code>crossover_rate</code> comes from <code>config.crossover_rate</code>, and the thresholds come from <code>parent_threshold_similarity</code> / <code>parent_threshold_score</code>.</p>
+<p><code>discover_workflows</code> skips folders named with <code>single_agent</code>, folders that fail <code>WorkflowInfo.is_valid()</code>, folders with an empty <code>state_result</code>, oracle folders (<code>is_oracle_generation</code>) unless <code>verifier_kind == "gold"</code>, and folders with no loadable genotype code (<code>workflow_selection.py:105-130</code>). Skipped oracle folders are counted and logged as <code>[LEAK GUARD]</code> (lines 132-140).</p>
 </div></details>
 </div>
 </div>
@@ -402,10 +402,10 @@ class WorkflowSelector                               # line 40
   </a>
 
   <a class="box" id="w6" href="#card-ws">
-    <title>WorkflowSelector.discover_workflows</title>
+    <title>WorkflowSelector.discover_workflows: scans config.workflow_dir; oracle folders are skipped unless verifier_kind is gold (parent-pool leak guard).</title>
     <rect x="620" y="120" width="280" height="56" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="760" y="144" text-anchor="middle">discover_workflows</text>
-    <text class="box-sub" x="760" y="162" text-anchor="middle">scans config.workflow_dir</text>
+    <text class="box-sub" x="760" y="162" text-anchor="middle">skips oracle unless gold run</text>
   </a>
   <a class="box" id="w7" href="#card-ws">
     <title>WorkflowSelector.sort_similar_workflows</title>
@@ -459,7 +459,7 @@ class WorkflowSelector                               # line 40
 
 </svg>
 </div>
-<p class="figcap">Diagram 4 - two paths into one return value (<code>select_parent_workflows</code>, <code>workflow_selection.py:300</code>). The cold-start path wraps each candidate in <code>_WorkflowScoreAdapter</code> so <code>select_parents</code> can read <code>reward</code> from a <code>WorkflowInfo</code>. Shared with <code>selection.py</code>: <code>PopulationMember</code>, <code>SelectionPressure</code>, <code>select_parents</code>, the <code>_archive</code> list.</p>
+<p class="figcap">Diagram 4 - two paths into one return value (<code>select_parent_workflows</code>, <code>workflow_selection.py:320</code>). The cold-start path wraps each candidate in <code>_WorkflowScoreAdapter</code> so <code>select_parents</code> can read <code>reward</code> from a <code>WorkflowInfo</code>. Shared with <code>selection.py</code>: <code>PopulationMember</code>, <code>SelectionPressure</code>, <code>select_parents</code>, the <code>_archive</code> list. The oracle skip filters this parent pool only; the shipped capsule is chosen by <code>evolution_engine.py::_select_best_run</code>, which has no oracle test and drops <code>FALLBACK_REWARD_KINDS</code> rewards instead.</p>
 
 <h3>Shared symbols and what the second module adds</h3>
 <table>
@@ -498,23 +498,23 @@ class WorkflowSelector                               # line 40
 <table>
 <thead><tr><th>Field</th><th>Default in config.py</th><th>Read by</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td class="sym">selection_strategy</td><td class="sym">"qd" (line 131)</td><td class="sym">evolution_engine.py:98</td><td>Picks the validator and parent draw.</td></tr>
-<tr><td class="sym">population_size</td><td class="sym">16 (line 143)</td><td class="sym">evolution_engine.py:99</td><td>Archive capacity; over-capacity evicts lowest qd_score.</td></tr>
-<tr><td class="sym">novelty_weight</td><td class="sym">0.25 (line 145)</td><td class="sym">evolution_engine.py:101</td><td>The <code>w</code> in qd_score; 0 is pure quality, 1 pure novelty.</td></tr>
-<tr><td class="sym">novelty_k_neighbours</td><td class="sym">16 (line 144)</td><td class="sym">evolution_engine.py:100</td><td>k for k-NN novelty in <code>archive_knn</code> mode.</td></tr>
-<tr><td class="sym">novelty_comparison</td><td class="sym">"archive_knn" (line 136)</td><td class="sym">evolution_engine.py:103</td><td>Peer set: whole archive, or the recent window.</td></tr>
-<tr><td class="sym">novelty_previous_n</td><td class="sym">16 (line 137)</td><td class="sym">evolution_engine.py:104</td><td>Window size for <code>previous_n</code> mode.</td></tr>
-<tr><td class="sym">admit_threshold</td><td class="sym">0.3 (line 146)</td><td class="sym">evolution_engine.py:102</td><td>Admit when qd_score clears 0.3.</td></tr>
-<tr><td class="sym">min_improvement_threshold</td><td class="sym">0.01 (line 142)</td><td class="sym">evolution_engine.py:97</td><td>Relative-improvement bar for the greedy part of the gate.</td></tr>
-<tr><td class="sym">length_penalty_baseline_chars</td><td class="sym">8000 (line 139)</td><td class="sym">evolution_engine.py:105</td><td>Penalty grows above 8 000 characters of genotype source.</td></tr>
-<tr><td class="sym">length_penalty_lambda</td><td class="sym">0.05 (line 140)</td><td class="sym">evolution_engine.py:106</td><td>Weight of the penalty subtracted from qd_score.</td></tr>
-<tr><td class="sym">crossover_rate</td><td class="sym">0.4 (line 149)</td><td class="sym">evolution_engine.py:295</td><td>Probability of crossover over mutation for the parent draw.</td></tr>
+<tr><td class="sym">selection_strategy</td><td class="sym">"qd" (line 184)</td><td class="sym">evolution_engine.py:208</td><td>Picks the validator and parent draw.</td></tr>
+<tr><td class="sym">population_size</td><td class="sym">16 (line 196)</td><td class="sym">evolution_engine.py:209</td><td>Archive capacity; over-capacity evicts lowest qd_score.</td></tr>
+<tr><td class="sym">novelty_weight</td><td class="sym">0.25 (line 198)</td><td class="sym">evolution_engine.py:211</td><td>The <code>w</code> in qd_score; 0 is pure quality, 1 pure novelty.</td></tr>
+<tr><td class="sym">novelty_k_neighbours</td><td class="sym">16 (line 197)</td><td class="sym">evolution_engine.py:210</td><td>k for k-NN novelty in <code>archive_knn</code> mode.</td></tr>
+<tr><td class="sym">novelty_comparison</td><td class="sym">"archive_knn" (line 189)</td><td class="sym">evolution_engine.py:213</td><td>Peer set: whole archive, or the recent window.</td></tr>
+<tr><td class="sym">novelty_previous_n</td><td class="sym">16 (line 190)</td><td class="sym">evolution_engine.py:214</td><td>Window size for <code>previous_n</code> mode.</td></tr>
+<tr><td class="sym">admit_threshold</td><td class="sym">0.3 (line 199)</td><td class="sym">evolution_engine.py:212</td><td>Admit when qd_score clears 0.3.</td></tr>
+<tr><td class="sym">min_improvement_threshold</td><td class="sym">0.01 (line 195)</td><td class="sym">evolution_engine.py:207</td><td>Relative-improvement bar for the greedy part of the gate.</td></tr>
+<tr><td class="sym">length_penalty_baseline_chars</td><td class="sym">8000 (line 192)</td><td class="sym">evolution_engine.py:215</td><td>Penalty grows above 8 000 characters of genotype source.</td></tr>
+<tr><td class="sym">length_penalty_lambda</td><td class="sym">0.05 (line 193)</td><td class="sym">evolution_engine.py:216</td><td>Weight of the penalty subtracted from qd_score.</td></tr>
+<tr><td class="sym">crossover_rate</td><td class="sym">0.4 (line 202)</td><td class="sym">evolution_engine.py:405</td><td>Probability of crossover over mutation for the parent draw.</td></tr>
 </tbody>
 </table>
 <details><summary>formula and defaults in context</summary><div class="dbody">
 <blockquote>qd_score = (1 - novelty_weight) * quality_norm + novelty_weight * novelty_norm - length_penalty_lambda * length_penalty</blockquote>
 <p>Path: <code class="path">sources/core/selection.py</code> lines 620-635 (<code>_compose_qd_score</code>). <code>quality_norm = min(max(reward, 0), 1)</code>; <code>novelty_norm = min(novelty / novelty_range, 1)</code>; <code>length_penalty = clip((chars - 8000) / 8000, 0, 1)</code> (<code>_length_penalty</code>, line 776).</p>
-<p>Class-level constructor defaults differ from the Config fields: <code>population_size=25</code>, <code>novelty_k_neighbours=10</code>, <code>admit_threshold=0.3</code>, <code>previous_n=5</code>, <code>length_penalty_baseline_chars=5000</code> (<code>selection.py:83-107</code>). The call in <code>evolution_engine.py:95</code> always passes the Config values, so the constructor defaults only apply to direct users such as <code class="path">tests/selection_test.py</code>.</p>
+<p>Class-level constructor defaults differ from the Config fields: <code>population_size=25</code>, <code>novelty_k_neighbours=10</code>, <code>admit_threshold=0.3</code>, <code>previous_n=5</code>, <code>length_penalty_baseline_chars=5000</code> (<code>selection.py:83-107</code>). The call in <code>evolution_engine.py:205</code> always passes the Config values, so the constructor defaults only apply to direct users such as <code class="path">tests/selection_test.py</code>.</p>
 <p>Novelty value range: <code>_cosine_distance</code> returns <code>1 - cosine_similarity</code> in <code>[0, 2]</code>, and returns the neutral <code>1.0</code> when either vector is empty or the shapes differ (<code>selection.py:754</code>).</p>
 </div></details>
 </div>
@@ -540,13 +540,13 @@ class WorkflowSelector                               # line 40
 <thead><tr><th>Doc claim</th><th>Code</th></tr></thead>
 <tbody>
 <tr><td class="sym">docs/DEVELOPER_GUIDE.md:283 - <code>MAX_CHILDREN_PER_PARENT = 2</code></td><td class="sym">selection.py:24 - <code>= 8</code></td></tr>
-<tr><td class="sym">docs/concepts/evolution-engine.md:66 - <code>population_size = 20</code></td><td class="sym">config.py:143 - <code>16</code></td></tr>
-<tr><td class="sym">docs/concepts/evolution-engine.md:76 - <code>k = 15</code></td><td class="sym">config.py:144 - <code>16</code></td></tr>
+<tr><td class="sym">docs/concepts/evolution-engine.md:66 - <code>population_size = 20</code></td><td class="sym">config.py:196 - <code>16</code></td></tr>
+<tr><td class="sym">docs/concepts/evolution-engine.md:76 - <code>k = 15</code></td><td class="sym">config.py:197 - <code>16</code></td></tr>
 <tr><td class="sym">docs/concepts/evolution-engine.md:68 - qd_score without penalty</td><td class="sym">selection.py:634 - subtracts <code>lambda * length_penalty</code></td></tr>
 </tbody>
 </table>
 <p class="note flag">Red note: the three numeric claims above contradict the code at commit <code>7e8463b</code>; the qd_score formula in both docs omits the <code>- lambda * length_penalty</code> term that <code>_compose_qd_score</code> applies.</p>
-<p class="note">Amber note: <code>config_default.json</code> ships <code>crossover_rate</code> 0.25 while <code>config.py</code> defaults to 0.4, and the <code>getattr</code> fallbacks in <code>evolution_engine.py:99-104</code> (50, 15, 5) differ from the Config defaults they normally read.</p>
+<p class="note">Amber note: <code>config_default.json</code> ships <code>crossover_rate</code> 0.25 while <code>config.py</code> defaults to 0.4, and the <code>getattr</code> fallbacks in <code>evolution_engine.py:209-214</code> (50, 15, 5) differ from the Config defaults they normally read.</p>
 <p class="note say">Why it matters: qd_score keeps a low-reward but differently-written workflow alive, so reward alone does not decide which code survives.</p>
 </div>
 
@@ -565,9 +565,9 @@ class WorkflowSelector                               # line 40
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/core/selection.py</code> (842 lines), <code class="path">sources/core/workflow_selection.py</code> (396 lines), <code>config.py</code> (selection block lines 131-149, 507-545), <code>config_default.json</code>, <code class="path">sources/core/evolution_engine.py</code> (lines 90-106, 285-320, 545-600, 940-985, 1023-1090), <code class="path">sources/core/schema.py</code> (<code>IndividualRun</code>, <code>SelectionLog</code>), <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/utils/archive_projection.py</code>, <code class="path">tests/selection_test.py</code>, <code class="path">docs/DEVELOPER_GUIDE.md</code>, <code class="path">docs/concepts/evolution-engine.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>.</p>
+<p>Sources read: <code class="path">sources/core/selection.py</code> (842 lines), <code class="path">sources/core/workflow_selection.py</code> (416 lines), <code>config.py</code> (selection block lines 184-207, 579-617), <code>config_default.json</code>, <code class="path">sources/core/evolution_engine.py</code> (lines 200-216, 368-420, 670-690, 1150-1170), <code class="path">sources/core/schema.py</code> (<code>IndividualRun</code>, <code>SelectionLog</code>), <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/utils/archive_projection.py</code>, <code class="path">tests/selection_test.py</code>, <code class="path">docs/DEVELOPER_GUIDE.md</code>, <code class="path">docs/concepts/evolution-engine.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>.</p>
 <p class="skips">Skipped: <code class="path">sources/core/genotype_embedding.py</code> and <code>code_features.py</code> internals (chunking, backends) because the genotype page covers them; only the descriptor contract matters here. Skipped <code class="path">sources/core/single_agent_factory.py</code> and <code>orchestrator.py</code> because they do not call selection. Skipped the <code>__main__</code> smoke blocks in both files beyond noting they exist. Skipped <code class="path">sources/workflows/</code>, <code>run_notes/</code>, <code>runs_capsule/</code> because they are runtime data (Tier D for this page).</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (53 modified paths); <code>config.py</code> was reformatted but its selection values are unchanged, and neither <code>selection.py</code> nor <code>workflow_selection.py</code> was modified.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28. <code>selection.py</code> is unchanged since <code>7e8463b</code>; <code>workflow_selection.py</code> gained the uncommitted oracle skip (+22/-2 lines), and engine and config line numbers were re-derived from the working tree.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

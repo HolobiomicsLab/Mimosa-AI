@@ -4,6 +4,40 @@ import re
 from pathlib import Path
 from statistics import mean
 
+#: ``evaluation.verifier.reward_fallback`` values whose reward is NOT on the
+#: comparable scale and must stay out of the capsule argmax. ``mean_claim``
+#: is the hybrid verifier's first-generation fallback; ``oracle_censored``
+#: marks a full-oracle gold-feedback generation whose benchmark grade was
+#: censored (it only carries the hybrid win-rate). ``short_circuit`` is a
+#: real measured 0.0 and is deliberately absent.
+FALLBACK_REWARD_KINDS = frozenset({"mean_claim", "oracle_censored"})
+
+#: Sidecar written by the gold-feedback (oracle) verifier in every
+#: generation folder it evaluates — the cheap on-disk leak marker.
+ORACLE_SIDECAR = "gold_feedback.json"
+
+
+def is_oracle_generation(workflow_folder: Path | str, state_result: dict | None = None) -> bool:
+    """True when a generation was evaluated by the benchmark-leaking gold verifier.
+
+    Args:
+        workflow_folder: The generation folder.
+        state_result: Its parsed ``state_result.json`` when already loaded.
+
+    Returns:
+        ``True`` if the gold-feedback sidecar exists or the persisted
+        ``evaluation.verifier.oracle`` flag is set.
+    """
+    folder = Path(workflow_folder)
+    if (folder / ORACLE_SIDECAR).exists():
+        return True
+    if isinstance(state_result, dict):
+        evaluation = state_result.get("evaluation") or {}
+        verifier = evaluation.get("verifier") if isinstance(evaluation, dict) else None
+        return isinstance(verifier, dict) and verifier.get("oracle") is True
+    return False
+
+
 class WorkflowInfo:
     """Lazy accessor for the artefacts of one workflow folder.
 
@@ -178,7 +212,7 @@ class WorkflowInfo:
         Read from :meth:`_selected_evaluation` so the flag always comes
         from the SAME block that produced ``overall_score``.
         """
-        return self._selected_evaluation().get("reward_fallback") == "mean_claim"
+        return self._selected_evaluation().get("reward_fallback") in FALLBACK_REWARD_KINDS
 
     @property
     def judge_evaluation(self) -> dict:

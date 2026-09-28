@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>reward.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators/gold_feedback &gt; reward.py">
+<div class="wrap">
+
+<h1 class="hud">reward.py</h1>
+<p class="intro">This 26-line file holds one function, <code>oracle_reward</code>, the full-oracle reward: 1.0 when SR passes, 0.5 x CBS after a clean re-run, else 0.0. <a href="file_gold_evaluator.html">GoldFeedbackEvaluator</a> calls it only when <code>gold_feedback_reward</code> is True and the grade is not censored.</p>
+<p><span class="chip warn">oracle - leaks gold</span> <span class="chip unknown">L4 verifier layer</span> <span class="chip unknown">new, uncommitted</span></p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; function and callers: grade in, reward float out, read by the evolution engine</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 350" role="img" aria-label="reward.py: config gold_feedback_reward enables full oracle; GoldFeedbackEvaluator passes the grade to oracle_reward, which returns a float in 0 to 1; the evolution engine reads it; censored grades get 0.0 in evaluator.py instead">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="r1" href="../../config.py">
+    <title>Default False = gradient-only oracle; CLI --gold_feedback_reward, main.py L85</title>
+    <rect x="20" y="20" width="220" height="96" rx="2" fill="rgba(230,251,255,0.06)" stroke="#E6FBFF"/>
+    <text class="box-label" x="130" y="44" text-anchor="middle">gold_feedback_reward</text>
+    <text class="box-sub" x="130" y="62" text-anchor="middle">config.py L110 &#183; default False</text>
+    <text class="box-sub" x="130" y="80" text-anchor="middle">CLI main.py L85</text>
+    <text class="box-sub" x="130" y="98" text-anchor="middle">read: evaluator.py L134</text>
+  </a>
+  <g class="box" id="r2">
+    <title>Normalised grade with status evaluated</title>
+    <rect x="20" y="160" width="220" height="80" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130" y="184" text-anchor="middle">grade dict</text>
+    <text class="box-sub" x="130" y="202" text-anchor="middle">SR &#183; VER &#183; CBS</text>
+    <text class="box-sub" x="130" y="220" text-anchor="middle">status evaluated</text>
+  </g>
+  <a class="box" id="r3" href="file_gold_evaluator.html">
+    <title>GoldFeedbackEvaluator._apply: calls oracle_reward only in full-oracle mode with status gold</title>
+    <rect x="290" y="60" width="240" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="410" y="84" text-anchor="middle">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="410" y="102" text-anchor="middle">_apply L345-L347</text>
+    <text class="box-sub" x="410" y="120" text-anchor="middle">full_oracle and</text>
+    <text class="box-sub" x="410" y="138" text-anchor="middle">status gold</text>
+    <text class="box-sub" x="410" y="156" text-anchor="middle">keeps hybrid_* values</text>
+    <text class="box-sub" x="522" y="73" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <a class="box" id="r4" href="../../sources/evaluators/gold_feedback/reward.py">
+    <title>The only function of the file: 3 branches, no I/O</title>
+    <rect x="580" y="60" width="220" height="110" rx="18" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="690" y="84" text-anchor="middle">oracle_reward</text>
+    <text class="box-sub" x="690" y="102" text-anchor="middle">L8 &#183; 26-line file</text>
+    <text class="box-sub" x="690" y="120" text-anchor="middle">SR -&gt; 1.0</text>
+    <text class="box-sub" x="690" y="138" text-anchor="middle">VER -&gt; 0.5 x CBS</text>
+    <text class="box-sub" x="690" y="156" text-anchor="middle">else 0.0</text>
+    <text class="box-sub" x="792" y="73" text-anchor="end" style="fill:#7DF9C7;letter-spacing:0.08em">ORACLE</text>
+  </a>
+  <g class="box" id="r5">
+    <title>Float in [0, 1]; the CBS branch is clamped and rounded to 4 decimals</title>
+    <rect x="850" y="60" width="230" height="110" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="965" y="84" text-anchor="middle">returns reward</text>
+    <text class="box-sub" x="965" y="102" text-anchor="middle">float in [0, 1]</text>
+    <text class="box-sub" x="965" y="120" text-anchor="middle">round 4 L25</text>
+    <text class="box-sub" x="965" y="138" text-anchor="middle">written as overall_score</text>
+    <text class="box-sub" x="965" y="156" text-anchor="middle">reward_source benchmark_grader</text>
+  </g>
+  <a class="box" id="r6" href="file_core_evolution_engine.html">
+    <title>Consumers of overall_score: early stop at 0.9, QD archive admit 0.3, capsule argmax</title>
+    <rect x="850" y="220" width="230" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="965" y="244" text-anchor="middle">evolution engine reads</text>
+    <text class="box-sub" x="965" y="262" text-anchor="middle">early stop &gt;= 0.9 L728</text>
+    <text class="box-sub" x="965" y="280" text-anchor="middle">admit_threshold 0.3</text>
+    <text class="box-sub" x="965" y="298" text-anchor="middle">_select_best_run L136</text>
+    <text class="box-sub" x="965" y="316" text-anchor="middle">not a fallback L106</text>
+  </a>
+  <a class="box" id="r7" href="file_gold_evaluator.html">
+    <title>Censored grade: evaluator sets CENSORED_ORACLE_REWARD 0.0 and reward_fallback oracle_censored, not this file</title>
+    <rect x="290" y="220" width="240" height="110" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="410" y="244" text-anchor="middle">censored: not this file</text>
+    <text class="box-sub" x="410" y="262" text-anchor="middle">CENSORED_ORACLE_REWARD 0.0</text>
+    <text class="box-sub" x="410" y="280" text-anchor="middle">evaluator.py L57 L379</text>
+    <text class="box-sub" x="410" y="298" text-anchor="middle">reward_fallback</text>
+    <text class="box-sub" x="410" y="316" text-anchor="middle">oracle_censored L381</text>
+  </a>
+  <path class="edge dashed-edge" data-from="r1" data-to="r3" d="M240,68 C265,68 265,95 290,95" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="262" y="70" text-anchor="start">flag</text>
+  <path class="edge dashed-edge" data-from="r2" data-to="r3" d="M240,200 C265,200 265,140 290,140" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="250" y="186" text-anchor="start">grade</text>
+  <path class="edge" data-from="r3" data-to="r4" d="M530,115 H580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="555" y="107" text-anchor="middle">L347</text>
+  <path class="edge" data-from="r4" data-to="r5" d="M800,115 H850" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="825" y="107" text-anchor="middle">float</text>
+  <path class="edge dashed-edge" data-from="r5" data-to="r6" d="M965,170 V220" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="978" y="200" text-anchor="start">overall_score</text>
+  <path class="edge" data-from="r3" data-to="r7" d="M410,170 V220" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="424" y="200" text-anchor="start">excluded grade</text>
+  <path class="edge dashed-edge" data-from="r7" data-to="r6" d="M530,275 H850" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="690" y="267" text-anchor="middle">0.0, fallback</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>reward.py::oracle_reward</code> L8 is the whole file. With <code>gold_feedback_reward</code> False (default) it is never called and the hybrid reward stays (<code>evaluator.py</code> L387). <code>evolution_engine.py::_run_reward_is_fallback</code> L106 treats <code>reward_source == "benchmark_grader"</code> as a real measurement, not a first-generation fallback.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; control: three branches, SR first</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1100 230" role="img" aria-label="oracle_reward control: SR true gives 1.0; else VER true gives 0.5 times CBS, rounded; else 0.0">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="w1">
+    <title>SR truthy</title>
+    <rect x="20" y="40" width="200" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="120" y="64" text-anchor="middle">SR true ?</text>
+    <text class="box-sub" x="120" y="82" text-anchor="middle">L21</text>
+  </g>
+  <g class="box" id="w2">
+    <title>Pass against the gold reference</title>
+    <rect x="20" y="140" width="200" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="120" y="164" text-anchor="middle">reward 1.0</text>
+    <text class="box-sub" x="120" y="182" text-anchor="middle">L22 &#183; reaches 0.9 stop</text>
+  </g>
+  <g class="box" id="w3">
+    <title>Clean re-execution but SR false</title>
+    <rect x="280" y="40" width="200" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="380" y="64" text-anchor="middle">VER true ?</text>
+    <text class="box-sub" x="380" y="82" text-anchor="middle">L23</text>
+  </g>
+  <g class="box" id="w4">
+    <title>CodeBERT similarity to the gold program, halved, clamped to [0, 1], 4 decimals; CBS None counts as 0.0</title>
+    <rect x="280" y="140" width="260" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="410" y="164" text-anchor="middle">round(0.5 x CBS, 4)</text>
+    <text class="box-sub" x="410" y="182" text-anchor="middle">L24-L25 &#183; max 0.5</text>
+  </g>
+  <g class="box" id="w5">
+    <title>Re-execution failed</title>
+    <rect x="560" y="40" width="200" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
+    <text class="box-label" x="660" y="64" text-anchor="middle">reward 0.0</text>
+    <text class="box-sub" x="660" y="82" text-anchor="middle">L26</text>
+  </g>
+  <g class="box" id="w6">
+    <title>Values checked by test_full_oracle_reward_comes_from_grader</title>
+    <rect x="600" y="120" width="480" height="90" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="840" y="144" text-anchor="middle">test values, L417-L426</text>
+    <text class="box-sub" x="840" y="162" text-anchor="middle">SR true, CBS 1.0 -&gt; 1.0</text>
+    <text class="box-sub" x="840" y="180" text-anchor="middle">VER true, SR false, CBS 0.6 -&gt; 0.3</text>
+    <text class="box-sub" x="840" y="198" text-anchor="middle">VER false, CBS 0.4 -&gt; 0.0</text>
+  </g>
+  <path class="edge" data-from="w1" data-to="w2" d="M120,98 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="134" y="124" text-anchor="start">yes</text>
+  <path class="edge" data-from="w1" data-to="w3" d="M220,69 H280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="250" y="61" text-anchor="middle">no</text>
+  <path class="edge" data-from="w3" data-to="w4" d="M380,98 V140" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="394" y="124" text-anchor="start">yes</text>
+  <path class="edge" data-from="w3" data-to="w5" d="M480,69 H560" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
+  <text class="edge-label" x="520" y="61" text-anchor="middle">no</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the SR branch does not read VER or CBS, and only the CBS branch is rounded. The top of the CBS branch is 0.5, below <code>learned_score_threshold</code> 0.9 (<code>config.py</code> L186), so with the default threshold only SR true can trigger the early stop.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">grade["SR"]</td><td>first test</td><td>pass gives 1.0</td><td class="size">L21</td></tr>
+<tr><td>reads</td><td class="sym">grade["VER"]</td><td>second test</td><td>clean re-run gives the CBS branch</td><td class="size">L23</td></tr>
+<tr><td>reads</td><td class="sym">grade["CBS"]</td><td>float(... or 0.0)</td><td>CodeBERT similarity to gold program</td><td class="size">L24</td></tr>
+<tr><td>config</td><td class="sym">gold_feedback_reward</td><td>read by evaluator.py L134, not here</td><td>decides if this function is called</td><td class="size">&#8212;</td></tr>
+<tr><td>writes</td><td class="sym">none</td><td>no I/O, no logger</td><td>evaluator.py writes overall_score</td><td class="size">&#8212;</td></tr>
+<tr><td>returns</td><td class="sym">float</td><td>1.0, 0.5 x CBS or 0.0</td><td>full-oracle reward</td><td class="size">L22 L25 L26</td></tr>
+</tbody>
+</table>
+<p class="note say">Why it matters: in full-oracle mode this value replaces the hybrid win-rate for the QD score, the early stop and the capsule choice, so the whole run is tuned on the benchmark grade.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Symbol inventory</h2>
+<details><summary>1 function &mdash; signature</summary><div class="dbody">
+<pre>oracle_reward(grade: dict[str, Any]) -&gt; float     L8    SR -&gt; 1.0 | VER -&gt; round(clamp(0.5 * CBS), 4) | else 0.0</pre>
+<p>Imports: <code>from __future__ import annotations</code> L3, <code>typing.Any</code> L5. No constant, no class. Related names outside this file: <code>evaluator.py::CENSORED_ORACLE_REWARD</code> L57 (0.0 for censored generations), <code>workflow_info.py::FALLBACK_REWARD_KINDS</code> L13 (holds <code>oracle_censored</code>).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="file_gold_evaluator.html">gold_feedback/evaluator.py</a></td><td>imports and calls <code>oracle_reward(grade)</code> in full-oracle mode</td><td class="sym">L42 L347</td></tr>
+<tr><td class="sym"><a href="file_core_evolution_engine.html">core/evolution_engine.py</a></td><td>reads the stored reward; <code>benchmark_grader</code> is not a fallback</td><td class="sym">L106 L136 L728</td></tr>
+</tbody>
+</table>
+<table>
+<thead><tr><th>Test in tests/gold_feedback_test.py</th><th>What it checks</th><th>Path</th><th class="size">Line</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_full_oracle_reward_comes_from_grader</a></td><td>3 cases: 1.0, 0.3, 0.0; also on disk</td><td>direct</td><td class="size">L428</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_full_oracle_gen0_grade_is_not_a_fallback_in_capsule_argmax</a></td><td>gen 0 with 1.0 wins the capsule argmax</td><td>via evaluator</td><td class="size">L908</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_full_oracle_censored_reward_is_neutral</a></td><td>censored: 0.0, not oracle_reward</td><td>via evaluator</td><td class="size">L446</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_full_oracle_censored_gen_is_excluded_from_capsule_argmax</a></td><td>censored gen skipped by argmax</td><td>via evaluator</td><td class="size">L932</td></tr>
+<tr><td class="sym"><a href="../../tests/gold_feedback_test.py">test_full_oracle_without_task_context_keeps_hybrid_reward</a></td><td>no row: hybrid reward stays</td><td>via evaluator</td><td class="size">L475</td></tr>
+</tbody>
+</table>
+<p>See also: <a href="mod_evaluators_gold_feedback.html">gold_feedback package page</a>, <a href="file_gold_grader.html">file_gold_grader.html</a>, <a href="file_gold_format.html">file_gold_format.html</a>, <a href="file_gold_leak.html">file_gold_leak.html</a>, <a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a> (the honest reward it replaces) and the <a href="file_index.html">file digest index</a>.</p>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/gold_feedback/reward.py</code> (26 lines, whole file), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (L42, L57, L134, L345&#8211;L387), <code class="path">sources/core/evolution_engine.py</code> (L106, L136, L728), <code class="path">sources/core/workflow_info.py</code> (L13), <code class="path">config.py</code> (L110, L186, L199), <code class="path">main.py</code> (L85), <code class="path">tests/gold_feedback_test.py</code> (test names by grep, L417&#8211;L426 parameters). Line counts from <code>wc -l</code>.</p>
+<p class="skips">Skipped: the QD archive code in <code>sources/core/selection.py</code> beyond <code>admit_threshold</code>, because <a href="file_core_selection.html">file_core_selection.html</a> covers it; secret files were not opened; no pytest run, by the build rules. The file is new and uncommitted.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

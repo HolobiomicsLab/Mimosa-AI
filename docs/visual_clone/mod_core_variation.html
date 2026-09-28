@@ -110,7 +110,7 @@
   <text class="box-sub" x="16" y="292">blue dashed arrow = external LLM call | green arrow = verifier signal | 8 boxes</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - parent code + diagnosis go in, a prompt leaves, a new genotype and its vector come out. Symbols: <code>sources/core/variation_engine.py::VariationEngine.mutation_prompt</code>, <code>::llm_think_mutation_directive</code>, <code>sources/core/workflow_factory.py::WorkflowFactory.llm_make_workflow</code>, <code>sources/core/genotype_embedding.py::GenotypeEmbedder.embed</code>.</p>
+<p class="figcap">Diagram 1 - parent code + diagnosis go in, a prompt leaves, a new genotype and its vector come out. Symbols: <code>sources/core/variation_engine.py::VariationEngine.mutation_prompt</code>, <code>::llm_think_mutation_directive</code>, <code>sources/core/workflow_factory.py::WorkflowFactory.llm_make_workflow</code>, <code>sources/core/genotype_embedding.py::GenotypeEmbedder.embed</code>. The full path of the gradient (mutation vs crossover) is on <a href="file_core_variation_engine.html#gradient">file_core_variation_engine.html</a>.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -121,12 +121,12 @@
 <tr><td>Trigger</td><td><code>select_parent_workflow</code> returns one parent</td><td>Two or more parents drawn, <code>use_crossover=True</code></td></tr>
 <tr><td>Parents</td><td>One parent, drawn by <code>SelectionPressure.select_parent</code></td><td>2+ parents, sorted best score first</td></tr>
 <tr><td>Prompt builder</td><td><code>mutation_prompt</code></td><td><code>crossover_prompt</code></td></tr>
-<tr><td>Diagnosis input</td><td>Gradient + agent answers + <code>&lt;search_state&gt;</code></td><td>Per-parent code and per-parent gradient</td></tr>
+<tr><td>Diagnosis input</td><td>Full gradient + answers + search state, to directive LLM</td><td>Per-parent code and full gradient, to workflow LLM</td></tr>
 <tr><td>Agent count</td><td>Parent count plus or minus 1, clamp 1..7</td><td>Cap equals highest parent agent count</td></tr>
 <tr><td>Keep rule</td><td>Keep 90% of previous prompts and code</td><td>Recombine, do not patch one parent</td></tr>
 </tbody>
 </table>
-<p class="sub">Directive <code>crossover_rate</code>: <code>config.py:149</code> default 0.4; <code>config_default.json:79</code> sets 0.25. <code>select_parents</code> draws it with <code>random.random() &lt; crossover_rate</code> (<code>selection.py:267</code>).</p>
+<p class="sub">Directive <code>crossover_rate</code>: <code>config.py:202</code> default 0.4; <code>config_default.json:81</code> sets 0.25. <code>select_parents</code> draws it with <code>random.random() &lt; crossover_rate</code> (<code>selection.py:267</code>).</p>
 
 <details><summary>prompt builders in detail</summary><div class="dbody">
 <pre>VariationEngine.seed_genome_prompt(goal: str) -&gt; str
@@ -135,7 +135,7 @@ VariationEngine.mutation_prompt(goal, wf_info, genotype, run_stderr, iteration_c
 VariationEngine.crossover_prompt(goal, wf_infos, genotypes, run_stderrs, iteration_count, max_iterations=10) -&gt; str</pre>
 <p>Mutation rules written into the prompt (<code>variation_engine.py:448-453</code>): follow the directive, add or remove at most one agent, use at most <code>agent_budget</code> agents, keep the topology unless the directive says otherwise, keep 90% of the previous code, and edit no prompt outside the directive scope.</p>
 <p>The gradient reaches the prompt as <code>&lt;directive&gt;...&lt;/directive&gt;</code> only. The raw verifier diagnosis and agent answers are consumed by the directive LLM, not by the workflow LLM (<code>variation_engine.py:426-446</code>).</p>
-<p>Gradient text is cleaned before use: underscores become spaces, the block is cut at 2048 characters, and an empty gradient falls back to the run stderr, then to a fixed failure sentence (<code>variation_engine.py:402-407</code>). Crossover falls back to the last 1024 characters of stderr per parent (<code>variation_engine.py:489</code>).</p>
+<p>Gradient text is cleaned before use: underscores become spaces and an empty gradient falls back to the run stderr, then to a fixed failure sentence (<code>variation_engine.py:402-407</code>). There is no length cut any more: the <code>[:2048]</code> slice on line 407 was removed in the uncommitted working tree (<code>git diff 336fe19</code>), so the full gradient reaches the directive LLM. Each agent answer is still cut at 2048 characters (<code>variation_engine.py:274</code>). Crossover falls back to the last 1024 characters of stderr per parent (<code>variation_engine.py:489</code>).</p>
 <p>Gotcha: crossover builds an <code>answers</code> field per parent but never prints it; the prompt shows code and gradient only (<code>variation_engine.py:490</code> vs <code>:505-512</code>).</p>
 </div></details>
 </div>
@@ -283,7 +283,7 @@ _OpenAIEmbedder.encode(text) -&gt; np.ndarray</pre>
 
 <div class="panel"><span class="br"></span>
 <h2>What the descriptor contains</h2>
-<p>Named features extracted by <code>code_features.py</code>: <strong>0</strong>. The file computes no named feature list; it returns the whole embedding vector. The QD archive stores that vector under the key <code>qd_descriptor</code> (<code>evolution_engine.py:1016</code> and <code>:1033</code>).</p>
+<p>Named features extracted by <code>code_features.py</code>: <strong>0</strong>. The file computes no named feature list; it returns the whole embedding vector. The QD archive stores that vector under the key <code>qd_descriptor</code> (<code>evolution_engine.py:1143</code> and <code>:1160</code>).</p>
 <details><summary>embedding and chunking parameters</summary><div class="dbody">
 <table>
 <thead><tr><th>Parameter</th><th>Value</th><th>Where</th></tr></thead>
@@ -313,7 +313,7 @@ _OpenAIEmbedder.encode(text) -&gt; np.ndarray</pre>
 <table>
 <thead><tr><th>Point</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td>No fixed-length genome</td><td>Parents are source strings; <code>select_parent_workflow</code> passes <code>wf.code</code> (<code>evolution_engine.py:668</code>)</td></tr>
+<tr><td>No fixed-length genome</td><td>Parents are source strings; the engine passes <code>primary_parent.code</code> to <code>mutation_prompt</code> (<code>evolution_engine.py:780-781</code>)</td></tr>
 <tr><td>Magnitude is judged, not scheduled</td><td><code>llm_think_mutation_directive</code> docstring: no boldness level or scope band to obey</td></tr>
 <tr><td>The 1/5 rule is telemetry only</td><td><code>_compute_success_rate</code> docstring: no longer drives any controller arithmetic</td></tr>
 <tr><td>One discrete knob</td><td><code>_sample_mutation_agent_budget</code> draws parent count plus or minus 1</td></tr>
@@ -327,12 +327,12 @@ _OpenAIEmbedder.encode(text) -&gt; np.ndarray</pre>
 </div>
 
 <p class="note">Amber note: the "features by name" question has no answer in this file - <code>code_features.py</code> returns the full 384-value embedding, so novelty cannot be read feature by feature with the current code.</p>
-<p class="note flag">Red note: <code>docs/concepts/evolution-engine.md:66</code> (working-tree copy) says <code>population_size = 20</code> and <code>:76</code> says <code>k = 15</code>; <code>config.py:143-144</code> and <code>config_default.json:74-75</code> both ship <code>population_size = 16</code> and <code>novelty_k_neighbours = 16</code>.</p>
+<p class="note flag">Red note: <code>docs/concepts/evolution-engine.md:66</code> (working-tree copy) says <code>population_size = 20</code> and <code>:76</code> says <code>k = 15</code>; <code>config.py:196-197</code> and <code>config_default.json:76-77</code> both ship <code>population_size = 16</code> and <code>novelty_k_neighbours = 16</code>.</p>
 
 <footer>
 <p>Sources read: <code class="path">sources/core/variation_engine.py</code> (609 lines), <code class="path">sources/core/genotype_embedding.py</code> (329), <code class="path">sources/core/code_features.py</code> (37), <code class="path">sources/core/selection.py</code> (novelty path), <code class="path">sources/core/evolution_engine.py</code> (call sites and logs), <code class="path">sources/core/workflow_factory.py</code> (prompt to code call), <code class="path">sources/core/workflow_info.py</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, <code class="path">docs/concepts/evolution-engine.md</code>, <code class="path">tests/variation_engine_test.py</code>, <code class="path">tests/genotype_embedding_chunking_test.py</code>, <code class="path">tests/selection_test.py</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>.</p>
 <p class="skips">Skipped: <code class="path">sources/core/__init__.py</code> (re-export list only) &#183; <code class="path">sources/core/failure_fingerprint.py</code> (retired novelty descriptor, shown on <a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a>) &#183; <code class="path">sources/core/workflow_selection.py</code> (parent retrieval, owned by <a href="mod_core_selection.html">mod_core_selection.html</a>) &#183; <code class="path">sources/core/orchestrator.py</code> and the rest of <code>workflow_factory.py</code> (sandbox path, owned by <a href="area_sources_core.html">area_sources_core.html</a>) &#183; <code class="path">sources/evaluators/hybrid_verifier/</code> (writes the gradient, owned by <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>) &#183; <code>diversity_experiments/code_reference/*.py</code> (byte-identical copies of these three files, verified with <code>diff -q</code>) &#183; <code>sources/prompts/workflow_v*.md</code> and <code>sources/modules/*</code> (injected templates, owned by <a href="data_modules_prompts.html">data_modules_prompts.html</a>) &#183; <code>__pycache__/*.pyc</code> &#183; <code class="path">docs/site/</code> (generated) &#183; <code>.env</code>, <code>token.json</code>, <code>credentials.json</code> (secrets, never opened).</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (for example <code>config.py</code>, <code>README.md</code>, <code class="path">docs/concepts/evolution-engine.md</code>); the three files on this page were clean at <code>7e8463b</code> (<code>git status --porcelain</code> returned nothing for them).</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28. Since <code>7e8463b</code> only <code>variation_engine.py</code> changed among the three files on this page (one line, uncommitted: the 2048-character gradient cut was removed); <code>genotype_embedding.py</code> and <code>code_features.py</code> are unchanged. Engine and config line numbers were re-derived.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

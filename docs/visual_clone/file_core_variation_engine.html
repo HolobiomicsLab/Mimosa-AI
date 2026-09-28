@@ -103,7 +103,7 @@
     <text class="box-sub" x="955" y="182" text-anchor="middle">crossover_prompt() line 456</text>
     <text class="box-sub" x="955" y="198" text-anchor="middle">seed_genome_prompt() line 281</text>
     <text class="box-sub" x="955" y="216" text-anchor="middle">returns the prompt string</text>
-    <text class="box-sub" x="955" y="234" text-anchor="middle">replaces _ with space, cuts 2048</text>
+    <text class="box-sub" x="955" y="234" text-anchor="middle">replaces _ with space, no cut</text>
   </a>
 
   <g class="box" id="bOut">
@@ -115,7 +115,7 @@
     <text class="box-sub" x="955" y="358" text-anchor="middle">evolution_prompt_uuid.md</text>
     <text class="box-sub" x="955" y="376" text-anchor="middle">last_variation_state dict</text>
     <text class="box-sub" x="955" y="392" text-anchor="middle">to run_metrics.json</text>
-    <text class="box-sub" x="955" y="408" text-anchor="middle">(engine lines 985, 1019)</text>
+    <text class="box-sub" x="955" y="408" text-anchor="middle">(engine lines 1111, 1146)</text>
   </g>
 
   <path class="edge" data-from="i1" data-to="bInit" d="M190,60 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
@@ -163,9 +163,128 @@
   <text class="edge-label" x="965" y="266" text-anchor="start">prompt</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - 10 boxes. Solid arrows are calls; dashed arrows carry a value. The directive LLM is the only model call in the file: <code class="sym">mutation_prompt</code> calls it (line 428), it returns text, and the text is embedded inside <code>&lt;directive&gt;</code> tags.</p>
+<p class="figcap">Diagram 1 - 10 boxes. Solid arrows are calls; dashed arrows carry a value. The directive LLM is the only model call in the file: <code class="sym">mutation_prompt</code> calls it (line 428), it returns text, and the text is embedded inside <code>&lt;directive&gt;</code> tags (line 444). The gradient path is on <a href="#gradient">Diagram 1b</a>.</p>
 </div>
 
+<div class="panel"><span class="br"></span>
+<h2 id="gradient">Diagram 1b &mdash; where the textual gradient goes now</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1120 430" role="img" aria-label="Path of the textual gradient into the mutation and crossover prompts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="t1">
+    <title>Written by the verifier; gold mode writes it too.</title>
+    <rect x="20" y="40" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9"/>
+    <text class="box-label" x="120" y="62" text-anchor="middle">gradient on disk</text>
+    <text class="box-sub" x="120" y="80" text-anchor="middle">state verifier text</text>
+    <text class="box-sub" x="120" y="96" text-anchor="middle">else textual_gradient.txt</text>
+  </g>
+  <a class="box" id="t2" href="file_core_workflow_info.html">
+    <title>Read on every access, no cache.</title>
+    <rect x="20" y="170" width="200" height="70" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="192" text-anchor="middle">abstracted_textual_gradient</text>
+    <text class="box-sub" x="120" y="210" text-anchor="middle">WorkflowInfo property</text>
+    <text class="box-sub" x="120" y="226" text-anchor="middle">workflow_info.py:241</text>
+  </a>
+  <g class="box" id="t3">
+    <title>Before 4020790 + working tree the block was cut to [:2048].</title>
+    <rect x="280" y="150" width="250" height="110" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405" y="172" text-anchor="middle">textual_gradient_block</text>
+    <text class="box-sub" x="405" y="190" text-anchor="middle">lines 402-407, mutation_prompt</text>
+    <text class="box-sub" x="405" y="206" text-anchor="middle">gradient, else run_stderr,</text>
+    <text class="box-sub" x="405" y="222" text-anchor="middle">else fail_msg; _ becomes space</text>
+    <text class="box-sub" x="405" y="238" text-anchor="middle">no length cut</text>
+  </g>
+  <g class="box" id="t4">
+    <title>One LLM call (line 363) returns the directive text.</title>
+    <rect x="600" y="20" width="240" height="100" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="42" text-anchor="middle">llm_think_mutation_directive()</text>
+    <text class="box-sub" x="720" y="60" text-anchor="middle">block inside &lt;diagnosis&gt;</text>
+    <text class="box-sub" x="720" y="76" text-anchor="middle">lines 343-346</text>
+    <text class="box-sub" x="720" y="92" text-anchor="middle">+ agent answers, + search_state</text>
+  </g>
+  <g class="box" id="t5">
+    <title>A failed parent skips the directive LLM; the block is built but not used.</title>
+    <rect x="600" y="160" width="240" height="70" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="182" text-anchor="middle">genotype is None?</text>
+    <text class="box-sub" x="720" y="200" text-anchor="middle">yes: fixed directive</text>
+    <text class="box-sub" x="720" y="216" text-anchor="middle">lines 425-426, block unused</text>
+  </g>
+  <g class="box" id="t6">
+    <title>The mutator sees only the directive, not the gradient itself (lines 434-454).</title>
+    <rect x="900" y="20" width="200" height="100" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1000" y="42" text-anchor="middle">mutation prompt</text>
+    <text class="box-sub" x="1000" y="60" text-anchor="middle">&lt;directive&gt; line 444</text>
+    <text class="box-sub" x="1000" y="76" text-anchor="middle">&lt;python&gt; parent code</text>
+    <text class="box-sub" x="1000" y="92" text-anchor="middle">gradient text not copied</text>
+  </g>
+  <g class="box" id="t7">
+    <title>Each parent gradient goes into its own error_diagnosis block.</title>
+    <rect x="280" y="310" width="250" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="405" y="332" text-anchor="middle">crossover_prompt()</text>
+    <text class="box-sub" x="405" y="350" text-anchor="middle">gradient per parent, else</text>
+    <text class="box-sub" x="405" y="366" text-anchor="middle">stderr tail [-1024:], line 489</text>
+    <text class="box-sub" x="405" y="382" text-anchor="middle">no cut on the gradient</text>
+  </g>
+  <g class="box" id="t8">
+    <title>Here the gradient text itself reaches the mutator.</title>
+    <rect x="600" y="310" width="240" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="332" text-anchor="middle">crossover prompt</text>
+    <text class="box-sub" x="720" y="350" text-anchor="middle">&lt;error_diagnosis&gt; lines 509-511</text>
+    <text class="box-sub" x="720" y="366" text-anchor="middle">parents sorted by score</text>
+    <text class="box-sub" x="720" y="382" text-anchor="middle">gradient text copied as is</text>
+  </g>
+  <g class="box" id="t9">
+    <title>_save_evolution_prompt_artifact writes the prompt string.</title>
+    <rect x="900" y="180" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9"/>
+    <text class="box-label" x="1000" y="202" text-anchor="middle">evolution_prompt_uuid.md</text>
+    <text class="box-sub" x="1000" y="220" text-anchor="middle">written by the engine</text>
+    <text class="box-sub" x="1000" y="236" text-anchor="middle">evolution_engine.py:1111</text>
+  </g>
+  <g class="box" id="t10">
+    <title>Engine line 657 passes the child gradient; only evolution_engine.py:492 clears the list.</title>
+    <rect x="20" y="310" width="200" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="332" text-anchor="middle">record_offspring_gradient()</text>
+    <text class="box-sub" x="120" y="350" text-anchor="middle">appends to</text>
+    <text class="box-sub" x="120" y="366" text-anchor="middle">textual_gradient_history</text>
+    <text class="box-sub" x="120" y="382" text-anchor="middle">never read (grep)</text>
+  </g>
+  <path class="edge dashed-edge" data-from="t1" data-to="t2" d="M120,116 V170" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="130" y="146" text-anchor="start">text</text>
+  <path class="edge" data-from="t2" data-to="t3" d="M220,205 H280" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="250" y="197" text-anchor="middle">str</text>
+  <path class="edge" data-from="t3" data-to="t4" d="M530,180 H560 V70 H600" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="565" y="110" text-anchor="start">diagnosis</text>
+  <path class="edge" data-from="t3" data-to="t5" d="M530,205 H600" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t4" data-to="t6" d="M840,70 H900" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="870" y="62" text-anchor="middle">directive</text>
+  <path class="edge" data-from="t5" data-to="t6" d="M840,195 H870 V100 H900" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="875" y="150" text-anchor="start">fixed text</text>
+  <path class="edge" data-from="t2" data-to="t7" d="M220,230 H250 V355 H280" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="256" y="300" text-anchor="start">str</text>
+  <path class="edge" data-from="t7" data-to="t8" d="M530,355 H600" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="565" y="347" text-anchor="middle">prompt</text>
+  <path class="edge dashed-edge" data-from="t6" data-to="t9" d="M1000,120 V180" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="1010" y="155" text-anchor="start">prompt</text>
+  <path class="edge dashed-edge" data-from="t8" data-to="t9" d="M840,355 H1000 V256" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="1010" y="300" text-anchor="start">prompt</text>
+  <path class="edge" data-from="t2" data-to="t10" d="M60,240 V310" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="70" y="280" text-anchor="start">engine call</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1b - 10 boxes. The 2048-character cut on the gradient is gone (<code class="path">variation_engine.py:407</code>, <code>git diff 336fe19</code>): in mutation the full gradient reaches the directive LLM only, in crossover it reaches the mutator directly. Two cuts remain: each agent answer at 2048 characters (line 274) and the crossover stderr fallback at the last 1024 (line 489).</p>
+<p class="note say">A mutation child never sees the raw gradient: <code>mutation_prompt</code> embeds only the directive text, so the gradient length changes the directive LLM input, not the mutator input.</p>
+</div>
 <div class="panel"><span class="br"></span>
 <h2>Diagram 2 &mdash; data flow: fields and scores in, prompt and telemetry out</h2>
 <div class="canvas">
@@ -196,10 +315,10 @@
     <rect x="20" y="190" width="250" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="145" y="214" text-anchor="middle">read from WorkflowInfo</text>
     <text class="box-sub" x="145" y="234" text-anchor="middle">overall_score</text>
-    <text class="box-sub" x="145" y="250" text-anchor="middle">(workflow_info.py:122)</text>
+    <text class="box-sub" x="145" y="250" text-anchor="middle">(workflow_info.py:156)</text>
     <text class="box-sub" x="145" y="266" text-anchor="middle">abstracted_textual_gradient</text>
-    <text class="box-sub" x="145" y="282" text-anchor="middle">(workflow_info.py:166)</text>
-    <text class="box-sub" x="145" y="298" text-anchor="middle">state_result (workflow_info.py:87)</text>
+    <text class="box-sub" x="145" y="282" text-anchor="middle">(workflow_info.py:241)</text>
+    <text class="box-sub" x="145" y="298" text-anchor="middle">state_result (workflow_info.py:121)</text>
   </g>
 
   <a class="box" id="d3" href="#inv">
@@ -227,11 +346,11 @@
     <rect x="650" y="170" width="280" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="790" y="194" text-anchor="middle">written by EvolutionEngine</text>
     <text class="box-sub" x="790" y="214" text-anchor="middle">evolution_prompt_uuid.md</text>
-    <text class="box-sub" x="790" y="230" text-anchor="middle">(evolution_engine.py:985)</text>
+    <text class="box-sub" x="790" y="230" text-anchor="middle">(evolution_engine.py:1111)</text>
     <text class="box-sub" x="790" y="246" text-anchor="middle">run_metrics.json key variation_state</text>
-    <text class="box-sub" x="790" y="262" text-anchor="middle">(evolution_engine.py:1019)</text>
-    <text class="box-sub" x="790" y="278" text-anchor="middle">qd archive entry</text>
-    <text class="box-sub" x="790" y="294" text-anchor="middle">(evolution_engine.py:1061)</text>
+    <text class="box-sub" x="790" y="262" text-anchor="middle">(evolution_engine.py:1146)</text>
+    <text class="box-sub" x="790" y="278" text-anchor="middle">variation_log.jsonl row</text>
+    <text class="box-sub" x="790" y="294" text-anchor="middle">(evolution_engine.py:1188)</text>
   </g>
 
   <path class="edge dashed-edge" data-from="d1" data-to="d3" d="M270,80 H330" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw4)"/>
@@ -256,7 +375,7 @@
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
     </marker>
     <marker id="arw6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
     </marker>
   </defs>
 
@@ -266,20 +385,20 @@
     <rect x="20" y="30" width="230" height="70" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="135" y="55" text-anchor="middle">walk history backwards</text>
     <text class="box-sub" x="135" y="73" text-anchor="middle">for c, b, failure in reversed(...)</text>
-    <text class="box-sub" x="135" y="89" text-anchor="middle">line 146</text>
+    <text class="box-sub" x="135" y="89" text-anchor="middle">line 150</text>
   </g>
 
   <g class="box" id="a2">
     <title>Entries that do not count</title>
-    <rect x="20" y="145" width="230" height="70" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <rect x="20" y="145" width="230" height="70" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="135" y="170" text-anchor="middle">not a scored entry</text>
     <text class="box-sub" x="135" y="188" text-anchor="middle">failure or c is None or b is None:</text>
-    <text class="box-sub" x="135" y="204" text-anchor="middle">continue, lines 147-148</text>
+    <text class="box-sub" x="135" y="204" text-anchor="middle">continue, lines 151-152</text>
   </g>
 
   <g class="box" id="a3">
     <title>Stop test of the streak</title>
-    <rect x="20" y="260" width="230" height="70" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <rect x="20" y="260" width="230" height="70" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="135" y="285" text-anchor="middle">c &gt; b + 1e-6</text>
     <text class="box-sub" x="135" y="303" text-anchor="middle">true: break (streak 0)</text>
     <text class="box-sub" x="135" y="319" text-anchor="middle">false: count += 1</text>
@@ -296,7 +415,7 @@
 
   <g class="box" id="b2">
     <title>Success rate needs at least two scored entries</title>
-    <rect x="345" y="145" width="230" height="70" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <rect x="345" y="145" width="230" height="70" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="460" y="170" text-anchor="middle">scored entries &lt; 2</text>
     <text class="box-sub" x="460" y="188" text-anchor="middle">true: success_rate None</text>
     <text class="box-sub" x="460" y="204" text-anchor="middle">false: improvements / window</text>
@@ -304,7 +423,7 @@
 
   <g class="box" id="b3">
     <title>Parent agent count fallback</title>
-    <rect x="345" y="260" width="230" height="70" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <rect x="345" y="260" width="230" height="70" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="460" y="285" text-anchor="middle">_count_parent_agents() is None</text>
     <text class="box-sub" x="460" y="303" text-anchor="middle">true: agent_count_history[-1]</text>
     <text class="box-sub" x="460" y="319" text-anchor="middle">else 1, line 418-421</text>
@@ -321,7 +440,7 @@
 
   <g class="box" id="c2">
     <title>Failed parent branch</title>
-    <rect x="670" y="145" width="230" height="70" rx="2" fill="rgba(255,77,106,0.08)" stroke="#FF4D6A"/>
+    <rect x="670" y="145" width="230" height="70" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="785" y="170" text-anchor="middle">genotype is None</text>
     <text class="box-sub" x="785" y="188" text-anchor="middle">true: fixed directive, line 425</text>
     <text class="box-sub" x="785" y="204" text-anchor="middle">"Previous attempt failed completly."</text>
@@ -339,7 +458,7 @@
   <text class="edge-label" x="145" y="126" text-anchor="start">walk</text>
   <path class="edge" data-from="a2" data-to="a3" d="M135,215 V260" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
   <text class="edge-label" x="145" y="242" text-anchor="start">scored</text>
-  <path class="edge dashed-edge" data-from="a3" data-to="a1" d="M250,295 H315 V65 H250" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arw6)"/>
+  <path class="edge dashed-edge" data-from="a3" data-to="a1" d="M250,295 H315 V65 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw6)"/>
 
   <path class="edge" data-from="b1" data-to="b2" d="M460,100 V145" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw5)"/>
   <text class="edge-label" x="470" y="126" text-anchor="start">feeds</text>
@@ -352,7 +471,7 @@
   <text class="edge-label" x="795" y="242" text-anchor="start">no</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - three independent mini trees, each inside one method. The amber return arrow at the left is the loop: the streak counter walks backwards until an entry improves. Column headings are plain text, not boxes.</p>
+<p class="figcap">Diagram 3 - three independent mini trees, each inside one method. The dashed return arrow at the left is the loop: the streak counter walks backwards until an entry improves. Column headings are plain text, not boxes.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -361,13 +480,13 @@
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
 <tr><td>config field</td><td class="sym">workflow_llm_model</td><td>line 41, stored as judge_model</td><td>model that writes the directive</td></tr>
-<tr><td>config field</td><td class="sym">reasoning_effort</td><td>line 47</td><td>passed into LLMConfig</td></tr>
-<tr><td>config field</td><td class="sym">max_tokens</td><td>line 48, getattr default 8192</td><td>token budget of the directive call</td></tr>
-<tr><td>config field</td><td class="sym">openrouter_provider_for(), openrouter_quantizations_for()</td><td>lines 49-50</td><td>provider routing for the directive call</td></tr>
-<tr><td>property read</td><td class="sym">WorkflowInfo.overall_score</td><td>lines 395, 485; source workflow_info.py:122</td><td>parent score in the prompt and search state</td></tr>
-<tr><td>property read</td><td class="sym">WorkflowInfo.abstracted_textual_gradient</td><td>lines 396, 486; source workflow_info.py:166</td><td>the diagnosis block, cut to 2048 chars</td></tr>
-<tr><td>property read</td><td class="sym">WorkflowInfo.state_result</td><td>lines 397, 490; source workflow_info.py:87</td><td>agent answers and the parent agent count</td></tr>
-<tr><td>memory state</td><td class="sym">textual_gradient_history, score_history, agent_count_history</td><td>lines 30-33</td><td>observer statistics and the budget fallback</td></tr>
+<tr><td>config field</td><td class="sym">reasoning_effort</td><td>line 48</td><td>passed into LLMConfig</td></tr>
+<tr><td>config field</td><td class="sym">max_tokens</td><td>line 49, getattr default 8192</td><td>token budget of the directive call</td></tr>
+<tr><td>config field</td><td class="sym">openrouter_provider_for(), openrouter_quantizations_for()</td><td>lines 50-51</td><td>provider routing for the directive call</td></tr>
+<tr><td>property read</td><td class="sym">WorkflowInfo.overall_score</td><td>lines 395, 485; source workflow_info.py:156</td><td>parent score in the prompt and search state</td></tr>
+<tr><td>property read</td><td class="sym">WorkflowInfo.abstracted_textual_gradient</td><td>lines 396, 486; source workflow_info.py:241</td><td>the diagnosis block, full length (no cut)</td></tr>
+<tr><td>property read</td><td class="sym">WorkflowInfo.state_result</td><td>lines 397, 490; source workflow_info.py:121</td><td>agent answers and the parent agent count</td></tr>
+<tr><td>memory state</td><td class="sym">textual_gradient_history, score_history, agent_count_history</td><td>lines 29-33</td><td>observer statistics and the budget fallback</td></tr>
 <tr><td>memory state</td><td class="sym">last_variation_state</td><td>set lines 231-236 and 423</td><td>telemetry dict, read by the engine</td></tr>
 <tr><td>memory state</td><td class="sym">max_possible_agents</td><td>line 34, value 7</td><td>hard cap on the sampled agent count</td></tr>
 <tr><td>return value</td><td class="sym">prompt string</td><td>lines 434, 514, 291</td><td>the engine writes it and feeds the mutator</td></tr>
@@ -425,12 +544,12 @@ module level, after the class:
 <table>
 <thead><tr><th>Importer</th><th>What it does</th><th class="size">Line</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>builds it in <code>__init__</code></td><td class="size">40, 92</td></tr>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>calls <code>seed_genome_prompt</code> for the cold start</td><td class="size">336</td></tr>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>calls <code>record_offspring_gradient</code> after scoring a child</td><td class="size">544</td></tr>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>calls <code>mutation_prompt</code> for the next generation</td><td class="size">332, 668</td></tr>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>calls <code>crossover_prompt</code> in crossover rounds</td><td class="size">653</td></tr>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>clears the three histories at the start of a task</td><td class="size">381-383</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>builds it in <code>__init__</code></td><td class="size">41, 202</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>calls <code>seed_genome_prompt</code> for the cold start</td><td class="size">446</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>calls <code>record_offspring_gradient</code> after scoring a child</td><td class="size">657</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>calls <code>mutation_prompt</code> for the next generation</td><td class="size">442, 781</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>calls <code>crossover_prompt</code> in crossover rounds</td><td class="size">766</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>clears the three histories at the start of a task</td><td class="size">491-493</td></tr>
 <tr><td class="sym"><a href="../../sources/core/__init__.py">sources/core/__init__.py</a></td><td>re-exports the class</td><td class="size">34</td></tr>
 </tbody>
 </table>
@@ -446,9 +565,9 @@ module level, after the class:
 </div>
 <footer>
 <p>Digest hub: <a href="file_index.html">file_index.html</a> &#183; area page: <a href="area_sources_core.html">area_sources_core.html</a> &#183; module page: <a href="mod_core_variation.html">mod_core_variation.html</a> &#183; loop page: <a href="flow_evolution_loop.html">flow_evolution_loop.html</a>.</p>
-<p>Sources: <code class="path">sources/core/variation_engine.py</code> (all 609 lines), <code class="path">sources/core/evolution_engine.py</code> (call sites and persistence), <code class="path">sources/core/workflow_info.py</code> (properties read), <code class="path">config.py</code> (fields read), <code class="path">tests/variation_engine_test.py</code>.</p>
+<p>Sources: <code class="path">sources/core/variation_engine.py</code> (all 609 lines, <code>wc -l</code>), <code class="path">sources/core/evolution_engine.py</code> (call sites and persistence), <code class="path">sources/core/workflow_info.py</code> (properties read), <code class="path">config.py</code> (fields read), <code class="path">tests/variation_engine_test.py</code>.</p>
 <p class="skips">Skipped: the <code class="path">__main__</code> smoke block (lines 531-609) was read but not run; no LLM call was made, so the directive text is <code>unknown</code> here; the exact system prompt wording of the directive LLM is quoted only where it states a rule; the print helper <code class="path">print_info</code> is not documented; the selection module that decides which parents cross over is on <code class="path">mod_core_selection.html</code>, not repeated here.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Built at 4020790 + uncommitted working tree, 2026-09-28. Only change since <code>336fe19</code> in this file: line 407 lost its <code>[:2048]</code> cut (uncommitted). Line numbers in <code>variation_engine.py</code> did not move; engine and <code>workflow_info.py</code> references were re-derived.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

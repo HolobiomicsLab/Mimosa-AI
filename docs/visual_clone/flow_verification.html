@@ -109,7 +109,7 @@
   <text class="box-sub" x="20" y="470">the earliest differing rung decides the pair; a claim passes at score &#8805; 0.5; a stage tie falls back to that stage's mean score-diff</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - the three rungs of the ladder and the comparison rail below them. Winner logic: <code>../../sources/evaluators/hybrid_verifier/aggregation.py::temporal_winner</code>. The rail compares the current generation against every previous generation of the same task.</p>
+<p class="figcap">Diagram 1 - the three rungs of the ladder and the comparison rail below them. Winner logic: <code>sources/evaluators/hybrid_verifier/aggregation.py::temporal_winner</code>. The rail compares the current generation against every previous generation of the same task. Figure tasks put a <code>visual</code> rung before <code>script</code> (<code>aggregation.py::FIGURE_STAGES</code>, <code>hybrid_verifier_visual_rung</code>, default <code>True</code>).</p>
 
 <p>A claim passes its rung at <code>score &gt;= 0.5</code> (<code>PASS_THRESHOLD</code>), so a script-stage failure dominates a later result-stage advantage. Claims with no score variance across workspaces are dropped (<code>claim_stats</code>, <code>MIN_OBS_FOR_VARIANCE = 2</code>) and may be replaced by refinement claims.</p>
 </div>
@@ -123,7 +123,7 @@
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
     </marker>
     <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
     </marker>
     <marker id="arwF" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
@@ -132,7 +132,7 @@
   </defs>
 
   <a class="box" id="l1" href="area_evaluators.html">
-    <title>Facade that picks the verifier kind</title>
+    <title>Facade that picks the verifier kind (hybrid, legacy or gold); in gold mode GoldFeedbackEvaluator sits between it and the hybrid lane</title>
     <rect x="20" y="20" width="160" height="46" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="100" y="40" text-anchor="middle">WorkflowEvaluator</text>
     <text class="box-sub" x="100" y="56" text-anchor="middle">picks verifier kind</text>
@@ -161,7 +161,7 @@
 
   <a class="box" id="l5" href="../../sources/core/workflow_runner.py">
     <title>Pinned host subprocess runs the scorer</title>
-    <rect x="800" y="20" width="190" height="46" rx="2" fill="rgba(255,181,71,0.10)" stroke="#FFB547"/>
+    <rect x="800" y="20" width="190" height="46" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
     <text class="box-label" x="895" y="40" text-anchor="middle">WorkflowRunner</text>
     <text class="box-sub" x="895" y="56" text-anchor="middle">host subprocess, 60 s</text>
   </a>
@@ -195,10 +195,10 @@
   <path class="edge" d="M475,315 H673" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwD)"/>
   <text class="edge-label" x="574" y="310" text-anchor="middle">7 scorer prompt</text>
 
-  <path class="edge" d="M475,350 H888" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge" d="M475,350 H888" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arwE)"/>
   <text class="edge-label" x="681" y="345" text-anchor="middle">8 scorer script</text>
 
-  <path class="edge" d="M895,382 H482" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <path class="edge" d="M895,382 H482" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arwE)"/>
   <text class="edge-label" x="688" y="377" text-anchor="middle">9 score JSON line</text>
 
   <path class="edge" d="M285,416 H468" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwD)"/>
@@ -210,7 +210,135 @@
   <text class="box-sub" x="200" y="494">11 returns scores and the textual gradient; reward comes from <tspan style="fill:#BFF6FF">win_rate_reward()</tspan> inside the evaluator</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - call order for one generation. Steps 3, 5 and 7 are one LLM call each (step 7 runs once per claim); step 8 runs the scorer subprocess with <code>cwd = workspace</code>, and step 11 returns the scores plus the gradient.</p>
+<p class="figcap">Diagram 2 - call order for one generation. Steps 3, 5 and 7 are one LLM call each (step 7 runs once per claim); step 8 runs the scorer subprocess with <code>cwd = workspace</code>, and step 11 returns the scores plus the gradient. In <code>gold</code> mode step 1 comes from <code>GoldFeedbackEvaluator.evaluate</code>, not from the facade (next panel).</p>
+</div>
+
+<div class="panel" id="verifier-kind"><span class="br"></span>
+<h2>Where the verifier kind is chosen - and the gold branch</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 400" role="img" aria-label="verifier_kind selection and the gold feedback wrapper around the hybrid verifier">
+  <defs>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glowG" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="g_cfg" href="area_entry_config.html">
+    <title>config.verifier_kind, default "hybrid" (config.py:106); CLI --verifier_kind hybrid|legacy|gold (main.py:76-83)</title>
+    <rect x="20" y="150" width="170" height="64" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
+    <text class="box-label" x="105" y="176" text-anchor="middle">verifier_kind</text>
+    <text class="box-sub" x="105" y="194" text-anchor="middle">config / --verifier_kind</text>
+  </a>
+
+  <a class="box" id="g_fac" href="file_eval_evaluator.html">
+    <title>WorkflowEvaluator.__init__ reads verifier_kind once and builds one verifier object (evaluator.py:88-110)</title>
+    <rect x="230" y="150" width="180" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="320" y="176" text-anchor="middle">WorkflowEvaluator</text>
+    <text class="box-sub" x="320" y="194" text-anchor="middle">__init__ picks one</text>
+  </a>
+
+  <a class="box" id="g_leg" href="area_evaluators_legacy.html">
+    <title>verifier_kind = legacy: deprecated per-claim verifier</title>
+    <rect x="460" y="20" width="200" height="54" rx="12" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="560" y="42" text-anchor="middle">VerifierEvaluator</text>
+    <text class="box-sub" x="560" y="60" text-anchor="middle">legacy &#183; DEPRECATED</text>
+  </a>
+
+  <a class="box" id="g_gold" href="mod_evaluators_gold_feedback.html">
+    <title>verifier_kind = gold: GoldFeedbackEvaluator.evaluate runs the inner hybrid, grades a private workspace copy, then swaps the gradient</title>
+    <rect x="460" y="150" width="200" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="560" y="172" text-anchor="middle">GoldFeedbackEvaluator</text>
+    <text class="box-sub" x="560" y="189" text-anchor="middle">gold</text>
+    <text class="box-sub" x="560" y="205" text-anchor="middle">ORACLE</text>
+  </a>
+
+  <a class="box" id="g_hyb" href="mod_evaluators_hybrid_verifier.html">
+    <title>The full hybrid ladder above; in gold mode built from gold_hybrid_config(config), so its registry sits under _verifier_tmp_gold</title>
+    <rect x="710" y="20" width="220" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="820" y="44" text-anchor="middle">HybridVerifierEvaluator</text>
+    <text class="box-sub" x="820" y="62" text-anchor="middle">hybrid, or inner in gold</text>
+  </a>
+
+  <a class="box" id="g_copy" href="file_gold_grader.html">
+    <title>make_private_copy copies the workspace to a mimosa_gold_* temp dir before the hybrid runs; grade_private_copy grades it with a gold_feedback_timeout_s cap (1800 s)</title>
+    <rect x="710" y="150" width="220" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="820" y="174" text-anchor="middle">grade_private_copy</text>
+    <text class="box-sub" x="820" y="192" text-anchor="middle">copy, cap 1800 s</text>
+  </a>
+
+  <a class="box" id="g_grade" href="area_benchmark_evaluation.html">
+    <title>outside the evaluators area: snapshot_grading.grade_directory builds CapsuleEvaluator (VER re-run, SR eval program, CBS) through ExecutionSandbox</title>
+    <rect x="980" y="150" width="200" height="64" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1080" y="174" text-anchor="middle">grade_directory</text>
+    <text class="box-sub" x="1080" y="192" text-anchor="middle">CapsuleEvaluator VER/SR/CBS</text>
+  </a>
+
+  <a class="box" id="g_grad" href="file_gold_format.html">
+    <title>format.build_gold_gradient turns the grade into the new textual gradient (max 2000 characters)</title>
+    <rect x="710" y="290" width="220" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="820" y="314" text-anchor="middle">build_gold_gradient</text>
+    <text class="box-sub" x="820" y="332" text-anchor="middle">replaces the gradient</text>
+  </a>
+
+  <a class="box" id="g_rew" href="file_gold_reward.html">
+    <title>reward stays the hybrid win-rate by default; gold_feedback_reward = True uses oracle_reward: SR 1.0, VER 0.5 x CBS, else 0.0</title>
+    <rect x="980" y="290" width="200" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1080" y="314" text-anchor="middle">reward source</text>
+    <text class="box-sub" x="1080" y="332" text-anchor="middle">hybrid, or oracle_reward</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="g_cfg" data-to="g_fac" d="M190,182 H230" fill="none" stroke="#E6FBFF" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="210" y="174" text-anchor="middle">reads</text>
+
+  <path class="edge" data-from="g_fac" data-to="g_leg" d="M410,165 H435 V47 H460" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arwH)"/>
+  <text class="edge-label" x="435" y="100" text-anchor="end">legacy</text>
+
+  <path class="edge" data-from="g_fac" data-to="g_gold" d="M410,182 H460" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="435" y="174" text-anchor="middle">gold</text>
+
+  <path class="edge" data-from="g_fac" data-to="g_hyb" d="M320,150 V8 H690 V40 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="400" y="4" text-anchor="middle">hybrid (default)</text>
+
+  <path class="edge" data-from="g_gold" data-to="g_hyb" d="M600,150 V110 H800 V84" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="700" y="104" text-anchor="middle">1 hybrid.evaluate(uuid)</text>
+
+  <path class="edge" data-from="g_gold" data-to="g_copy" d="M660,182 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="685" y="174" text-anchor="middle">2</text>
+
+  <path class="edge" data-from="g_copy" data-to="g_grade" d="M930,182 H980" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwH)"/>
+  <text class="edge-label" x="955" y="174" text-anchor="middle">grade</text>
+
+  <path class="edge" data-from="g_gold" data-to="g_grad" d="M560,214 V322 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="630" y="314" text-anchor="middle">3 VER/SR msgs</text>
+
+  <path class="edge" data-from="g_grad" data-to="g_rew" d="M930,322 H980" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <text class="edge-label" x="955" y="314" text-anchor="middle">4</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> chooses the channel once. Gold does not replace the ladder: <code>sources/evaluators/gold_feedback/evaluator.py::GoldFeedbackEvaluator.evaluate</code> runs the full hybrid first (built with <code>gold_hybrid_config</code>), then grades a private copy of the workspace, then swaps only <code>abstracted_textual_gradient</code> and <code>textual_gradient.txt</code>. <span class="chip warn">oracle - leaks gold</span></p>
+<p class="note">Amber: gold feeds the benchmark verdict against the gold reference back into evolution; <code>leak.py::LEAK_WARNING</code> says its scores must never be reported. With no task row (any run without <code>--science_agent_bench</code>) or a censored grade, the hybrid gradient stays (<code>STATUS_NO_TASK</code>, <code>STATUS_CENSORED</code>).</p>
+<details><summary>gold mode: files, keys and reward rules</summary><div class="dbody">
+<pre>inner hybrid registry   (temp_dir or workflow_dir/_verifier_tmp) + "_gold"   # gold_hybrid_config
+private copy            &lt;mkdtemp(prefix="mimosa_gold_")&gt;/workspace      # grader.make_private_copy
+grading cap             gold_feedback_timeout_s = 1800 (0 = no cap)           # config.py:115
+engine call             asyncio.to_thread(judge.evaluate, ...) in gold only   # evolution_engine.py:921-932
+written per generation  textual_gradient.txt (gold text), textual_gradient_hybrid.txt,
+                        gold_feedback.json, evaluation.txt (leak banner prepended),
+                        state_result.json evaluation.verifier (+ oracle, benchmark_leak)
+                        and evaluation.gold_oracle                              # GoldFeedbackEvaluator._persist
+reward (default)        hybrid win-rate, reward_source = "hybrid_verifier"
+reward (full oracle)    gold_feedback_reward = True: SR -&gt; 1.0, VER -&gt; 0.5 * CBS, else 0.0
+censored full oracle    0.0, reward_fallback = "oracle_censored"             # CENSORED_ORACLE_REWARD
+honest runs             WorkflowSelector skips folders where is_oracle_generation() is true</pre>
+<p>Sources: <code class="path">sources/evaluators/gold_feedback/evaluator.py</code>, <code class="path">grader.py</code>, <code class="path">reward.py</code>, <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>, <code class="path">sources/core/workflow_info.py</code> (<code>is_oracle_generation</code>, <code>FALLBACK_REWARD_KINDS</code>), <code class="path">sources/core/workflow_selection.py</code>. File digests: <a href="file_gold_evaluator.html">evaluator.py</a> &#183; <a href="file_gold_grader.html">grader.py</a> &#183; <a href="file_gold_format.html">format.py</a> &#183; <a href="file_gold_reward.html">reward.py</a> &#183; <a href="file_gold_leak.html">leak.py</a>.</p>
+</div></details>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -218,24 +346,25 @@
 <table>
 <thead><tr><th>File</th><th>Role</th><th>Key symbol</th><th class="size">Lines</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td>Exports the evaluator, the layer interface and the reward helpers.</td><td class="sym">HybridVerifierEvaluator</td><td class="size">89</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td>Runs the pipeline for one uuid; writes the artifacts.</td><td class="sym">HybridVerifierEvaluator.evaluate</td><td class="size">645</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td>Default evidence layer: claim lifecycle, scorer build, execution.</td><td class="sym">ClaimsEvidenceLayer.collect</td><td class="size">497</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/aggregation.py">hybrid_verifier/aggregation.py</a></td><td>Variance filter and the pairwise reward modes.</td><td class="sym">win_rate_reward, temporal_winner</td><td class="size">434</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/claims.py">hybrid_verifier/claims.py</a></td><td>Ladder claim extraction, validation and refinement prompts.</td><td class="sym">extract_claims_prompt, validate_claims</td><td class="size">375</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/scorers.py">hybrid_verifier/scorers.py</a></td><td>Scorer prompts, static policy screen, output parsing, launcher.</td><td class="sym">build_launcher, static_violations</td><td class="size">309</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td>Elimination-first gradient and <code>evaluation.txt</code> renderer.</td><td class="sym">build_gradient</td><td class="size">294</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a></td><td>Per-task JSON state: claims, scorers, score vectors.</td><td class="sym">TaskRegistry.load</td><td class="size">274</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/inventory.py">hybrid_verifier/inventory.py</a></td><td>Workspace inventory with CSV and PNG content signals.</td><td class="sym">scan_workspace</td><td class="size">253</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td>Exports the evaluator, the layer interface and the reward helpers.</td><td class="sym">HybridVerifierEvaluator</td><td class="size">136</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td>Runs the pipeline for one uuid; writes the artifacts.</td><td class="sym">HybridVerifierEvaluator.evaluate</td><td class="size">784</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td>Claims, visual and execution-gate layers; scorer build.</td><td class="sym">ClaimsEvidenceLayer.collect</td><td class="size">1049</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/aggregation.py">hybrid_verifier/aggregation.py</a></td><td>Variance filter and the pairwise reward modes.</td><td class="sym">win_rate_reward, temporal_winner</td><td class="size">454</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/claims.py">hybrid_verifier/claims.py</a></td><td>Ladder claim extraction, validation and refinement prompts.</td><td class="sym">extract_claims_prompt, validate_claims</td><td class="size">701</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/scorers.py">hybrid_verifier/scorers.py</a></td><td>Scorer prompts, static policy screen, output parsing, launcher.</td><td class="sym">build_launcher, static_violations</td><td class="size">411</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td>Elimination-first gradient and <code>evaluation.txt</code> renderer.</td><td class="sym">build_gradient</td><td class="size">380</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a></td><td>Per-task JSON state: claims, scorers, score vectors.</td><td class="sym">TaskRegistry.load</td><td class="size">355</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/inventory.py">hybrid_verifier/inventory.py</a></td><td>Workspace inventory with CSV and PNG content signals.</td><td class="sym">scan_workspace</td><td class="size">282</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/digest.py">hybrid_verifier/digest.py</a></td><td>One format-digest call per task, cached for the scorer prompts.</td><td class="sym">ensure_digests</td><td class="size">175</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a></td><td>Shared judge LLM, workflow loading and result persistence.</td><td class="sym">BaseEvaluator._save_results</td><td class="size">380</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>Facade that selects the hybrid verifier or the legacy one.</td><td class="sym">WorkflowEvaluator.evaluate</td><td class="size">193</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>Facade that selects hybrid, legacy or gold.</td><td class="sym">WorkflowEvaluator.evaluate</td><td class="size">205</td></tr>
+<tr><td class="sym"><a href="mod_evaluators_gold_feedback.html">sources/evaluators/gold_feedback/</a></td><td>ORACLE wrapper: inner hybrid plus grader gradient.</td><td class="sym">GoldFeedbackEvaluator.evaluate</td><td class="size">1 075</td></tr>
 </tbody>
 </table>
 
 <p class="note">Amber note: the scorer is <b>not</b> sandboxed. It runs as a subprocess of the host interpreter - <code>RuntimeConfig(python_executable=sys.executable, use_pty=False)</code> with the workspace as execution directory (<code>sources/evaluators/hybrid_verifier/evaluator.py::HybridVerifierEvaluator._execute_scorer_script</code>). <code>AGENTS.md</code> states the same exception under Security considerations; only static screening, a read-only contract and the 60 s timeout hold the line.</p>
 
-<p class="note flag">Red note: <code>AGENTS.md</code> says generated workflow code runs through the SmolAgents sandbox "in <code class="path">sources/core/workflow_runner.py</code>", but <code>LocalPythonExecutor</code> appears nowhere in <code>sources/</code> (grep hit only in <code>.venv</code> and the injected template <code class="path">sources/modules/smolagent_factory.py</code>). <code>workflow_runner.py</code> runs a generated script as a subprocess (<code>WorkflowRunner.execute</code>).</p>
+<p class="note flag">Red note: <code>AGENTS.md</code> says generated workflow code runs through the SmolAgents sandbox "in <code class="path">sources/core/workflow_runner.py</code>", but <code>LocalPythonExecutor</code> appears nowhere in <code>sources/</code> (grep, 2026-09-28). <code>workflow_runner.py</code> runs a generated script as a subprocess (<code>WorkflowRunner.execute</code>).</p>
 
 <p class="note say">The reward is relative: it compares the current workspace only against previous generations of the same task goal, and the registry file is keyed by <code>sha256(goal + registry_version)</code>.</p>
 
@@ -259,8 +388,9 @@ ClaimsEvidenceLayer.collect(context: LayerContext) -&gt; list[LayerScore]
 ClaimsEvidenceLayer.revise(context, dead_claim_ids) -&gt; list[LayerScore]
 TaskRegistry.load(root: Path, goal: str, logger=None) -&gt; TaskRegistry
 TaskRegistry.record_generation(uuid, scores, evidence, reward=None) -&gt; None
-win_rate_reward(now, previous, claims, mode="temporal") -&gt; dict[str, Any]
-temporal_winner(now, prev, claims, mode="temporal") -&gt; tuple[int, dict]
+win_rate_reward(now, previous, claims, mode="temporal", stages=STAGES) -&gt; dict[str, Any]
+temporal_winner(now, prev, claims, mode="temporal", stages=STAGES) -&gt; tuple[int, dict]
+GoldFeedbackEvaluator.evaluate(uuid: str) -&gt; dict[str, Any]          # gold only, wraps the hybrid
 claim_stats(observed: list[float | None]) -&gt; dict[str, Any]
 build_gradient(...) -&gt; str
 build_evaluation_report(...) -&gt; str</pre>
@@ -278,9 +408,15 @@ build_evaluation_report(...) -&gt; str</pre>
 <tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="size">60</td><td>Subprocess timeout; floor is <code>5 s</code>.</td></tr>
 <tr><td class="sym">hybrid_verifier_refinement_rounds</td><td class="size">2</td><td>Replacement claims per generation; cap 14 total.</td></tr>
 <tr><td class="sym">hybrid_verifier_digest_max_files</td><td class="size">8</td><td>Files sampled by the one format-digest call.</td></tr>
-<tr><td class="sym">verifier_kind</td><td class="size">hybrid</td><td><code>legacy</code> loads the deprecated verifier instead.</td></tr>
+<tr><td class="sym">hybrid_verifier_visual_rung</td><td class="size">True</td><td>Figure tasks get a <code>visual</code> rung first.</td></tr>
+<tr><td class="sym">hybrid_verifier_execution_gate</td><td class="size">True</td><td>Re-run cap: crash 0.0, divergent 0.5.</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="size">hybrid</td><td><code>legacy</code>: deprecated verifier; <code>gold</code>: oracle wrapper.</td></tr>
+<tr><td class="sym">gold_feedback_reward</td><td class="size">False</td><td>Gold only: reward from <code>oracle_reward</code>.</td></tr>
+<tr><td class="sym">gold_feedback_timeout_s</td><td class="size">1800</td><td>Gold only: grading cap; <code>0</code> disables it.</td></tr>
 </tbody>
 </table>
+
+<p class="note">Amber: the Default column is <code>config.py</code>; <code class="path">config_default.json</code> lines 18-23 set <code>hybrid_verifier_num_claims</code> 16 (extraction 14&#8211;18), <code>hybrid_verifier_scorer_timeout_s</code> 120 and <code>hybrid_verifier_digest_max_files</code> 16.</p>
 
 <details><summary>pairwise modes and reward maths</summary><div class="dbody">
 <pre>PAIRWISE_MODES      temporal (default), temporal_strict, mean_diff, sign_sum, escalation
@@ -289,23 +425,25 @@ MIN_OBS_FOR_VARIANCE 2         # below this, no variance verdict
 reward (win_rate)   (wins + 0.5 * ties) / n_previous
 first generation    fallback = mean claim score over surviving claims
 bradley_terry       sigmoid(beta_now - mean(beta)), ridge 1.0
-cap                 reward = min(reward, *layer gates)   # no gate by default</pre>
+cap                 reward = min(reward, *layer gates)   # ExecutionGateLayer on by default</pre>
 <p>Written per generation: <code>evaluation.txt</code> and <code>textual_gradient.txt</code> under <code>sources/workflows/&lt;uuid&gt;/</code> (<code>_write_artifacts</code>), plus scores under <code>evaluation.verifier</code> (<code>_save_results</code>).</p>
 </div></details>
 
 <details><summary>artifacts written per generation</summary><div class="dbody">
 <pre>evaluation.txt          per-claim scores with stage headers, pass &gt;= 0.5
-textual_gradient.txt    elimination point, losses, wins, transcript, dropped claims
+textual_gradient.txt    decisive losses, persistent failures, wins, exec facts, dead claims, transcript
+                        (gold mode: replaced by the grader text; hybrid copy in textual_gradient_hybrid.txt)
 state_result.json       read by the evaluator (short-circuit when missing)
-tmp/&lt;uuid&gt;/hybrid_registry_&lt;key&gt;.json   claims, cached scorers, score vectors</pre>
+workflow_dir/_verifier_tmp/hybrid_registry_&lt;key&gt;.json   claims, cached scorers, score vectors
+                        (gold mode: _verifier_tmp_gold/)</pre>
 <p>Gradient sections come from <code>gradient.py::build_gradient</code>; the report from <code>gradient.py::build_evaluation_report</code>.</p>
 </div></details>
 </div>
 
 <footer>
-<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>; all ten files of <code class="path">sources/evaluators/hybrid_verifier/</code>; <code class="path">sources/evaluators/base.py</code>; <code class="path">sources/evaluators/evaluator.py</code>; <code class="path">sources/core/workflow_runner.py</code> (grep + slices); <code class="path">sources/modules/smolagent_factory.py</code> (grep); <code>config.py</code>, <code>config_default.json</code>, <code>main.py</code> (grep); <code>AGENTS.md</code>.</p>
-<p class="skips">Skipped: <code>sources/evaluators/legacy_verifier/verifier*.py</code>, <code>generic/bs_detection.py</code>, <code>generic/generic.py</code>, <code>scenario/scenario.py</code>, <code>grounding.py</code> - deprecated or unrelated verifier channels, covered by <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>; <code class="path">experiments_verifiers/harness/e19b_extract.py</code> and friends - experiment harness the package only ports from, not on the runtime path; <code>.venv/</code>, <code>tmp/</code>, <code>datasets/</code>, <code>webui/</code> - out of scope for this page.</p>
-<p>Built at commit <code>336fe19</code>, 2026-09-26. The working tree has uncommitted changes: the flat <code class="path">sources/evaluators/*.py</code> modules are deleted into sub-packages and <code class="path">sources/evaluators/evaluator.py</code> is modified, so the facade lines above come from the working tree, not from the commit.</p>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>; all ten files of <code class="path">sources/evaluators/hybrid_verifier/</code> (grep and <code>wc -l</code> for this build); all six files of <code class="path">sources/evaluators/gold_feedback/</code>; <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>; <code class="path">sources/evaluators/base.py</code>; <code class="path">sources/evaluators/evaluator.py</code>; <code class="path">sources/core/evolution_engine.py</code> (lines 903-938); <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/workflow_selection.py</code> (grep); <code class="path">sources/core/workflow_runner.py</code> (grep + slices); <code>config.py</code>, <code>config_default.json</code>, <code>main.py</code> (grep); <code>AGENTS.md</code>.</p>
+<p class="skips">Skipped: <code>sources/evaluators/legacy_verifier/verifier*.py</code>, <code>generic/bs_detection.py</code>, <code>generic/generic.py</code>, <code>scenario/scenario.py</code>, <code>grounding.py</code> - deprecated or unrelated verifier channels, covered by <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>; <code>gold_feedback/format.py</code> message rules - covered by <a href="file_gold_format.html">file_gold_format.html</a>; <code class="path">experiments_verifiers/harness/e19b_extract.py</code> and friends - experiment harness the package only ports from, not on the runtime path; <code>.venv/</code>, <code>tmp/</code>, <code>datasets/</code>, <code>webui/</code> - out of scope for this page.</p>
+<p>Built at commit <code>4020790</code> + uncommitted working tree, 2026-09-28. The <code>gold</code> branch and <code class="path">sources/evaluators/gold_feedback/</code> are uncommitted; the hybrid package lines come from commit <code>4020790</code>.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>
