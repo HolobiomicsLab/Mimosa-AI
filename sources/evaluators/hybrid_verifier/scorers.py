@@ -19,9 +19,12 @@ from __future__ import annotations
 import json
 import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from .claims import _flag, _screen_call
 
 # Allowed imports for scorer scripts: stdlib + numpy + pandas + PIL (E18 set).
 ALLOWED_IMPORTS: frozenset[str] = frozenset(
@@ -189,6 +192,14 @@ log lines for loss/accuracy at a step, or read the script's code for the require
 method — then map that measured quantity to a CONTINUOUS 0..1 score implementing the \
 scoring_rule EXACTLY (partial credit per the rule). Do NOT collapse to 0/1 unless the \
 property is truly binary. Absent/unreadable target -> 0.
+- When the claim names EXACT column names, header fields, file names or output paths, \
+your script MUST verify them with EXACT equality — set equality such as \
+set(df.columns) == {{"gene_id", "expression_value", "p_value"}} or a direct == \
+comparison. Never use substring matching (`"X" in c`), case-insensitive matching, or \
+partial names for an exact-name requirement: a column named PRED_score does NOT \
+satisfy a requirement for PRED, and an exact-set requirement also fails when extra \
+or renamed columns are present. Fuzzy/substring matching is ONLY for LOCATING a \
+candidate file or column, never for verifying an exact-name claim.
 - Print EXACTLY ONE line to stdout: a single JSON object
   {{"claim_id": "<claim id>", "score": <number 0..1>, "evidence": "<=40 words quoting \
 the measured numbers (counts, values, ranges) you actually read"}}
@@ -219,8 +230,11 @@ on 0..1 (never a bare 0/1 unless truly binary); absent target -> 0.
 "<=40 words with the measured numbers"}}; exit 0.
 - Common pitfalls: workspace lacks the target entirely (must print score 0, not \
 crash); CSV delimiter/encoding variance (try engine fallbacks, dtype=str first); \
-column names vary (match by fuzzy/substring, not exact); numbers embedded in logs \
-(regex the LAST occurrence); NaN handling; printing anything else to stdout.
+column names vary across workspaces (locate a column fuzzily if you must, but when \
+the claim demands exact column/file names verify them with EXACT set equality — \
+never substring or case-insensitive matching, PRED_score is NOT PRED); numbers \
+embedded in logs (regex the LAST occurrence); NaN handling; printing anything else \
+to stdout.
 
 Output ONLY the corrected Python source code in one ```python fenced block."""
 
@@ -234,8 +248,96 @@ def parse_code(text: str) -> str | None:
     return t if t and len(t) > 80 else None
 
 
+def _pair_block(
+    claims: list[dict[str, Any]], scripts: dict[str, str]
+) -> list[dict[str, str]]:
+    """Claim/script pairs as one strict-JSON line for a screen prompt."""
+    out: list[dict[str, str]] = []
+    for c in claims:
+        cid = str(c.get("id", ""))
+        code = scripts.get(cid)
+        if not cid or not code:
+            continue
+        out.append(
+            {
+                "claim_id": cid,
+                "statement": str(c.get("statement", "")),
+                "target": str(c.get("target", "")),
+                "scoring_rule": str(c.get("scoring_rule", "")),
+                "script": code,
+            }
+        )
+    return out
+
+
+def exact_name_violations(
+    claims: list[dict[str, Any]],
+    scripts: dict[str, str],
+    llm_text: Callable[[str, str, str], str],
+    uuid: str = "",
+) -> dict[str, str]:
+    """ONE batched LLM judgment: which exact-name scorers match leniently.
+
+    A claim that specifies exact column names, header fields, file names
+    or output paths must be verified by its scorer script with EXACT
+    equality — set equality (``set(df.columns) == expected_set``) or a
+    direct ``==`` comparison. Lenient matching (substring ``in``,
+    ``.str.contains()``, a ``.lower()`` before the comparison, partial
+    names) lets a near-miss name such as ``PRED_score`` satisfy a
+    requirement for ``PRED`` and scores the wrong artifact 1.0. All of
+    the task's claim/script pairs go to the judge in a single call
+    (batched, never per-claim), reusing the claims screens' retry
+    transport. Returns ``{claim_id: reason}`` naming only the lenient
+    scripts; verdicts on ids outside the screened pairs are ignored, and
+    a failed judge call degrades open (nothing flagged).
+    """
+    pairs = _pair_block(claims, scripts)
+    if not pairs:
+        return {}
+    prompt = f"""# EXACT-NAME SCORER SCREEN
+You are auditing the scorer scripts of ONE scientific verification rubric. Each claim \
+below specifies exact column names, header fields, file names or output paths, and is \
+verified by ONE Python script. EXACT equality means the script compares names with \
+`set(df.columns) == expected_set`, `col == "name"` or an equivalent direct equality \
+(including each name inside a set/list literal compared with ==). LENIENT matching \
+means substring membership (`"X" in c`, `any(n in col for col in cols)`), \
+`.str.contains("X")`, a `.lower()` call before the comparison, or any other partial \
+or case-insensitive name test. Lenient matching lets near-miss names pass — a column \
+named PRED_score does NOT satisfy a requirement for PRED — so a script that verifies \
+exact names leniently is defective even if it also checks other things loosely.
+
+CLAIMS + SCRIPTS (JSON):
+{json.dumps(pairs)}
+
+For EACH pair above, judge: does the script verify the claim's exact names with EXACT \
+equality, or does it use lenient matching? Reply with ONLY a strict JSON array, \
+exactly one entry per pair and nothing else:
+[{{"claim_id": "<claim id>", "lenient": true, "line_evidence": "<the specific \
+script line>", "reason": "<one sentence>"}}]
+(entries for exact scripts use "lenient": false)."""
+    verdicts = _screen_call(llm_text, uuid, "hybrid_screen_exact_name", prompt)
+    ids = {p["claim_id"] for p in pairs}
+    flagged: dict[str, str] = {}
+    for v in verdicts or []:
+        if not isinstance(v, dict):
+            continue
+        cid = str(v.get("claim_id", ""))
+        if cid not in ids or not _flag(v, "lenient"):
+            continue
+        reason = str(v.get("reason") or "lenient name matching").strip()
+        ev = str(v.get("line_evidence") or "").strip()
+        flagged[cid] = f"{reason} — line: {ev}" if ev else reason
+    return flagged
+
+
 def static_violations(code: str) -> list[str]:
-    """Static policy screen for a scorer script (E18+E19 guards)."""
+    """Static STRUCTURAL policy screen for a scorer script (E18+E19).
+
+    Allowed imports, banned APIs, write-mode opens — pure structure, no
+    content judgment. The exact-name content screen is LLM-powered
+    (``exact_name_violations``) and runs on the host's judge call in the
+    scorer build loop.
+    """
     v: list[str] = []
     for mod in _IMPORT_RE.findall(code):
         root = mod.split(".")[0]

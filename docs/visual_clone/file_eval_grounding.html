@@ -108,17 +108,17 @@
     </filter>
   </defs>
 
-  <a class="box" id="d1" href="../../sources/evaluators/generic.py">
-    <title>generic.py imports the function at L30 and calls it at L353</title>
+  <a class="box" id="d1" href="../../sources/evaluators/generic/generic.py">
+    <title>generic/generic.py imports the function at L29 and calls it at L353</title>
     <rect x="20" y="30" width="200" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="120" y="56" text-anchor="middle">generic.py</text>
+    <text class="box-label" x="120" y="56" text-anchor="middle">generic/generic.py</text>
     <text class="box-sub" x="120" y="74" text-anchor="middle">call &#183; L353</text>
   </a>
 
-  <a class="box" id="d2" href="../../sources/evaluators/verifier.py">
-    <title>verifier.py imports the function at L36 and calls it at L258, one call per uuid, cached</title>
+  <a class="box" id="d2" href="../../sources/evaluators/legacy_verifier/verifier.py">
+    <title>legacy_verifier/verifier.py imports the function at L41 and calls it at L258, one call per uuid, cached</title>
     <rect x="20" y="176" width="200" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="120" y="202" text-anchor="middle">verifier.py</text>
+    <text class="box-label" x="120" y="202" text-anchor="middle">legacy_verifier/verifier.py</text>
     <text class="box-sub" x="120" y="220" text-anchor="middle">call &#183; L258</text>
     <text class="box-sub" x="120" y="238" text-anchor="middle">gated by use_grounding</text>
   </a>
@@ -214,9 +214,9 @@
     <text class="box-sub" x="455" y="184" text-anchor="middle">L54&#8211;L55 &#183; cause not logged</text>
   </g>
   <g class="box" id="c4">
-    <title>verifier.py only ever receives a string back; its own except branch needs an exception, and this file raises none</title>
+    <title>legacy_verifier/verifier.py only ever receives a string back; its own except branch needs an exception, and this file raises none</title>
     <rect x="640" y="80" width="330" height="62" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
-    <text class="box-label" x="805" y="106" text-anchor="middle">verifier.py takes the text</text>
+    <text class="box-label" x="805" y="106" text-anchor="middle">legacy_verifier/verifier.py takes the text</text>
     <text class="box-sub" x="805" y="124" text-anchor="middle">marker branch L259&#8211;L261 idle</text>
   </g>
 
@@ -230,7 +230,7 @@
   <text class="box-sub" x="20" y="210">red = failing branch; the exception object is discarded at L54, so no traceback reaches the caller</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 &mdash; the only branch in the file. Because <code>except Exception</code> at L54 keeps no message, a caller that sees the fallback text cannot tell a timeout from a missing service. The legacy verifier keeps a failure marker of its own (<code>verifier.py::_GROUNDING_FAILED_MARKER</code> L239, used at L261), but it needs the callee to raise, and this file swallows the exception first.</p>
+<p class="figcap">Diagram 3 &mdash; the only branch in the file. Because <code>except Exception</code> at L54 keeps no message, a caller that sees the fallback text cannot tell a timeout from a missing service. The legacy verifier keeps a failure marker of its own (<code>legacy_verifier/verifier.py::_GROUNDING_FAILED_MARKER</code> L239, used at L261), but it needs the callee to raise, and this file swallows the exception first.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -247,7 +247,7 @@
 <tr><td>returns</td><td class="sym">fixed fallback sentence</td><td>except branch</td><td>lets the caller proceed without grounding</td><td class="size">L55</td></tr>
 </tbody>
 </table>
-<p class="note">Amber note: <code>config.literrature_grounding</code> (config.py:103) does not gate this file. It gates a separate generation-time path, <code>Orchestrator._ground_with_perspicacite</code> (orchestrator.py:327), which reaches Perspicacite through <code>perspicacite_grounding_task</code>. The evaluator call here has no config switch of its own; the legacy verifier has a constructor flag instead (<code>verifier.py::VerifierEvaluator</code> <code>use_grounding</code> L116).</p>
+<p class="note">Amber note: <code>config.literrature_grounding</code> (config.py:112) does not gate this file. It gates a separate generation-time path, <code>Orchestrator._ground_with_perspicacite</code> (orchestrator.py:327), which reaches Perspicacite through <code>perspicacite_grounding_task</code>. The evaluator call here has no config switch of its own; the legacy verifier has a constructor flag instead (<code>legacy_verifier/verifier.py::VerifierEvaluator</code> <code>use_grounding</code> L116).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -281,8 +281,8 @@
 <table>
 <thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/generic.py">sources/evaluators/generic.py</a></td><td><code>from .grounding import get_perspicacite_grounding</code>; called when the run succeeded</td><td class="sym">L30 L353</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/verifier.py">sources/evaluators/verifier.py</a></td><td>called inside <code>_get_grounding</code>, one call per uuid, cached, gated by <code>use_grounding</code></td><td class="sym">L36 L258</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/generic/generic.py">sources/evaluators/generic/generic.py</a></td><td><code>from sources.evaluators.grounding import get_perspicacite_grounding</code>; called when the run succeeded</td><td class="sym">L29 L353</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py</a></td><td>called inside <code>_get_grounding</code>, one call per uuid, cached, gated by <code>use_grounding</code></td><td class="sym">L41 L258</td></tr>
 <tr><td class="sym"><a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a></td><td>does NOT import this file; it has its own Perspicacite path</td><td class="sym">L157 L327</td></tr>
 </tbody>
 </table>
@@ -291,9 +291,9 @@
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/grounding.py</code> (55 lines, whole file), <code class="path">sources/evaluators/generic.py</code> (import and call sites), <code class="path">sources/evaluators/verifier.py</code> (import, call, marker lines), <code class="path">sources/utils/perspicacite_client.py</code> (env var, POST path, cache path &mdash; header and named lines only), <code class="path">sources/core/orchestrator.py</code> (L141&#8211;L167, L327), <code class="path">config.py</code> (L103), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
+<p>Sources read: <code class="path">sources/evaluators/grounding.py</code> (55 lines, whole file), <code class="path">sources/evaluators/generic/generic.py</code> (import and call sites), <code class="path">sources/evaluators/legacy_verifier/verifier.py</code> (import, call, marker lines), <code class="path">sources/utils/perspicacite_client.py</code> (env var, POST path, cache path &mdash; header and named lines only), <code class="path">sources/core/orchestrator.py</code> (L141&#8211;L167, L327), <code class="path">config.py</code> (L103), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
 <p class="skips">Skipped, with reason: <code class="path">.env</code> and <code class="path">experiments_verifiers/.env</code> (never opened, secrets); the body of <code class="path">sources/utils/perspicacite_client.py</code> after L305 (streaming and non-streaming HTTP detail; the page needs only the env var, the URL and the cache path); <code class="path">sources/memory/perspicacite_requests/</code> contents (runtime cache, not needed to describe the code); every other evaluator file (grep shows no importer); no pytest run and no script executed, as instructed.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (the flat evaluator modules are deleted and <code>evaluator.py</code> is modified).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

@@ -37,7 +37,6 @@ class Config:
     """Configuration class for Mimosa AI Agent Framework."""
 
     def __init__(self):
-
         ##############
         # Workspace Configuration
         # Must point to Toolomics workspace
@@ -68,6 +67,41 @@ class Config:
         # Vision model for Source G (visual figure inspection).
         self.vision_judge_model: str | None = "openrouter/moonshotai/kimi-k3"
 
+        ##############
+        # Verifier channel (evaluation pipeline)
+        ##############
+        # "hybrid" (default) = E19/E19b hybrid verifier
+        # (sources/evaluators/hybrid_verifier); "legacy" = the deprecated
+        # multi-source per-claim verifier (sources/evaluators/verifier.py).
+        self.verifier_kind: str = "hybrid"
+        # Target key-claim count per task (extraction accepts ±2).
+        self.hybrid_verifier_num_claims: int = 10
+        # Max replacement claims requested per generation (E19b refinement).
+        self.hybrid_verifier_refinement_rounds: int = 2
+        # Per scorer-subprocess timeout in seconds.
+        self.hybrid_verifier_scorer_timeout_s: int = 60
+        # Pairwise reward mode: "temporal" (default — temporal-elimination
+        # ladder: earliest differing stage decides), "temporal_strict",
+        # "mean_diff", "sign_sum", or "escalation".
+        self.hybrid_verifier_pairwise_mode: str = "temporal"
+        # Max deliverable files sampled by the hybrid verifier format digest.
+        self.hybrid_verifier_digest_max_files: int = 8
+        # Reward aggregation over pairwise outcomes: "win_rate" (default —
+        # raw majority score vs previous generations; measured BEST on the
+        # frozen arena, E19c 2026-09-25: 0.742 vs BT-online 0.643, paired
+        # Δ +0.097 CI excluding 0) or "bradley_terry" (logistic-MLE
+        # strengths, opponent-weighted).
+        self.hybrid_verifier_reward: str = "win_rate"
+        # E26/E35 visual rung: figure tasks (>=50% image deliverables) get
+        # goal-anchored visual claims scored by the vision model at a
+        # ladder stage BEFORE "script" (E26: visual-early 0.833 vs 0.646
+        # as 4th rung).
+        self.hybrid_verifier_visual_rung: bool = True
+        # E24/E35 execution gate: crash / no-entry / timeout re-execution
+        # caps the reward at 0.0; divergent re-execution caps it at 0.5;
+        # clean recovery leaves the reward uncapped (E24: 29% of
+        # workspaces fail clean re-execution).
+        self.hybrid_verifier_execution_gate: bool = True
         #############
         # Orchestrator Workflow generation options
         #############
@@ -89,7 +123,9 @@ class Config:
         ##############
         # ScienceAgentBench Concurrency settings
         ##############
-        self.max_concurrent_eval_tasks: int = 1  # Number of concurrent tasks for CSV evaluation mode
+        self.max_concurrent_eval_tasks: int = (
+            1  # Number of concurrent tasks for CSV evaluation mode
+        )
         # Ablation: also benchmark-score every per-iteration /tmp snapshot
         # (mimosa_run_<session>_<uuid>) after the capsule eval, to track VER/SR
         # convergence across evolution. Multiplies per-task eval wall-clock.
@@ -138,10 +174,34 @@ class Config:
         self._model_pricing_cache = None
         # openrouter providers
         self.openrouter_provider: list[str] | None = [
-            "anthropic", "openai", "google-vertex", "google-ai-studio", "azure", "amazon-bedrock",
-            "xai", "deepseek", "mistral", "cohere", "moonshotai", "z-ai", "alibaba", "minimax", "perplexity",
-             "siliconflow", "novita", "deepinfra", "atlas-cloud", "parasail", "together", "fireworks", "nebius", "chutes",
-             "groq", "cerebras", "sambanova", "nvidia"
+            "anthropic",
+            "openai",
+            "google-vertex",
+            "google-ai-studio",
+            "azure",
+            "amazon-bedrock",
+            "xai",
+            "deepseek",
+            "mistral",
+            "cohere",
+            "moonshotai",
+            "z-ai",
+            "alibaba",
+            "minimax",
+            "perplexity",
+            "siliconflow",
+            "novita",
+            "deepinfra",
+            "atlas-cloud",
+            "parasail",
+            "together",
+            "fireworks",
+            "nebius",
+            "chutes",
+            "groq",
+            "cerebras",
+            "sambanova",
+            "nvidia",
         ]
         # Request token logprobs and save them with agent memory (for ablations). Litellm only.
         self.save_logprobs: bool = True
@@ -149,13 +209,23 @@ class Config:
         ##############
         # Prompts and pre-defined code paths; Do not modify unless you know what you are doing.
         ##############
-        self.prompt_planner: str = paths.resource_path("sources/prompts/planner_reproduction.md")
-        self.prompt_workflow_creator: str = paths.resource_path("sources/prompts/workflow_v15.md")
-        self.prompt_smolagent: str = paths.resource_path("sources/prompts/smolagent_sys_prompt.md")
+        self.prompt_planner: str = paths.resource_path(
+            "sources/prompts/planner_reproduction.md"
+        )
+        self.prompt_workflow_creator: str = paths.resource_path(
+            "sources/prompts/workflow_v15.md"
+        )
+        self.prompt_smolagent: str = paths.resource_path(
+            "sources/prompts/smolagent_sys_prompt.md"
+        )
 
         # folder paths for workflow pre-defined code
-        self.schema_code_path: str = paths.resource_path("sources/modules/state_schema.py")
-        self.smolagent_factory_code_path: str = paths.resource_path("sources/modules/smolagent_factory.py")
+        self.schema_code_path: str = paths.resource_path(
+            "sources/modules/state_schema.py"
+        )
+        self.smolagent_factory_code_path: str = paths.resource_path(
+            "sources/modules/smolagent_factory.py"
+        )
         # folder path for cache
         self.runs_capsule_dir = paths.default_runs_capsule_dir()
         self.workflow_dir: str = paths.default_workflow_dir()
@@ -188,7 +258,7 @@ class Config:
             "smolagents[litellm,mlx-lm,telemetry,mcp]",
             "litellm>=1.77.7,<1.92",
             "langgraph>=0.4.7",
-            #"matplotlib>=3.9.0",
+            # "matplotlib>=3.9.0",
             "pandas==2.3.2",
             "numpy>=2.0.0",
             # correct PyPI package name
@@ -200,7 +270,6 @@ class Config:
         # notifications
         self.pushover_token: str | None = os.getenv("PUSHOVER_TOKEN")
         self.pushover_user: str | None = os.getenv("PUSHOVER_USER")
-
 
     def openrouter_provider_for(self, model_id: str | None) -> list[str] | None:
         """Return the precheck-selected provider list for `model_id`, or the
@@ -322,6 +391,15 @@ class Config:
             "judge_model": self.judge_model,
             "vision_judge_model": self.vision_judge_model,
             "capsule_namer_model": self.capsule_namer_model,
+            "verifier_kind": self.verifier_kind,
+            "hybrid_verifier_num_claims": self.hybrid_verifier_num_claims,
+            "hybrid_verifier_refinement_rounds": self.hybrid_verifier_refinement_rounds,
+            "hybrid_verifier_scorer_timeout_s": self.hybrid_verifier_scorer_timeout_s,
+            "hybrid_verifier_pairwise_mode": self.hybrid_verifier_pairwise_mode,
+            "hybrid_verifier_digest_max_files": self.hybrid_verifier_digest_max_files,
+            "hybrid_verifier_reward": self.hybrid_verifier_reward,
+            "hybrid_verifier_visual_rung": self.hybrid_verifier_visual_rung,
+            "hybrid_verifier_execution_gate": self.hybrid_verifier_execution_gate,
             "engine_name": self.engine_name,
             "openrouter_provider": self.openrouter_provider,
             "default_openrouter_quantizations": self.default_openrouter_quantizations,
@@ -351,7 +429,9 @@ class Config:
             "parent_threshold_similarity": self.parent_threshold_similarity,
             "parent_threshold_score": self.parent_threshold_score,
             "schema_code_path": portable_resources["schema_code_path"],
-            "smolagent_factory_code_path": portable_resources["smolagent_factory_code_path"],
+            "smolagent_factory_code_path": portable_resources[
+                "smolagent_factory_code_path"
+            ],
             "runs_capsule_dir": self.runs_capsule_dir,
             "workflow_dir": self.workflow_dir,
             "memory_dir": self.memory_dir,
@@ -381,16 +461,55 @@ class Config:
         self.workflow_llm_model = data.get(
             "workflow_llm_model", self.workflow_llm_model
         )
-        self.smolagent_model_id = data.get("smolagent_model_id", self.smolagent_model_id)
-        self.judge_model = data.get("judge_model", self.judge_model)
-        self.vision_judge_model = data.get(
-            "vision_judge_model", self.vision_judge_model
+        self.smolagent_model_id = data.get(
+            "smolagent_model_id", self.smolagent_model_id
         )
         self.capsule_namer_model = data.get(
             "capsule_namer_model", self.capsule_namer_model
         )
+        self.verifier_kind = str(data.get("verifier_kind", self.verifier_kind))
+        self.hybrid_verifier_num_claims = int(
+            data.get("hybrid_verifier_num_claims", self.hybrid_verifier_num_claims)
+        )
+        self.hybrid_verifier_refinement_rounds = int(
+            data.get(
+                "hybrid_verifier_refinement_rounds",
+                self.hybrid_verifier_refinement_rounds,
+            )
+        )
+        self.hybrid_verifier_scorer_timeout_s = int(
+            data.get(
+                "hybrid_verifier_scorer_timeout_s",
+                self.hybrid_verifier_scorer_timeout_s,
+            )
+        )
+        self.hybrid_verifier_pairwise_mode = str(
+            data.get(
+                "hybrid_verifier_pairwise_mode", self.hybrid_verifier_pairwise_mode
+            )
+        )
+        self.hybrid_verifier_digest_max_files = int(
+            data.get(
+                "hybrid_verifier_digest_max_files",
+                self.hybrid_verifier_digest_max_files,
+            )
+        )
+        self.hybrid_verifier_reward = str(
+            data.get("hybrid_verifier_reward", self.hybrid_verifier_reward)
+        ).lower()
+        self.hybrid_verifier_visual_rung = bool(
+            data.get("hybrid_verifier_visual_rung", self.hybrid_verifier_visual_rung)
+        )
+        self.hybrid_verifier_execution_gate = bool(
+            data.get(
+                "hybrid_verifier_execution_gate",
+                self.hybrid_verifier_execution_gate,
+            )
+        )
         self.engine_name = data.get("engine_name", self.engine_name)
-        self.openrouter_provider = data.get("openrouter_provider", self.openrouter_provider)
+        self.openrouter_provider = data.get(
+            "openrouter_provider", self.openrouter_provider
+        )
         self.default_openrouter_quantizations = data.get(
             "default_openrouter_quantizations", self.default_openrouter_quantizations
         )
@@ -405,7 +524,9 @@ class Config:
         self.learned_score_threshold = data.get(
             "learned_score_threshold", self.learned_score_threshold
         )
-        self.selection_strategy = data.get("selection_strategy", self.selection_strategy)
+        self.selection_strategy = data.get(
+            "selection_strategy", self.selection_strategy
+        )
         self.max_concurrent_eval_tasks = data.get(
             "max_concurrent_eval_tasks", self.max_concurrent_eval_tasks
         )
@@ -415,12 +536,16 @@ class Config:
         self.evaluate_snapshot_ablations = bool(
             data.get("evaluate_snapshot_ablations", self.evaluate_snapshot_ablations)
         )
-        self.novelty_comparison = data.get("novelty_comparison", self.novelty_comparison)
+        self.novelty_comparison = data.get(
+            "novelty_comparison", self.novelty_comparison
+        )
         self.novelty_previous_n = int(
             data.get("novelty_previous_n", self.novelty_previous_n)
         )
         self.length_penalty_baseline_chars = int(
-            data.get("length_penalty_baseline_chars", self.length_penalty_baseline_chars)
+            data.get(
+                "length_penalty_baseline_chars", self.length_penalty_baseline_chars
+            )
         )
         self.length_penalty_lambda = float(
             data.get("length_penalty_lambda", self.length_penalty_lambda)
@@ -452,9 +577,7 @@ class Config:
         self.runs_capsule_dir = data.get("runs_capsule_dir", self.runs_capsule_dir)
         self.workflow_dir = data.get("workflow_dir", self.workflow_dir)
         self.memory_dir = data.get("memory_dir", self.memory_dir)
-        self.export_astra = bool(
-            data.get("export_astra", self.export_astra)
-        )
+        self.export_astra = bool(data.get("export_astra", self.export_astra))
         self.planner_human_approve = bool(
             data.get("planner_human_approve", self.planner_human_approve)
         )
@@ -503,7 +626,9 @@ class Config:
             value = getattr(self, field)
             if value and not os.path.isabs(value):
                 relative = os.path.normpath(value)
-                setattr(self, field, paths.state_dir(relative, os.path.basename(relative)))
+                setattr(
+                    self, field, paths.state_dir(relative, os.path.basename(relative))
+                )
         tmp = self.runner_temp_dir
         if tmp and not os.path.isabs(tmp):
             relative = os.path.normpath(tmp)
@@ -511,7 +636,9 @@ class Config:
                 self.runner_temp_dir = str(paths.PACKAGE_ROOT / relative)
             else:
                 # Scratch data belongs in the cache dir, matching the default.
-                self.runner_temp_dir = str(paths.cache_dir() / os.path.basename(relative))
+                self.runner_temp_dir = str(
+                    paths.cache_dir() / os.path.basename(relative)
+                )
 
     def dump(self, filepath: str) -> None:
         """Save configuration to a JSON file, creating parent dirs as needed."""
@@ -549,11 +676,17 @@ class Config:
         lines.append(f"  max_tokens={self.max_tokens}")
         lines.append(f"  learned_score_threshold={self.learned_score_threshold}")
         lines.append(f"  selection_strategy={self.selection_strategy}")
-        lines.append(f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}")
-        lines.append(f"  evaluate_snapshot_ablations={self.evaluate_snapshot_ablations}")
+        lines.append(
+            f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}"
+        )
+        lines.append(
+            f"  evaluate_snapshot_ablations={self.evaluate_snapshot_ablations}"
+        )
         lines.append(f"  novelty_comparison={self.novelty_comparison}")
         lines.append(f"  novelty_previous_n={self.novelty_previous_n}")
-        lines.append(f"  length_penalty_baseline_chars={self.length_penalty_baseline_chars}")
+        lines.append(
+            f"  length_penalty_baseline_chars={self.length_penalty_baseline_chars}"
+        )
         lines.append(f"  length_penalty_lambda={self.length_penalty_lambda}")
         lines.append(f"  min_improvement_threshold={self.min_improvement_threshold}")
         lines.append(f"  population_size={self.population_size}")
@@ -563,29 +696,46 @@ class Config:
         lines.append(f"  initial_population={self.initial_population}")
         lines.append(f"  crossover_rate={self.crossover_rate}")
         lines.append(f"  n_parents={self.n_parents}")
-        lines.append(f"  parent_threshold_similarity={self.parent_threshold_similarity}")
+        lines.append(
+            f"  parent_threshold_similarity={self.parent_threshold_similarity}"
+        )
         lines.append(f"  parent_threshold_score={self.parent_threshold_score}")
         lines.append(f"  max_concurrent_eval_tasks={self.max_concurrent_eval_tasks}")
         lines.append(f"  schema_code_path={self.schema_code_path}")
-        lines.append(f"  smolagent_factory_code_path={self.smolagent_factory_code_path}")
+        lines.append(
+            f"  smolagent_factory_code_path={self.smolagent_factory_code_path}"
+        )
         lines.append(f"  runs_capsule_dir={self.runs_capsule_dir}")
         lines.append(f"  workflow_dir={self.workflow_dir}")
         lines.append(f"  memory_dir={self.memory_dir}")
         lines.append(f"  openrouter_provider={self.openrouter_provider}")
-        lines.append(f"  openrouter_provider_by_model={self.openrouter_provider_by_model}")
-        lines.append(f"  openrouter_quantizations_by_model={self.openrouter_quantizations_by_model}")
-        lines.append(f"  default_openrouter_quantizations={self.default_openrouter_quantizations}")
-        lines.append(f"  runner_default_python_version={self.runner_default_python_version}")
+        lines.append(
+            f"  openrouter_provider_by_model={self.openrouter_provider_by_model}"
+        )
+        lines.append(
+            f"  openrouter_quantizations_by_model={self.openrouter_quantizations_by_model}"
+        )
+        lines.append(
+            f"  default_openrouter_quantizations={self.default_openrouter_quantizations}"
+        )
+        lines.append(
+            f"  runner_default_python_version={self.runner_default_python_version}"
+        )
         lines.append(f"  runner_default_timeout={self.runner_default_timeout}")
         lines.append(f"  agent_execution_timeout={self.agent_execution_timeout}")
-        lines.append(f"  runner_default_max_memory_mb={self.runner_default_max_memory_mb}")
-        lines.append(f"  runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}")
+        lines.append(
+            f"  runner_default_max_memory_mb={self.runner_default_max_memory_mb}"
+        )
+        lines.append(
+            f"  runner_default_max_cpu_percent={self.runner_default_max_cpu_percent}"
+        )
         lines.append(f"  runner_temp_dir={self.runner_temp_dir}")
         lines.append(f"  runner_requirements={self.runner_requirements}")
         lines.append(f"  pushover_token={'***' if self.pushover_token else None}")
         lines.append(f"  pushover_user={'***' if self.pushover_user else None}")
         lines.append(")")
         return "\n".join(lines)
+
 
 if __name__ == "__main__":
     config = Config()

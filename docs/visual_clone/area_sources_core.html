@@ -155,7 +155,7 @@
 <tr><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a> (2)</td><td>Also rehydrates workflow info from disk.</td><td class="size">396</td><td class="sym">_rehydrate_workflow_info</td></tr>
 </tbody>
 </table>
-<p class="note say">Nineteen modules, <code>__init__.py</code> included; <code>__pycache__/</code> is not counted. <code>failure_fingerprint.py</code> says deprecated in its own docstring, but <a href="../../sources/evaluators/verifier.py">sources/evaluators/verifier.py:32</a> still imports it.</p>
+<p class="note say">Nineteen modules, <code>__init__.py</code> included; <code>__pycache__/</code> is not counted. <code>failure_fingerprint.py</code> says deprecated in its own docstring, but the deprecated <a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py:32</a> still imports it.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -177,9 +177,10 @@
 </div>
 
 <footer>
-<p>Sources: <code class="path">sources/core/*.py</code> (import lines, <code>wc -l</code>, top-level <code>class</code>/<code>def</code>), <code class="path">sources/evaluators/verifier.py</code>.</p>
+<p>Sources: <code class="path">sources/core/*.py</code> (import lines, <code>wc -l</code>, top-level <code>class</code>/<code>def</code>), <code class="path">sources/evaluators/legacy_verifier/verifier.py</code>.</p>
 <p class="skips">Skipped: <code class="path">sources/core/__pycache__/</code> (bytecode); method bodies (owned by the seven L2 pages); the <code>__main__</code> smoke blocks. First write of this page failed inside the coordinator's worker, so the coordinator wrote it directly from the same evidence.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes in <code>sources/evaluators/</code>; <code>sources/core/*.py</code> is unmodified.</p>
+<p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

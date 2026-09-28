@@ -139,6 +139,47 @@ class WorkflowInfo:
         uncapped = float(verifier.get("overall_score_uncapped", 0.0))
         return max(0.0, uncapped)
 
+    def _selected_evaluation(self) -> dict:
+        """The evaluation block that backs ``overall_score`` (or ``{}``).
+
+        ``calculate_overall_score`` reads the first evaluator block in
+        priority order (``generic`` → ``verifier`` → ``scenario``); the
+        fallback flag MUST come from that same block, otherwise a state
+        result written by two evaluators can pair one block's score with
+        another block's ``reward_fallback`` (N1: the pains_brenk gen-13
+        mean-claim flag was read from a different block than the 0.745
+        score that won the capsule argmax).
+        """
+        state_result = self.load_state_result()
+        if not state_result:
+            return {}
+        evaluation = state_result.get("evaluation", {})
+        if not isinstance(evaluation, dict):
+            return {}
+        for key in ("generic", "verifier", "scenario"):
+            block = evaluation.get(key)
+            if isinstance(block, dict):
+                return block
+        return {}
+
+    @property
+    def reward_is_fallback(self) -> bool:
+        """True when the selected evaluation's reward is a fallback, not a pairwise win.
+
+        The hybrid verifier persists ``reward_fallback`` alongside
+        ``overall_score``: ``"mean_claim"`` marks a first-generation reward
+        computed as the mean claim score (no rivals to compare against yet)
+        — a different scale from the pairwise win-rate every later
+        generation earns. Comparing the two in one argmax ships the wrong
+        generation (E37 R1: bulk_modulus shipped gen 0's 0.89 fallback over
+        gen 11's winning 0.70). ``"short_circuit"`` (execution failed,
+        reward 0.0) is a real measured outcome, not a fallback.
+
+        Read from :meth:`_selected_evaluation` so the flag always comes
+        from the SAME block that produced ``overall_score``.
+        """
+        return self._selected_evaluation().get("reward_fallback") == "mean_claim"
+
     @property
     def judge_evaluation(self) -> dict:
         """Return the contents of ``evaluation.txt`` for this workflow.
@@ -223,29 +264,23 @@ class WorkflowInfo:
         """Compute the overall score from the workflow's evaluation block.
 
         Uses the first matching evaluator in priority order (``generic`` →
-        ``verifier`` → ``scenario``) and returns the mean of the collected
-        scores. Returns ``0.0`` when no evaluation data is available.
+        ``verifier`` → ``scenario`` — the same block
+        :meth:`_selected_evaluation` feeds to ``reward_is_fallback``) and
+        returns its score. Returns ``0.0`` when no evaluation data is
+        available.
 
         Returns:
-            The mean of the collected score(s), or ``0.0`` when none exist.
+            The evaluation's overall score, or ``0.0`` when none exists.
         """
-        state_result = self.load_state_result()
-        if not state_result:
+        block = self._selected_evaluation()
+        if not block:
             return 0.0
-
-        evaluation = state_result.get("evaluation", {})
-        scores = []
-        if evaluation:
-            try:
-                if "generic" in evaluation:
-                        scores.append(evaluation["generic"]["overall_score"])
-                elif "verifier" in evaluation:
-                        scores.append(evaluation["verifier"]["overall_score"])
-                elif "scenario" in evaluation:
-                    scores.append(evaluation["scenario"]["score"])
-            except Exception as _:
-                scores.append(0)
-        return mean(scores) if scores else 0.0
+        try:
+            # generic/verifier persist "overall_score"; scenario uses "score".
+            value = block.get("overall_score", block.get("score"))
+            return mean([float(value)]) if value is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
 
     def is_valid(self) -> bool:
         """Return True when both ``state_result.json`` and the genotype file exist."""

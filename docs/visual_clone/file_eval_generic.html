@@ -3,15 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>sources/evaluators/generic.py - Mimosa-AI visual clone</title>
+<title>sources/evaluators/generic/generic.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<!-- file_eval_generic.html - file digest: sources/evaluators/generic.py.
+<!-- file_eval_generic.html - file digest: sources/evaluators/generic/generic.py.
      Sources and skip decisions: see the footer. Read-only page, nothing outside docs/visual_clone/ touched. -->
-<body data-crumb="File digests > sources/evaluators > generic.py">
+<body data-crumb="File digests > sources/evaluators > generic/generic.py">
 <div class="wrap">
 
-<h1 class="hud">generic.py</h1>
+<h1 class="hud">generic/generic.py</h1>
 <p class="intro"><code>GenericEvaluator</code> scores one workflow run with four independent LLM judges: goal alignment, agent collaboration, output quality and answer plausibility. It averages the four scores, can subtract a numerical-fraud penalty, and writes <code>evaluation.txt</code> plus the <code>evaluation.generic</code> block of <code>state_result.json</code>. The module header marks it <code>[DEPRECATED](V1)</code>; the default verifier channel is the hybrid package.</p>
 
 <div id="legend" data-auto></div>
@@ -42,7 +42,7 @@
     <text class="box-sub" x="105" y="236" text-anchor="middle">agent_answers)</text>
   </g>
 
-  <a class="box" id="g2" href="../../sources/evaluators/generic.py">
+  <a class="box" id="g2" href="../../sources/evaluators/generic/generic.py">
     <title>evaluate() (line 334): reads the run text, gates grounding on the success flag, then runs the four criteria.</title>
     <rect x="250" y="140" width="190" height="130" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="345" y="166" text-anchor="middle">evaluate() 334</text>
@@ -61,7 +61,7 @@
     <text class="box-sub" x="590" y="112" text-anchor="middle">else "No grounding available." 346</text>
   </a>
 
-  <a class="box" id="g4" href="../../sources/evaluators/generic.py">
+  <a class="box" id="g4" href="../../sources/evaluators/generic/generic.py">
     <title>The four criterion methods: _evaluate_goal_alignment (121), _evaluate_agent_collaboration (147), _evaluate_output_quality (169), _evaluate_answer_plausibility (191).</title>
     <rect x="490" y="180" width="200" height="130" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="590" y="206" text-anchor="middle">four criterion judges</text>
@@ -72,7 +72,7 @@
     <text class="box-sub" x="590" y="294" text-anchor="middle">each has its own prompt string</text>
   </a>
 
-  <a class="box" id="g5" href="../../sources/evaluators/generic.py">
+  <a class="box" id="g5" href="../../sources/evaluators/generic/generic.py">
     <title>_evaluate_single_criterion (line 63) builds one LLMProvider per criterion with a fresh context (lines 103-109).</title>
     <rect x="740" y="30" width="190" height="110" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="835" y="56" text-anchor="middle">single criterion 63</text>
@@ -81,7 +81,7 @@
     <text class="box-sub" x="835" y="112" text-anchor="middle">empty reply raises 112</text>
   </a>
 
-  <a class="box" id="g6" href="../../sources/evaluators/generic.py">
+  <a class="box" id="g6" href="../../sources/evaluators/generic/generic.py">
     <title>_extract_single_score (line 259) pulls the JSON object, checks the three fields, normalizes the category and clamps the score to 0.0-1.0.</title>
     <rect x="740" y="180" width="190" height="130" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="835" y="206" text-anchor="middle">_extract_single_score 259</text>
@@ -92,7 +92,7 @@
     <text class="box-sub" x="835" y="294" text-anchor="middle">returns category, score, evidence</text>
   </a>
 
-  <a class="box" id="g7" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="g7" href="../../sources/evaluators/generic/bs_detection.py">
     <title>Aggregation (lines 406-441): mean of the four scores, then the optional numerical-fraud penalty.</title>
     <rect x="970" y="30" width="190" height="280" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="1065" y="58" text-anchor="middle">score aggregate 406</text>
@@ -136,14 +136,14 @@
   <text class="edge-label" x="1096" y="340" text-anchor="middle">writes</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - one pass over a finished run: build the execution text, fetch optional literature grounding, run four single-criterion judge calls, parse each score, average, then write the two artefacts. Line numbers are from <code class="path">sources/evaluators/generic.py</code>; solid arrows are direct calls, dashed arrows are value or file movement.</p>
+<p class="figcap">Diagram 1 - one pass over a finished run: build the execution text, fetch optional literature grounding, run four single-criterion judge calls, parse each score, average, then write the two artefacts. Line numbers are from <code class="path">sources/evaluators/generic/generic.py</code>; solid arrows are direct calls, dashed arrows are value or file movement.</p>
 <p class="note say">Each criterion is judged in a fresh <code>LLMProvider</code> context, and the file says why: "to avoid inter-criteria bias" (line 65).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Data flow - what goes in, what comes out</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1000 400" role="img" aria-label="Data flow of generic.py: config fields, judge memory files, the two written artefacts and the None return value">
+<svg class="diagram" viewBox="0 0 1000 400" role="img" aria-label="Data flow of generic/generic.py: config fields, judge memory files, the two written artefacts and the None return value">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -338,7 +338,7 @@
   <text class="edge-label" x="740" y="335" text-anchor="middle">then</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - three branch groups: per-criterion failure handling (<code class="path">sources/evaluators/generic.py:368-404</code>), the optional penalty with its clamp and its 0.0 fallback (<code class="path">:419-441</code>), and the two save steps with their local error handling (<code class="path">:443-472</code>).</p>
+<p class="figcap">Diagram 3 - three branch groups: per-criterion failure handling (<code class="path">sources/evaluators/generic/generic.py:368-404</code>), the optional penalty with its clamp and its 0.0 fallback (<code class="path">:419-441</code>), and the two save steps with their local error handling (<code class="path">:443-472</code>).</p>
 <p class="note">Amber: the comment at line 411 says the overall score is "excluding answer_plausibility", but the key list immediately below (line 412) includes <code>answer_plausibility</code>, so all four criteria are averaged.</p>
 </div>
 
@@ -361,8 +361,8 @@
 <tr><td>file write</td><td class="sym">memory_dir/&lt;uuid&gt;/generic_judge_&lt;category&gt;.json</td><td class="sym">LLMProvider lines 103-108, 241-246</td><td>judge call cache, one file per criterion.</td></tr>
 </tbody>
 </table>
-<p class="note flag">Red: the module docstring starts with <code>[DEPRECATED](V1)</code> (<code class="path">sources/evaluators/generic.py:2</code>) and the pipeline agrees: the evolution engine always asks for <code>evaluator_type="verifier"</code> (<code class="path">sources/core/evolution_engine.py:808-810</code>), and the facade forwards <code>use_bs_penalty=False</code> (<code class="path">sources/evaluators/evaluator.py:54</code>). Nothing in <code class="path">sources/</code> calls this evaluator on the default run path.</p>
-<p class="note">Amber: <code>from .base import *</code> (line 29) supplies <code>BaseEvaluator</code>, the exception classes and <code>_save_results</code> without naming them; a reader cannot see the parent's members from this file alone. Imports <code>datetime</code> (line 14) and the colour names <code>CYAN</code>, <code>YELLOW</code>, <code>RED</code>, <code>DIM</code>, <code>RESET</code>, <code>BOLD</code> (line 26) are unused; only <code>GREEN</code> and <code>print_box</code> are used (line 354).</p>
+<p class="note flag">Red: the module docstring starts with <code>[DEPRECATED](V1)</code> (<code class="path">sources/evaluators/generic/generic.py:2</code>) and the pipeline agrees: the evolution engine always asks for <code>evaluator_type="verifier"</code> (<code class="path">sources/core/evolution_engine.py:808-810</code>), and the facade forwards <code>use_bs_penalty=False</code> (<code class="path">sources/evaluators/evaluator.py:54</code>). Nothing in <code class="path">sources/</code> calls this evaluator on the default run path.</p>
+<p class="note">Amber: <code>from sources.evaluators.base import *</code> (line 28) supplies <code>BaseEvaluator</code>, the exception classes and <code>_save_results</code> without naming them; a reader cannot see the parent's members from this file alone. Imports <code>datetime</code> (line 14) and the colour names <code>CYAN</code>, <code>YELLOW</code>, <code>RED</code>, <code>DIM</code>, <code>RESET</code>, <code>BOLD</code> (line 26) are unused; only <code>GREEN</code> and <code>print_box</code> are used (line 354).</p>
 <p class="note">Amber: the file has no <code>__main__</code> block at the end; the <code>if __name__ == "__main__":</code> at line 20 only appends the repository root to <code>sys.path</code>. The class docstring counts four judges and the code runs four, one per criterion.</p>
 </div>
 
@@ -385,7 +385,7 @@
   _extract_single_score(self, evaluation_text: str, expected_category: str)
            -&gt; dict[str, Any]                                    line 259  parse and validate one score
   evaluate(self, uuid: str, agent_answers: str | None = None) -&gt; None  line 334  the whole run, writes artefacts</pre>
-<p>Module level: <code>if __name__ == "__main__":</code> at line 20 appends the repository root to <code>sys.path</code>. Imports: <code>json</code>, <code>logging</code>, <code>re</code>, <code>datetime</code> (unused), <code>Path</code>, <code>Any</code>, <code>sys</code>, <code>os</code> at lines 11-18; <code>sources.core.llm_provider</code> at line 23; <code>sources.cli.pretty_print</code> at lines 24-27; <code>.base</code> star import, <code>.grounding</code> and <code>.bs_detection</code> at lines 29-31. The prompt strings live inline: lines 79-98 (single criterion), 133-144, 157-166 and 179-188 (three criteria) and 210-236 (plausibility).</p>
+<p>Module level: <code>if __name__ == "__main__":</code> at line 20 appends the repository root to <code>sys.path</code>. Imports: <code>json</code>, <code>logging</code>, <code>re</code>, <code>datetime</code> (unused), <code>Path</code>, <code>Any</code>, <code>sys</code>, <code>os</code> at lines 11-18; <code>sources.cli.pretty_print</code> at lines 23-26; <code>sources.core.llm_provider</code> at line 27; the star import of <code>sources.evaluators.base</code> at line 28, <code>sources.evaluators.grounding</code> at line 29 and <code>.bs_detection</code> at line 31. The prompt strings live inline: lines 79-98 (single criterion), 133-144, 157-166 and 179-188 (three criteria) and 210-236 (plausibility).</p>
 </div></details>
 </div>
 
@@ -396,24 +396,25 @@
 <thead><tr><th>Importer</th><th>What it calls</th><th>Where</th></tr></thead>
 <tbody>
 <tr><td class="sym"><a href="file_eval_evaluator.html">sources/evaluators/evaluator.py</a></td><td>imports <code>GenericEvaluator</code>; builds it at line 77; calls it twice</td><td class="sym">lines 16-20, 77-81, 158, 166</td></tr>
-<tr><td class="sym"><a href="file_eval_bs_detection.html">sources/evaluators/bs_detection.py</a></td><td>imported by this file, not the other way round</td><td class="sym">line 31 here</td></tr>
+<tr><td class="sym"><a href="file_eval_bs_detection.html">sources/evaluators/generic/bs_detection.py</a></td><td>imported by this file, not the other way round</td><td class="sym">line 31 here</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/hybrid_verifier_test.py</a></td><td>stubs <code>evaluator_mod.GenericEvaluator</code> so the facade builds without a judge</td><td class="sym">lines 893, 933</td></tr>
 </tbody>
 </table>
-<p>No other file imports this module. No importer of <code class="path">sources/evaluators/generic.py</code> calls the private helpers from outside the class: the four criterion methods are called only from <code>evaluate()</code> (lines 364, 375, 386, 397), <code>_evaluate_single_criterion</code> is called by those four (lines 145, 167, 189), and <code>_extract_single_score</code> is called at lines 114 and 252.</p>
+<p>No other file imports this module. No importer of <code class="path">sources/evaluators/generic/generic.py</code> calls the private helpers from outside the class: the four criterion methods are called only from <code>evaluate()</code> (lines 364, 375, 386, 397), <code>_evaluate_single_criterion</code> is called by those four (lines 145, 167, 189), and <code>_extract_single_score</code> is called at lines 114 and 252.</p>
 <h3>Tests that exercise it</h3>
 <ul>
-<li>No test file imports <code>GenericEvaluator</code> for its own body. The only two mentions are the stub monkeypatches in <code class="path">tests/hybrid_verifier_test.py:893</code> and <code class="path">:933</code>, which replace the class before the facade is built.</li>
+<li>No test file imports <code>GenericEvaluator</code> for its own body. The only two mentions are the stub monkeypatches in <code class="path">tests/hybrid_verifier_test.py:1020</code> and <code class="path">:1060</code>, which replace the class before the facade is built.</li>
 <li>No test asserts <code>evaluation.txt</code> content or the <code>evaluation.generic</code> block produced by this evaluator.</li>
-<li><code class="path">tests/hybrid_verifier_test.py:1024-1026</code> tests <code>extract_json_payload</code>, which lives in <code class="path">sources/evaluators/base.py</code> and is not used by this file.</li>
+<li><code class="path">tests/hybrid_verifier_test.py:1152</code> tests <code>extract_json_payload</code>, which lives in <code class="path">sources/evaluators/base.py</code> and is not used by this file.</li>
 </ul>
 <p>Related pages: <a href="file_index.html">file_index.html</a>, <a href="area_evaluators.html">area_evaluators.html</a>, <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>, <a href="file_eval_base.html">file_eval_base.html</a>, <a href="file_eval_bs_detection.html">file_eval_bs_detection.html</a>, <a href="file_eval_evaluator.html">file_eval_evaluator.html</a>, <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="flow_verification.html">flow_verification.html</a>.</p>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/generic.py</code> (471 lines, every def and class), <code class="path">sources/evaluators/base.py</code> (lines 108-145, 189-225, 227-286, 288-332), <code class="path">sources/evaluators/bs_detection.py</code> (lines 148-181, 228-301, 419-481, 528-583, 642-786), <code class="path">sources/evaluators/grounding.py</code> (entry point <code>get_perspicacite_grounding</code>, signature only), <code class="path">sources/evaluators/evaluator.py</code> (lines 16-20, 50-109, 146-167), <code class="path">sources/core/evolution_engine.py</code> (lines 29, 800-815), <code class="path">sources/cli/pretty_print.py</code> (imported names only), <code class="path">config.py</code> (lines 65-76, 160-165), <code class="path">tests/hybrid_verifier_test.py</code> (lines 886-964), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code> and <code class="path">docs/visual_clone/_clone.js</code> for the page skeleton.</p>
-<p class="skips">Skipped: the four long inline judge prompts (quoted only by their criterion names and line ranges); the bodies of <code class="path">sources/evaluators/grounding.py</code> and <code class="path">sources/evaluators/bs_detection.py</code> (own digest pages); <code class="path">sources/cli/pretty_print.py</code> internals (print formatting only); runtime folders <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code> and <code>tmp/</code> (not read); <code class="path">.env</code>-style files (not opened; the Perspicacité client handles its own configuration). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Sources read: <code class="path">sources/evaluators/generic/generic.py</code> (471 lines, every def and class), <code class="path">sources/evaluators/base.py</code> (lines 108-145, 189-225, 227-286, 288-332), <code class="path">sources/evaluators/generic/bs_detection.py</code> (lines 148-181, 228-301, 419-481, 528-583, 642-786), <code class="path">sources/evaluators/grounding.py</code> (entry point <code>get_perspicacite_grounding</code>, signature only), <code class="path">sources/evaluators/evaluator.py</code> (lines 16-20, 50-109, 146-167), <code class="path">sources/core/evolution_engine.py</code> (lines 29, 800-815), <code class="path">sources/cli/pretty_print.py</code> (imported names only), <code class="path">config.py</code> (lines 65-76, 160-165), <code class="path">tests/hybrid_verifier_test.py</code> (lines 1013-1092), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code> and <code class="path">docs/visual_clone/_clone.js</code> for the page skeleton.</p>
+<p class="skips">Skipped: the four long inline judge prompts (quoted only by their criterion names and line ranges); the bodies of <code class="path">sources/evaluators/grounding.py</code> and <code class="path">sources/evaluators/generic/bs_detection.py</code> (own digest pages); <code class="path">sources/cli/pretty_print.py</code> internals (print formatting only); runtime folders <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code> and <code>tmp/</code> (not read); <code class="path">.env</code>-style files (not opened; the Perspicacité client handles its own configuration). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
+<p>Move note: the working tree moved this file into <code class="path">sources/evaluators/generic/</code> and deleted the flat copy; the body is unchanged apart from the import lines, so the line numbers on this page were recomputed against the new path.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (the flat evaluator modules are deleted and <code>evaluator.py</code> is modified).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

@@ -126,7 +126,7 @@
   <text class="box-sub" x="20" y="200">top lane = compute path (lines 56-96) &#183; bottom lane = read-back path (lines 99-153). No config field, no file write.</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. Muted dashed = data that lives outside the file. Arrows are real calls: <code>_source_letter</code> (line 47), <code>_pass_total_by_source</code> (line 72), <code>failure_fingerprint_from_state_result</code> (line 143). The one dashed out-edge is not a call: the evaluator stores the returned <code>vector</code> under <code>evaluation.verifier.failure_fingerprint</code> in <code>state_result.json</code> (<code class="path">sources/evaluators/verifier.py:376</code>; the file write is <code class="path">sources/evaluators/base.py:272</code>).</p>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. Muted dashed = data that lives outside the file. Arrows are real calls: <code>_source_letter</code> (line 47), <code>_pass_total_by_source</code> (line 72), <code>failure_fingerprint_from_state_result</code> (line 143). The one dashed out-edge is not a call: the evaluator stores the returned <code>vector</code> under <code>evaluation.verifier.failure_fingerprint</code> in <code>state_result.json</code> (<code class="path">sources/evaluators/legacy_verifier/verifier.py:376</code>; the file write is <code class="path">sources/evaluators/base.py:272</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -387,8 +387,8 @@ if __name__ == "__main__":                                            # line 156
 <table>
 <thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/verifier.py">sources/evaluators/verifier.py</a></td><td>imports constants + <code>compute_failure_fingerprint</code>; stores result, writes zeros on failure</td><td class="sym">lines 29-33, 376, 567</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a></td><td>imports <code>DESCRIPTOR_DIM</code> as <code>_FP_DIM</code>; writes the zero/neutral field, does not compute it</td><td class="sym">lines 47, 496, 607</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py</a> <span class="tag dep">DEPRECATED</span></td><td>imports constants + <code>compute_failure_fingerprint</code>; stores result, writes zeros on failure</td><td class="sym">lines 29-33, 376, 567</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a></td><td>imports <code>DESCRIPTOR_DIM</code> as <code>_FP_DIM</code>; writes the zero/neutral field, does not compute it</td><td class="sym">lines 58, 635, 746</td></tr>
 <tr><td class="sym">no importer found</td><td>no source file calls the read helpers at runtime (grep, 2026-10-02)</td><td class="sym">grep -rn sources/</td></tr>
 <tr><td class="sym"><a href="../../tests/failure_fingerprint_test.py">tests/failure_fingerprint_test.py</a></td><td>exercises all four functions: dimension, firewall, label forms, disk read</td><td class="sym">lines 13-148</td></tr>
 <tr><td class="sym"><a href="../../tests/verifier_recovery_test.py">tests/verifier_recovery_test.py</a></td><td>imports <code>compute_failure_fingerprint</code> to prime the import chain</td><td class="sym">lines 31-32</td></tr>
@@ -398,13 +398,14 @@ if __name__ == "__main__":                                            # line 156
 </tbody>
 </table>
 <p class="note flag">Mismatch: <code>sources/core/failure_fingerprint.py:13</code> defines 7 letters <code>("a"&#8230;"g")</code>, so <code>DESCRIPTOR_DIM == 7</code>, but <code class="path">tests/failure_fingerprint_test.py:27-29</code> asserts <code>DESCRIPTOR_DIM == 6</code> and <code>SOURCES == ("a".."f")</code>. A run of that test against this file fails on both asserts. The docstring at line 21 also says "``a``-``f``" while the tuple ends at <code>g</code>.</p>
-<p class="note">The descriptor is marked deprecated in the module header (line 3), yet the legacy verifier still computes and stores it (<code class="path">sources/evaluators/verifier.py:376</code>), so the JSON key is present in fresh <code>state_result.json</code> files.</p>
+<p class="note">The descriptor is marked deprecated in the module header (line 3), yet the legacy verifier still computes and stores it (<code class="path">sources/evaluators/legacy_verifier/verifier.py:376</code>), so the JSON key is present in fresh <code>state_result.json</code> files.</p>
 </div>
 
 <footer>
-<p>Sources: <a href="../../sources/core/failure_fingerprint.py">sources/core/failure_fingerprint.py</a> (all 195 lines, read line by line), <a href="../../sources/evaluators/verifier.py">sources/evaluators/verifier.py</a> (imports and fingerprint writes), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a> (import and zero-field writes), <a href="../../tests/failure_fingerprint_test.py">tests/failure_fingerprint_test.py</a>, and greps over <code>sources/</code> and <code>tests/</code> for importers.</p>
+<p>Sources: <a href="../../sources/core/failure_fingerprint.py">sources/core/failure_fingerprint.py</a> (all 195 lines, read line by line), <a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py</a> (imports and fingerprint writes), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">sources/evaluators/hybrid_verifier/evaluator.py</a> (import and zero-field writes), <a href="../../tests/failure_fingerprint_test.py">tests/failure_fingerprint_test.py</a>, and greps over <code>sources/</code> and <code>tests/</code> for importers.</p>
 <p class="skips">Skipped: <code>diversity_experiments/</code> and <code>experiments_verifiers/</code> (analysis scripts that read the JSON field directly, outside the runtime path); <code>docs/site/</code> and <code>docs/concepts/</code> prose (not evidence about the code); the <code>__main__</code> smoke block is documented in the inventory, not re-run.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (flat evaluator modules deleted); the <code>hybrid_verifier/evaluator.py</code> line refs above were re-checked against the current tree.</p>
+<p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

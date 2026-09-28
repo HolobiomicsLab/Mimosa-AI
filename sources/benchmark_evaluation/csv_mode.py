@@ -428,7 +428,10 @@ class CsvEvaluationMode:
             execution_time: Time taken for execution
             current_execution_data: Optional current task execution data (for concurrent mode).
                                    If provided, this task's data is included even if not yet
-                                   in self.execution_history.
+                                   in self.execution_history. When given, it always defines
+                                   the per-task note fields (uuids, rewards, ablations) —
+                                   including for infra-excluded tasks (VER is None), which
+                                   must record their own lineage, never another task's.
         """
         timestamp = datetime.now().isoformat()
 
@@ -453,8 +456,21 @@ class CsvEvaluationMode:
         }
 
         if sab_runs:
-            # Use current_execution_data if provided, otherwise use last from sab_runs
-            current_task_data = current_execution_data if current_execution_data and current_execution_data.get('VER') is not None else sab_runs[-1]
+            # The task's own execution data always defines the per-task note
+            # fields — even when the task was infra-excluded (VER is None), so
+            # an excluded task records its own lineage and ablations instead
+            # of silently copying a previously evaluated task's. Only fall
+            # back to the last evaluated run when no execution data was
+            # provided at all (legacy callers), and warn loudly then.
+            if current_execution_data:
+                current_task_data = current_execution_data
+            else:
+                self.logger.warning(
+                    f"[PAPERS DATASET MODE] No execution data provided for task "
+                    f"'{capsule_name}' — recording the last evaluated run's "
+                    f"lineage, which may not belong to this task"
+                )
+                current_task_data = sab_runs[-1]
             runs_data = current_task_data.get('runs', [])
 
             notes = {
@@ -1491,8 +1507,12 @@ EXPECTED OUTPUT:
 
                         self.execution_history.append(execution_data)
                         self._print_final_summary()
+                        # Pass the task's own execution data so infra-excluded
+                        # tasks (VER is None) record their own lineage in the
+                        # note instead of falling back to the previous task's.
                         self._save_run_notes(
-                            capsule_name, goal, execution_time
+                            capsule_name, goal, execution_time,
+                            current_execution_data=execution_data
                         )
 
                         print_ok(f"Iteration {i + 1} completed")

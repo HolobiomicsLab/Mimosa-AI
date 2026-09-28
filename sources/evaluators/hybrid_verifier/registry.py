@@ -25,7 +25,17 @@ from typing import Any
 
 REGISTRY_VERSION = "hybrid-v1-e19b-20260924"
 
-_DEAD_STATES = ("zero_variance", "all_fail")
+# Evidence prefixes the layers write when a scorer crashed (not measured).
+# Legacy registries recorded score 0.0 — not None — for those crashes; the
+# evidence string is the only discriminator (E37 R3).
+_SCORER_CRASH_EVIDENCE = (
+    "scorer failed",
+    "scorer raised",
+    "scorer task failed",
+    "visual scorer failed",
+)
+
+_DEAD_STATES = ("zero_variance", "all_fail", "all_scorer_fail")
 
 
 def task_key(goal: str) -> str:
@@ -269,14 +279,55 @@ class TaskRegistry:
     def observed_scores(
         self, claim_id: str, exclude_uuid: str | None = None
     ) -> list[float]:
-        """All non-None scores observed for one claim across generations."""
+        """All MEASURED scores for one claim across generations.
+
+        Crashed scorers are not measurements (E37 R3): ``None`` scores are
+        skipped, and legacy registries that recorded ``0.0`` with a
+        scorer-crash evidence string are skipped too — otherwise the
+        variance filter prunes live correctness signals as
+        ``zero_variance`` (pains_brenk: a scorer crashing on a wrong path
+        scored 0 for every generation and its claim was silently
+        dropped instead of reported as unverifiable).
+        """
         out = []
         for g in self.generations:
             if exclude_uuid is not None and g.get("uuid") == exclude_uuid:
                 continue
             s = (g.get("scores") or {}).get(claim_id)
-            if s is not None:
-                out.append(float(s))
+            if s is None:
+                continue
+            ev = str((g.get("evidence") or {}).get(claim_id) or "")
+            if ev.startswith(_SCORER_CRASH_EVIDENCE):
+                continue
+            out.append(float(s))
+        return out
+
+    def claim_score_history(
+        self, claim_id: str, exclude_uuid: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Per-generation measured record for one claim, dead or alive.
+
+        R4-fix: a zero-variance-pruned claim leaves ``self.claims`` marked
+        ``dead`` but its scores stay in ``generations``; the gradient's
+        persistent-failure section needs that history to tell a constant
+        FAILING claim (surfaced with a pruned annotation) from a constant
+        passing one (a scorer false positive). Each record carries the
+        generation uuid, the MEASURED score (crashed scorers skipped, per
+        :meth:`observed_scores`) and the scorer's evidence string.
+        """
+        out: list[dict[str, Any]] = []
+        for g in self.generations:
+            if exclude_uuid is not None and g.get("uuid") == exclude_uuid:
+                continue
+            s = (g.get("scores") or {}).get(claim_id)
+            if s is None:
+                continue
+            ev = str((g.get("evidence") or {}).get(claim_id) or "")
+            if ev.startswith(_SCORER_CRASH_EVIDENCE):
+                continue
+            out.append(
+                {"uuid": g.get("uuid"), "score": float(s), "evidence": ev}
+            )
         return out
 
     # ------------------------------------------------------------------

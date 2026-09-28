@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">Legacy claim verifier</h1>
-<p class="intro">The legacy claim verifier scored a workflow by extracting atomic claims and checking each claim with a generated Python script. It is deprecated since 2026-09-24 and replaced by the hybrid temporal-ladder verifier. This page maps it in one diagram, and maps the other evaluators under <code class="path">sources/evaluators/</code> in a second diagram.</p>
+<p class="intro">The legacy claim verifier scored a workflow by extracting atomic claims and checking each claim with a generated Python script; it is deprecated since 2026-09-24 and replaced by the hybrid temporal-ladder verifier. Its five modules now live in the deprecated <code class="path">sources/evaluators/legacy_verifier/</code> sub-package. This page maps the pipeline in one diagram, and maps the other evaluators under <code class="path">sources/evaluators/</code> in a second diagram.</p>
 
 <div id="legend" data-auto></div>
 
@@ -34,9 +34,9 @@
     </filter>
   </defs>
 
-  <text class="box-sub" x="20" y="30">DEPRECATED 2026-09-24 &#183; reachable only when config.verifier_kind = "legacy"</text>
+  <text class="box-sub" x="20" y="30">DEPRECATED 2026-09-24 &#183; five modules in sources/evaluators/legacy_verifier/ &#183; reachable when config.verifier_kind = "legacy"</text>
 
-  <a class="box" id="l1" href="../../sources/evaluators/verifier_claim_sources.py">
+  <a class="box" id="l1" href="../../sources/evaluators/legacy_verifier/verifier_claim_sources.py">
     <title>claim extraction, five LLM source prompts</title>
     <rect x="20" y="50" width="200" height="68" rx="2" fill="rgba(79,116,134,0.08)" stroke="#4F7486" stroke-dasharray="5 4"/>
     <text class="box-label" x="120" y="74" text-anchor="middle">extract claims</text>
@@ -44,7 +44,7 @@
     <text class="box-sub" x="120" y="108" text-anchor="middle" fill="#4F7486">DEPRECATED</text>
   </a>
 
-  <a class="box" id="l2" href="../../sources/evaluators/verifier_claims.py">
+  <a class="box" id="l2" href="../../sources/evaluators/legacy_verifier/verifier_claims.py">
     <title>dedup pass, then importance rating 1-10</title>
     <rect x="280" y="50" width="200" height="68" rx="2" fill="rgba(79,116,134,0.08)" stroke="#4F7486" stroke-dasharray="5 4"/>
     <text class="box-label" x="380" y="74" text-anchor="middle">dedup + rate 1-10</text>
@@ -52,7 +52,7 @@
     <text class="box-sub" x="380" y="108" text-anchor="middle" fill="#4F7486">DEPRECATED</text>
   </a>
 
-  <a class="box" id="l3" href="../../sources/evaluators/verifier_per_claim.py">
+  <a class="box" id="l3" href="../../sources/evaluators/legacy_verifier/verifier_per_claim.py">
     <title>one LLM-written verifier script per claim</title>
     <rect x="540" y="50" width="200" height="68" rx="2" fill="rgba(79,116,134,0.08)" stroke="#4F7486" stroke-dasharray="5 4"/>
     <text class="box-label" x="640" y="74" text-anchor="middle">write verifier script</text>
@@ -60,7 +60,7 @@
     <text class="box-sub" x="640" y="108" text-anchor="middle" fill="#4F7486">DEPRECATED</text>
   </a>
 
-  <a class="box" id="l4" href="../../sources/evaluators/verifier_per_claim.py">
+  <a class="box" id="l4" href="../../sources/evaluators/legacy_verifier/verifier_per_claim.py">
     <title>WorkflowRunner sandbox, bounded retry loop</title>
     <rect x="20" y="190" width="200" height="68" rx="2" fill="rgba(79,116,134,0.08)" stroke="#4F7486" stroke-dasharray="5 4"/>
     <text class="box-label" x="120" y="214" text-anchor="middle">run in sandbox</text>
@@ -68,7 +68,7 @@
     <text class="box-sub" x="120" y="248" text-anchor="middle" fill="#4F7486">DEPRECATED</text>
   </a>
 
-  <a class="box" id="l5" href="../../sources/evaluators/verifier.py">
+  <a class="box" id="l5" href="../../sources/evaluators/legacy_verifier/verifier.py">
     <title>importance-weighted mean, hard-fail cap 0.89</title>
     <rect x="280" y="190" width="200" height="68" rx="2" fill="rgba(79,116,134,0.08)" stroke="#4F7486" stroke-dasharray="5 4"/>
     <text class="box-label" x="380" y="214" text-anchor="middle">aggregate + cap 0.89</text>
@@ -97,7 +97,7 @@
   <text class="box-sub" x="20" y="285">solid = call &#183; dashed border = deprecated &#183; rounded = class</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - the legacy pipeline, read left to right then snake back. Symbols: <a href="../../sources/evaluators/verifier.py"><code>verifier.py::VerifierEvaluator.evaluate</code></a> runs it, <a href="../../sources/evaluators/verifier_claims.py"><code>verifier_claims.py::_VerifierClaimExtractionMixin._extract_claims</code></a> and <code>::_declare_claim_importance</code> build the rubric, <a href="../../sources/evaluators/verifier_per_claim.py"><code>verifier_per_claim.py::_VerifierPerClaimMixin._generate_specs_parallel</code></a> writes the scripts, <code>::_run_verifier_with_recovery</code> runs them, <a href="../../sources/evaluators/verifier.py"><code>verifier.py::VerifierEvaluator._aggregate</code></a> scores with <code>_HARD_FAIL_CAP = 0.89</code>. The cap fires when a claim of importance &#8805; 8 (<code>_HARD_FAIL_IMPORTANCE</code>) fails.</p>
+<p class="figcap">Diagram 1 - the legacy pipeline, read left to right then snake back; the five boxes are the modules of <code class="path">sources/evaluators/legacy_verifier/</code>. Symbols: <a href="../../sources/evaluators/legacy_verifier/verifier.py"><code>legacy_verifier/verifier.py::VerifierEvaluator.evaluate</code></a> runs it, <a href="../../sources/evaluators/legacy_verifier/verifier_claims.py"><code>legacy_verifier/verifier_claims.py::_VerifierClaimExtractionMixin._extract_claims</code></a> and <code>::_declare_claim_importance</code> build the rubric, <a href="../../sources/evaluators/legacy_verifier/verifier_per_claim.py"><code>legacy_verifier/verifier_per_claim.py::_VerifierPerClaimMixin._generate_specs_parallel</code></a> writes the scripts, <code>::_run_verifier_with_recovery</code> runs them, <a href="../../sources/evaluators/legacy_verifier/verifier.py"><code>legacy_verifier/verifier.py::VerifierEvaluator._aggregate</code></a> scores with <code>_HARD_FAIL_CAP = 0.89</code>. The cap fires when a claim of importance &#8805; 8 (<code>_HARD_FAIL_IMPORTANCE</code>) fails.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -105,16 +105,16 @@
 <table>
 <thead><tr><th>File</th><th>One line</th><th class="size">Lines</th><th>Deprecated?</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/verifier.py">verifier.py</a></td><td>Owns <code>VerifierEvaluator</code>; runs the claim pipeline end to end.</td><td class="size">961</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/verifier_claims.py">verifier_claims.py</a></td><td>Extracts claims, drops duplicates, rates importance 1-10.</td><td class="size">477</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/verifier_claim_sources.py">verifier_claim_sources.py</a></td><td>Holds the five claim prompts and the <code>SOURCES</code> table.</td><td class="size">477</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/verifier_per_claim.py">verifier_per_claim.py</a></td><td>Generates, runs and scores one verifier script per claim.</td><td class="size">1 799</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/verifier_workspace.py">verifier_workspace.py</a></td><td>Lists workspace files, renders previews, caches grounding text.</td><td class="size">252</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier.py">legacy_verifier/verifier.py</a></td><td>Owns <code>VerifierEvaluator</code>; runs the claim pipeline end to end.</td><td class="size">961</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier_claims.py">legacy_verifier/verifier_claims.py</a></td><td>Extracts claims, drops duplicates, rates importance 1-10.</td><td class="size">477</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier_claim_sources.py">legacy_verifier/verifier_claim_sources.py</a></td><td>Holds the five claim prompts and the <code>SOURCES</code> table.</td><td class="size">477</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier_per_claim.py">legacy_verifier/verifier_per_claim.py</a></td><td>Generates, runs and scores one verifier script per claim.</td><td class="size">1 798</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier_workspace.py">legacy_verifier/verifier_workspace.py</a></td><td>Lists workspace files, renders previews, caches grounding text.</td><td class="size">252</td><td><span class="tag dep">deprecated 2026-09-24</span></td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/base.py">base.py</a></td><td><code>BaseEvaluator</code>: shared config, judge calls, result writes.</td><td class="size">380</td><td>no</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">evaluator.py</a></td><td>Facade that routes <code>evaluator_type</code> to one channel.</td><td class="size">193</td><td>no</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/generic.py">generic.py</a></td><td>Four LLM judge criteria; optional fraud penalty on the score.</td><td class="size">472</td><td>docstring says <code>[DEPRECATED](V1)</code></td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/scenario.py">scenario.py</a></td><td>Scores a run against rubric items loaded from JSON.</td><td class="size">654</td><td>no</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/bs_detection.py">bs_detection.py</a></td><td>Backtraces numeric values in agent memory; scores fraud.</td><td class="size">801</td><td><span class="tag dep">marker: prototype, unused</span></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/generic/generic.py">generic/generic.py</a></td><td>Four LLM judge criteria; optional fraud penalty on the score.</td><td class="size">471</td><td>docstring says <code>[DEPRECATED](V1)</code></td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/scenario/scenario.py">scenario/scenario.py</a></td><td>Scores a run against rubric items loaded from JSON.</td><td class="size">653</td><td>no</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/generic/bs_detection.py">generic/bs_detection.py</a></td><td>Backtraces numeric values in agent memory; scores fraud.</td><td class="size">801</td><td><span class="tag dep">marker: prototype, unused</span></td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/grounding.py">grounding.py</a></td><td>Fetches a Perspicacite literature block for a goal.</td><td class="size">55</td><td>no</td></tr>
 </tbody>
 </table>
@@ -123,7 +123,7 @@
 
 <h3>One line from a real legacy artifact</h3>
 <blockquote>Overall: 0.700, uncapped 0.834, hard_fail_capped=True)</blockquote>
-<p class="sub">Path: <code class="path">sources/workflows/asb_iterative_1/20260901_213152_e62ff421/evaluation.txt</code> line 4 (header lines 1-5 written by <a href="../../sources/evaluators/verifier.py"><code>verifier.py::VerifierEvaluator._format_report_header</code></a>).</p>
+<p class="sub">Path: <code class="path">sources/workflows/asb_iterative_1/20260901_213152_e62ff421/evaluation.txt</code> line 4 (header lines 1-5 written by <a href="../../sources/evaluators/legacy_verifier/verifier.py"><code>legacy_verifier/verifier.py::VerifierEvaluator._format_report_header</code></a>).</p>
 <p class="sub">My computation: <code class="path">sources/workflows/</code> holds 803 files named <code>evaluation.txt</code>; 802 start with the legacy header <code>Verifier Evaluation</code>, and 1 (<code class="path">sources/workflows/20260925_093314_281402bd/evaluation.txt</code>) starts with the hybrid header.</p>
 
 <details><summary>legacy pipeline constants and outputs</summary><div class="dbody">
@@ -145,7 +145,7 @@ _RUBRIC_VERSION = "v2-fixability-20260912"</pre>
 <p>Writes per run: <code>sources/workflows/&lt;uuid&gt;/evaluation.txt</code> (<code>::_write_report</code>), <code>textual_gradient.txt</code> (<code>::_persist_textual_gradient</code>), and <code>state_result.json</code> key <code>evaluation.verifier</code> (<code>base.py::BaseEvaluator._save_results</code>). A run with no code and no <code>state_result</code> short-circuits to 0.0 (<code>::_short_circuit_failed_run</code>).</p>
 </div></details>
 
-<details><summary>the five claim sources (verifier_claim_sources.py::SOURCES)</summary><div class="dbody">
+<details><summary>the five claim sources (legacy_verifier/verifier_claim_sources.py::SOURCES)</summary><div class="dbody">
 <table>
 <thead><tr><th>Label</th><th>Asks for</th></tr></thead>
 <tbody>
@@ -159,8 +159,9 @@ _RUBRIC_VERSION = "v2-fixability-20260912"</pre>
 <p>Source <code>d</code> is named in the prompts as the code-based checks, but <code>SOURCES</code> registers no <code>_build_source_d</code>.</p>
 </div></details>
 
-<p class="note">Amber: <code>generic.py</code> carries a <code>[DEPRECATED](V1)</code> docstring, but <code>evaluator.py::WorkflowEvaluator.__init__</code> still builds <code>GenericEvaluator</code> and calls it as the fallback when a scenario evaluation raises.</p>
-<p class="note">Amber: the sandbox names and pip-installs recovery packages for the host interpreter (<code>verifier_per_claim.py::_sandbox_install_packages</code>, <code>sys.executable -m pip install</code>), with no version pin in that path.</p>
+<p class="note">Amber: <code>generic/generic.py</code> carries a <code>[DEPRECATED](V1)</code> docstring, but <code>evaluator.py::WorkflowEvaluator.__init__</code> still builds <code>GenericEvaluator</code> and calls it as the fallback when a scenario evaluation raises.</p>
+<p class="note">Amber: the sandbox names and pip-installs recovery packages for the host interpreter (<code>legacy_verifier/verifier_per_claim.py::_sandbox_install_packages</code>, <code>sys.executable -m pip install</code>), with no version pin in that path.</p>
+<p class="note flag">Red: <code>docs/concepts/evaluation-pipeline.md:7</code>, <code>:356</code> and <code>:603</code> still link the deleted flat <code>verifier.py</code> under <code class="path">sources/evaluators/</code>; the file is now <code class="path">sources/evaluators/legacy_verifier/verifier.py</code>.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -191,20 +192,20 @@ _RUBRIC_VERSION = "v2-fixability-20260912"</pre>
     <text class="box-sub" x="95" y="206" text-anchor="middle">built by the engine</text>
   </a>
 
-  <a class="box" id="e1" href="../../sources/evaluators/generic.py">
+  <a class="box" id="e1" href="../../sources/evaluators/generic/generic.py">
     <title>four LLM judge criteria</title>
     <rect x="240" y="20" width="200" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="340" y="48" text-anchor="middle">GenericEvaluator</text>
     <text class="box-sub" x="340" y="64" text-anchor="middle">4 LLM judge criteria</text>
-    <text class="box-sub" x="340" y="82" text-anchor="middle">generic.py</text>
+    <text class="box-sub" x="340" y="82" text-anchor="middle">generic/generic.py</text>
   </a>
 
-  <a class="box" id="e2" href="../../sources/evaluators/scenario.py">
+  <a class="box" id="e2" href="../../sources/evaluators/scenario/scenario.py">
     <title>rubric item scoring</title>
     <rect x="240" y="140" width="200" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="340" y="168" text-anchor="middle">ScenarioEvaluator</text>
     <text class="box-sub" x="340" y="184" text-anchor="middle">rubric item checks</text>
-    <text class="box-sub" x="340" y="202" text-anchor="middle">scenario.py</text>
+    <text class="box-sub" x="340" y="202" text-anchor="middle">scenario/scenario.py</text>
   </a>
 
   <a class="box" id="e3" href="mod_evaluators_hybrid_verifier.html">
@@ -222,11 +223,11 @@ _RUBRIC_VERSION = "v2-fixability-20260912"</pre>
     <text class="box-sub" x="615" y="60" text-anchor="middle">get_perspicacite_grounding</text>
   </a>
 
-  <a class="box" id="e5" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="e5" href="../../sources/evaluators/generic/bs_detection.py">
     <title>fraud penalty on the generic score</title>
     <rect x="520" y="116" width="190" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="615" y="142" text-anchor="middle">BullshitDetectorNumerical</text>
-    <text class="box-sub" x="615" y="160" text-anchor="middle">bs_detection.py</text>
+    <text class="box-sub" x="615" y="160" text-anchor="middle">generic/bs_detection.py</text>
   </a>
 
   <a class="box" id="e6" href="area_utils.html">
@@ -270,10 +271,10 @@ _RUBRIC_VERSION = "v2-fixability-20260912"</pre>
 </div>
 
 <footer>
-<p>Sources read: UPDATE_VISUAL_CLONE.md; docs/visual_clone/_reference.html; docs/visual_clone/_clone.css; docs/visual_clone/_clone.js; AGENTS.md; config.py; config_default.json; sources/evaluators/verifier.py, verifier_claims.py, verifier_claim_sources.py, verifier_per_claim.py, verifier_workspace.py, base.py, evaluator.py, generic.py, scenario.py, bs_detection.py, grounding.py; sources/workflows/asb_iterative_1/20260901_213152_e62ff421/evaluation.txt (header lines only); sources/core/evolution_engine.py (lines 805-819); sources/benchmark_evaluation/scenario_loader.py; sources/utils/perspicacite_client.py; tests/hybrid_verifier_test.py (grep only).</p>
-<p class="skips">Skipped: per-file cards for the five <code>verifier*.py</code> modules (deprecated, one diagram and the table cover them); line-by-line reading of <code>verifier_per_claim.py</code> bodies (only its public chain and constants); the recovery, visual and package-install branches beyond their entry points; <code class="path">sources/evaluators/hybrid_verifier/</code> (own page, mod_evaluators_hybrid_verifier.html); <code>sources/evaluators/__pycache__</code> (generated); <code>tests/verifier*_test.py</code> bodies (reported as coverage only, see area_tests.html); artifact files other than the one quoted <code>evaluation.txt</code> header; Tier D paths (<code>datasets/</code>, <code>webui/</code>, <code>docs/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, lock files, <code>.env</code>-family files).</p>
-<p>Working tree note: this page was built from a tree with uncommitted changes (git status shows modified <code>sources/evaluators/verifier*.py</code>, <code>evaluator.py</code> and an untracked <code class="path">sources/evaluators/hybrid_verifier/</code>), so line counts and symbols reflect the working tree, not commit 7e8463b.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+<p>Sources read: UPDATE_VISUAL_CLONE.md; docs/visual_clone/_reference.html; docs/visual_clone/_clone.css; docs/visual_clone/_clone.js; AGENTS.md; config.py; config_default.json; sources/evaluators/legacy_verifier/verifier.py, legacy_verifier/verifier_claims.py, legacy_verifier/verifier_claim_sources.py, legacy_verifier/verifier_per_claim.py, legacy_verifier/verifier_workspace.py, base.py, evaluator.py, generic/generic.py, scenario/scenario.py, generic/bs_detection.py, grounding.py; sources/workflows/asb_iterative_1/20260901_213152_e62ff421/evaluation.txt (header lines only); sources/core/evolution_engine.py (lines 805-819); sources/benchmark_evaluation/scenario_loader.py; sources/utils/perspicacite_client.py; tests/hybrid_verifier_test.py (grep only).</p>
+<p class="skips">Skipped: per-file cards for the five <code class="path">legacy_verifier/verifier*.py</code> modules (deprecated, one diagram and the table cover them); line-by-line reading of <code>legacy_verifier/verifier_per_claim.py</code> bodies (only its public chain and constants); the recovery, visual and package-install branches beyond their entry points; <code class="path">sources/evaluators/hybrid_verifier/</code> (own page, mod_evaluators_hybrid_verifier.html); every <code class="path">__pycache__/</code> directory (generated); <code>tests/verifier*_test.py</code> bodies (reported as coverage only, see area_tests.html); artifact files other than the one quoted <code>evaluation.txt</code> header; Tier D paths (<code>datasets/</code>, <code>webui/</code>, <code>docs/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, lock files, <code>.env</code>-family files).</p>
+<p>Move note: the working tree moved these five modules into <code class="path">sources/evaluators/legacy_verifier/</code> and deleted the flat copies. The content changed only by the move: a <code>[DEPRECATED 2026-09-24]</code> line was prepended to each docstring, <code>from .base import ...</code> became <code>from sources.evaluators.base import ...</code>, and <code>verifier_claims.py</code> now imports <code>.verifier_claim_sources</code> relatively. No function body changed.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

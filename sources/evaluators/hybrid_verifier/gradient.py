@@ -2,7 +2,10 @@
 
 The E35 PRIME gradient format: DECISIVE LOSSES lead ("WHAT TO FIX
 FIRST" — each row carries the goal-anchored requirement, the measured
-score and the scorer's evidence), then the decisive wins, the E24
+score and the scorer's evidence), then the persistently failing claims
+(E37 R4: a claim below the pass threshold in every generation has no
+decisive loss — both sides of each comparison fail — and was previously
+invisible to the workflow), then the decisive wins, the E24
 execution facts, the E26 visual evidence for figure tasks, the dead
 claims report, the all-claims transcript and the pairwise record.
 NO elimination-point framing — E19c measured it significantly worse
@@ -15,6 +18,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .aggregation import PASS_THRESHOLD
 from .claims import STAGES
 
 _HEADER_BAR = "=" * 60
@@ -28,6 +32,83 @@ def _sign(sa: float | None, sb: float | None) -> str:
     return "+" if sa > sb else ("-" if sa < sb else "=")
 
 
+
+
+def _persistent_failure_rows(
+    claims: list[dict[str, Any]],
+    now_scores: dict[str, float | None],
+    evidence: dict[str, str],
+    pair_records: list[dict[str, Any]],
+    surviving: list[str],
+    order: dict[str, int],
+    stages: tuple[str, ...],
+) -> list[str]:
+    """Rows for claims failing in the current AND every previous generation.
+
+    E37 R4 (clintox C16): a claim that fails for every generation has no
+    decisive loss — both sides of every pairwise comparison fail — so it
+    never enters "WHAT TO FIX FIRST" and the workflow never hears about
+    it. A claim qualifies only when every MEASURED score (its own and all
+    predecessors') stayed below the pass threshold; crashed scorers
+    (None) disqualify — "never passed" cannot be asserted for generations
+    where the claim was not measured.
+
+    R4-fix (N-scope): zero-variance-PRUNED claims never reach the main
+    claim loop (they are not in ``surviving``), so a claim that scored a
+    CONSTANT FAILING value (e.g. 0.3 every generation) vanished from the
+    gradient the moment it was pruned. Dead claims (``state == "dead"``)
+    are checked against their recorded history too and surfaced with a
+    "(pruned as zero-variance — was failing constantly before pruning)"
+    annotation. A dead claim that scored a constant PASSING value (the
+    clintox C8 false positive) is a scorer bug, not a persistent failure,
+    and stays out of this section.
+    """
+    surviving_set = set(surviving)
+    rows: list[tuple[int, int, str]] = []
+    for c in claims:
+        cid = c["id"]
+        pruned = cid not in surviving_set
+        if pruned and c.get("state") != "dead":
+            continue
+        s = now_scores.get(cid)
+        if not pruned and (s is None or s >= PASS_THRESHOLD):
+            continue
+        rivals = [
+            p.get("prev_scores", {}).get(cid)
+            for p in pair_records
+            if p.get("prev_scores", {}).get(cid) is not None
+        ]
+        if not rivals or any(r >= PASS_THRESHOLD for r in rivals):
+            continue
+        if s is not None and s >= PASS_THRESHOLD:
+            continue
+        stage = c.get("stage", "result")
+        rank = order.get(stage, len(stages))
+        if pruned:
+            row = (
+                f"- [{cid}] (stage {stage}) REQUIREMENT: {c.get('statement', '')}\n"
+                f"  this workspace: {s:.3f} | all rivals: {max(rivals):.3f} | "
+                f"failing for {len(rivals) + 1} consecutive generations "
+                f"(pruned as zero-variance — was failing constantly before "
+                f"pruning)\n"
+                f"  evidence: {evidence.get(cid, '')}\n"
+                f"  → This claim NEVER passed for any generation and was "
+                f"pruned as non-discriminative; the requirement it encodes "
+                f"is still unmet. The workflow must change how it "
+                f"satisfies this requirement."
+            )
+        else:
+            row = (
+                f"- [{cid}] (stage {stage}) REQUIREMENT: {c.get('statement', '')}\n"
+                f"  this workspace: {s:.3f} | all rivals: {max(rivals):.3f} | "
+                f"failing for {len(rivals) + 1} consecutive generations\n"
+                f"  evidence: {evidence.get(cid, '')}\n"
+                f"  → This claim has NEVER passed for any generation. The "
+                f"workflow must change how it satisfies this requirement."
+            )
+        rows.append((rank, int(c.get("temporal_index", 0)), row))
+    rows.sort(key=lambda t: (t[0], t[1]))
+    return [r for _, _, r in rows]
 
 
 
@@ -114,6 +195,15 @@ def build_gradient(
     lost_rows.sort(key=lambda t: (t[0], t[1]))
     won_rows.sort(key=lambda t: (t[0], t[1]))
 
+    persistent_block = (
+        "\n".join(
+            _persistent_failure_rows(
+                claims, now_scores, evidence, pair_records, surviving, order, stages
+            )
+        )
+        or "(none)"
+    )
+
     transcript_lines = []
     for p in sorted(pair_records, key=lambda p: -abs(p.get("d", 0))):
         parts = [
@@ -132,15 +222,17 @@ def build_gradient(
         )
     transcript = "\n".join(transcript_lines)[:_TRANSCRIPT_CAP]
 
-    dropped = (
-        "\n".join(
+    def _dropped_line(c: dict[str, Any]) -> str:
+        reason = c.get("drop_reason", "unknown")
+        line = (
             f"- [{c['id']}] (stage {c.get('stage', 'result')}) "
-            f"{c.get('statement', '')[:130]} "
-            f"(dropped: {c.get('drop_reason', 'unknown')})"
-            for c in dead_claims
+            f"{c.get('statement', '')[:130]} (dropped: {reason})"
         )
-        or "(none)"
-    )
+        if reason in ("all_fail", "all_scorer_fail"):
+            line += " — this claim could not be verified (scorer crashed on every workspace)"
+        return line
+
+    dropped = "\n".join(_dropped_line(c) for c in dead_claims) or "(none)"
 
     lost_block = (
         "\n".join(r for _, _, r in lost_rows[:5]) or "(none — no decisive losses)"
@@ -185,10 +277,6 @@ def build_gradient(
 
     return f"""# Hybrid verifier gradient v3 (PRIME) — {uuid}
 Task goal: {goal[:500]}
-Generated: verifier v3 PRIME — deterministic per-claim policy scorers (the SAME
-script for every workspace) + goal-anchored visual rung for figure tasks
-(criteria frozen before scoring) + execution gate; decisive-first assembly.
-Faithful measured transcript; NO labels used or shown.
 
 Bottom line: reward {reward:.4f} | win-rate (ties=0.5) {win_rate:.3f} over
 {len(pair_records)} comparisons ({wins}W/{losses}L/{ties}T) | {len(surviving)} of
@@ -197,6 +285,8 @@ non-discriminative) | mean claim score {mean_score:.3f}.
 
 ## 1. WHAT TO FIX FIRST — decisive lost claims (earliest ladder stage first)
 {lost_block}
+## 1b. PERSISTENTLY FAILING CLAIMS (failing for N consecutive generations — likely unfixable at the workflow level or a systematic error)
+{persistent_block}
 ## 2. WHAT ALREADY WORKS — decisive wins (keep these properties)
 {won_block}
 ## 3. Execution facts — re-execution gate (crash/no-entry/timeout -> cap 0.0; divergent -> cap 0.5)

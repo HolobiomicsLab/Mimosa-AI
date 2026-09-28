@@ -90,6 +90,10 @@ def _scorer_body(cid: str, score: float) -> str:
         "'evidence': 'measured 10 rows, 8 valid'}))\n"
     )
 
+_CLEAN_EXACT_NAME_VERDICT = json.dumps(
+    [{"claim_id": "C1", "lenient": False, "line_evidence": "", "reason": "exact"}]
+)
+
 
 class _FakeRunner:
     """Script executor mock: runs the scorer body with real Python."""
@@ -146,6 +150,91 @@ class _LLM:
         if not self.responses:
             raise AssertionError(f"unexpected LLM call: {agent}")
         return self.responses.pop(0)
+
+
+class _StaticLLM:
+    """Returns one canned response to every call; counts the calls."""
+
+    def __init__(self, response: str):
+        self.response = response
+        self.calls = 0
+
+    def __call__(self, uuid: str, agent: str, prompt: str) -> str:
+        self.calls += 1
+        return self.response
+
+
+class _ScreenLLM:
+    """Mock for the batched LLM content screens (generic / smuggled /
+    exact-name).
+
+    Parses the claims out of the screen prompt's CLAIMS (JSON) block (the
+    exact-name screen's CLAIMS + SCRIPTS block carries claim_id/script
+    pairs) and answers with a strict JSON array: "generic" per
+    *generic_when* (predicate on the parsed claim), "smuggled" per
+    *smuggled* (id -> (violating_field, violating_value)), "lenient" per
+    *lenient* (id -> (line_evidence, reason)). Any other prompt fails
+    the test loudly.
+    """
+
+    def __init__(self, generic_when=None, smuggled=None, lenient=None):
+        self.generic_when = generic_when or (lambda c: False)
+        self.smuggled = smuggled or {}
+        self.lenient = lenient or {}
+        self.calls: list[str] = []
+        self.prompts: list[str] = []
+
+    def __call__(self, uuid: str, agent: str, prompt: str) -> str:
+        self.calls.append(agent)
+        self.prompts.append(prompt)
+        lines = prompt.splitlines()
+        if "GENERIC-CLAIM SCREEN" in prompt:
+            claims = json.loads(lines[lines.index("CLAIMS (JSON):") + 1])
+            return json.dumps(
+                [
+                    {
+                        "id": c["id"],
+                        "generic": bool(self.generic_when(c)),
+                        "reason": "stub verdict",
+                    }
+                    for c in claims
+                ]
+            )
+        if "SMUGGLED-ANSWER SCREEN" in prompt:
+            claims = json.loads(lines[lines.index("CLAIMS (JSON):") + 1])
+            out = []
+            for c in claims:
+                hit = self.smuggled.get(c["id"])
+                out.append(
+                    {
+                        "id": c["id"],
+                        "smuggled": hit is not None,
+                        "violating_field": hit[0] if hit else None,
+                        "violating_value": hit[1] if hit else None,
+                        "reason": "stub verdict",
+                    }
+                )
+            return json.dumps(out)
+        if "EXACT-NAME SCORER SCREEN" in prompt:
+            pairs = json.loads(
+                lines[lines.index("CLAIMS + SCRIPTS (JSON):") + 1]
+            )
+            return json.dumps(
+                [
+                    {
+                        "claim_id": p["claim_id"],
+                        "lenient": p["claim_id"] in self.lenient,
+                        "line_evidence": self.lenient.get(
+                            p["claim_id"], ("", "")
+                        )[0],
+                        "reason": self.lenient.get(
+                            p["claim_id"], ("", "exact equality")
+                        )[1],
+                    }
+                    for p in pairs
+                ]
+            )
+        raise AssertionError(f"unexpected LLM call: {agent}")
 
 
 def _make_evaluator(
@@ -234,37 +323,63 @@ def test_next_claim_id_and_dedupe():
 
 
 def test_validate_claims_drops_generic_claims():
+    screen = _ScreenLLM(
+        generic_when=lambda c: "file exists" in c["statement"]
+        or "runs without error" in c["statement"]
+    )
     claims = [_claim(f"C{i}") for i in range(1, 10)]
     claims[0]["statement"] = "predictions.csv file exists in the workspace"
     claims[0]["scoring_rule"] = "score 1 if the file exists else 0"
-    out, err = claims_mod.validate_claims({"claims": claims}, lo=8, hi=12)
+    out, err = claims_mod.validate_claims(
+        {"claims": claims}, lo=8, hi=12, llm_text=screen
+    )
     # the generic claim was dropped; the remaining 8 still satisfy the floor
     assert err is None and len(out) == 8
     assert all("file exists" not in c["statement"] for c in out)
+    # the screen ran as ONE batched call over all 9 claims, not per claim
+    assert screen.calls == ["hybrid_screen_generic"]
     # a fully-generic batch falls under the floor -> repairable error
     for c in claims:
         c["statement"] = "predictions.csv file exists in the workspace"
         c["scoring_rule"] = "score 1 if the file exists else 0"
-    _, err2 = claims_mod.validate_claims({"claims": claims}, lo=8, hi=12)
+    _, err2 = claims_mod.validate_claims(
+        {"claims": claims}, lo=8, hi=12, llm_text=screen
+    )
     assert err2 is not None and "got 0" in err2
     # a script-runs claim is generic even with count vocabulary in the rule
     claims2 = [_claim(f"C{i}") for i in range(1, 11)]
     claims2[3]["statement"] = "the script runs without error"
     claims2[3]["scoring_rule"] = "count of successful runs, fraction -> 0..1"
-    out2, err2 = claims_mod.validate_claims({"claims": claims2}, lo=8, hi=12)
+    out2, err2 = claims_mod.validate_claims(
+        {"claims": claims2}, lo=8, hi=12, llm_text=screen
+    )
     assert err2 is None and len(out2) == 9
     assert all("runs without error" not in c["statement"] for c in out2)
 
 
-def test_is_generic_claim_detection():
-    generic = {
-        "statement": "output is valid csv present in the workspace",
-        "target": "*.csv",
-        "scoring_rule": "file exists check",
-    }
-    assert claims_mod.is_generic_claim(generic)
-    solid = _claim("C1")
-    assert not claims_mod.is_generic_claim(solid)
+def test_is_generic_claim_batch_llm_screen():
+    """The generic screen is ONE batched LLM call: verdicts on unknown ids
+    are ignored and a failed judge call degrades open (nothing flagged)."""
+    generic = dict(
+        _claim("C1"),
+        statement="output is valid csv present in the workspace",
+        scoring_rule="file exists check",
+    )
+    solid = _claim("C2")
+    screen = _ScreenLLM(generic_when=lambda c: "file exists" in c["scoring_rule"])
+    flagged = claims_mod.is_generic_claim([generic, solid], screen, uuid="u1")
+    assert flagged == {"C1": "stub verdict"}
+    assert screen.calls == ["hybrid_screen_generic"]  # one batched call
+    # the prompt carried every claim's fields to the judge
+    assert "claim C2 statement about row counts" in screen.prompts[0]
+    assert "file exists check" in screen.prompts[0]
+    # hallucinated ids never leak into the verdict
+    bogus = _StaticLLM('[{"id": "C99", "generic": true, "reason": "rogue"}]')
+    assert claims_mod.is_generic_claim([solid], bogus) == {}
+    # a judge that never produces JSON degrades open after one repair round
+    garbage = _StaticLLM("not json at all")
+    assert claims_mod.is_generic_claim([solid], garbage) == {}
+    assert garbage.calls == 2
 
 
 # -------------------------------------- (2) scorer contract + repair loop ----
@@ -335,7 +450,9 @@ def test_scorer_build_repairs_on_bad_output(tmp_path: Path):
     llm = _LLM(
         [
             "```python\nimport json\nprint('debug to stdout')\n```",  # attempt 1 body
+            _CLEAN_EXACT_NAME_VERDICT,  # screen: clean
             "```python\nimport json\nprint(json.dumps({'claim_id': 'C1', 'score': 0.5, 'evidence': 'half ok'}))\n```",
+            _CLEAN_EXACT_NAME_VERDICT,  # screen: clean
         ]
     )
     runner = _ScriptedRunner(
@@ -358,11 +475,10 @@ def test_scorer_build_repairs_on_bad_output(tmp_path: Path):
         generation_index=0,
     )
     scores = v._claims_layer.collect(ctx)
-    assert len(scores) == 1
     assert scores[0].score == 0.5
     assert runner.calls == 2
     # repair prompt carried the failure feedback
-    repair_prompt = llm.prompts[1][1]
+    repair_prompt = next(p for a, p in llm.prompts if "_repair" in a)
     assert "previous scoring script failed" in repair_prompt.lower()
     assert "debug to stdout" in repair_prompt
 
@@ -390,6 +506,12 @@ def test_full_pipeline_real_subprocess(tmp_path: Path):
         """Extraction returns 8 claims; scorers key off the claim in the prompt."""
 
         def __call__(self, uuid: str, agent: str, prompt: str) -> str:
+            if (
+                "GENERIC-CLAIM SCREEN" in prompt
+                or "SMUGGLED-ANSWER SCREEN" in prompt
+                or "EXACT-NAME SCORER SCREEN" in prompt
+            ):
+                return "[]"  # batched screens: every claim clean
             if "verification rubric" in prompt:
                 return _claims_json(8)
             if "FORMAT DIGESTS" in prompt:
@@ -473,13 +595,53 @@ def test_full_pipeline_real_subprocess(tmp_path: Path):
 
 
 def test_claim_stats_zero_variance_semantics():
-    assert aggregation.claim_stats([])["drop_reason"] == "all_fail"
+    assert aggregation.claim_stats([])["drop_reason"] == "all_scorer_fail"
     single = aggregation.claim_stats([0.7])
     assert not single["dropped"]  # live guard: 1 obs cannot discriminate yet
     flat = aggregation.claim_stats([0.5, 0.5, 0.5])
     assert flat["dropped"] and flat["drop_reason"] == "zero_variance"
     var = aggregation.claim_stats([0.2, 0.8])
     assert not var["dropped"] and var["variance"] > 0
+
+
+def test_claim_stats_crash_is_not_measured_constant():
+    """E37 R3: a crashed scorer (None) must not read as 'all scores equal 0'."""
+    # every observation crashed -> could-not-verify, not zero-variance
+    crashed = aggregation.claim_stats([None, None, None])
+    assert crashed["dropped"] and crashed["drop_reason"] == "all_scorer_fail"
+    # >= 2 MEASURED equal observations (crashes excluded) are still flat
+    flat = aggregation.claim_stats([None, 0.0, 0.0])
+    assert flat["dropped"] and flat["drop_reason"] == "zero_variance"
+    # one crash + one real score: not enough measured evidence to prune
+    guard = aggregation.claim_stats([None, 0.5])
+    assert not guard["dropped"]
+
+
+def test_registry_excludes_legacy_crash_zero_from_variance_filter(tmp_path: Path):
+    """E37 R3 (pains_brenk): legacy registries recorded 0.0 with scorer-crash
+    evidence; treating those as measurements pruned the correctness signal
+    as zero-variance. The crash evidence must disqualify the observation."""
+    reg = TaskRegistry.load(tmp_path, GOAL)
+    reg.seed_claims([_claim("C1")])
+    reg.record_generation("u0", {"C1": 0.0}, {"C1": "scorer failed: exit 1"}, reward=0.0)
+    reg.record_generation("u1", {"C1": 0.0}, {"C1": "scorer raised: ValueError"}, reward=0.0)
+    reg.record_generation("u2", {"C1": 0.6}, {"C1": "6 of 10 rows valid"}, reward=0.6)
+    # only the MEASURED observations feed the variance filter
+    assert reg.observed_scores("C1") == [0.6]
+    assert not aggregation.claim_stats(reg.observed_scores("C1"))["dropped"]
+    # a genuine measured 0 is kept
+    reg.record_generation("u3", {"C1": 0.0}, {"C1": "0 of 10 rows valid"}, reward=0.0)
+    assert reg.observed_scores("C1") == [0.6, 0.0]
+
+
+def test_registry_all_crashes_drop_as_all_scorer_fail(tmp_path: Path):
+    """Every observation a crash -> the claim is reported unverifiable, not flat."""
+    reg = TaskRegistry.load(tmp_path, GOAL)
+    reg.seed_claims([_claim("C1")])
+    reg.record_generation("u0", {"C1": 0.0}, {"C1": "scorer failed: exit 1"}, reward=0.0)
+    reg.record_generation("u1", {"C1": None}, {"C1": "scorer failed: exit 1"}, reward=0.0)
+    stats = aggregation.claim_stats(reg.observed_scores("C1"))
+    assert stats["dropped"] and stats["drop_reason"] == "all_scorer_fail"
 
 
 def test_registry_persistence_and_upsert(tmp_path: Path):
@@ -545,6 +707,8 @@ def test_zero_variance_drops_claim_and_triggers_replacement(tmp_path: Path):
             self.prompts: list[tuple[str, str]] = []
 
         def __call__(self, uuid: str, agent: str, prompt: str) -> str:
+            if "GENERIC-CLAIM SCREEN" in prompt or "SMUGGLED-ANSWER SCREEN" in prompt:
+                return "[]"  # batched screens: every claim clean
             self.prompts.append((agent, prompt))
             if "FORMAT DIGESTS" in prompt:
                 return json.dumps({"digests": []})
@@ -815,6 +979,128 @@ def test_gradient_v5_decisive_first_no_elimination_point():
     assert report.index("--- stage: LOG ---") < report.index("--- stage: RESULT ---")
 
 # ------------------------------------------------- (6) short-circuit parity ----
+
+
+def test_gradient_surfaces_persistently_failing_claims():
+    """E37 R4 (clintox C16): a claim failing for EVERY generation has no
+    decisive loss (both sides of every comparison fail), so it never
+    entered the gradient. It must surface in its own section between the
+    decisive losses and the decisive wins."""
+    from sources.evaluators.hybrid_verifier import gradient as g
+
+    claims = [
+        _claim("C16", stage="result", tidx=0),
+        _claim("R1", stage="result", tidx=1),
+    ]
+    pair_records = [
+        {
+            "prev_uuid": "u0",
+            "outcome": "tie",
+            "prev_scores": {"C16": 0.333, "R1": 0.9},
+            "d": 0,
+            "dm": 0.0,
+        },
+        {
+            "prev_uuid": "u1",
+            "outcome": "tie",
+            "prev_scores": {"C16": 0.2, "R1": 0.1},
+            "d": 0,
+            "dm": 0.0,
+        },
+    ]
+    text = g.build_gradient(
+        uuid="u2",
+        goal=GOAL,
+        now_scores={"C16": 0.333, "R1": 0.9},
+        evidence={
+            "C16": "Expected columns [FDA_APPROVED, CT_TOX], "
+            "found [FDA_APPROVED_prob, CT_TOX_prob]",
+            "R1": "10/10 rows",
+        },
+        claims=claims,
+        surviving=["C16", "R1"],
+        pair_records=pair_records,
+        reward=0.5,
+        win_rate=0.5,
+        mean_score=0.6,
+        dead_claims=[],
+    )
+    # the section sits between the decisive losses and the decisive wins
+    assert (
+        text.index("## 1. WHAT TO FIX FIRST")
+        < text.index("## 1b. PERSISTENTLY FAILING CLAIMS")
+        < text.index("## 2. WHAT ALREADY WORKS")
+    )
+    block = text.split("## 1b.")[1].split("\n", 1)[1].split("## 2.")[0]
+    assert "[C16]" in block
+    assert "failing for 3 consecutive generations" in block
+    assert "NEVER passed" in block
+    assert "Expected columns [FDA_APPROVED, CT_TOX]" in block
+    # R1 passed in gen u0 -> not persistently failing
+    assert "[R1]" not in block
+
+    # a claim with no predecessor yet (first generation) never qualifies
+    first = g.build_gradient(
+        uuid="u0",
+        goal=GOAL,
+        now_scores={"C16": 0.1},
+        evidence={"C16": "wrong columns"},
+        claims=claims[:1],
+        surviving=["C16"],
+        pair_records=[],
+        reward=0.1,
+        win_rate=0.1,
+        mean_score=0.1,
+        dead_claims=[],
+    )
+    assert "## 1b." in first
+    assert first.split("## 1b.")[1].split("\n", 1)[1].split("## 2.")[0].strip() == "(none)"
+
+    # crashed observations (None) cannot prove "never passed"
+    crashed = g.build_gradient(
+        uuid="u2",
+        goal=GOAL,
+        now_scores={"C16": 0.1},
+        evidence={"C16": "wrong columns"},
+        claims=claims[:1],
+        surviving=["C16"],
+        pair_records=[
+            {"prev_uuid": "u0", "outcome": "tie", "prev_scores": {"C16": None}}
+        ],
+        reward=0.1,
+        win_rate=0.1,
+        mean_score=0.1,
+        dead_claims=[],
+    )
+    assert crashed.split("## 1b.")[1].split("\n", 1)[1].split("## 2.")[0].strip() == "(none)"
+
+def test_gradient_dead_claims_report_marks_unverifiable():
+    """E37 R3: an all-crash claim drops as all_scorer_fail and the dead
+    report says it could not be verified."""
+    from sources.evaluators.hybrid_verifier import gradient as g
+
+    text = g.build_gradient(
+        uuid="u1",
+        goal=GOAL,
+        now_scores={"C1": 0.5},
+        evidence={"C1": "ok"},
+        claims=[_claim("C1")],
+        surviving=["C1"],
+        pair_records=[],
+        reward=0.5,
+        win_rate=0.5,
+        mean_score=0.5,
+        dead_claims=[
+            {"id": "C9", "stage": "result", "statement": "flat",
+             "drop_reason": "all_scorer_fail"},
+            {"id": "C8", "stage": "log", "statement": "equal",
+             "drop_reason": "zero_variance"},
+        ],
+    )
+    dropped = text.split("## 5. Dead claims report")[1]
+    assert "could not be verified" in dropped
+    assert "[C9]" in dropped and "all_scorer_fail" in dropped
+    assert "zero_variance" in dropped
 
 
 def test_config_defaults_and_overrides():
@@ -1312,9 +1598,9 @@ def test_config_reward_default_and_roundtrip():
 
 
 def test_t1_firewall_rejects_numeric_answer_keys():
-    """The E29 smuggle class is flagged: negatives other than the -1
-    sentinel, integers >= 13 that are not round, decimals with >= 2
-    fractional digits — unless the goal states them."""
+    """The E29 smuggle class is flagged by the batched LLM screen: a
+    specific numeric constant the goal does not state (energy -2,
+    coverage 16268, optimum 376, measured 0.239448)."""
     goal = "Plot the charge density heatmap for the slab."
     smugglers = [
         {"statement": "the minimum energy equals -2",
@@ -1326,22 +1612,34 @@ def test_t1_firewall_rejects_numeric_answer_keys():
         {"statement": "measured value 0.239448",
          "target": "m.json", "scoring_rule": "value matches 0.239448"},
     ]
-    for claim in smugglers:
-        assert claims_mod.t1_violations(claim, goal), claim["statement"]
-    checks = claims_mod.t1_check(
-        [{**c, "id": f"C{i}"} for i, c in enumerate(smugglers, 1)], goal
+    claims = [{**c, "id": f"C{i}"} for i, c in enumerate(smugglers, 1)]
+    screen = _ScreenLLM(
+        smuggled={
+            f"C{i}": ("statement", v)
+            for i, v in enumerate(("-2", "16268", "376", "0.239448"), 1)
+        }
     )
-    assert all(checks.values()) and set(checks) == {"C1", "C2", "C3", "C4"}
+    why = claims_mod.t1_violations(claims, goal, screen, uuid="u1")
+    assert set(why) == {"C1", "C2", "C3", "C4"} and all(why.values())
+    assert why["C1"] == ["statement:-2"]
+    # ONE batched call over the whole claim set, prompt carrying goal + claims
+    assert screen.calls == ["hybrid_screen_t1"]
+    assert goal in screen.prompts[0]
+    assert "the minimum energy equals -2" in screen.prompts[0]
     # a number the goal itself states is verifiable, not smuggled
-    ok = {"statement": "value equals 16268", "target": "x",
+    ok = {"id": "C1", "statement": "value equals 16268", "target": "x",
           "scoring_rule": "== 16268"}
-    assert claims_mod.t1_violations(ok, "the coverage must be 16268") == []
+    clean = _ScreenLLM()
+    assert claims_mod.t1_violations(
+        [ok], "the coverage must be 16268", clean
+    ) == {"C1": []}
 
 
 def test_t1_firewall_passes_structural_constants():
-    """Structural constants are whitelisted: [0,1]/[-1,1] bands, the -1
-    sentinel, small counts, round bin/grid counts, hyphenated words,
-    bracketed range bands, RGB components of goal-named colors."""
+    """Structural constants pass the LLM screen clean: [0,1]/[-1,1]
+    bands, the -1 sentinel, small counts, round bin/grid counts,
+    hyphenated words, bracketed range bands, RGB components of
+    goal-named colors."""
     goal = "Plot the charge density difference heatmap."
     structural = [
         {"statement": "probabilities lie in [0,1]",
@@ -1363,13 +1661,16 @@ def test_t1_firewall_passes_structural_constants():
         {"statement": "5-fold cross-validation used",
          "target": "s.py", "scoring_rule": "count of 5-fold splits"},
     ]
-    for claim in structural:
-        assert claims_mod.t1_violations(claim, goal) == [], claim["statement"]
-    # an RGB component WITHOUT the color named stays an answer key
-    assert claims_mod.t1_violations(
-        {"statement": "value is 165", "target": "c", "scoring_rule": "== 165"},
-        goal,
-    )
+    claims = [{**c, "id": f"C{i}"} for i, c in enumerate(structural, 1)]
+    screen = _ScreenLLM()
+    why = claims_mod.t1_violations(claims, goal, screen)
+    assert why == {f"C{i}": [] for i in range(1, len(structural) + 1)}
+    assert screen.calls == ["hybrid_screen_t1"]  # one batched call
+    # a judge failure degrades open: every claim stays clean
+    garbage = _StaticLLM("no json here")
+    assert claims_mod.t1_violations(claims, goal, garbage) == {
+        f"C{i}": [] for i in range(1, len(structural) + 1)
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1381,6 +1682,11 @@ def test_extract_prompt_demands_content_lever():
     prompt = claims_mod.extract_claims_prompt(GOAL, "(union)", "(prev)", 8, 12)
     # >=2 core_computation: the goal's computation end-to-end
     assert 'AT LEAST 2 claims of category "core_computation"' in prompt
+    # the SELF-CHECK mandate: the model judges its own claims (operator
+    # mandate — content judgment via the LLM, batched post-screens follow)
+    assert 'output a "self_check" field' in prompt
+    assert '"self_check": {"generic": false, "smuggled_answer": false' in prompt
+    assert "trivially satisfy" in prompt and "smuggled_answer" in prompt
     assert "goal's computation END-TO-END" in prompt
     assert "goal-stated parameters" in prompt
     assert "a bare import" in prompt and "not identity" in prompt
@@ -1403,7 +1709,7 @@ def test_extraction_retries_on_t1_and_composition_then_accepts():
 
     goal = "Predict the bulk modulus for the provided structures."
     smuggled = dict(_claim("C1"), statement="energy minimum equals -7.5")
-    compliant = [_claim(f"C{i+1}") for i in range(9)]
+    compliant = [_claim(f"C{i+2}") for i in range(9)]  # C2..C10; C1 = smuggler
     for c in compliant[:2]:
         c["category"] = "core_computation"
     for c in compliant[2:4]:
@@ -1411,9 +1717,24 @@ def test_extraction_retries_on_t1_and_composition_then_accepts():
     weak = [_claim(f"C{i+1}") for i in range(9)]
     weak[1]["category"] = "core_computation"  # only 1: mandate unmet
     responses = [
-        json.dumps({"claims": [smuggled, *compliant[:7]]}),  # T1 reject
-        json.dumps({"claims": weak}),  # composition shortfall (1 of 2)
-        json.dumps({"claims": compliant}),  # compliant
+        json.dumps({"claims": [smuggled, *compliant[:7]]}),  # extract 1
+        "[]",  # generic screen 1: clean
+        json.dumps(
+            [
+                {
+                    "id": "C1",
+                    "smuggled": True,
+                    "violating_field": "statement",
+                    "violating_value": "-7.5",
+                    "reason": "goal never states -7.5",
+                }
+            ]
+        ),  # T1 screen 1: C1 smuggles an answer key
+        json.dumps({"claims": weak}),  # extract 2 (composition shortfall)
+        "[]",  # generic screen 2: clean
+        json.dumps({"claims": compliant}),  # extract 3
+        "[]",  # generic screen 3: clean
+        "[]",  # T1 screen 3: clean
     ]
     llm = _LLM(responses)
     with _tf.TemporaryDirectory() as td:
@@ -1428,10 +1749,17 @@ def test_extraction_retries_on_t1_and_composition_then_accepts():
         assert err is None
         assert len(reg.claims) == 9
         assert all(c["statement"] != smuggled["statement"] for c in reg.claims)
-        # 3 extraction calls; the retries carried the feedback
-        assert len(llm.prompts) == 3
-        assert "T1 FIREWALL" in llm.prompts[1][1]
-        assert "core_computation" in llm.prompts[2][1]
+        # 3 extraction calls, each followed by the batched screens
+        # (generic inside validate_claims, T1 after it) = 8 calls total
+        assert len(llm.prompts) == 8
+        extract_prompts = [
+            p for _, p in llm.prompts
+            if "TEMPORALLY-ORDERED verification rubric" in p
+        ]
+        assert len(extract_prompts) == 3
+        # the retries carried the feedback
+        assert "T1 FIREWALL" in extract_prompts[1]
+        assert "core_computation" in extract_prompts[2]
 
 
 def test_figure_task_detection_threshold():
@@ -1915,3 +2243,272 @@ def test_evaluate_uses_figure_stage_order_for_figure_tasks(tmp_path: Path):
     assert "## 3. Execution facts" in grad  # still rendered (no gate data)
     reg2 = TaskRegistry.load(v._runner_temp_root, figure_goal)
     assert {c["stage"] for c in reg2.claims} >= {"visual", "result"}
+
+
+# --------------------------------------- (N3) exact-name contract screen ----
+
+
+def test_scorer_prompt_demands_exact_name_matching():
+    """N3: the scorer prompt must forbid substring/case-insensitive
+    matching of exact column/file names and demand set equality, using
+    ONLY generic (non-benchmark) example names."""
+    claim = _claim(
+        "C8",
+        statement="the output CSV has exactly the columns smiles, "
+        "FDA_APPROVED and CT_TOX",
+        rule="fraction of the three exact column names present in the "
+        "header (exact equality, no suffixes)",
+    )
+    prompt = scorers_mod.scorer_prompt(GOAL, claim, "pred_results/out.csv")
+    assert "EXACT equality" in prompt
+    assert 'set(df.columns) == {"gene_id", "expression_value", "p_value"}' in prompt
+    assert "PRED_score" in prompt
+    assert "does NOT satisfy" in prompt
+    # no benchmark-derived example names leak into the prompt TEMPLATE
+    # (the claim's own text above is task input, not a prompt example)
+    template = prompt.replace(json.dumps(claim, indent=1), "<CLAIM>")
+    assert "FDA_APPROVED" not in template and "CT_TOX" not in template
+    # the repair prompt no longer coaches fuzzy matching for exact names
+    repair = scorers_mod.repair_prompt("feedback", "previous code")
+    assert "EXACT set equality" in repair
+    assert "PRED_score is NOT PRED" in repair
+    assert "FDA_APPROVED" not in repair
+
+
+_CLINTOX_CLAIM = _claim(
+    "C8",
+    statement="the predictions CSV header contains exactly the columns "
+    "smiles, FDA_APPROVED and CT_TOX",
+    rule="fraction of required exact column names FDA_APPROVED, CT_TOX, "
+    "smiles present in the CSV header (exact names, no suffix variants)",
+    tidx=0,
+)
+
+_SUBSTRING_SCORER = """import json
+import pandas as pd
+df = pd.read_csv("pred_results/out.csv")
+cols = [c.lower() for c in df.columns]
+ok = sum(1 for name in ["smiles", "fda_approved", "ct_tox"]
+         if any(name in c for c in cols))
+print(json.dumps({"claim_id": "C8", "score": ok / 3, "evidence": "cols"}))
+"""
+
+
+_EXACT_SCORER = """import json
+import pandas as pd
+df = pd.read_csv("pred_results/out.csv")
+expected = {"smiles", "FDA_APPROVED", "CT_TOX"}
+score = 1.0 if set(df.columns) == expected else len(expected & set(df.columns)) / 3
+print(json.dumps({"claim_id": "C8", "score": score, "evidence": "exact set"}))
+"""
+
+
+def test_exact_name_screen_is_one_batched_llm_call():
+    """The exact-name screen is ONE batched LLM judgment over the task's
+    claim/script pairs (never a regex): lenient verdicts come back keyed
+    by claim id with the offending line, every pair rides the same call,
+    unknown ids are ignored and a failed judge call degrades open."""
+    screen = _ScreenLLM(
+        lenient={
+            "C8": (
+                "any(name in c for c in cols)",
+                "case-insensitive substring membership",
+            )
+        }
+    )
+    flagged = scorers_mod.exact_name_violations(
+        [_CLINTOX_CLAIM], {"C8": _SUBSTRING_SCORER}, screen, uuid="u1"
+    )
+    assert flagged == {
+        "C8": "case-insensitive substring membership — line: "
+        "any(name in c for c in cols)"
+    }
+    assert screen.calls == ["hybrid_screen_exact_name"]  # one batched call
+    # the prompt carried BOTH the claim's fields and the script body
+    assert "EXACT-NAME SCORER SCREEN" in screen.prompts[0]
+    assert "pred_results/out.csv" in screen.prompts[0]
+
+    # every pair goes in the SAME call; clean pairs come back unflagged
+    both = _ScreenLLM(
+        lenient={"C8": ("x in c", "substring membership, never ==")}
+    )
+    flagged2 = scorers_mod.exact_name_violations(
+        [_CLINTOX_CLAIM, _claim("C9")],
+        {"C8": _SUBSTRING_SCORER, "C9": _EXACT_SCORER},
+        both,
+        uuid="u1",
+    )
+    assert flagged2 == {"C8": "substring membership, never == — line: x in c"}
+    assert both.calls == ["hybrid_screen_exact_name"]
+
+    # verdicts on ids outside the screened set are ignored
+    bogus = _StaticLLM('[{"claim_id": "C99", "lenient": true, "reason": "rogue"}]')
+    assert scorers_mod.exact_name_violations(
+        [_CLINTOX_CLAIM], {"C8": _EXACT_SCORER}, bogus
+    ) == {}
+    # a judge that never produces JSON degrades open after one repair round
+    garbage = _StaticLLM("not json at all")
+    assert scorers_mod.exact_name_violations(
+        [_CLINTOX_CLAIM], {"C8": _SUBSTRING_SCORER}, garbage
+    ) == {}
+    assert garbage.calls == 2
+
+
+def test_exact_name_screen_skips_missing_scripts_structural_stays_pure():
+    """A claim with no generated script is never screened (no judge call),
+    and the structural static screen passes a lenient matcher untouched —
+    content judgment is the LLM screen's job, never static analysis."""
+    silent = _StaticLLM("[1]")
+    assert scorers_mod.exact_name_violations([_CLINTOX_CLAIM], {}, silent) == {}
+    assert silent.calls == 0
+    assert scorers_mod.static_violations(_SUBSTRING_SCORER) == []
+
+
+def test_build_scorer_regenerates_on_exact_name_violation(tmp_path: Path):
+    """The screen rides the existing repair loop: attempt 1 (substring
+    matcher) is rejected on the judge's lenient verdict, the repair prompt
+    carries the exact-equality feedback, and attempt 2 (set equality) is
+    kept."""
+    llm = _LLM(
+        [
+            f"```python\n{_SUBSTRING_SCORER}\n```",
+            json.dumps(
+                [
+                    {
+                        "claim_id": "C8",
+                        "lenient": True,
+                        "line_evidence": "any(name in c for c in cols)",
+                        "reason": "case-insensitive substring match",
+                    }
+                ]
+            ),
+            f"```python\n{_EXACT_SCORER}\n```",
+            json.dumps(
+                [
+                    {
+                        "claim_id": "C8",
+                        "lenient": False,
+                        "line_evidence": "",
+                        "reason": "set equality",
+                    }
+                ]
+            ),
+        ]
+    )
+    runner = _ScriptedRunner(
+        [scorers_mod.ExecOutcome(
+            rc=0,
+            stdout='{"claim_id": "C8", "score": 1.0, "evidence": "exact set"}',
+        )]
+    )
+    v = _make_evaluator(tmp_path, llm, runner)
+    reg = TaskRegistry.load(v._runner_temp_root, GOAL, logger=v.logger)
+    reg.seed_claims([_CLINTOX_CLAIM])
+    ctx = LayerContext(
+        uuid="u1",
+        goal=GOAL,
+        workspace=v.workspace_dir,
+        registry=reg,
+        generation_index=0,
+    )
+    script, telemetry, parsed = v._claims_layer._build_scorer(ctx, _CLINTOX_CLAIM)
+    assert parsed is not None and parsed["score"] == 1.0
+    assert "set(df.columns) == expected" in script
+    assert telemetry["attempts"][0]["parse"] == "static_violation"
+    assert any(
+        "lenient matching" in msg and "EXACT equality" in msg
+        for msg in telemetry["attempts"][0]["static_violations"]
+    )
+    # the repair prompt fed back the exact-equality requirement
+    repair_prompt = next(p for a, p in llm.prompts if "_repair" in a)
+    assert "exact" in repair_prompt.lower() and "lenient" in repair_prompt.lower()
+    assert runner.calls == 1  # only the repaired script ever executed
+
+# ------------------------------------ (R4-fix) pruned persistent failures ----
+
+
+def test_gradient_surfaces_pruned_persistent_failures():
+    """R4-fix: a claim that scored a CONSTANT FAILING value (0.3 for three
+    generations) is zero-variance-pruned and never reaches the surviving
+    claim loop — it must still surface in section 1b with the pruned
+    annotation, otherwise the workflow stops hearing about it."""
+    from sources.evaluators.hybrid_verifier import gradient as g
+
+    dead = dict(
+        _claim("C13", stage="result", tidx=0),
+        state="dead",
+        drop_reason="zero_variance",
+    )
+    claims = [dead, _claim("R1", stage="result", tidx=1)]
+    pair_records = [
+        {"prev_uuid": f"u{i}", "outcome": "tie",
+         "prev_scores": {"C13": 0.3, "R1": 0.9}, "d": 0, "dm": 0.0}
+        for i in range(3)
+    ]
+    text = g.build_gradient(
+        uuid="u3",
+        goal=GOAL,
+        now_scores={"C13": 0.3, "R1": 0.9},
+        evidence={"C13": "AUC undefined on degenerate labels", "R1": "ok"},
+        claims=claims,
+        surviving=["R1"],  # C13 was pruned before the gradient saw it
+        pair_records=pair_records,
+        reward=0.5,
+        win_rate=0.5,
+        mean_score=0.6,
+        dead_claims=[{**dead, "drop_reason": "zero_variance"}],
+    )
+    block = text.split("## 1b.")[1].split("\n", 1)[1].split("## 2.")[0]
+    assert "[C13]" in block
+    assert "failing for 4 consecutive generations" in block
+    assert "pruned as zero-variance — was failing constantly before pruning" in block
+    assert "AUC undefined on degenerate labels" in block
+    assert "[R1]" not in block  # passing claim, pruned or not, stays out
+
+    # a constant-PASSING pruned claim (the clintox C8 false positive) is a
+    # scorer bug, not a persistent failure — it must NOT enter section 1b
+    false_positive = dict(
+        _claim("C8", stage="result", tidx=0),
+        state="dead",
+        drop_reason="zero_variance",
+    )
+    passing_records = [
+        {"prev_uuid": f"u{i}", "outcome": "tie",
+         "prev_scores": {"C8": 1.0}, "d": 0, "dm": 0.0}
+        for i in range(3)
+    ]
+    fp_text = g.build_gradient(
+        uuid="u3", goal=GOAL,
+        now_scores={"C8": 1.0}, evidence={"C8": "lenient header match"},
+        claims=[false_positive], surviving=[],
+        pair_records=passing_records, reward=1.0, win_rate=1.0,
+        mean_score=1.0, dead_claims=[false_positive],
+    )
+    fp_block = fp_text.split("## 1b.")[1].split("\n", 1)[1].split("## 2.")[0]
+    assert fp_block.strip() == "(none)"
+
+
+def test_registry_exposes_dead_claim_score_history(tmp_path: Path):
+    """The registry keeps a pruned claim's per-generation measurements —
+    the gradient's persistent-failure verdict for dead claims depends on
+    them surviving the pruning."""
+    reg = TaskRegistry.load(tmp_path, GOAL)
+    reg.seed_claims([_claim("C13")])
+    for i, uuid in enumerate(["u0", "u1", "u2"]):
+        reg.record_generation(
+            uuid, {"C13": 0.3}, {"C13": "measured 0.3"}, reward=0.3
+        )
+    reg.mark_dead("C13", "zero_variance")
+    reg.save()
+
+    reloaded = TaskRegistry.load(tmp_path, GOAL)
+    history = reloaded.claim_score_history("C13")
+    assert [h["score"] for h in history] == [0.3, 0.3, 0.3]
+    assert [h["uuid"] for h in history] == ["u0", "u1", "u2"]
+    assert all(h["evidence"] == "measured 0.3" for h in history)
+    assert reloaded.claim_score_history("C13", exclude_uuid="u1") == [
+        history[0], history[2]
+    ]
+    # crashed scorers are not measurements — same rule as observed_scores
+    reg.record_generation("u3", {"C13": 0.0}, {"C13": "scorer raised: boom"})
+    assert len(reg.claim_score_history("C13")) == 3

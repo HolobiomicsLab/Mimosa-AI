@@ -21,11 +21,11 @@ sys.path.append(str(_REPO_ROOT))
 from sources.core.failure_fingerprint import (
     compute_failure_fingerprint,  # noqa: E402, F401
 )
-from sources.evaluators import (
+from sources.evaluators.legacy_verifier import (
     verifier_claim_sources,  # noqa: E402
     )
-from sources.evaluators.verifier_claim_sources import SOURCES  # noqa: E402
-from sources.evaluators.verifier_per_claim import (  # noqa: E402
+from sources.evaluators.legacy_verifier.verifier_claim_sources import SOURCES  # noqa: E402
+from sources.evaluators.legacy_verifier.verifier_per_claim import (  # noqa: E402
     VERIFIER_PROMPT_RULES,
     _VerifierPerClaimMixin,
 )
@@ -98,7 +98,7 @@ def test_verifier_select_files_fallback_excludes_code(tmp_path):
 
     # Judge returns an empty pick -> fallback again, still no code files.
     # (_validate_workspace_paths comes from the workspace mixin at runtime.)
-    from sources.evaluators.verifier_workspace import (
+    from sources.evaluators.legacy_verifier.verifier_workspace import (
         _VerifierWorkspaceMixin,  # noqa: E402
     )
 

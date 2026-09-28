@@ -375,7 +375,7 @@ class ClaimsEvidenceLayer:
     @staticmethod
     def _dead_reason(reg: TaskRegistry, claim: dict[str, Any]) -> str:
         """Why one claim died (rendered into the refinement prompt)."""
-        if claim.get("drop_reason") == "all_fail":
+        if claim.get("drop_reason") in ("all_fail", "all_scorer_fail"):
             return "scorer failed on all workspaces"
         n = len(reg.observed_scores(claim["id"]))
         return f"all {n} workspaces scored equally"
@@ -450,6 +450,18 @@ class ClaimsEvidenceLayer:
                 feedback = "model returned no python code block"
                 continue
             violations = scorers_mod.static_violations(code)
+            # N3 exact-name screen: ONE batched LLM judgment (never regex)
+            # on the candidate script; a lenient verdict rides the repair
+            # loop like any other static violation.
+            lenient = scorers_mod.exact_name_violations(
+                [claim], {claim["id"]: code}, self._llm_text, context.uuid
+            )
+            if (reason := lenient.get(str(claim["id"]))) is not None:
+                violations.append(
+                    "exact-name claim verified with lenient matching — verify "
+                    "names with EXACT equality (set(df.columns) == expected "
+                    f'or col == "name"); judge: {reason}'
+                )
             if violations:
                 rec["parse"] = "static_violation"
                 rec["static_violations"] = violations[:5]

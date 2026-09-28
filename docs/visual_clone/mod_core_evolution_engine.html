@@ -410,8 +410,8 @@ async EvolutionEngine.evolve_generation(runs, rewards_history=None, assertion_hi
   <a class="box" id="d3-legacy" href="area_evaluators_legacy.html">
     <title>Legacy claims verifier still computes the fingerprint</title>
     <rect x="280" y="140" width="240" height="56" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
-    <text class="box-label" x="294" y="163">verifier.py (legacy)</text>
-    <text class="box-sub" x="294" y="179">VerifierEvaluator</text>
+    <text class="box-label" x="294" y="163">legacy_verifier/verifier.py</text>
+    <text class="box-sub" x="294" y="179">DEPRECATED &#183; VerifierEvaluator</text>
   </a>
   <a class="box" id="d3-ff" href="#card-fingerprint">
     <title>Deprecated descriptor</title>
@@ -436,7 +436,7 @@ async EvolutionEngine.evolve_generation(runs, rewards_history=None, assertion_hi
   <text class="edge-label" x="540" y="160" text-anchor="middle">claims</text>
   <path class="edge" data-from="d3-ff" data-to="d3-key" d="M760,168 H830" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arw3)"/>
   <text class="edge-label" x="795" y="160" text-anchor="middle">7 floats</text>
-  <text class="box-sub" x="20" y="215">dashed grey = deprecated path | the hybrid verifier imports only DESCRIPTOR_DIM (evaluator.py:47)</text>
+  <text class="box-sub" x="20" y="215">dashed grey = deprecated path | the hybrid verifier imports only DESCRIPTOR_DIM (hybrid_verifier/evaluator.py:58)</text>
   </svg>
 </div>
 <p class="figcap">Diagram 3 - the engine itself does not import these helpers; they are reached through <a href="mod_core_selection.html">mod_core_selection.html</a> and the verifier.</p>
@@ -461,7 +461,7 @@ compute_failure_fingerprint(per_claim) -&gt; {"vector", "presence_mask", "pass_r
 failure_fingerprint_from_state_result(state_result) -&gt; list[float] | None
 failure_fingerprint_from_workflow_dir(workflow_dir, uuid) -&gt; list[float] | None
 neutral_fingerprint() -&gt; [0.0] * 7</pre>
-<p>Absent sources get pass rate <code>0.5</code> and mask <code>0.0</code>; the vector is centered on the mean of present sources, so all-pass and all-fail both give a zero vector. Still imported by <code>sources/evaluators/verifier.py:32</code> (legacy) and, for the constant only, by <code>sources/evaluators/hybrid_verifier/evaluator.py:47</code>.</p>
+<p>Absent sources get pass rate <code>0.5</code> and mask <code>0.0</code>; the vector is centered on the mean of present sources, so all-pass and all-fail both give a zero vector. Still imported by <code class="path">sources/evaluators/legacy_verifier/verifier.py:29-34</code> (deprecated verifier) and, for the constant only, by <code class="path">sources/evaluators/hybrid_verifier/evaluator.py:58</code>.</p>
 </div></details>
 </div>
 
@@ -484,7 +484,8 @@ WorkflowOrchestrator._parse_generation_error(error) -&gt; tuple[str, str]</pre>
 <p class="skips">Skipped: webui, tests, docs/ (except <code class="path">docs/concepts/evolution-engine.md</code>, read only for the default values quoted in the red note), datasets, run_notes, runs_capsule, sources/workflows, sources/memory, logs (Tier D, or other pages). Read but not drawn as boxes, no cards: <code class="path">sources/utils/pricing.py</code> (cost), <code class="path">sources/utils/notify.py</code> (Pushover), <code class="path">sources/utils/visualization.py</code> (reward curve), <code class="path">sources/utils/evolution_tree.py</code> and <code class="path">sources/utils/archive_projection.py</code> (PNG refresh, both best-effort), <code class="path">sources/cli/pretty_print.py</code> (console output), <code class="path">sources/core/genotype_embedding.py</code> (only its entry point is shown in diagram 3), <code class="path">sources/evaluators/</code> beyond the facade (<a href="mod_evaluators_hybrid_verifier.html">hybrid verifier page</a> and <a href="area_evaluators_legacy.html">legacy page</a>). <code class="path">sources/utils/run_metrics.py</code> is covered inside the "files written" block instead of a card.</p>
 <p>No <code>run_task</code> method exists in this file; the entry point is <code>start_workflow_evolution</code>.</p>
 <p>The working tree had uncommitted changes when this page was built (<code>git status --porcelain</code> listed modified <code>config.py</code> and <code>main.py</code>). Line numbers are hints from that working tree.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes in <code>sources/evaluators/</code>; <code>sources/core/evolution_engine.py</code> is unmodified by that diff.</p>
+<p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

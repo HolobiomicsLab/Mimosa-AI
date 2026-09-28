@@ -36,9 +36,9 @@
 
 ## TL;DR
 
-Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, checks what the agents actually did against independent vantage points, and evolves the workflow across generations with a **Quality-Diversity** inspired search to find the optimal workflow for the task.
+Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, scores what the agents actually produced with deterministic Python policy scorers, and evolves the workflow across generations with a **Quality-Diversity** inspired search to find the optimal workflow for the task.
 
-The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The verifier score workflows by running deterministic Python checks that verify litterature grounding, non-triviality, and quality metrics against artifacts that the agents produced. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
+The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The hybrid verifier scores each run by executing deterministic Python **policy scorers** against the artifacts the agents produced (code → logs → deliverables, as a temporal ladder), and the reward is a pairwise win-rate over the task's previous generations. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
 
 ## Automatic Installation
 
@@ -87,7 +87,7 @@ The reproduced network matches the topology reported in the paper at the cluster
 Five layers, wired through small dataclass schemas — full details in [`docs/concepts/architecture.md`](./docs/concepts/architecture.md).
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, hybrid temporal-ladder verifier" width="90%">
 </p>
 
 | Layer | Component | What it does |
@@ -96,7 +96,7 @@ Five layers, wired through small dataclass schemas — full details in [`docs/co
 | 1 | **ToolManager + Perspicacité** | Discovers MCP tools on the configured address/port range; optionally pulls literature snippets. |
 | 2 | **EvolutionEngine** | Synthesizes the workflow and evolves it across generations (see below). |
 | 3 | **WorkflowRunner** | Runs the synthesized Python workflow in a sandbox using Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) (`LocalPythonExecutor` with AST allow-list) and shared LangGraph state. |
-| 4 | **VerifierEvaluator** | Multi-source per-claim verifier. Drives the next mutation. |
+| 4 | **HybridVerifierEvaluator** | Hybrid temporal-ladder verifier (deterministic policy scorers + pairwise reward). Drives the next mutation. |
 
 ### The evolution loop — what's actually evolving
 
@@ -112,19 +112,13 @@ Full mechanics: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-
 
 ### The verifier — what scores actually mean
 
-After each run, five independent claim sources look at the workspace and emit success-polarity claims:
+After each run, the **hybrid temporal-ladder verifier** (`sources/evaluators/hybrid_verifier/`) scores the workspace:
 
-| Source | Vantage |
-|--------|---------|
-| **A** | Peer-reviewed practice (via Perspicacité literature grounding) |
-| **B** | The literal goal text — did the agents deliver what was asked? |
-| **C** | Math invariants — probabilities in [0,1], shape consistency, no NaN, conservation |
-| **E** | Statistical fingerprint — beats a baseline, no degenerate predictions, no leakage signatures |
-| **G** | Visual correctness — a vision-capable judge inspects figure deliverables (only when the goal asks for one) |
+1. **Temporal claim ladder** — one LLM call per task extracts 8–12 stage-tagged key claims in temporal order: `script` (delivered code exists, is valid, reads the goal's inputs), `log` (training dynamics parsed from logs — loss decreasing, no NaN), `result` (artifact fidelity — prediction-CSV columns match the ORIGINAL input columns exactly, completeness, prediction sanity).
+2. **Python policy scorers** — one LLM call per claim writes a self-contained deterministic scorer that grades any workspace of the task 0–1 (subprocess, cached and re-run for every generation; write/network APIs banned).
+3. **Pairwise reward** — the score is the win-rate against the task's previous generations, each pair decided at the **earliest ladder stage where the two differ**: a script-stage failure loses regardless of result-stage quality.
 
-Each claim is verified by a **python program** the judge writes against the workspace — not by re-asking an LLM whether it believes the agent.
-
-**Rubric-blind mutation — the mutator never sees the rubric.** The only signal that flows back is an `abstracted_prompt_gradient` — a code-named diagnosis of failure modes that does not name claims, scores, or sources. By construction the search cannot over-fit to a rubric vocabulary it never sees.
+The mutator is steered by an **elimination-point-first textual gradient** — it leads with the earliest stage/claim where this generation lost, with measured evidence.
 
 Full pipeline: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
 
@@ -245,9 +239,9 @@ Mimosa-AI sits in a small but active lineage of LLM-driven program-search and au
 |---------|--------------|--------------------|
 | [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | End-to-end paper generation in ML | Mimosa optimises **per-task workflow synthesis** with QD+verifier, not full-paper generation |
 | [DiscoPOP](https://github.com/SakanaAI/DiscoPOP) (Lange et al. 2024) | LLM-driven discovery of preference-optimisation algorithms | Same "LLM as variation operator over code" paradigm; Mimosa applies it to multi-agent workflow code rather than loss functions |
-| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | Evolutionary search over Python functions guided by an LLM | Mimosa evolves whole multi-agent programs and adds a multi-source per-claim verifier instead of a single fitness function |
+| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | Evolutionary search over Python functions guided by an LLM | Mimosa evolves whole multi-agent programs and adds an auditable deterministic verifier instead of a single fitness function |
 | [ELM](https://github.com/CarperAI/OpenELM) (Lehman et al. 2022) | LLM-mediated quality-diversity over code | Closest QD ancestor; Mimosa's behaviour descriptor is a domain-agnostic embedding of the workflow's code rather than a hand-designed per-domain descriptor |
-| AIDE | Automated ML pipelines on Kaggle-like tasks | Mimosa targets broader scientific reproduction (ScienceAgentBench, PaperBench, lab data) and ships an auditable per-claim verifier |
+| AIDE | Automated ML pipelines on Kaggle-like tasks | Mimosa targets broader scientific reproduction (ScienceAgentBench, PaperBench, lab data) and ships an auditable deterministic verifier |
 
 If you're publishing comparative work, the [manuscript](https://arxiv.org/abs/2603.28986) has the detailed positioning.
 
@@ -266,7 +260,7 @@ Site config: [`mkdocs.yml`](./mkdocs.yml). Index: [`docs/index.md`](./docs/index
 
 ## Contributing
 
-Patches, MCP tools, evaluators, and new claim sources welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md), the [Developer guide](./docs/DEVELOPER_GUIDE.md), and the contribution terms in [`CLA/`](./CLA/).
+Patches, MCP tools, evaluators, and new verifier evidence layers welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md), the [Developer guide](./docs/DEVELOPER_GUIDE.md), and the contribution terms in [`CLA/`](./CLA/).
 
 ---
 

@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">layers.py</h1>
-<p class="intro">This file defines the evidence-layer interface and the default layer, <code>ClaimsEvidenceLayer</code>, which turns one workspace into <code>(claim_id, score)</code> pairs. It runs once per evaluated generation, called from <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a>. Package context is on <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>.</p>
+<p class="intro">This file defines the evidence-layer interface and its three layers: <code>ClaimsEvidenceLayer</code> turns one workspace into <code>(claim_id, score)</code> pairs, <code>VisualEvidenceLayer</code> scores figures for figure tasks, and <code>ExecutionGateLayer</code> caps the reward from re-execution status. It runs once per evaluated generation, called from <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a>. Package context is on <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>.</p>
 
 <div id="legend" data-auto></div>
 
@@ -34,40 +34,40 @@
   <g class="box" id="lCtx">
     <title>LayerContext, built by the evaluator</title>
     <rect x="10" y="40" width="175" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="97" y="64" text-anchor="middle">in: LayerContext (60)</text>
+    <text class="box-label" x="97" y="64" text-anchor="middle">in: LayerContext (68)</text>
     <text class="box-sub" x="97" y="82" text-anchor="middle">uuid, goal, workspace</text>
     <text class="box-sub" x="97" y="98" text-anchor="middle">registry, generation_index</text>
-    <text class="box-sub" x="97" y="114" text-anchor="middle">built at evaluator.py:314</text>
+    <text class="box-sub" x="97" y="114" text-anchor="middle">built at evaluator.py:435</text>
     <text class="box-sub" x="97" y="130" text-anchor="middle">one instance per generation</text>
   </g>
 
   <a class="box" id="lCollect" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>collect: the interface entry point</title>
     <rect x="210" y="40" width="175" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="297" y="64" text-anchor="middle">collect (459)</text>
-    <text class="box-sub" x="297" y="82" text-anchor="middle">extract if no claims (462)</text>
-    <text class="box-sub" x="297" y="98" text-anchor="middle">digest stage (468)</text>
-    <text class="box-sub" x="297" y="114" text-anchor="middle">score alive claims (469-477)</text>
-    <text class="box-sub" x="297" y="130" text-anchor="middle">returns list at 493</text>
+    <text class="box-label" x="297" y="64" text-anchor="middle">collect (556)</text>
+    <text class="box-sub" x="297" y="82" text-anchor="middle">extract if no claims (559)</text>
+    <text class="box-sub" x="297" y="98" text-anchor="middle">digest stage (565)</text>
+    <text class="box-sub" x="297" y="114" text-anchor="middle">score alive claims (568-592)</text>
+    <text class="box-sub" x="297" y="130" text-anchor="middle">returns list at 592</text>
   </a>
 
   <a class="box" id="lExtract" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>_extract: first-sight claim extraction</title>
     <rect x="410" y="40" width="175" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="497" y="64" text-anchor="middle">_extract (192)</text>
-    <text class="box-sub" x="497" y="82" text-anchor="middle">count contract lo..hi (195)</text>
-    <text class="box-sub" x="497" y="98" text-anchor="middle">scan + union + previews (197-203)</text>
-    <text class="box-sub" x="497" y="114" text-anchor="middle">reg.seed_claims (216)</text>
-    <text class="box-sub" x="497" y="130" text-anchor="middle">returns error text at 215</text>
+    <text class="box-label" x="497" y="64" text-anchor="middle">_extract (200)</text>
+    <text class="box-sub" x="497" y="82" text-anchor="middle">count contract lo..hi (215-216)</text>
+    <text class="box-sub" x="497" y="98" text-anchor="middle">scan + union + previews (217-224)</text>
+    <text class="box-sub" x="497" y="114" text-anchor="middle">reg.seed_claims (288)</text>
+    <text class="box-sub" x="497" y="130" text-anchor="middle">returns error text at 277</text>
   </a>
 
   <a class="box" id="lJson" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>_llm_json: one judge call, one repair round</title>
     <rect x="610" y="40" width="175" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="697" y="64" text-anchor="middle">_llm_json (159)</text>
-    <text class="box-sub" x="697" y="82" text-anchor="middle">attempts 1 and 2 (165)</text>
-    <text class="box-sub" x="697" y="98" text-anchor="middle">extract_json_payload (171)</text>
-    <text class="box-sub" x="697" y="114" text-anchor="middle">appends PREVIOUS ATTEMPT (182)</text>
+    <text class="box-label" x="697" y="64" text-anchor="middle">_llm_json (167)</text>
+    <text class="box-sub" x="697" y="82" text-anchor="middle">attempts 1 and 2 (173)</text>
+    <text class="box-sub" x="697" y="98" text-anchor="middle">extract_json_payload (179)</text>
+    <text class="box-sub" x="697" y="114" text-anchor="middle">appends PREVIOUS ATTEMPT (189-193)</text>
     <text class="box-sub" x="697" y="130" text-anchor="middle">returns (payload, err)</text>
   </a>
 
@@ -75,31 +75,31 @@
     <title>What collect and revise return</title>
     <rect x="810" y="40" width="200" height="115" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="910" y="64" text-anchor="middle">out: list[LayerScore]</text>
-    <text class="box-sub" x="910" y="82" text-anchor="middle">claim_id, statement (36-56)</text>
+    <text class="box-sub" x="910" y="82" text-anchor="middle">claim_id, statement (44-64)</text>
     <text class="box-sub" x="910" y="98" text-anchor="middle">score 0..1 or None</text>
     <text class="box-sub" x="910" y="114" text-anchor="middle">evidence, category, meta</text>
-    <text class="box-sub" x="910" y="130" text-anchor="middle">sorted by claim_id (492)</text>
+    <text class="box-sub" x="910" y="130" text-anchor="middle">sorted by claim_id (591)</text>
   </g>
 
   <a class="box" id="lScore" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>Per-claim scoring: safe wrapper around _score_claim</title>
     <rect x="10" y="205" width="210" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="115" y="229" text-anchor="middle">_score_claim_safe (434)</text>
-    <text class="box-sub" x="115" y="247" text-anchor="middle">catches, returns None score (446)</text>
-    <text class="box-sub" x="115" y="263" text-anchor="middle">_score_claim (382)</text>
-    <text class="box-sub" x="115" y="279" text-anchor="middle">cached script, else build (388)</text>
-    <text class="box-sub" x="115" y="295" text-anchor="middle">run launcher (405), parse (410)</text>
-    <text class="box-sub" x="115" y="311" text-anchor="middle">also called by revise (271)</text>
+    <text class="box-label" x="115" y="229" text-anchor="middle">_score_claim_safe (531)</text>
+    <text class="box-sub" x="115" y="247" text-anchor="middle">catches, returns None score (537-550)</text>
+    <text class="box-sub" x="115" y="263" text-anchor="middle">_score_claim (479)</text>
+    <text class="box-sub" x="115" y="279" text-anchor="middle">cached script, else build (485-490)</text>
+    <text class="box-sub" x="115" y="295" text-anchor="middle">run launcher (502-506), parse (507-511)</text>
+    <text class="box-sub" x="115" y="311" text-anchor="middle">also called by revise (368)</text>
   </a>
 
   <a class="box" id="lBuild" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>_build_scorer: generate and repair one policy script</title>
     <rect x="245" y="205" width="195" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="342" y="229" text-anchor="middle">_build_scorer (317)</text>
-    <text class="box-sub" x="342" y="247" text-anchor="middle">3 attempts max (333)</text>
-    <text class="box-sub" x="342" y="263" text-anchor="middle">scorers_mod prompts (335-340)</text>
-    <text class="box-sub" x="342" y="279" text-anchor="middle">parse, screen, run (349-366)</text>
-    <text class="box-sub" x="342" y="295" text-anchor="middle">stops at first parsed score (378)</text>
+    <text class="box-label" x="342" y="229" text-anchor="middle">_build_scorer (414)</text>
+    <text class="box-sub" x="342" y="247" text-anchor="middle">3 attempts max (430)</text>
+    <text class="box-sub" x="342" y="263" text-anchor="middle">scorers_mod prompts (432-437)</text>
+    <text class="box-sub" x="342" y="279" text-anchor="middle">parse, screen, run (446-465)</text>
+    <text class="box-sub" x="342" y="295" text-anchor="middle">stops at first parsed score (472-475)</text>
     <text class="box-sub" x="342" y="311" text-anchor="middle">returns script, telemetry, parse</text>
   </a>
 
@@ -107,15 +107,15 @@
     <title>Host callables injected in the constructor</title>
     <rect x="465" y="205" width="195" height="115" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="562" y="229" text-anchor="middle">host: llm_text, run_script</text>
-    <text class="box-sub" x="562" y="247" text-anchor="middle">wired at 146-147</text>
-    <text class="box-sub" x="562" y="263" text-anchor="middle">judge call cached (168, 344)</text>
-    <text class="box-sub" x="562" y="279" text-anchor="middle">pinned subprocess (362, 405)</text>
+    <text class="box-sub" x="562" y="247" text-anchor="middle">wired at 154-155</text>
+    <text class="box-sub" x="562" y="263" text-anchor="middle">judge call cached (176, 441)</text>
+    <text class="box-sub" x="562" y="279" text-anchor="middle">pinned subprocess (459, 502)</text>
     <text class="box-sub" x="562" y="295" text-anchor="middle">evaluator passes both</text>
     <text class="box-sub" x="562" y="311" text-anchor="middle">returns raw text / ExecOutcome</text>
   </g>
 
   <g class="box" id="lScorers">
-    <title>scorers.py, imported at L27</title>
+    <title>scorers.py, imported at L35</title>
     <rect x="685" y="205" width="170" height="115" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="770" y="229" text-anchor="middle">scorers.py helpers</text>
     <text class="box-sub" x="770" y="247" text-anchor="middle">scorer_prompt, repair_prompt</text>
@@ -128,32 +128,32 @@
   <a class="box" id="lDigest" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>_ensure_digests: one digest call per task</title>
     <rect x="10" y="375" width="200" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="110" y="399" text-anchor="middle">_ensure_digests (294)</text>
-    <text class="box-sub" x="110" y="417" text-anchor="middle">cache hit returns early (301)</text>
-    <text class="box-sub" x="110" y="433" text-anchor="middle">digest_mod.ensure_digests (304)</text>
-    <text class="box-sub" x="110" y="449" text-anchor="middle">stores in reg.digests (314)</text>
-    <text class="box-sub" x="110" y="465" text-anchor="middle">returns prompt block (315)</text>
+    <text class="box-label" x="110" y="399" text-anchor="middle">_ensure_digests (391)</text>
+    <text class="box-sub" x="110" y="417" text-anchor="middle">cache hit returns early (398)</text>
+    <text class="box-sub" x="110" y="433" text-anchor="middle">digest_mod.ensure_digests (401)</text>
+    <text class="box-sub" x="110" y="449" text-anchor="middle">stores in reg.digests (411)</text>
+    <text class="box-sub" x="110" y="465" text-anchor="middle">returns prompt block (412)</text>
     <text class="box-sub" x="110" y="481" text-anchor="middle">max_files = digest_max_files</text>
   </a>
 
   <a class="box" id="lRevise" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>revise: replace dead claims and score them</title>
     <rect x="235" y="375" width="220" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="345" y="399" text-anchor="middle">revise (219)</text>
-    <text class="box-sub" x="345" y="417" text-anchor="middle">budget = rounds - used (233)</text>
-    <text class="box-sub" x="345" y="433" text-anchor="middle">refinement_prompt (241)</text>
-    <text class="box-sub" x="345" y="449" text-anchor="middle">replace_claims (265)</text>
-    <text class="box-sub" x="345" y="465" text-anchor="middle">counts in reg.refinements (268)</text>
-    <text class="box-sub" x="345" y="481" text-anchor="middle">_dead_reason (279) builds text</text>
+    <text class="box-label" x="345" y="399" text-anchor="middle">revise (291)</text>
+    <text class="box-sub" x="345" y="417" text-anchor="middle">budget = rounds - used (310)</text>
+    <text class="box-sub" x="345" y="433" text-anchor="middle">refinement_prompt (318)</text>
+    <text class="box-sub" x="345" y="449" text-anchor="middle">replace_claims (360)</text>
+    <text class="box-sub" x="345" y="465" text-anchor="middle">counts in reg.refinements (365)</text>
+    <text class="box-sub" x="345" y="481" text-anchor="middle">_dead_reason (375-376) builds text</text>
   </a>
 
   <a class="box" id="lGate" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>gate: no reward cap for this layer</title>
     <rect x="480" y="375" width="175" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="567" y="399" text-anchor="middle">gate (495)</text>
-    <text class="box-sub" x="567" y="417" text-anchor="middle">always returns None (497)</text>
+    <text class="box-label" x="567" y="399" text-anchor="middle">gate (594)</text>
+    <text class="box-sub" x="567" y="417" text-anchor="middle">always returns None (596)</text>
     <text class="box-sub" x="567" y="433" text-anchor="middle">no cap on the reward</text>
-    <text class="box-sub" x="567" y="449" text-anchor="middle">called by evaluator.py:409</text>
+    <text class="box-sub" x="567" y="449" text-anchor="middle">called by evaluator.py:546</text>
     <text class="box-sub" x="567" y="465" text-anchor="middle">interface hook for other layers</text>
   </a>
 
@@ -161,45 +161,128 @@
   <text class="edge-label" x="197" y="90" text-anchor="middle">passed in</text>
 
   <path class="edge" data-from="lCollect" data-to="lExtract" d="M385,97 H410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="397" y="90" text-anchor="middle">no claims (462)</text>
+  <text class="edge-label" x="397" y="90" text-anchor="middle">no claims (559)</text>
 
   <path class="edge" data-from="lExtract" data-to="lJson" d="M585,97 H610" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="597" y="90" text-anchor="middle">judge call (205)</text>
+  <text class="edge-label" x="597" y="90" text-anchor="middle">judge call (244)</text>
 
   <path class="edge" data-from="lCollect" data-to="lJson" d="M340,155 V178 H697 V155" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="520" y="173" text-anchor="middle">extract and refine (205)</text>
+  <text class="edge-label" x="520" y="173" text-anchor="middle">extract and refine (244, 333)</text>
 
   <path class="edge dashed-edge" data-from="lJson" data-to="lHost" d="M697,155 V182 H560 V205" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="628" y="196" text-anchor="middle">llm_text (168)</text>
+  <text class="edge-label" x="628" y="196" text-anchor="middle">llm_text (176)</text>
 
   <path class="edge dashed-edge" data-from="lBuild" data-to="lHost" d="M440,262 H465" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="452" y="255" text-anchor="middle">llm_text (344)</text>
+  <text class="edge-label" x="452" y="255" text-anchor="middle">llm_text (441)</text>
 
   <path class="edge dashed-edge" data-from="lScore" data-to="lHost" d="M115,320 V345 H500 V320" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="330" y="340" text-anchor="middle">run_script (405)</text>
+  <text class="edge-label" x="330" y="340" text-anchor="middle">run_script (502)</text>
 
   <path class="edge dotted-edge" data-from="lBuild" data-to="lScorers" d="M440,290 H685" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="560" y="305" text-anchor="middle">import at L27</text>
+  <text class="edge-label" x="560" y="305" text-anchor="middle">import at L35</text>
 
   <path class="edge" data-from="lScore" data-to="lBuild" d="M220,262 H245" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="232" y="255" text-anchor="middle">no script (389)</text>
+  <text class="edge-label" x="232" y="255" text-anchor="middle">no script (485)</text>
 
   <path class="edge dashed-edge" data-from="lScore" data-to="lOut" d="M60,320 V358 H900 V155" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
   <text class="edge-label" x="900" y="330" text-anchor="middle">returns LayerScore</text>
 
   <path class="edge dashed-edge" data-from="lCollect" data-to="lOut" d="M360,40 V20 H900 V40" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="630" y="15" text-anchor="middle">returns list (493)</text>
+  <text class="edge-label" x="630" y="15" text-anchor="middle">returns list (592)</text>
 
   <path class="edge" data-from="lRevise" data-to="lJson" d="M290,375 V362 H670 V155" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="480" y="357" text-anchor="middle">refine prompt (256)</text>
+  <text class="edge-label" x="480" y="357" text-anchor="middle">refine prompt (318)</text>
 
   <path class="edge dashed-edge" data-from="lDigest" data-to="lScorers" d="M210,432 H232 V345 H880 V320" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="700" y="340" text-anchor="middle">digest block (327)</text>
+  <text class="edge-label" x="700" y="340" text-anchor="middle">digest block (424)</text>
 
-  <text class="box-sub" x="10" y="530">Calls that would cross the layout are written inside the boxes with line numbers: revise scores each replacement through _score_claim_safe (271); collect fans out with ThreadPoolExecutor (475-478); gate is called by the evaluator (409).</text>
+  <text class="box-sub" x="10" y="530">Calls that would cross the layout are written inside the boxes with line numbers: revise scores each replacement through _score_claim_safe (368); collect fans out with ThreadPoolExecutor (574-577); gate is called by the evaluator (546).</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 &mdash; three lanes: the collect path (top), per-claim scoring with the scorer build loop (middle), and the refinement and gate hooks (bottom). Solid arrows are calls; dashed arrows pass values or run host callables; the dotted arrow is the import of <code>scorers.py</code> (L27). Line numbers in brackets.</p>
+<p class="figcap">Diagram 1 &mdash; three lanes: the collect path (top), per-claim scoring with the scorer build loop (middle), and the refinement and gate hooks (bottom). Solid arrows are calls; dashed arrows pass values or run host callables; the dotted arrow is the import of <code>scorers.py</code> (L35). Line numbers in brackets.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1b &mdash; the two E35 layers: visual evidence and the execution gate</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1000 320" role="img" aria-label="VisualEvidenceLayer scores figures and ExecutionGateLayer caps the reward">
+  <defs>
+    <marker id="arwb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwb2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glowb" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="vVis" href="../../sources/evaluators/hybrid_verifier/layers.py">
+    <title>VisualEvidenceLayer: figure tasks only</title>
+    <rect x="20" y="40" width="220" height="120" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="130" y="64" text-anchor="middle">VisualEvidenceLayer (649)</text>
+    <text class="box-sub" x="130" y="82" text-anchor="middle">name "visual" (665)</text>
+    <text class="box-sub" x="130" y="98" text-anchor="middle">_extract_claims (760): 3-6 claims</text>
+    <text class="box-sub" x="130" y="114" text-anchor="middle">_score_figures (811): one call</text>
+    <text class="box-sub" x="130" y="130" text-anchor="middle">collect (867) / gate (913)</text>
+    <text class="box-sub" x="130" y="146" text-anchor="middle">scores &lt;=3 figures (602)</text>
+  </a>
+
+  <a class="box" id="vGate" href="../../sources/evaluators/hybrid_verifier/layers.py">
+    <title>ExecutionGateLayer: reward cap from re-execution status</title>
+    <rect x="290" y="40" width="230" height="120" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="405" y="64" text-anchor="middle">ExecutionGateLayer (942)</text>
+    <text class="box-sub" x="405" y="82" text-anchor="middle">name "execution_gate" (956)</text>
+    <text class="box-sub" x="405" y="98" text-anchor="middle">gate (1015): status to cap</text>
+    <text class="box-sub" x="405" y="114" text-anchor="middle">_frozen_lookup (998)</text>
+    <text class="box-sub" x="405" y="130" text-anchor="middle">_load_frozen (978)</text>
+    <text class="box-sub" x="405" y="146" text-anchor="middle">collect (1006) / revise (1010): []</text>
+  </a>
+
+  <g class="box" id="vCaps">
+    <title>Status to reward cap</title>
+    <rect x="570" y="40" width="180" height="120" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
+    <text class="box-label" x="660" y="64" text-anchor="middle">GATE_CAPS (924)</text>
+    <text class="box-sub" x="660" y="82" text-anchor="middle">crash / timeout: 0.0</text>
+    <text class="box-sub" x="660" y="98" text-anchor="middle">no_entry_script: 0.0</text>
+    <text class="box-sub" x="660" y="114" text-anchor="middle">divergent: 0.5</text>
+    <text class="box-sub" x="660" y="130" text-anchor="middle">clean_recover: no cap</text>
+  </g>
+
+  <g class="box" id="vLedger">
+    <title>Frozen E24 ledger</title>
+    <rect x="800" y="40" width="180" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="890" y="64" text-anchor="middle">FROZEN_REEXEC_LEDGER (934)</text>
+    <text class="box-sub" x="890" y="82" text-anchor="middle">E24 holdout JSON</text>
+    <text class="box-sub" x="890" y="98" text-anchor="middle">keyed by uuid8 (998)</text>
+    <text class="box-sub" x="890" y="114" text-anchor="middle">miss: no evidence</text>
+    <text class="box-sub" x="890" y="130" text-anchor="middle">no cap on miss</text>
+  </g>
+
+  <g class="box" id="vMerge">
+    <title>The evaluator merges layer caps</title>
+    <rect x="570" y="215" width="410" height="70" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="775" y="241" text-anchor="middle">reward = min(reward, caps)</text>
+    <text class="box-sub" x="775" y="261" text-anchor="middle">evaluator.py:552 &#183; one cap per layer &#183; None = no cap</text>
+  </g>
+
+  <path class="edge" data-from="vVis" data-to="vGate" d="M240,100 H290" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwb)"/>
+  <text class="edge-label" x="265" y="93" text-anchor="middle">LayerScore</text>
+  <path class="edge" data-from="vGate" data-to="vCaps" d="M520,100 H570" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwb)"/>
+  <text class="edge-label" x="545" y="93" text-anchor="middle">status</text>
+  <path class="edge dashed-edge" data-from="vLedger" data-to="vGate" d="M890,160 V185 H405 V160" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arwb2)"/>
+  <text class="edge-label" x="650" y="182" text-anchor="middle">frozen status</text>
+  <path class="edge" data-from="vCaps" data-to="vMerge" d="M660,160 V215" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwb)"/>
+  <text class="edge-label" x="672" y="192" text-anchor="start">cap 0.0-0.5</text>
+
+  <text class="box-sub" x="20" y="240">Visual claims join the ladder at stage "visual", ordered BEFORE "script" (figure tasks, L661).</text>
+  <text class="box-sub" x="20" y="262">ExecutionGateLayer produces no claim scores: collect and revise return [] (L1006, L1010).</text>
+  <text class="box-sub" x="20" y="284">Unknown or missing re-execution evidence never caps the reward (L1000, L1026).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1b &mdash; the two E35 layers the file adds beyond the claims pipeline. <code>VisualEvidenceLayer</code> is armed only for figure tasks and freezes its claims once; <code>ExecutionGateLayer</code> only caps the reward through its <code>gate</code> hook.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -227,27 +310,27 @@
     <text class="box-sub" x="125" y="88" text-anchor="middle">hybrid_verifier_refinement_rounds</text>
     <text class="box-sub" x="125" y="104" text-anchor="middle">hybrid_verifier_scorer_timeout_s</text>
     <text class="box-sub" x="125" y="120" text-anchor="middle">hybrid_verifier_digest_max_files</text>
-    <text class="box-sub" x="125" y="136" text-anchor="middle">read at evaluator.py:169-211</text>
+    <text class="box-sub" x="125" y="136" text-anchor="middle">read at evaluator.py:197-249</text>
   </g>
 
   <g class="box" id="fCtx">
     <title>LayerContext fields</title>
     <rect x="270" y="30" width="200" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="370" y="54" text-anchor="middle">LayerContext (60)</text>
+    <text class="box-label" x="370" y="54" text-anchor="middle">LayerContext (68)</text>
     <text class="box-sub" x="370" y="72" text-anchor="middle">uuid, goal</text>
     <text class="box-sub" x="370" y="88" text-anchor="middle">workspace: Path</text>
     <text class="box-sub" x="370" y="104" text-anchor="middle">registry: TaskRegistry</text>
     <text class="box-sub" x="370" y="120" text-anchor="middle">generation_index: int</text>
-    <text class="box-sub" x="370" y="136" text-anchor="middle">built at evaluator.py:314-320</text>
+    <text class="box-sub" x="370" y="136" text-anchor="middle">built at evaluator.py:435-440</text>
   </g>
 
   <a class="box" id="fLayer" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>ClaimsEvidenceLayer.collect and revise</title>
     <rect x="500" y="30" width="200" height="120" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="600" y="54" text-anchor="middle">collect (459) / revise (219)</text>
-    <text class="box-sub" x="600" y="72" text-anchor="middle">reads: workspace files (197)</text>
+    <text class="box-label" x="600" y="54" text-anchor="middle">collect (556) / revise (291)</text>
+    <text class="box-sub" x="600" y="72" text-anchor="middle">reads: workspace files (217)</text>
     <text class="box-sub" x="600" y="88" text-anchor="middle">reads: reg.claims, reg.inventory</text>
-    <text class="box-sub" x="600" y="104" text-anchor="middle">reads: reg.digests cache (301)</text>
+    <text class="box-sub" x="600" y="104" text-anchor="middle">reads: reg.digests cache (398)</text>
     <text class="box-sub" x="600" y="120" text-anchor="middle">writes: registry fields only</text>
     <text class="box-sub" x="600" y="136" text-anchor="middle">no file opened for writing</text>
   </a>
@@ -258,9 +341,9 @@
     <text class="box-label" x="860" y="54" text-anchor="middle">out: list[LayerScore]</text>
     <text class="box-sub" x="860" y="72" text-anchor="middle">score None when the scorer failed</text>
     <text class="box-sub" x="860" y="88" text-anchor="middle">meta.scorer_status: ok/exec_failed</text>
-    <text class="box-sub" x="860" y="104" text-anchor="middle">failed/raised (401, 423, 452)</text>
-    <text class="box-sub" x="860" y="120" text-anchor="middle">evaluator joins on claim_id (333)</text>
-    <text class="box-sub" x="860" y="136" text-anchor="middle">gate adds no cap (497)</text>
+    <text class="box-sub" x="860" y="104" text-anchor="middle">failed/raised (498, 520, 547)</text>
+    <text class="box-sub" x="860" y="120" text-anchor="middle">evaluator joins on claim_id (454)</text>
+    <text class="box-sub" x="860" y="136" text-anchor="middle">gate adds no cap (596)</text>
   </g>
 
   <g class="box" id="fRegJson">
@@ -270,29 +353,29 @@
     <text class="box-sub" x="145" y="242" text-anchor="middle">sources/workflows/&lt;run&gt;/_verifier_tmp/</text>
     <text class="box-sub" x="145" y="258" text-anchor="middle">hybrid_registry_&lt;task_key&gt;.json</text>
     <text class="box-sub" x="145" y="274" text-anchor="middle">path built at registry.py:76</text>
-    <text class="box-sub" x="145" y="290" text-anchor="middle">saved by registry.save() (120)</text>
-    <text class="box-sub" x="145" y="306" text-anchor="middle">called from evaluator.py:505</text>
+    <text class="box-sub" x="145" y="290" text-anchor="middle">saved by registry.save() (122)</text>
+    <text class="box-sub" x="145" y="306" text-anchor="middle">called from evaluator.py:644</text>
   </g>
 
   <g class="box" id="fMut">
     <title>Registry fields this layer mutates</title>
     <rect x="310" y="200" width="300" height="120" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="460" y="224" text-anchor="middle">registry fields mutated</text>
-    <text class="box-sub" x="460" y="242" text-anchor="middle">claims[].scorer via set_scorer (390)</text>
-    <text class="box-sub" x="460" y="258" text-anchor="middle">claims list via replace_claims (265)</text>
-    <text class="box-sub" x="460" y="274" text-anchor="middle">refinements[uuid] counter (268)</text>
-    <text class="box-sub" x="460" y="290" text-anchor="middle">digests cache (314)</text>
-    <text class="box-sub" x="460" y="306" text-anchor="middle">seed_claims on first sight (216)</text>
+    <text class="box-sub" x="460" y="242" text-anchor="middle">claims[].scorer via set_scorer (487)</text>
+    <text class="box-sub" x="460" y="258" text-anchor="middle">claims list via replace_claims (360)</text>
+    <text class="box-sub" x="460" y="274" text-anchor="middle">refinements[uuid] counter (365)</text>
+    <text class="box-sub" x="460" y="290" text-anchor="middle">digests cache (411)</text>
+    <text class="box-sub" x="460" y="306" text-anchor="middle">seed_claims on first sight (288)</text>
   </g>
 
   <g class="box" id="fScorerRun">
     <title>Scorer execution and its data</title>
     <rect x="640" y="200" width="350" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="815" y="224" text-anchor="middle">scorer run: read-only</text>
-    <text class="box-sub" x="815" y="242" text-anchor="middle">run_script(workspace, launcher, id) (362, 405)</text>
-    <text class="box-sub" x="815" y="258" text-anchor="middle">execution id: hybrid_score_&lt;claim id&gt; (365)</text>
-    <text class="box-sub" x="815" y="274" text-anchor="middle">reads one JSON line from stdout (368)</text>
-    <text class="box-sub" x="815" y="290" text-anchor="middle">timeout from scorer_timeout_s (379)</text>
+    <text class="box-sub" x="815" y="242" text-anchor="middle">run_script(workspace, launcher, id) (459, 502)</text>
+    <text class="box-sub" x="815" y="258" text-anchor="middle">execution id: hybrid_score_&lt;claim id&gt; (462)</text>
+    <text class="box-sub" x="815" y="274" text-anchor="middle">reads one JSON line from stdout (464-465)</text>
+    <text class="box-sub" x="815" y="290" text-anchor="middle">timeout from scorer_timeout_s (476)</text>
     <text class="box-sub" x="815" y="306" text-anchor="middle">writes nothing itself</text>
   </g>
 
@@ -311,8 +394,8 @@
   <path class="edge dashed-edge" data-from="fMut" data-to="fRegJson" d="M310,290 H280" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
   <text class="edge-label" x="295" y="283" text-anchor="middle">saved later</text>
 
-  <text class="box-sub" x="10" y="370">This file writes no file: it edits the <code>TaskRegistry</code> object in memory. Persistence is <code>registry.save()</code>, called once per evaluation at evaluator.py:505.</text>
-  <text class="box-sub" x="10" y="392">gen_parallelism is a constructor argument of the evaluator, not a config key (evaluator.py:144, 190); it sets the ThreadPoolExecutor width (474).</text>
+  <text class="box-sub" x="10" y="370">This file writes no file: it edits the <code>TaskRegistry</code> object in memory. Persistence is <code>registry.save()</code>, called once per evaluation at evaluator.py:644.</text>
+  <text class="box-sub" x="10" y="392">gen_parallelism is a constructor argument of the evaluator, not a config key (evaluator.py:153, 220); it sets the ThreadPoolExecutor width (573-574).</text>
 </svg>
 </div>
 <p class="figcap">Diagram 2 &mdash; config keys arrive through the evaluator; the layer reads workspace files and registry state and returns <code>LayerScore</code> items. The registry JSON is read and later written by <code>registry.save()</code> from the caller.</p>
@@ -338,7 +421,7 @@
   <a class="box" id="pStart" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>Attempt 1 uses the scorer prompt; later attempts use the repair prompt</title>
     <rect x="10" y="30" width="180" height="80" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="100" y="54" text-anchor="middle">attempt 1 (333-338)</text>
+    <text class="box-label" x="100" y="54" text-anchor="middle">attempt 1 (430-435)</text>
     <text class="box-sub" x="100" y="72" text-anchor="middle">scorer_prompt, agent</text>
     <text class="box-sub" x="100" y="88" text-anchor="middle">hybrid_scorer_&lt;id&gt;</text>
   </a>
@@ -348,7 +431,7 @@
     <rect x="215" y="30" width="190" height="80" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="310" y="54" text-anchor="middle">llm_text raises?</text>
     <text class="box-sub" x="310" y="72" text-anchor="middle">yes: record call_failed</text>
-    <text class="box-sub" x="310" y="88" text-anchor="middle">and break (345-348)</text>
+    <text class="box-sub" x="310" y="88" text-anchor="middle">and break (442-445)</text>
   </g>
 
   <g class="box" id="pCode">
@@ -356,7 +439,7 @@
     <rect x="430" y="30" width="180" height="80" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="520" y="54" text-anchor="middle">parse_code gives None?</text>
     <text class="box-sub" x="520" y="72" text-anchor="middle">yes: feedback "no code"</text>
-    <text class="box-sub" x="520" y="88" text-anchor="middle">next attempt (350-354)</text>
+    <text class="box-sub" x="520" y="88" text-anchor="middle">next attempt (447-451)</text>
   </g>
 
   <g class="box" id="pScreen">
@@ -364,7 +447,7 @@
     <rect x="635" y="30" width="180" height="80" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="725" y="54" text-anchor="middle">static_violations?</text>
     <text class="box-sub" x="725" y="72" text-anchor="middle">yes: list first 5</text>
-    <text class="box-sub" x="725" y="88" text-anchor="middle">feedback (355-361)</text>
+    <text class="box-sub" x="725" y="88" text-anchor="middle">feedback (452-458)</text>
   </g>
 
   <g class="box" id="pRun">
@@ -372,7 +455,7 @@
     <rect x="840" y="30" width="165" height="80" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="922" y="54" text-anchor="middle">parsed score?</text>
     <text class="box-sub" x="922" y="72" text-anchor="middle">yes: best_ok, break</text>
-    <text class="box-sub" x="922" y="88" text-anchor="middle">(375-378)</text>
+    <text class="box-sub" x="922" y="88" text-anchor="middle">(472-475)</text>
   </g>
 
   <g class="box" id="pLoop">
@@ -380,28 +463,28 @@
     <rect x="430" y="160" width="220" height="100" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
     <text class="box-label" x="540" y="184" text-anchor="middle">attempt &lt;= MAX_CODE_ATTEMPTS?</text>
     <text class="box-sub" x="540" y="202" text-anchor="middle">MAX_CODE_ATTEMPTS = 3 (108)</text>
-    <text class="box-sub" x="540" y="218" text-anchor="middle">repair_prompt + feedback (340)</text>
-    <text class="box-sub" x="540" y="234" text-anchor="middle">fail after 3: script None (380)</text>
-    <text class="box-sub" x="540" y="250" text-anchor="middle">score None, status failed (394)</text>
+    <text class="box-sub" x="540" y="218" text-anchor="middle">repair_prompt + feedback (437)</text>
+    <text class="box-sub" x="540" y="234" text-anchor="middle">fail after 3: script None (477)</text>
+    <text class="box-sub" x="540" y="250" text-anchor="middle">score None, status failed (491-499)</text>
   </g>
 
   <a class="box" id="pGuard" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>collect first-sight guard</title>
     <rect x="10" y="160" width="180" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="100" y="184" text-anchor="middle">reg.claims empty? (462)</text>
+    <text class="box-label" x="100" y="184" text-anchor="middle">reg.claims empty? (559)</text>
     <text class="box-sub" x="100" y="202" text-anchor="middle">yes: _extract, then</text>
-    <text class="box-sub" x="100" y="218" text-anchor="middle">return [] if it failed (464)</text>
+    <text class="box-sub" x="100" y="218" text-anchor="middle">return [] if it failed (561-562)</text>
     <text class="box-sub" x="100" y="234" text-anchor="middle">no: score alive claims</text>
-    <text class="box-sub" x="100" y="250" text-anchor="middle">empty alive: return [] (471)</text>
+    <text class="box-sub" x="100" y="250" text-anchor="middle">empty alive: return [] (569-570)</text>
   </a>
 
   <a class="box" id="pBudget" href="../../sources/evaluators/hybrid_verifier/layers.py">
     <title>revise replacement budget</title>
     <rect x="770" y="160" width="230" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="885" y="184" text-anchor="middle">replacement count (236)</text>
-    <text class="box-sub" x="885" y="202" text-anchor="middle">budget = rounds - used (233)</text>
-    <text class="box-sub" x="885" y="218" text-anchor="middle">room = 14 - alive (32, 236)</text>
-    <text class="box-sub" x="885" y="234" text-anchor="middle">n_new &lt;= 0: return [] (237)</text>
+    <text class="box-label" x="885" y="184" text-anchor="middle">replacement count (310)</text>
+    <text class="box-sub" x="885" y="202" text-anchor="middle">budget = rounds - used (310)</text>
+    <text class="box-sub" x="885" y="218" text-anchor="middle">room = 14 - alive (40, 313)</text>
+    <text class="box-sub" x="885" y="234" text-anchor="middle">n_new &lt;= 0: return [] (314-315)</text>
     <text class="box-sub" x="885" y="250" text-anchor="middle">refinements[uuid] counts used</text>
   </a>
 
@@ -414,15 +497,15 @@
   <path class="edge" data-from="pScreen" data-to="pRun" d="M815,70 H840" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="827" y="63" text-anchor="middle">clean code</text>
   <path class="edge" data-from="pRun" data-to="pLoop" d="M922,110 V130 H540 V160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="740" y="125" text-anchor="middle">no score: feedback_lines (379)</text>
+  <text class="edge-label" x="740" y="125" text-anchor="middle">no score: feedback_lines (476)</text>
   <path class="edge" data-from="pLoop" data-to="pStart" d="M430,210 H300 V160 H100 V110" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="240" y="155" text-anchor="middle">retry with repair prompt</text>
   <path class="edge" data-from="pBudget" data-to="pGuard" d="M770,210 H190" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="470" y="300" text-anchor="middle">guards run first</text>
 
-  <text class="box-sub" x="10" y="330">Loop stops on the first attempt whose stdout parses: the build does not re-execute a working script (326-328, 378).</text>
+  <text class="box-sub" x="10" y="330">Loop stops on the first attempt whose stdout parses: the build does not re-execute a working script (472-475).</text>
   <text class="box-sub" x="10" y="352">Refinement is budgeted twice: per generation (refinement_rounds, default 2) and per task (MAX_CLAIMS_TOTAL = 14).</text>
-  <text class="box-sub" x="10" y="374">Every failure path records a reason string in meta and returns score None, so one bad claim never stops the run (434-453).</text>
+  <text class="box-sub" x="10" y="374">Every failure path records a reason string in meta and returns score None, so one bad claim never stops the run (531-550).</text>
 </svg>
 </div>
 <p class="figcap">Diagram 3 &mdash; the scorer build loop (top row, left to right, retry edge back to attempt 1) and the two guards that decide whether scoring work happens at all (bottom row). Conditions and constants are quoted with line numbers.</p>
@@ -433,76 +516,98 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td>config</td><td class="sym">num_claims</td><td class="sym">hybrid_verifier_num_claims (evaluator 169)</td><td>claim count contract lo..hi (195)</td></tr>
-<tr><td>config</td><td class="sym">refinement_rounds</td><td class="sym">hybrid_verifier_refinement_rounds (evaluator 172)</td><td>replacement budget per generation (233)</td></tr>
-<tr><td>config</td><td class="sym">scorer_timeout_s</td><td class="sym">hybrid_verifier_scorer_timeout_s (evaluator 178)</td><td>timeout text in repair feedback (379)</td></tr>
-<tr><td>config</td><td class="sym">digest_max_files</td><td class="sym">hybrid_verifier_digest_max_files (evaluator 204)</td><td>files sampled by the digest (310)</td></tr>
-<tr><td>config</td><td class="sym">gen_parallelism</td><td class="sym">constructor argument (evaluator 190)</td><td>ThreadPoolExecutor width (474)</td></tr>
-<tr><td>reads</td><td class="sym">workspace files</td><td class="sym">workspace Path (197, 303)</td><td>inventory, previews, scoring</td></tr>
-<tr><td>reads</td><td class="sym">registry state: claims, inventory, digests</td><td class="sym">reg.claims (462), reg.inventory (198), reg.digests (301)</td><td>extract prompts, cache hits</td></tr>
-<tr><td>reads</td><td class="sym">registry JSON on disk</td><td class="sym">hybrid_registry_&lt;task_key&gt;.json (registry 76)</td><td>loaded by the caller at evaluator.py:312</td></tr>
-<tr><td>reads</td><td class="sym">judge text, scorer stdout</td><td class="sym">llm_text (168, 344); run_script (362, 405)</td><td>claims JSON, one JSON score line</td></tr>
+<tr><td>config</td><td class="sym">num_claims</td><td class="sym">hybrid_verifier_num_claims (evaluator 199)</td><td>claim count contract lo..hi (215-216)</td></tr>
+<tr><td>config</td><td class="sym">refinement_rounds</td><td class="sym">hybrid_verifier_refinement_rounds (evaluator 205)</td><td>replacement budget per generation (310)</td></tr>
+<tr><td>config</td><td class="sym">scorer_timeout_s</td><td class="sym">hybrid_verifier_scorer_timeout_s (evaluator 210)</td><td>timeout text in repair feedback (476)</td></tr>
+<tr><td>config</td><td class="sym">digest_max_files</td><td class="sym">hybrid_verifier_digest_max_files (evaluator 245)</td><td>files sampled by the digest (407)</td></tr>
+<tr><td>config</td><td class="sym">gen_parallelism</td><td class="sym">constructor argument (evaluator 220)</td><td>ThreadPoolExecutor width (573-574)</td></tr>
+<tr><td>reads</td><td class="sym">workspace files</td><td class="sym">workspace Path (217, 400)</td><td>inventory, previews, scoring</td></tr>
+<tr><td>reads</td><td class="sym">registry state: claims, inventory, digests</td><td class="sym">reg.claims (559), reg.inventory (219), reg.digests (398)</td><td>extract prompts, cache hits</td></tr>
+<tr><td>reads</td><td class="sym">registry JSON on disk</td><td class="sym">hybrid_registry_&lt;task_key&gt;.json (registry 76)</td><td>loaded by the caller at evaluator.py:433</td></tr>
+<tr><td>reads</td><td class="sym">judge text, scorer stdout</td><td class="sym">llm_text (176, 441); run_script (459, 502)</td><td>claims JSON, one JSON score line</td></tr>
 <tr><td>writes</td><td class="sym">none</td><td class="sym">no write call in the file</td><td>registry object edited in memory</td></tr>
-<tr><td>writes</td><td class="sym">registry fields</td><td class="sym">set_scorer (390), replace_claims (265), refinements (268), digests (314)</td><td>state for the next generation</td></tr>
-<tr><td>returns</td><td class="sym">list[LayerScore]</td><td class="sym">collect (493), revise (272)</td><td>the evaluator's score vector (333)</td></tr>
-<tr><td>returns</td><td class="sym">None</td><td class="sym">gate (497)</td><td>no reward cap from this layer</td></tr>
-<tr><td>returns</td><td class="sym">error text or None</td><td class="sym">_extract (215)</td><td>logged warning, empty collect</td></tr>
+<tr><td>writes</td><td class="sym">registry fields</td><td class="sym">set_scorer (487), replace_claims (360), refinements (268), digests (314)</td><td>state for the next generation</td></tr>
+<tr><td>returns</td><td class="sym">list[LayerScore]</td><td class="sym">collect (592), revise (369)</td><td>the evaluator's score vector (454)</td></tr>
+<tr><td>returns</td><td class="sym">None</td><td class="sym">gate (596)</td><td>no reward cap from this layer</td></tr>
+<tr><td>returns</td><td class="sym">error text or None</td><td class="sym">_extract (277)</td><td>logged warning, empty collect</td></tr>
 </tbody>
 </table>
 <p class="note say">Why it matters: one script per claim grades every generation, so the reward compares the same measurements instead of a fresh rubric.</p>
-<p class="note flag">Hook that does nothing here: <code>gate</code> always returns <code>None</code> (L495-L497), so the evaluator's cap branch (evaluator.py:415-418) never fires for this layer. The hook exists for other layers.</p>
+<p class="note flag">Hook that does nothing here: <code>gate</code> always returns <code>None</code> (L594-L596), so the evaluator's cap branch (evaluator.py:546-552) never fires for this layer. The hook exists for other layers.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Symbol inventory, callers and tests</h2>
-<details><summary>Full symbol inventory &mdash; 3 classes, 15 methods, 1 module constant</summary><div class="dbody">
-<pre>LayerScore (dataclass, L36)              # one measured item for one workspace
-LayerContext (dataclass, L60)            # uuid, goal, workspace, registry, generation_index
-EvidenceLayer (Protocol, L79)            # name: str; the layer interface
-  collect(self, context) -&gt; list[LayerScore]                      # L93   required entry point
-  revise(self, context, dead_claim_ids) -&gt; list[LayerScore]       # L97   optional replacements
-  gate(self, context, collected) -&gt; float | None                  # L103  optional reward cap
-ClaimsEvidenceLayer (L108)               # name = "claims" (119)
+<details><summary>Full symbol inventory &mdash; 6 classes, 30 methods, 9 module constants</summary><div class="dbody">
+<pre>LayerScore (dataclass, L44)              # one measured item for one workspace
+LayerContext (dataclass, L68)            # uuid, goal, workspace, registry, generation_index
+EvidenceLayer (Protocol, L87)            # name: str; the layer interface
+  collect(self, context) -&gt; list[LayerScore]                      # L101  required entry point
+  revise(self, context, dead_claim_ids) -&gt; list[LayerScore]       # L105  optional replacements
+  gate(self, context, collected) -&gt; float | None                  # L111  optional reward cap
+ClaimsEvidenceLayer (L116)               # name = "claims" (127)
   __init__(self, llm_text, run_script, logger=None, num_claims=10, refinement_rounds=2,
-           scorer_timeout_s=60, gen_parallelism=8, digest_max_files=8)   # L121  host wiring
-  _llm_json(self, context, agent, prompt) -&gt; tuple[Any, str | None]   # L159  judge call, one JSON repair
-  _extract(self, context) -&gt; str | None                               # L192  first-sight extraction
-  revise(self, context, dead_claim_ids) -&gt; list[LayerScore]           # L219  budgeted replacement
-  _dead_reason(reg, claim) -&gt; str            (staticmethod)            # L279  text for the refine prompt
-  _union_for_prompt(self, context) -&gt; str                              # L286  union listing text
-  _ensure_digests(self, context) -&gt; str                                # L294  one digest call per task
-  _build_scorer(self, context, claim) -&gt; tuple[str|None, dict, dict|None]  # L317  generate and repair
-  _score_claim(self, context, claim) -&gt; LayerScore                     # L382  ensure script, run it
-  _score_claim_safe(self, context, claim) -&gt; LayerScore                # L434  soft-fail wrapper
-  collect(self, context) -&gt; list[LayerScore]                           # L459  extract then score all
-  gate(self, context, collected) -&gt; float | None                       # L495  returns None
-MAX_CLAIMS_TOTAL = 14 (L32)              # live claims per task, replacements included
+           scorer_timeout_s=60, gen_parallelism=8, digest_max_files=8)   # L129  host wiring
+  _llm_json(self, context, agent, prompt) -&gt; tuple[Any, str | None]   # L167  judge call, one JSON repair
+  _extract(self, context) -&gt; str | None                               # L200  first-sight extraction
+  revise(self, context, dead_claim_ids) -&gt; list[LayerScore]           # L291  budgeted replacement
+  _dead_reason(reg, claim) -&gt; str            (staticmethod)            # L375  text for the refine prompt
+  _union_for_prompt(self, context) -&gt; str                              # L383  union listing text
+  _ensure_digests(self, context) -&gt; str                                # L391  one digest call per task
+  _build_scorer(self, context, claim) -&gt; tuple[str|None, dict, dict|None]  # L414  generate and repair
+  _score_claim(self, context, claim) -&gt; LayerScore                     # L479  ensure script, run it
+  _score_claim_safe(self, context, claim) -&gt; LayerScore                # L531  soft-fail wrapper
+  collect(self, context) -&gt; list[LayerScore]                           # L556  extract then score all
+  gate(self, context, collected) -&gt; float | None                       # L594  returns None
+VisualEvidenceLayer (L649)               # name = "visual" (665); E26 rung for figure tasks
+  __init__(self, vision_call, logger=None, min_claims=3, max_claims=6,
+           max_images_score=3, max_images_extract=2)                  # L667  host vision call wiring
+  _vision_json(self, context, agent, prompt, images) -&gt; tuple[Any, str | None]  # L698  one vision repair
+  _deliverable_images(inventory, workspace, cap) -&gt; list[Path]         # L731  largest figures first
+  _figure_listing(self, reg) -&gt; str                                     # L746  [FIGURE]-tagged listing
+  _extract_claims(self, context) -&gt; list[dict]                         # L760  3-6 visual claims, frozen
+  _score_figures(self, context, claims, images) -&gt; list[LayerScore]     # L811  one vision scoring call
+  collect(self, context) -&gt; list[LayerScore]                            # L867  detect, freeze, score
+  revise(self, context, dead_claim_ids) -&gt; list[LayerScore]             # L907  returns []
+  gate(self, context, collected) -&gt; float | None                        # L913  returns None
+ExecutionGateLayer (L942)                # name = "execution_gate" (956); E24 reward gate
+  __init__(self, status_lookup=None, logger=None) -&gt; None                # L958  wire the status source
+  _load_frozen(self) -&gt; dict                                            # L978  read the frozen E24 ledger
+  _frozen_lookup(self, uuid) -&gt; tuple[str | None, float | None]          # L998  uuid8 prefix lookup
+  collect(self, context) -&gt; list[LayerScore]                            # L1006 returns []
+  revise(self, context, dead_claim_ids) -&gt; list[LayerScore]             # L1010 returns []
+  gate(self, context, collected) -&gt; float | None                        # L1015 status to reward cap
+MAX_CLAIMS_TOTAL = 14 (L40)              # live claims per task, replacements included
+MAX_IMAGES_SCORE = 3 (L602), MAX_IMAGES_EXTRACT = 2 (L603)   # figures scored / sampled
+MIN_VISUAL_CLAIMS = 3 (L604), MAX_VISUAL_CLAIMS = 6 (L605)   # visual-claim count window
+GATE_CAPS (L924)                         # re-execution status to reward cap (None = no cap)
+FROZEN_REEXEC_LEDGER (L934)              # frozen E24 re-execution ledger path
 </pre>
-<p>Imports used inside the file: <code>threading</code>, <code>ThreadPoolExecutor</code>, <code>as_completed</code> (L15-17), <code>extract_json_payload</code> (L22), <code>claims</code> / <code>digest</code> / <code>inventory</code> / <code>scorers</code> module aliases (L24-27), <code>TaskRegistry</code> and <code>ExecOutcome</code> (L28-29).</p>
+<p>Imports used inside the file: <code>threading</code> (L23), <code>ThreadPoolExecutor</code> / <code>as_completed</code> (L25), <code>extract_json_payload</code> (L30), <code>claims</code> / <code>digest</code> / <code>inventory</code> / <code>scorers</code> module aliases (L32-35), <code>TaskRegistry</code> and <code>ExecOutcome</code> (L36-37).</p>
 </div></details>
 
 <table>
 <thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td>re-exports the layer, the protocol and both dataclasses</td><td class="sym">import L76</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td>constructs <code>ClaimsEvidenceLayer</code>; calls <code>collect</code>, <code>revise</code>, <code>gate</code></td><td class="sym">import L64; 196-213, 326, 364, 409</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>LayerContext</code>, <code>ClaimsEvidenceLayer.collect</code> in the scorer tests</td><td class="sym">imports L38-47; uses 360, 433, 1148</td></tr>
-<tr><td class="sym">test_scorer_build_repairs_on_bad_output</td><td>drives <code>_build_scorer</code> through <code>collect</code>: bad output, then a valid score</td><td class="sym">test 333-368</td></tr>
-<tr><td class="sym">test_scorer_build_exhausts_attempts_and_soft_fails</td><td>three unparsable runs; asserts a None score and failed status</td><td class="sym">test 370-378</td></tr>
-<tr><td class="sym">test_zero_variance_drops_claim_and_triggers_replacement</td><td>exercises <code>revise</code>, <code>_dead_reason</code> text and the replacement scorer</td><td class="sym">test 503-577</td></tr>
-<tr><td class="sym">test_full_pipeline_real_subprocess</td><td>real scorer subprocess through the layer; 8 claims, cached scripts</td><td class="sym">test 380-473</td></tr>
-<tr><td class="sym">test_format_digest_cached_once_per_task</td><td><code>_ensure_digests</code> twice: one LLM call, registry cache filled</td><td class="sym">test 1120-1158</td></tr>
-<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>the layer's digests reach <code>scorers.scorer_prompt</code></td><td class="sym">test 1181-1191</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td>re-exports the layer, the protocol and both dataclasses</td><td class="sym">import L114</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td>constructs <code>ClaimsEvidenceLayer</code>; calls <code>collect</code>, <code>revise</code>, <code>gate</code></td><td class="sym">import L75; 234-266, 447, 481, 546</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>LayerContext</code>, <code>ClaimsEvidenceLayer.collect</code> in the scorer tests</td><td class="sym">imports L47; uses 1641, 1965</td></tr>
+<tr><td class="sym">test_scorer_build_repairs_on_bad_output</td><td>drives <code>_build_scorer</code> through <code>collect</code>: bad output, then a valid score</td><td class="sym">test 421-456</td></tr>
+<tr><td class="sym">test_scorer_build_exhausts_attempts_and_soft_fails</td><td>three unparsable runs; asserts a None score and failed status</td><td class="sym">test 457-466</td></tr>
+<tr><td class="sym">test_zero_variance_drops_claim_and_triggers_replacement</td><td>exercises <code>revise</code>, <code>_dead_reason</code> text and the replacement scorer</td><td class="sym">test 592-681</td></tr>
+<tr><td class="sym">test_full_pipeline_real_subprocess</td><td>real scorer subprocess through the layer; 8 claims, cached scripts</td><td class="sym">test 467-563</td></tr>
+<tr><td class="sym">test_format_digest_cached_once_per_task</td><td><code>_ensure_digests</code> twice: one LLM call, registry cache filled</td><td class="sym">test 1248-1287</td></tr>
+<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>the layer's digests reach <code>scorers.scorer_prompt</code></td><td class="sym">test 1309-1326</td></tr>
 </tbody>
 </table>
 <p class="note">No importer found outside the package, the facade <code>__init__</code> and the test file: <code>grep -rn "from .layers import\|hybrid_verifier.layers" sources tests</code> returns only those three files. The harness script <code>e19c_ratchet.py</code> imports <code>claims</code>, <code>digest</code>, <code>inventory</code>, <code>registry</code> and <code>scorers</code> but not <code>layers</code>; it re-implements the build loop in its own file.</p>
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/layers.py">sources/evaluators/hybrid_verifier/layers.py</a> (all 497 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L57-L66, L144-L213, L302-L420, L502-L510), <a href="../../sources/evaluators/hybrid_verifier/__init__.py">__init__.py</a> (L76-L77), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L31-L35, L71-L102, L143-L271), <a href="../../sources/evaluators/hybrid_verifier/scorers.py">scorers.py</a> (constants and signatures), <a href="../../config.py">config.py</a> (L78-L94), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L36-L48, L333-L378, L380-L473, L503-L577, L1120-L1191), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/layers.py">sources/evaluators/hybrid_verifier/layers.py</a> (all 1037 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L75-L84, L153-L266, L433-L552, L641-L644), <a href="../../sources/evaluators/hybrid_verifier/__init__.py">__init__.py</a> (L114-L122), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L31-L35, L72-L140, L145-L304), <a href="../../sources/evaluators/hybrid_verifier/scorers.py">scorers.py</a> (constants and signatures), <a href="../../config.py">config.py</a> (L78-L94), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L36-L48, L421-L466, L467-L563, L592-L681, L1248-L1326), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
 <p class="skips">Skipped: the full body of the prompts (<code>claims.extract_claims_prompt</code>, <code>refinement_prompt</code>, <code>scorers.scorer_prompt</code>) &mdash; only their call sites here; the internals of <code>digest.ensure_digests</code> (on <a href="file_hybrid_digest.html">file_hybrid_digest.html</a>) and of <code>scorers</code> (on <a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a>); <code>claim_stats</code> and the reward code, which live in the evaluator and aggregation. Every credential file was skipped, not opened. No pytest run and no application run, by the build rules.</p>
 <p>Sibling file digests: <a href="file_hybrid_inventory.html">file_hybrid_inventory.html</a>, <a href="file_hybrid_registry.html">file_hybrid_registry.html</a>, <a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a>, <a href="file_hybrid_claims.html">file_hybrid_claims.html</a>, <a href="file_hybrid_digest.html">file_hybrid_digest.html</a>, <a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a>, <a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a>, <a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a>; hub: <a href="file_index.html">file_index.html</a>.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git status --porcelain sources/evaluators/hybrid_verifier</code> reports the whole package as <code>??</code> (untracked), so this page describes the working tree, not the committed tree.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

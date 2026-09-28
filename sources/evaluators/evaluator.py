@@ -8,7 +8,9 @@ import sys
 from typing import Any
 
 if __name__ == "__main__":
-    sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    sys.path.append(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    )
 
 from .base import BaseEvaluator, EvaluatorError, WorkflowDataError  # noqa: F401
 from .generic import (  # noqa: F401
@@ -16,15 +18,22 @@ from .generic import (  # noqa: F401
     LLMEvaluationError,
     ScoreExtractionError,
 )
+from .hybrid_verifier import HybridVerifierEvaluator
 from .scenario import ScenarioError, ScenarioEvaluator
-from .verifier import VerifierEvaluator
 
-# Re-exported for `sources.evaluation.__init__`; touch with care.
+# Re-exported for downstream importers; touch with care. The legacy
+# ``VerifierEvaluator`` is no longer imported on the default path — it is
+# instantiated lazily only when ``config.verifier_kind == "legacy"``.
 __all__ = [
-    "BaseEvaluator", "EvaluatorError", "WorkflowDataError",
-    "GenericEvaluator", "LLMEvaluationError", "ScoreExtractionError",
-    "ScenarioError", "ScenarioEvaluator",
-    "VerifierEvaluator",
+    "BaseEvaluator",
+    "EvaluatorError",
+    "WorkflowDataError",
+    "GenericEvaluator",
+    "LLMEvaluationError",
+    "ScoreExtractionError",
+    "ScenarioError",
+    "ScenarioEvaluator",
+    "HybridVerifierEvaluator",
     "WorkflowEvaluator",
 ]
 
@@ -32,18 +41,26 @@ __all__ = [
 class WorkflowEvaluator:
     """Combined workflow evaluator: generic judge, scenario rubric, and verifier.
 
-    Facade over GenericEvaluator, ScenarioEvaluator and VerifierEvaluator. The
-    three evaluators are independent and can be invoked separately.
+    Facade over GenericEvaluator, ScenarioEvaluator and the verifier
+    channel. The verifier defaults to the hybrid E19/E19b evaluator
+    (``HybridVerifierEvaluator``); ``config.verifier_kind = "legacy"``
+    selects the deprecated multi-source ``VerifierEvaluator`` instead.
     """
 
-    def __init__(self, config: "Config", scenarios_dir: str = "datasets/scenarios",
-                 use_bs_penalty: bool = False, bs_fraud_threshold: float = 5.0,
-                 verifier_workspace_dir: str | None = None) -> None:
+    def __init__(
+        self,
+        config: "Config",
+        scenarios_dir: str = "datasets/scenarios",
+        use_bs_penalty: bool = False,
+        bs_fraud_threshold: float = 5.0,
+        verifier_workspace_dir: str | None = None,
+    ) -> None:
         """Initialize the WorkflowEvaluator with configuration.
 
         Args:
             config: Configuration object containing memory_dir, workflow_dir,
-                model_pricing, and reasoning_effort.
+                model_pricing, reasoning_effort, and (optionally)
+                ``verifier_kind`` plus the ``hybrid_verifier_*`` knobs.
             scenarios_dir: Directory containing scenario rubric files.
             use_bs_penalty: Forwarded to GenericEvaluator — enables the
                 BullshitDetectorNumerical penalty on the generic overall score.
@@ -54,7 +71,7 @@ class WorkflowEvaluator:
 
         Raises:
             EvaluatorError: If configuration is invalid or required directories
-                don't exist.
+            don't exist.
         """
         try:
             self.generic_evaluator = GenericEvaluator(
@@ -62,14 +79,34 @@ class WorkflowEvaluator:
                 use_bs_penalty=use_bs_penalty,
                 bs_fraud_threshold=bs_fraud_threshold,
             )
-            self.scenario_evaluator = ScenarioEvaluator(config, scenarios_dir=scenarios_dir)
-            self.verifier_evaluator = VerifierEvaluator(config, workspace_dir=verifier_workspace_dir)
+            self.scenario_evaluator = ScenarioEvaluator(
+                config, scenarios_dir=scenarios_dir
+            )
+            verifier_kind = str(getattr(config, "verifier_kind", "hybrid")).lower()
+            if verifier_kind == "legacy":
+                # Escape hatch: the deprecated multi-source verifier.
+                # Imported lazily so the default path never loads it.
+                from .legacy_verifier import VerifierEvaluator
+
+                self.verifier_evaluator = VerifierEvaluator(
+                    config, workspace_dir=verifier_workspace_dir
+                )
+            else:
+                self.verifier_evaluator = HybridVerifierEvaluator(
+                    config, workspace_dir=verifier_workspace_dir
+                )
+            self.verifier_kind = verifier_kind
             self.logger = logging.getLogger(__name__)
-            self.logger.info("WorkflowEvaluator initialized successfully")
+            self.logger.info(
+                f"WorkflowEvaluator initialized successfully "
+                f"(verifier_kind={verifier_kind})"
+            )
         except Exception as e:
             if isinstance(e, EvaluatorError):
                 raise
-            raise EvaluatorError(f"Failed to initialize WorkflowEvaluator: {str(e)}") from e
+            raise EvaluatorError(
+                f"Failed to initialize WorkflowEvaluator: {str(e)}"
+            ) from e
 
     def evaluate(
         self,
@@ -140,6 +177,7 @@ if __name__ == "__main__":
     import dotenv
 
     from config import Config
+
     dotenv.load_dotenv()
     config = Config()
     config.memory_dir = "../../sources/memory"
@@ -153,4 +191,3 @@ if __name__ == "__main__":
         print(f"✓ Scenario evaluation completed: {result}")
     except Exception as e:
         print(f"⚠ Unexpected error in scenario evaluation: {e}")
-

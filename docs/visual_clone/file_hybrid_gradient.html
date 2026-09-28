@@ -10,14 +10,14 @@
 <div class="wrap">
 
 <h1 class="hud">gradient.py</h1>
-<p class="intro">This file writes two texts: the textual gradient the mutator reads, and the human-readable <code>evaluation.txt</code> report. It runs at the end of <code>HybridVerifierEvaluator.evaluate</code>, after the reward is known, and it is pure formatting of measured facts. The verifier as a whole is on <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> and <a href="flow_verification.html">flow_verification.html</a>.</p>
+<p class="intro">This file writes the two texts of one generation: the textual gradient the mutator reads, and the human-readable <code>evaluation.txt</code>. It runs at the end of <code>HybridVerifierEvaluator.evaluate</code>, after the reward is known, and it only formats measured facts. The package view is on <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> and the wider flow on <a href="flow_verification.html">flow_verification.html</a>.</p>
 
 <div id="legend" data-auto></div>
 
 <div class="panel"><span class="br"></span>
-<h2>Diagram 1 &mdash; the file's job: five input maps in, two texts out</h2>
+<h2>Diagram 1 &mdash; the file's job: measured maps in, two texts out</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 980 560" role="img" aria-label="gradient.py stages from inputs to two text outputs">
+<svg class="diagram" viewBox="0 0 980 570" role="img" aria-label="gradient.py stages from inputs to two text outputs">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -33,119 +33,150 @@
 
   <g class="box" id="tIn">
     <title>Everything build_gradient receives as arguments</title>
-    <rect x="20" y="150" width="170" height="170" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="105" y="174" text-anchor="middle">inputs (82-93)</text>
-    <text class="box-sub" x="105" y="192" text-anchor="middle">uuid, goal</text>
-    <text class="box-sub" x="105" y="208" text-anchor="middle">now_scores, evidence</text>
-    <text class="box-sub" x="105" y="224" text-anchor="middle">claims, surviving</text>
-    <text class="box-sub" x="105" y="240" text-anchor="middle">pair_records</text>
-    <text class="box-sub" x="105" y="256" text-anchor="middle">reward, win_rate, mean_score</text>
-    <text class="box-sub" x="105" y="272" text-anchor="middle">dead_claims</text>
+    <rect x="20" y="150" width="180" height="190" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="174" text-anchor="middle">inputs (35-47)</text>
+    <text class="box-sub" x="110" y="192" text-anchor="middle">uuid, goal</text>
+    <text class="box-sub" x="110" y="208" text-anchor="middle">now_scores, evidence</text>
+    <text class="box-sub" x="110" y="224" text-anchor="middle">claims, surviving</text>
+    <text class="box-sub" x="110" y="240" text-anchor="middle">pair_records</text>
+    <text class="box-sub" x="110" y="256" text-anchor="middle">reward, win_rate, mean_score</text>
+    <text class="box-sub" x="110" y="272" text-anchor="middle">dead_claims</text>
+    <text class="box-sub" x="110" y="288" text-anchor="middle">exec_facts=None, stages</text>
+    <text class="box-sub" x="110" y="312" text-anchor="middle">stages default STAGES (47)</text>
   </g>
 
-  <a class="box" id="tElim" href="../../sources/evaluators/hybrid_verifier/gradient.py">
-    <title>Earliest stage and claim where this generation lost</title>
-    <rect x="230" y="30" width="250" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="355" y="54" text-anchor="middle">_elimination_point (28)</text>
-    <text class="box-sub" x="355" y="72" text-anchor="middle">only pairs with outcome "loss" (42)</text>
-    <text class="box-sub" x="355" y="88" text-anchor="middle">stage rank + temporal_index (48-53)</text>
-    <text class="box-sub" x="355" y="104" text-anchor="middle">keeps the earliest (54-55)</text>
-    <text class="box-sub" x="355" y="120" text-anchor="middle">statement + both scores (59-77)</text>
+  <a class="box" id="tSign" href="../../sources/evaluators/hybrid_verifier/gradient.py">
+    <title>One claim between two generations</title>
+    <rect x="240" y="24" width="210" height="90" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345" y="48" text-anchor="middle">_sign (24)</text>
+    <text class="box-sub" x="345" y="66" text-anchor="middle">+ win, - loss, = tie</text>
+    <text class="box-sub" x="345" y="82" text-anchor="middle">None on either side: n/a (29)</text>
+    <text class="box-sub" x="345" y="98" text-anchor="middle">called per claim (121)</text>
   </a>
 
   <a class="box" id="tGroup" href="../../sources/evaluators/hybrid_verifier/gradient.py">
-    <title>Per-claim balance, split into losses and wins</title>
-    <rect x="230" y="160" width="250" height="120" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="355" y="184" text-anchor="middle">stage grouping (107-158)</text>
-    <text class="box-sub" x="355" y="202" text-anchor="middle">skip: not surviving and not scored (109)</text>
-    <text class="box-sub" x="355" y="218" text-anchor="middle">rival min / median / max, rank (129-134)</text>
-    <text class="box-sub" x="355" y="234" text-anchor="middle">balance bal (145)</text>
-    <text class="box-sub" x="355" y="250" text-anchor="middle">bal &lt; 0: lost row, bal &gt; 0: won row (154)</text>
-    <text class="box-sub" x="355" y="266" text-anchor="middle">sort by (rank, tidx) (157-158)</text>
+    <title>Per-claim comparison against every scored predecessor</title>
+    <rect x="240" y="140" width="210" height="130" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345" y="164" text-anchor="middle">lost_rows, won_rows (73)</text>
+    <text class="box-sub" x="345" y="182" text-anchor="middle">skip never-scored claims (70)</text>
+    <text class="box-sub" x="345" y="198" text-anchor="middle">rival min, median, max (87-91)</text>
+    <text class="box-sub" x="345" y="214" text-anchor="middle">rank n of rivals (86)</text>
+    <text class="box-sub" x="345" y="230" text-anchor="middle">balance bal = sum signs (102)</text>
+    <text class="box-sub" x="345" y="246" text-anchor="middle">bal below 0 loses (111)</text>
+    <text class="box-sub" x="345" y="262" text-anchor="middle">sort by rank, index (114)</text>
   </a>
 
   <a class="box" id="tTr" href="../../sources/evaluators/hybrid_verifier/gradient.py">
-    <title>Per-claim sign lines against every previous generation</title>
-    <rect x="230" y="300" width="250" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="355" y="324" text-anchor="middle">transcript (160-176)</text>
-    <text class="box-sub" x="355" y="342" text-anchor="middle">_sign per claim (21-25)</text>
-    <text class="box-sub" x="355" y="358" text-anchor="middle">pairs sorted by abs(d) (161)</text>
-    <text class="box-sub" x="355" y="374" text-anchor="middle">stage name when decided (167-171)</text>
-    <text class="box-sub" x="355" y="390" text-anchor="middle">capped at 4000 chars (18, 176)</text>
+    <title>One sign line per pair, longest difference first</title>
+    <rect x="240" y="300" width="210" height="120" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345" y="324" text-anchor="middle">transcript (117-133)</text>
+    <text class="box-sub" x="345" y="342" text-anchor="middle">pairs sorted by abs(d) (118)</text>
+    <text class="box-sub" x="345" y="358" text-anchor="middle">deciding stage when known (125)</text>
+    <text class="box-sub" x="345" y="374" text-anchor="middle">else the signed d (127)</text>
+    <text class="box-sub" x="345" y="390" text-anchor="middle">capped at 4000 chars (133)</text>
+    <text class="box-sub" x="345" y="406" text-anchor="middle">cap constant at line 21</text>
   </a>
 
   <a class="box" id="tDrop" href="../../sources/evaluators/hybrid_verifier/gradient.py">
-    <title>The dropped-claim block</title>
-    <rect x="230" y="430" width="250" height="100" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="355" y="454" text-anchor="middle">dropped block (178-186)</text>
-    <text class="box-sub" x="355" y="472" text-anchor="middle">one line per dead claim (180-183)</text>
-    <text class="box-sub" x="355" y="488" text-anchor="middle">drop_reason, "unknown" fallback</text>
-    <text class="box-sub" x="355" y="504" text-anchor="middle">"(none)" when the list is empty</text>
+    <title>The block listing non-discriminative claims</title>
+    <rect x="240" y="450" width="210" height="100" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="345" y="474" text-anchor="middle">dropped block (135-142)</text>
+    <text class="box-sub" x="345" y="492" text-anchor="middle">one line per dead claim (137)</text>
+    <text class="box-sub" x="345" y="508" text-anchor="middle">drop_reason, "unknown" fallback</text>
+    <text class="box-sub" x="345" y="524" text-anchor="middle">"(none)" when empty (142)</text>
+  </a>
+
+  <a class="box" id="tExec" href="../../sources/evaluators/hybrid_verifier/gradient.py">
+    <title>Re-execution gate facts, section 3</title>
+    <rect x="510" y="24" width="220" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="620" y="48" text-anchor="middle">execution facts (151-166)</text>
+    <text class="box-sub" x="620" y="66" text-anchor="middle">status, wall-clock (156)</text>
+    <text class="box-sub" x="620" y="82" text-anchor="middle">no runtime: status only (158)</text>
+    <text class="box-sub" x="620" y="98" text-anchor="middle">gate off text (161)</text>
+    <text class="box-sub" x="620" y="114" text-anchor="middle">else "reward capped at N" (165)</text>
+  </a>
+
+  <a class="box" id="tVis" href="../../sources/evaluators/hybrid_verifier/gradient.py">
+    <title>Visual rung evidence, section 4</title>
+    <rect x="510" y="160" width="220" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="620" y="184" text-anchor="middle">visual block (168-183)</text>
+    <text class="box-sub" x="620" y="202" text-anchor="middle">claims with stage visual (170)</text>
+    <text class="box-sub" x="620" y="218" text-anchor="middle">REQUIREMENT plus evidence (177)</text>
+    <text class="box-sub" x="620" y="234" text-anchor="middle">score or "not scored" (175)</text>
+    <text class="box-sub" x="620" y="250" text-anchor="middle">else non-figure text (183)</text>
   </a>
 
   <a class="box" id="tAsm" href="../../sources/evaluators/hybrid_verifier/gradient.py">
     <title>The f-string that assembles the gradient</title>
-    <rect x="520" y="150" width="230" height="180" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="635" y="174" text-anchor="middle">build_gradient (82)</text>
-    <text class="box-sub" x="635" y="192" text-anchor="middle">1 ELIMINATION POINT (205)</text>
-    <text class="box-sub" x="635" y="208" text-anchor="middle">2 WHAT TO FIX FIRST, max 5 (207)</text>
-    <text class="box-sub" x="635" y="224" text-anchor="middle">3 WHAT ALREADY WORKS, max 5 (209)</text>
-    <text class="box-sub" x="635" y="240" text-anchor="middle">4 all claim scores + evidence (211)</text>
-    <text class="box-sub" x="635" y="256" text-anchor="middle">5 comparison transcript (213)</text>
-    <text class="box-sub" x="635" y="272" text-anchor="middle">6 dropped claims (215)</text>
-    <text class="box-sub" x="635" y="288" text-anchor="middle">bottom line with reward (200-203)</text>
-    <text class="box-sub" x="635" y="304" text-anchor="middle">goal trimmed to 500 chars (195)</text>
+    <rect x="510" y="300" width="220" height="180" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="620" y="324" text-anchor="middle">build_gradient (34)</text>
+    <text class="box-sub" x="620" y="342" text-anchor="middle">header at line 186</text>
+    <text class="box-sub" x="620" y="358" text-anchor="middle">goal cut to 500 (187)</text>
+    <text class="box-sub" x="620" y="374" text-anchor="middle">bottom line (189-192)</text>
+    <text class="box-sub" x="620" y="390" text-anchor="middle">sections 1 to 7 (194-208)</text>
+    <text class="box-sub" x="620" y="406" text-anchor="middle">max 5 rows per block (145-148)</text>
+    <text class="box-sub" x="620" y="422" text-anchor="middle">returns str (186-209)</text>
+    <text class="box-sub" x="620" y="446" text-anchor="middle">Generated preamble gone</text>
+    <text class="box-sub" x="620" y="462" text-anchor="middle">(uncommitted edit, git diff)</text>
   </a>
 
   <a class="box" id="tRep" href="../../sources/evaluators/hybrid_verifier/gradient.py">
     <title>The report that becomes evaluation.txt</title>
-    <rect x="520" y="380" width="230" height="140" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="635" y="404" text-anchor="middle">build_evaluation_report (220)</text>
-    <text class="box-sub" x="635" y="422" text-anchor="middle">header bar 60 "=" (17, 232)</text>
-    <text class="box-sub" x="635" y="438" text-anchor="middle">claim counts and reward lines (234-252)</text>
-    <text class="box-sub" x="635" y="454" text-anchor="middle">stage headers on change (259-261)</text>
-    <text class="box-sub" x="635" y="470" text-anchor="middle">"pass &gt;= 0.5" next to each score (269)</text>
-    <text class="box-sub" x="635" y="486" text-anchor="middle">SURVIVING / DROPPED marker (264)</text>
-    <text class="box-sub" x="635" y="502" text-anchor="middle">pairwise record (276-292)</text>
+    <rect x="770" y="24" width="190" height="190" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="865" y="48" text-anchor="middle">report (212-286)</text>
+    <text class="box-sub" x="865" y="66" text-anchor="middle">title, 60 "=" rule (223)</text>
+    <text class="box-sub" x="865" y="82" text-anchor="middle">claim counts (226-230)</text>
+    <text class="box-sub" x="865" y="98" text-anchor="middle">reward, win rate (232-240)</text>
+    <text class="box-sub" x="865" y="114" text-anchor="middle">replacements (242)</text>
+    <text class="box-sub" x="865" y="130" text-anchor="middle">stage headers (253)</text>
+    <text class="box-sub" x="865" y="146" text-anchor="middle">SURVIVING / DROPPED (256)</text>
+    <text class="box-sub" x="865" y="162" text-anchor="middle">"pass &gt;= 0.5" (261)</text>
+    <text class="box-sub" x="865" y="178" text-anchor="middle">pairwise record (269)</text>
+    <text class="box-sub" x="865" y="194" text-anchor="middle">no pairs: first generation (280)</text>
   </a>
 
   <g class="box" id="tOut">
     <title>The two strings the evaluator writes to disk</title>
-    <rect x="790" y="200" width="170" height="170" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
-    <text class="box-label" x="875" y="224" text-anchor="middle">out: two strings</text>
-    <text class="box-sub" x="875" y="242" text-anchor="middle">gradient text</text>
-    <text class="box-sub" x="875" y="258" text-anchor="middle">to textual_gradient.txt</text>
-    <text class="box-sub" x="875" y="274" text-anchor="middle">(evaluator.py:492, 640)</text>
-    <text class="box-sub" x="875" y="296" text-anchor="middle">report text</text>
-    <text class="box-sub" x="875" y="312" text-anchor="middle">to evaluation.txt</text>
-    <text class="box-sub" x="875" y="328" text-anchor="middle">(evaluator.py:507, 639)</text>
-    <text class="box-sub" x="875" y="350" text-anchor="middle">also the state_result key</text>
+    <rect x="770" y="300" width="190" height="180" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="865" y="324" text-anchor="middle">out: two strings</text>
+    <text class="box-sub" x="865" y="342" text-anchor="middle">gradient text</text>
+    <text class="box-sub" x="865" y="358" text-anchor="middle">to textual_gradient.txt</text>
+    <text class="box-sub" x="865" y="374" text-anchor="middle">(evaluator.py:779)</text>
+    <text class="box-sub" x="865" y="396" text-anchor="middle">report text</text>
+    <text class="box-sub" x="865" y="412" text-anchor="middle">to evaluation.txt</text>
+    <text class="box-sub" x="865" y="428" text-anchor="middle">(evaluator.py:778)</text>
+    <text class="box-sub" x="865" y="450" text-anchor="middle">gradient also into</text>
+    <text class="box-sub" x="865" y="466" text-anchor="middle">state_result.json (631)</text>
   </g>
 
-  <path class="edge" data-from="tIn" data-to="tElim" d="M190,180 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="210" y="172" text-anchor="middle">pairs</text>
-  <path class="edge" data-from="tIn" data-to="tGroup" d="M190,215 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="210" y="207" text-anchor="middle">scores + claims</text>
-  <path class="edge" data-from="tIn" data-to="tTr" d="M190,255 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="210" y="247" text-anchor="middle">pairs</text>
-  <path class="edge" data-from="tIn" data-to="tDrop" d="M190,295 H230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="210" y="287" text-anchor="middle">dead claims</text>
-  <path class="edge" data-from="tElim" data-to="tAsm" d="M480,85 H500 V180 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="490" y="140" text-anchor="middle">line</text>
-  <path class="edge" data-from="tGroup" data-to="tAsm" d="M480,220 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="500" y="212" text-anchor="middle">rows</text>
-  <path class="edge" data-from="tTr" data-to="tAsm" d="M480,340 H500 V270 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="490" y="320" text-anchor="middle">transcript</text>
-  <path class="edge" data-from="tDrop" data-to="tAsm" d="M480,460 H500 V310 H520" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="490" y="430" text-anchor="middle">dropped</text>
-  <path class="edge" data-from="tAsm" data-to="tOut" d="M750,240 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="770" y="232" text-anchor="middle">str</text>
-  <path class="edge" data-from="tRep" data-to="tOut" d="M750,450 H770 V330 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="770" y="420" text-anchor="middle">str</text>
-  <text class="box-sub" x="20" y="552">build_gradient uses all five inputs; build_evaluation_report uses scores, claims, now_scores, evidence, surviving and pairs.</text>
+  <path class="edge" data-from="tIn" data-to="tGroup" d="M200,200 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="192" text-anchor="middle">scores, claims</text>
+  <path class="edge" data-from="tIn" data-to="tTr" d="M200,250 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="242" text-anchor="middle">pairs</text>
+  <path class="edge" data-from="tIn" data-to="tDrop" d="M200,300 H240" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="220" y="292" text-anchor="middle">dead claims</text>
+  <path class="edge" data-from="tIn" data-to="tExec" d="M200,340 H225 V79 H510" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="290" y="132" text-anchor="middle">exec facts</text>
+  <path class="edge" data-from="tSign" data-to="tTr" d="M345,114 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="355" y="210" text-anchor="start">sign per claim</text>
+  <path class="edge" data-from="tGroup" data-to="tAsm" d="M450,205 H480 V390 H510" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="280" text-anchor="middle">rows</text>
+  <path class="edge" data-from="tTr" data-to="tAsm" d="M450,360 H510" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="480" y="352" text-anchor="middle">transcript</text>
+  <path class="edge" data-from="tDrop" data-to="tAsm" d="M450,500 H480 V430 H510" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="470" y="470" text-anchor="middle">dropped</text>
+  <path class="edge" data-from="tExec" data-to="tAsm" d="M730,79 H750 V330 H730" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="745" y="200" text-anchor="middle">lines</text>
+  <path class="edge" data-from="tVis" data-to="tAsm" d="M730,215 H745 V345 H730" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="745" y="290" text-anchor="middle">visual</text>
+  <path class="edge" data-from="tAsm" data-to="tOut" d="M730,390 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="750" y="382" text-anchor="middle">str</text>
+  <path class="edge" data-from="tRep" data-to="tOut" d="M865,214 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="875" y="256" text-anchor="start">str</text>
+  <text class="box-sub" x="20" y="562">A claim with balance 0 appears in the all-claims block but in neither the loss block nor the win block (111).</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 &mdash; <code>8 boxes</code>. <code>build_gradient</code> calls <code>_elimination_point</code> at line 101 and <code>_sign</code> at line 163; nothing else in this file calls another function here, and both public functions return a plain <code>str</code>.</p>
+<p class="figcap">Diagram 1 &mdash; <code>10 boxes</code>. <code>build_gradient</code> calls <code>_sign</code> per claim (121) and nothing else in this file; both public functions return a plain <code>str</code>. The <code>Generated:</code> preamble is gone in the working tree, so the header runs from <code>Task goal:</code> (187) straight to <code>Bottom line:</code> (189).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -167,81 +198,92 @@
 
   <g class="box" id="w1">
     <title>Maps keyed by claim id</title>
-    <rect x="20" y="30" width="220" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <rect x="20" y="30" width="220" height="140" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="130" y="54" text-anchor="middle">maps keyed by claim id</text>
     <text class="box-sub" x="130" y="72" text-anchor="middle">now_scores: {cid: float | None}</text>
     <text class="box-sub" x="130" y="88" text-anchor="middle">evidence: {cid: str}</text>
     <text class="box-sub" x="130" y="104" text-anchor="middle">claims: stage, temporal_index,</text>
     <text class="box-sub" x="130" y="120" text-anchor="middle">statement, target, category</text>
     <text class="box-sub" x="130" y="136" text-anchor="middle">surviving: list of claim ids</text>
+    <text class="box-sub" x="130" y="158" text-anchor="middle">built by the evidence layers</text>
   </g>
 
   <g class="box" id="w2">
     <title>Pairwise records built by evaluate</title>
-    <rect x="20" y="200" width="220" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="130" y="224" text-anchor="middle">pair_records</text>
-    <text class="box-sub" x="130" y="242" text-anchor="middle">prev_uuid, outcome, prev_scores</text>
-    <text class="box-sub" x="130" y="258" text-anchor="middle">detail: kind, stage, claim_id,</text>
-    <text class="box-sub" x="130" y="274" text-anchor="middle">now_passes, prev_passes</text>
-    <text class="box-sub" x="130" y="290" text-anchor="middle">or d, dm, k_eff for flat modes</text>
-    <text class="box-sub" x="130" y="306" text-anchor="middle">built in evaluator.py:419-432</text>
-    <text class="box-sub" x="130" y="322" text-anchor="middle">from aggregation's pair list</text>
+    <rect x="20" y="210" width="220" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="130" y="234" text-anchor="middle">pair_records</text>
+    <text class="box-sub" x="130" y="252" text-anchor="middle">prev_uuid, outcome, prev_scores</text>
+    <text class="box-sub" x="130" y="268" text-anchor="middle">detail: stage, claim_id, kind,</text>
+    <text class="box-sub" x="130" y="284" text-anchor="middle">now_passes, prev_passes, now, prev</text>
+    <text class="box-sub" x="130" y="300" text-anchor="middle">or d, dm, k_eff in flat modes</text>
+    <text class="box-sub" x="130" y="316" text-anchor="middle">from aggregation via evaluate</text>
+    <text class="box-sub" x="130" y="338" text-anchor="middle">read at 118, 121, 126</text>
   </g>
 
   <a class="box" id="w3" href="../../sources/evaluators/hybrid_verifier/gradient.py">
-    <title>The two public functions</title>
-    <rect x="350" y="80" width="240" height="190" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="470" y="108" text-anchor="middle">gradient.py</text>
-    <text class="box-sub" x="470" y="130" text-anchor="middle">build_gradient (82)</text>
-    <text class="box-sub" x="470" y="148" text-anchor="middle">build_evaluation_report (220)</text>
-    <text class="box-sub" x="470" y="172" text-anchor="middle">no Config object</text>
-    <text class="box-sub" x="470" y="188" text-anchor="middle">no file opened</text>
-    <text class="box-sub" x="470" y="204" text-anchor="middle">no import outside typing (15)</text>
-    <text class="box-sub" x="470" y="228" text-anchor="middle">returns plain str</text>
-    <text class="box-sub" x="470" y="248" text-anchor="middle">2 module constants (17-18)</text>
+    <title>The three functions of this file</title>
+    <rect x="350" y="90" width="240" height="200" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="470" y="118" text-anchor="middle">gradient.py (286 lines)</text>
+    <text class="box-sub" x="470" y="140" text-anchor="middle">_sign (24)</text>
+    <text class="box-sub" x="470" y="158" text-anchor="middle">build_gradient (34)</text>
+    <text class="box-sub" x="470" y="176" text-anchor="middle">build_evaluation_report (212)</text>
+    <text class="box-sub" x="470" y="198" text-anchor="middle">no Config object</text>
+    <text class="box-sub" x="470" y="214" text-anchor="middle">no file opened or written</text>
+    <text class="box-sub" x="470" y="230" text-anchor="middle">imports: typing, .claims STAGES</text>
+    <text class="box-sub" x="470" y="252" text-anchor="middle">2 module constants (20-21)</text>
+    <text class="box-sub" x="470" y="272" text-anchor="middle">returns plain str</text>
   </a>
 
-  <g class="box" id="w4">
+  <a class="box" id="w4" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>The one import this file makes from its own package</title>
+    <rect x="350" y="330" width="240" height="50" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="470" y="360" text-anchor="middle">claims.py::STAGES (18)</text>
+  </a>
+
+  <g class="box" id="w5">
     <title>Files the caller writes from these strings</title>
     <rect x="700" y="30" width="260" height="130" rx="2" fill="none" stroke="#4D9FFF" stroke-dasharray="5 4"/>
     <text class="box-label" x="830" y="54" text-anchor="middle">writes, done by the evaluator</text>
-    <text class="box-sub" x="830" y="72" text-anchor="middle">textual_gradient.txt (evaluator.py:640)</text>
-    <text class="box-sub" x="830" y="88" text-anchor="middle">evaluation.txt (evaluator.py:639)</text>
-    <text class="box-sub" x="830" y="104" text-anchor="middle">under workflow_dir/&lt;uuid&gt;/</text>
-    <text class="box-sub" x="830" y="120" text-anchor="middle">gradient also into state_result.json</text>
-    <text class="box-sub" x="830" y="136" text-anchor="middle">key abstracted_textual_gradient (492)</text>
+    <text class="box-sub" x="830" y="72" text-anchor="middle">evaluation.txt (evaluator.py:778)</text>
+    <text class="box-sub" x="830" y="88" text-anchor="middle">textual_gradient.txt (779)</text>
+    <text class="box-sub" x="830" y="104" text-anchor="middle">under workflow_dir/&lt;uuid&gt; (775)</text>
+    <text class="box-sub" x="830" y="120" text-anchor="middle">gradient into state_result.json</text>
+    <text class="box-sub" x="830" y="136" text-anchor="middle">key abstracted_textual_gradient (631)</text>
   </g>
 
-  <g class="box" id="w5">
+  <g class="box" id="w6">
     <title>Score dict keys the report reads</title>
-    <rect x="700" y="200" width="260" height="150" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <rect x="700" y="200" width="260" height="160" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="830" y="224" text-anchor="middle">scores keys read</text>
     <text class="box-sub" x="830" y="242" text-anchor="middle">n_claims, n_surviving, n_dropped,</text>
-    <text class="box-sub" x="830" y="258" text-anchor="middle">n_scored, n_scorer_failures (234-238)</text>
+    <text class="box-sub" x="830" y="258" text-anchor="middle">n_scored, n_scorer_failures (226-230)</text>
     <text class="box-sub" x="830" y="274" text-anchor="middle">overall_score, pairwise_mode,</text>
     <text class="box-sub" x="830" y="290" text-anchor="middle">mean_claim_score, win_rate, n_pairs,</text>
-    <text class="box-sub" x="830" y="306" text-anchor="middle">n_wins, n_losses, n_ties (241-247)</text>
-    <text class="box-sub" x="830" y="322" text-anchor="middle">n_replacements (250)</text>
+    <text class="box-sub" x="830" y="306" text-anchor="middle">n_wins, n_losses, n_ties (232-240)</text>
+    <text class="box-sub" x="830" y="322" text-anchor="middle">n_replacements (242)</text>
+    <text class="box-sub" x="830" y="344" text-anchor="middle">all with .get defaults</text>
   </g>
 
-  <path class="edge dashed-edge" data-from="w1" data-to="w3" d="M240,95 H350" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="295" y="87" text-anchor="middle">scores, claims</text>
-  <path class="edge dashed-edge" data-from="w2" data-to="w3" d="M240,275 H350" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="295" y="267" text-anchor="middle">pairs</text>
-  <path class="edge dashed-edge" data-from="w5" data-to="w3" d="M700,275 H590" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="645" y="267" text-anchor="middle">counts</text>
-  <path class="edge" data-from="w3" data-to="w4" d="M590,120 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge dashed-edge" data-from="w1" data-to="w3" d="M240,100 H350" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="295" y="92" text-anchor="middle">scores, claims</text>
+  <path class="edge dashed-edge" data-from="w2" data-to="w3" d="M240,285 H350" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="295" y="277" text-anchor="middle">pairs</text>
+  <path class="edge dashed-edge" data-from="w6" data-to="w3" d="M700,280 H590" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="645" y="272" text-anchor="middle">counts</text>
+  <path class="edge dashed-edge" data-from="w4" data-to="w3" d="M470,330 V290" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="520" y="312" text-anchor="start">ladder order</text>
+  <path class="edge" data-from="w3" data-to="w5" d="M590,120 H700" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="645" y="112" text-anchor="middle">two strings</text>
-  <text class="box-sub" x="20" y="384">Config fields read: none (grep over the file, 2026-10-02). Files written by this file: none.</text>
+  <text class="box-sub" x="20" y="384">Config fields read: none (grep over the file, 2026-09-26). Files written by this file: none.</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 &mdash; <code>5 boxes</code>. Every value here is measured scorer output or a counter computed in <code>evaluate</code>; the module docstring states the intent as "faithful transcript of measured facts; no editorializing, no labels" (lines 9-10).</p>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. Every value here is measured scorer output or a counter built in <code>evaluate</code>; the module docstring states the intent as "Faithful transcript of measured facts; no editorializing, no labels" (lines 10-11).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Diagram 3 &mdash; control logic: which claim lands in which section</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 980 500" role="img" aria-label="decision tree for gradient sections">
+<svg class="diagram" viewBox="0 0 980 520" role="img" aria-label="decision tree for gradient sections">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -256,110 +298,111 @@
   </defs>
 
   <g class="box" id="d0">
-    <title>Elimination scan over the losing pairs</title>
+    <title>Which claims enter the per-claim loop</title>
     <rect x="20" y="30" width="240" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="140" y="52" text-anchor="middle">pair outcome is "loss" ?</text>
-    <text class="box-sub" x="140" y="70" text-anchor="middle">line 42; other outcomes skipped</text>
-    <text class="box-sub" x="140" y="86" text-anchor="middle">earliest (rank, tidx) kept (54)</text>
+    <text class="box-label" x="140" y="52" text-anchor="middle">surviving or scored ?</text>
+    <text class="box-sub" x="140" y="70" text-anchor="middle">line 70; else skipped</text>
+    <text class="box-sub" x="140" y="86" text-anchor="middle">claim_lines for the rest</text>
   </g>
 
   <g class="box" id="d1">
-    <title>Per-claim loop</title>
-    <rect x="20" y="130" width="240" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="140" y="152" text-anchor="middle">claim has a score ?</text>
-    <text class="box-sub" x="140" y="170" text-anchor="middle">line 120; cid filter at 109</text>
-    <text class="box-sub" x="140" y="186" text-anchor="middle">no: "NOT SCORED" line (121-124)</text>
+    <title>Unscored claims still get a line</title>
+    <rect x="20" y="130" width="240" height="70" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="140" y="152" text-anchor="middle">score is None ?</text>
+    <text class="box-sub" x="140" y="170" text-anchor="middle">line 77; "NOT SCORED" (80)</text>
+    <text class="box-sub" x="140" y="186" text-anchor="middle">scorer failure text carried</text>
   </g>
 
   <g class="box" id="d2">
-    <title>Rival comparison</title>
+    <title>Rival comparison, only when a predecessor scored</title>
     <rect x="20" y="230" width="240" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="140" y="252" text-anchor="middle">any scored rival ?</text>
-    <text class="box-sub" x="140" y="270" text-anchor="middle">line 143; else "no scored predecessor"</text>
-    <text class="box-sub" x="140" y="286" text-anchor="middle">line 136</text>
+    <text class="box-sub" x="140" y="270" text-anchor="middle">line 85; else no stats (93)</text>
+    <text class="box-sub" x="140" y="286" text-anchor="middle">no rivals: no lost or won row (100)</text>
   </g>
 
   <g class="box" id="d3">
     <title>The sign of the balance decides the section</title>
-    <rect x="20" y="330" width="240" height="90" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
-    <text class="box-label" x="140" y="352" text-anchor="middle">balance bal = sum(sign)</text>
-    <text class="box-sub" x="140" y="370" text-anchor="middle">line 145</text>
-    <text class="box-sub" x="140" y="386" text-anchor="middle">bal &lt; 0 loses, bal &gt; 0 wins,</text>
-    <text class="box-sub" x="140" y="402" text-anchor="middle">bal = 0 in neither list (154)</text>
+    <rect x="20" y="330" width="240" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="140" y="352" text-anchor="middle">balance bal = sum signs</text>
+    <text class="box-sub" x="140" y="370" text-anchor="middle">line 102</text>
+    <text class="box-sub" x="140" y="386" text-anchor="middle">bal below 0 loses, above 0 wins,</text>
+    <text class="box-sub" x="140" y="402" text-anchor="middle">0 lands in neither list (111)</text>
   </g>
 
   <a class="box" id="d4" href="../../sources/evaluators/hybrid_verifier/gradient.py">
-    <title>Section 2 rows</title>
-    <rect x="340" y="120" width="240" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="460" y="144" text-anchor="middle">lost_rows, max 5</text>
-    <text class="box-sub" x="460" y="162" text-anchor="middle">sorted by stage then index (157)</text>
-    <text class="box-sub" x="460" y="178" text-anchor="middle">none: "(none - no decisive losses)" (189)</text>
+    <title>Section 1 rows</title>
+    <rect x="340" y="120" width="250" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="465" y="144" text-anchor="middle">lost_rows, max 5</text>
+    <text class="box-sub" x="465" y="162" text-anchor="middle">sorted by rank, index (113)</text>
+    <text class="box-sub" x="465" y="178" text-anchor="middle">none: no decisive losses (145)</text>
   </a>
 
   <a class="box" id="d5" href="../../sources/evaluators/hybrid_verifier/gradient.py">
-    <title>Section 3 rows</title>
-    <rect x="340" y="230" width="240" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="460" y="254" text-anchor="middle">won_rows, max 5</text>
-    <text class="box-sub" x="460" y="272" text-anchor="middle">same sort key (158)</text>
-    <text class="box-sub" x="460" y="288" text-anchor="middle">none: "(none yet)" (191)</text>
+    <title>Section 2 rows</title>
+    <rect x="340" y="230" width="250" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="465" y="254" text-anchor="middle">won_rows, max 5</text>
+    <text class="box-sub" x="465" y="272" text-anchor="middle">same sort key (114)</text>
+    <text class="box-sub" x="465" y="288" text-anchor="middle">none: "(none yet)" (148)</text>
   </a>
 
   <a class="box" id="d6" href="../../sources/evaluators/hybrid_verifier/gradient.py">
-    <title>Section 7 of the full claim list</title>
-    <rect x="340" y="340" width="240" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="460" y="364" text-anchor="middle">claim_lines block</text>
-    <text class="box-sub" x="460" y="382" text-anchor="middle">target, score, rival min/med/max</text>
-    <text class="box-sub" x="460" y="398" text-anchor="middle">verbatim evidence (141)</text>
+    <title>Section 6 of the all-claims block</title>
+    <rect x="340" y="340" width="250" height="80" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="465" y="364" text-anchor="middle">claim_lines block (76)</text>
+    <text class="box-sub" x="465" y="382" text-anchor="middle">target, score, rival stats</text>
+    <text class="box-sub" x="465" y="398" text-anchor="middle">evidence verbatim (98)</text>
   </a>
 
   <g class="box" id="d7">
     <title>Transcript cap and section assembly</title>
     <rect x="650" y="120" width="310" height="140" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="805" y="144" text-anchor="middle">assembly (160-217)</text>
-    <text class="box-sub" x="805" y="162" text-anchor="middle">transcript capped at 4000 chars (176)</text>
-    <text class="box-sub" x="805" y="178" text-anchor="middle">"(no previous generations ...)" (214)</text>
-    <text class="box-sub" x="805" y="194" text-anchor="middle">bottom line: reward, win rate, W/L/T (200)</text>
-    <text class="box-sub" x="805" y="210" text-anchor="middle">claims that discriminate (201-203)</text>
-    <text class="box-sub" x="805" y="226" text-anchor="middle">"(none - no rival eliminated ...)" (206)</text>
-    <text class="box-sub" x="805" y="242" text-anchor="middle">"(none)" when no claim lines (192)</text>
+    <text class="box-label" x="805" y="144" text-anchor="middle">assembly (186-209)</text>
+    <text class="box-sub" x="805" y="162" text-anchor="middle">transcript capped at 4000 (133)</text>
+    <text class="box-sub" x="805" y="178" text-anchor="middle">no pairs: first generation text (208)</text>
+    <text class="box-sub" x="805" y="194" text-anchor="middle">bottom line: reward, win rate (189)</text>
+    <text class="box-sub" x="805" y="210" text-anchor="middle">claims that discriminate (190-191)</text>
+    <text class="box-sub" x="805" y="226" text-anchor="middle">"(none)" when no claim lines (149)</text>
+    <text class="box-sub" x="805" y="242" text-anchor="middle">7 section headers in order</text>
   </g>
 
   <g class="box" id="d8">
     <title>Report branch</title>
-    <rect x="650" y="300" width="310" height="130" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="805" y="324" text-anchor="middle">build_evaluation_report (220)</text>
-    <text class="box-sub" x="805" y="342" text-anchor="middle">stage header printed on change (259)</text>
-    <text class="box-sub" x="805" y="358" text-anchor="middle">score None: "n/a (scorer failed)" (265)</text>
-    <text class="box-sub" x="805" y="374" text-anchor="middle">no pairs: first-generation line (289-292)</text>
-    <text class="box-sub" x="805" y="390" text-anchor="middle">pairs: stage and claim, or d/dm/k (280-286)</text>
-    <text class="box-sub" x="805" y="406" text-anchor="middle">drop_reason line only for dead (273-274)</text>
+    <rect x="650" y="300" width="310" height="140" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="805" y="324" text-anchor="middle">build_evaluation_report (212)</text>
+    <text class="box-sub" x="805" y="342" text-anchor="middle">stage header on change (251)</text>
+    <text class="box-sub" x="805" y="358" text-anchor="middle">None score: "n/a (scorer failed)" (257)</text>
+    <text class="box-sub" x="805" y="374" text-anchor="middle">evidence when present (263)</text>
+    <text class="box-sub" x="805" y="390" text-anchor="middle">dropped line only when dead (265)</text>
+    <text class="box-sub" x="805" y="406" text-anchor="middle">pairs: stage and claim, or d/dm/k (272)</text>
+    <text class="box-sub" x="805" y="422" text-anchor="middle">no pairs: first-generation line (280)</text>
   </g>
 
   <path class="edge" data-from="d0" data-to="d1" d="M140,100 V130" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="150" y="122" text-anchor="start">then claims</text>
+  <text class="edge-label" x="150" y="122" text-anchor="start">next</text>
   <path class="edge" data-from="d1" data-to="d2" d="M140,200 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="150" y="222" text-anchor="start">scored</text>
   <path class="edge" data-from="d2" data-to="d3" d="M140,300 V330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="150" y="322" text-anchor="start">yes</text>
-  <path class="edge" data-from="d3" data-to="d4" d="M260,345 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="300" y="337" text-anchor="middle">bal &lt; 0</text>
-  <path class="edge" data-from="d3" data-to="d5" d="M260,375 L340,280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="300" y="330" text-anchor="middle">bal &gt; 0</text>
-  <path class="edge" data-from="d2" data-to="d6" d="M260,265 H300 V380 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="300" y="300" text-anchor="middle">every scored claim</text>
-  <path class="edge" data-from="d4" data-to="d7" d="M580,160 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="615" y="152" text-anchor="middle">loss rows</text>
-  <path class="edge" data-from="d5" data-to="d7" d="M580,270 H620 V200 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="615" y="222" text-anchor="middle">win rows</text>
-  <path class="edge" data-from="d6" data-to="d7" d="M580,380 H620 V260 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
-  <text class="edge-label" x="615" y="330" text-anchor="middle">claim lines</text>
+  <path class="edge" data-from="d3" data-to="d4" d="M260,350 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="342" text-anchor="middle">bal below 0</text>
+  <path class="edge" data-from="d3" data-to="d5" d="M260,380 L340,280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="335" text-anchor="middle">bal above 0</text>
+  <path class="edge" data-from="d2" data-to="d6" d="M260,270 H300 V380 H340" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="302" text-anchor="middle">every claim line</text>
+  <path class="edge" data-from="d4" data-to="d7" d="M590,160 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="620" y="152" text-anchor="middle">loss rows</text>
+  <path class="edge" data-from="d5" data-to="d7" d="M590,270 H620 V200 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="620" y="222" text-anchor="middle">win rows</text>
+  <path class="edge" data-from="d6" data-to="d7" d="M590,380 H620 V260 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="620" y="330" text-anchor="middle">claim lines</text>
   <path class="edge dashed-edge" data-from="d7" data-to="d8" d="M805,260 V300" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
   <text class="edge-label" x="815" y="284" text-anchor="start">same inputs</text>
-
-  <text class="box-sub" x="20" y="470">A claim with zero balance appears in the full claim list but in neither the loss block nor the win block.</text>
+  <text class="box-sub" x="20" y="478">Unscored claims appear in the all-claims block and never in a loss or win block (71-75).</text>
+  <text class="box-sub" x="20" y="502">The report and the gradient are assembled from the same maps, so a number shown twice agrees.</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 &mdash; <code>9 boxes</code>. The two blocks are ordered by the same key (stage rank, then <code>temporal_index</code>, lines 157-158), so section 2 always reads script before log before result. <code>test_gradient_leads_with_elimination_point</code> (<code class="path">tests/hybrid_verifier_test.py:689</code>) checks the elimination line, the section order and the stage headers.</p>
+<p class="figcap">Diagram 3 &mdash; <code>9 boxes</code>. Both blocks use the same sort key (stage rank, then <code>temporal_index</code>, lines 113-114), so section 1 reads script before log before result. <code>test_gradient_v5_decisive_first_no_elimination_point</code> (<code class="path">tests/hybrid_verifier_test.py:780</code>) checks the section order, the goal-anchored rows and the stage headers of the report.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -367,53 +410,78 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td class="sym">argument</td><td class="sym">uuid, goal</td><td>lines 83-84 (goal trimmed at 195)</td><td>gradient header, first 500 chars of goal</td></tr>
-<tr><td class="sym">argument</td><td class="sym">now_scores, evidence</td><td>lines 85-86 (used at 111-112)</td><td>per-claim score and verbatim evidence</td></tr>
-<tr><td class="sym">argument</td><td class="sym">claims, surviving</td><td>lines 87-88 (used at 96, 164)</td><td>order, statements, transcript columns</td></tr>
-<tr><td class="sym">argument</td><td class="sym">pair_records</td><td>line 89 (used at 41, 126, 161)</td><td>outcomes, per-claim signs, deciding stage</td></tr>
-<tr><td class="sym">argument</td><td class="sym">reward, win_rate, mean_score</td><td>lines 90-92 (used at 200-203)</td><td>bottom line of the gradient</td></tr>
-<tr><td class="sym">argument</td><td class="sym">dead_claims</td><td>line 93 (used at 178-186)</td><td>section 6, with drop_reason</td></tr>
-<tr><td class="sym">argument</td><td class="sym">scores dict</td><td>lines 222, 234-252</td><td>report header lines and counts</td></tr>
-<tr><td class="sym">pair key</td><td class="sym">detail.stage, detail.claim_id</td><td>lines 45-47, 72-74, 168, 281-283</td><td>which stage decided the pair</td></tr>
-<tr><td class="sym">claim key</td><td class="sym">stage, temporal_index</td><td>lines 47-53, 113-119</td><td>stage rank and ordering</td></tr>
-<tr><td class="sym">claim key</td><td class="sym">statement, target, category, drop_reason</td><td>lines 58, 139, 182, 267, 273</td><td>quote the requirement, name the target</td></tr>
-<tr><td class="sym">constant</td><td class="sym">_HEADER_BAR</td><td>line 17 = 60 "=" characters</td><td>report rule under the title</td></tr>
-<tr><td class="sym">constant</td><td class="sym">_TRANSCRIPT_CAP</td><td>line 18 = 4000, applied at 176</td><td>longest transcript kept</td></tr>
-<tr><td class="sym">cap</td><td class="sym">5 rows per block</td><td>lines 189, 191</td><td>loss and win blocks stay short</td></tr>
-<tr><td class="sym">cap</td><td class="sym">160 chars of evidence</td><td>line 149 (full evidence at 141)</td><td>loss and win rows stay readable</td></tr>
-<tr><td class="sym">returns</td><td class="sym">str</td><td>lines 194-217, 294</td><td>gradient text and report text</td></tr>
-<tr><td class="sym">config field</td><td class="sym">none</td><td>grep over the file, 2026-10-02</td><td>this module reads no Config object</td></tr>
-<tr><td class="sym">file written</td><td class="sym">none</td><td>&mdash;</td><td>the evaluator writes both files (evaluator.py:639-640)</td></tr>
+<tr><td class="sym">argument</td><td class="sym">uuid, goal</td><td>lines 35-36 (goal cut at 187)</td><td>gradient header, first 500 chars of goal</td></tr>
+<tr><td class="sym">argument</td><td class="sym">now_scores, evidence</td><td>lines 37-38 (used at 72-73)</td><td>per-claim score and verbatim evidence</td></tr>
+<tr><td class="sym">argument</td><td class="sym">claims, surviving</td><td>lines 39-40 (used at 70, 121)</td><td>order, statements, transcript columns</td></tr>
+<tr><td class="sym">argument</td><td class="sym">pair_records</td><td>line 41 (used at 64, 118, 285)</td><td>outcomes, per-claim signs, deciding stage</td></tr>
+<tr><td class="sym">argument</td><td class="sym">reward, win_rate, mean_score</td><td>lines 42-44 (used at 189-191)</td><td>bottom line of the gradient</td></tr>
+<tr><td class="sym">argument</td><td class="sym">dead_claims</td><td>line 45 (used at 135-142)</td><td>section 5, with drop_reason</td></tr>
+<tr><td class="sym">argument</td><td class="sym">exec_facts</td><td>line 46 (used at 152-165)</td><td>section 3, re-execution gate facts</td></tr>
+<tr><td class="sym">argument</td><td class="sym">stages</td><td>line 47, default <code>STAGES</code></td><td>stage rank inside the gradient text</td></tr>
+<tr><td class="sym">argument</td><td class="sym">scores dict</td><td>lines 214, 226-242</td><td>report header lines and counts</td></tr>
+<tr><td class="sym">pair key</td><td class="sym">detail.stage, detail.claim_id</td><td>lines 123-127, 272-274</td><td>which stage decided the pair</td></tr>
+<tr><td class="sym">claim key</td><td class="sym">stage, temporal_index</td><td>lines 74-76, 61, 620</td><td>stage rank and ordering</td></tr>
+<tr><td class="sym">claim key</td><td class="sym">statement, target, category, drop_reason</td><td>lines 79, 96, 138, 259, 265</td><td>quote the requirement, name the target</td></tr>
+<tr><td class="sym">import</td><td class="sym">claims.STAGES</td><td>line 18 (default at 47)</td><td>ladder order for the text tasks</td></tr>
+<tr><td class="sym">constant</td><td class="sym">_HEADER_BAR</td><td>line 20 = 60 "=" characters</td><td>rule line in evaluation.txt (224)</td></tr>
+<tr><td class="sym">constant</td><td class="sym">_TRANSCRIPT_CAP</td><td>line 21 = 4000, applied at 133</td><td>longest comparison transcript kept</td></tr>
+<tr><td class="sym">cap</td><td class="sym">5 rows per block</td><td>lines 145, 148</td><td>loss and win blocks stay short</td></tr>
+<tr><td class="sym">cap</td><td class="sym">160 chars of evidence</td><td>line 106 (full evidence at 98)</td><td>comparative rows stay readable</td></tr>
+<tr><td class="sym">returns</td><td class="sym">str</td><td>lines 186-209, 286</td><td>gradient text and report text</td></tr>
+<tr><td class="sym">config field</td><td class="sym">none</td><td>grep over the file, 2026-09-26</td><td>this module reads no Config object</td></tr>
+<tr><td class="sym">file written</td><td class="sym">none</td><td>&mdash;</td><td>the evaluator writes both files (evaluator.py:778-780)</td></tr>
 </tbody>
 </table>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Full symbol inventory</h2>
-<p class="sub">4 top-level functions, no class, 2 module constants. 294 lines (<code>wc -l</code>). Only import: <code>from typing import Any</code> (line 15).</p>
-<details><summary>every def in sources/evaluators/hybrid_verifier/gradient.py</summary><div class="dbody">
-<pre>_HEADER_BAR = "=" * 60                # L17 - rule line in evaluation.txt
-_TRANSCRIPT_CAP = 4000                # L18 - transcript character cap
+<p class="sub">3 top-level functions, no class, 2 module constants. 286 lines (<code>wc -l</code>). Imports: <code>from typing import Any</code> (16), <code>from .claims import STAGES</code> (18).</p>
+<details><summary>every def and constant in sources/evaluators/hybrid_verifier/gradient.py</summary><div class="dbody">
+<pre>_HEADER_BAR = "=" * 60                # L20 - rule line in evaluation.txt
+_TRANSCRIPT_CAP = 4000                # L21 - transcript character cap
 
-_sign(sa: float | None, sb: float | None) -&gt; str                            # L21  - "+", "-", "=", "n/a"
-_elimination_point(now_scores, evidence, claims_by_id, pair_records) -&gt; str | None   # L28  - earliest lost claim
-build_gradient(uuid, goal, now_scores, evidence, claims, surviving,
-    pair_records, reward, win_rate, mean_score,
-    dead_claims) -&gt; str                                                     # L82  - six-section gradient text
-build_evaluation_report(uuid, scores, claims, now_scores, evidence,
-    surviving, pair_records) -&gt; str                                         # L220 - human-readable report
+_sign(sa: float | None, sb: float | None) -&gt; str                 # L24  - "+", "-", "=", "n/a"
+build_gradient(
+    uuid, goal, now_scores, evidence, claims, surviving,
+    pair_records, reward, win_rate, mean_score, dead_claims,
+    exec_facts=None, stages=STAGES) -&gt; str                        # L34  - seven-section gradient
+build_evaluation_report(
+    uuid, scores, claims, now_scores, evidence, surviving,
+    pair_records) -&gt; str                                          # L212 - human-readable report
 
-gradient section headers (verbatim in the template):
-    "# Hybrid verifier gradient (E19/E19b, temporal ladder)"                # L194
-    "## 1. ELIMINATION POINT"                                               # L205
-    "## 2. WHAT TO FIX FIRST"                                               # L207
-    "## 3. WHAT ALREADY WORKS"                                              # L209
-    "## 4. All claim scores for this workspace"                             # L211
-    "## 5. Comparison transcript"                                           # L213
-    "## 6. Dropped claims"                                                  # L215
-report stage header: f"--- stage: {stage.upper()} ---"                      # L261
-report pass mark: "pass &gt;= 0.5"                                            # L269</pre>
+gradient header and body markers (verbatim in the template):
+    "# Hybrid verifier gradient v3 (PRIME) — {uuid}"               # L186
+    "Task goal: {goal[:500]}"                                      # L187
+    "Bottom line: reward {reward:.4f} | win-rate (ties=0.5) ..."   # L189
+    "## 1. WHAT TO FIX FIRST — decisive lost claims ..."           # L194
+    "## 2. WHAT ALREADY WORKS — decisive wins ..."                 # L196
+    "## 3. Execution facts — re-execution gate ..."                # L198
+    "## 4. Visual evidence — figure deliverable ..."               # L201
+    "## 5. Dead claims report (non-discriminative; one line each)" # L203
+    "## 6. All claim scores for this workspace (0..1; ...)"        # L205
+    "## 7. Comparison transcript (per-claim sign ...)"             # L207
+report markers: "Hybrid Verifier Evaluation (E35 PRIME, temporal ladder)"  # L223
+    f"--- stage: {stage.upper()} ---"                              # L253
+    "SURVIVING" / "DROPPED"                                        # L256
+    "  score: ... (pass &gt;= 0.5)"                                   # L261
+    "Pairwise record vs previous generations:"                     # L269
+removed in the working tree: the 4-line "Generated: verifier v3 PRIME ..." preamble</pre>
 </div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Uncommitted edit in the working tree</h2>
+<p class="sub">Evidence: <code>git diff -- sources/evaluators/hybrid_verifier/gradient.py</code>, read 2026-09-26 at commit <code>336fe19</code> with a dirty tree.</p>
+<details><summary>the removed preamble, quoted from the diff</summary><div class="dbody">
+<blockquote>-Generated: verifier v3 PRIME — deterministic per-claim policy scorers (the SAME<br>
+-script for every workspace) + goal-anchored visual rung for figure tasks<br>
+-(criteria frozen before scoring) + execution gate; decisive-first assembly.<br>
+-Faithful measured transcript; NO labels used or shown.</blockquote>
+<p>Four lines go away, so <code>build_gradient</code> now returns the header (186), the goal line (187), one blank line and the bottom line (189). The provenance sentence stays in the module docstring (lines 1-11) and in the harness copy: <code>experiments_verifiers/harness/e35_prime.py</code> keeps its own <code>build_gradient_v3</code> (L1327) with the same preamble at L1430.</p>
+<p>Test coverage of the header change: <code>test_gradient_v5_decisive_first_no_elimination_point</code> (<code class="path">tests/hybrid_verifier_test.py:780</code>) asserts the section order and the absence of elimination framing, and <code>test_full_pipeline_real_subprocess</code> (L467) reads the written gradient file &mdash; but no test asserts the preamble text is gone: <code>grep -rn "Generated:" tests/</code> returns 0 hits (my check, 2026-09-26). Treat the header change as covered by the section-order test only.</p>
+</div></details>
+<p class="note say">Why it matters: the mutator sees only this text, and section 1 is now the first thing it reads, built from measured scores plus the claim's own goal-anchored statement.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -421,23 +489,30 @@ report pass mark: "pass &gt;= 0.5"                                            # 
 <table>
 <thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td><code>build_gradient</code> at line 479 and <code>build_evaluation_report</code> at line 507, both inside <code>evaluate</code></td><td class="sym">import L56; calls 479, 507</td></tr>
-<tr><td class="sym">evaluate artifact step</td><td>gradient text stored in <code>abstracted_textual_gradient</code> (492) and written by <code>_write_artifacts</code> (639-640)</td><td class="sym">evaluator.py 492-516</td></tr>
-<tr><td class="sym">short-circuit path</td><td>builds its own gradient and report strings instead</td><td class="sym">evaluator.py 581-623</td></tr>
-<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_eval.py">experiments_verifiers/harness/e19c_eval.py</a></td><td><code>build_gradient</code> per generation, "production build_gradient" (header comment line 15)</td><td class="sym">import L41; call L197</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_gradient_leads_with_elimination_point</code>: elimination at SCRIPT, section and header order</td><td class="sym">lines 689-774</td></tr>
-<tr><td class="sym">build_evaluation_report</td><td>no other in-repo caller found; the only caller outside tests is <code>evaluate</code></td><td class="sym">grep, 2026-10-02</td></tr>
-<tr><td class="sym">_elimination_point / _sign</td><td>private; called only from inside this file (101, 163)</td><td class="sym">lines 101, 163</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td>does not re-export <code>gradient</code> (grep over <code>__init__.py</code>)</td><td class="sym">__init__.py L75-L82</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td><code>build_gradient</code> and <code>build_evaluation_report</code> inside <code>evaluate</code>, after the reward is known</td><td class="sym">import L67; calls 616, 646</td></tr>
+<tr><td class="sym">evaluate artifact step</td><td>gradient text as <code>abstracted_textual_gradient</code> (631) and legacy-typo key (634); write at 655</td><td class="sym">evaluator.py 631-634, 773-780</td></tr>
+<tr><td class="sym">short-circuit path</td><td>builds its own gradient and report strings instead of calling this file</td><td class="sym">evaluator.py 682-762</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_eval.py">experiments_verifiers/harness/e19c_eval.py</a></td><td><code>build_gradient</code> per generation in the offline replay</td><td class="sym">import L41; call L197</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e30_optimus.py">e30_optimus.py</a>, <a href="../../experiments_verifiers/harness/e32_mirror_v2.py">e32_mirror_v2.py</a></td><td>the same production builder over replayed scores</td><td class="sym">e30_optimus 1026; e32_mirror_v2 1185</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e35_prime.py">experiments_verifiers/harness/e35_prime.py</a></td><td>keeps its own <code>build_gradient_v3</code>, with the preamble this file dropped</td><td class="sym">L1327, preamble L1430</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_gradient_v5_decisive_first_no_elimination_point</code>: section order, no elimination framing, gate and report text</td><td class="sym">lines 780-906</td></tr>
+<tr><td class="sym">test_full_pipeline_real_subprocess</td><td>reads <code>textual_gradient.txt</code> and <code>evaluation.txt</code> and checks both gradient keys are identical</td><td class="sym">lines 538-551</td></tr>
+<tr><td class="sym">test_execution_gate_wired_into_evaluate</td><td>the capped reward text reaches the gradient</td><td class="sym">lines 1845-1899</td></tr>
+<tr><td class="sym">test_evaluate_uses_figure_stage_order_for_figure_tasks</td><td>visual-first order plus the visual and execution sections in the real gradient</td><td class="sym">lines 1996-2048</td></tr>
+<tr><td class="sym">_sign</td><td>private; called only from <code>build_gradient</code> at 121</td><td class="sym">line 121</td></tr>
+<tr><td class="sym">header preamble absence</td><td>no test greps the removed <code>Generated:</code> line</td><td class="sym">grep tests/, 2026-09-26</td></tr>
 </tbody>
 </table>
-<p class="note say">Why it matters: the mutator only ever sees this text, so section 1 (elimination point) is what steers the next workflow, and it is built from measured scores and the claim's own statement, not from any label.</p>
+<details><summary>what <code>test_gradient_v5_decisive_first_no_elimination_point</code> asserts (full cell text)</summary><div class="dbody">
+<p>Section order, no elimination framing, goal-anchored rows, gate text, visual block, and the report stage headers (<code class="path">tests/hybrid_verifier_test.py:780-906</code>).</p>
+</div></details>
+<p class="note">My run: <code>uv run pytest tests/hybrid_verifier_test.py -q</code> gives <code>53 passed</code> (2 warnings, 2.02 s) on 2026-09-26 &mdash; my computation, not a recorded result.</p>
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/gradient.py">sources/evaluators/hybrid_verifier/gradient.py</a> (all 294 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L56 import, L389-L432 reward and pair records, L479-L516 artifacts, L543-L628 short-circuit), <a href="../../sources/evaluators/hybrid_verifier/aggregation.py">aggregation.py</a> (pair record fields referenced at L419-L431), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L686-L774), <a href="../../experiments_verifiers/harness/e19c_eval.py">experiments_verifiers/harness/e19c_eval.py</a> (L15, L41, L190-L200), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
-<p class="skips">Skipped: <code>aggregation</code>'s decision rules that produce <code>detail</code> (own page: <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>); the E19b originals named in the docstring (<code>e19b_dryrun.GRAD_HEADER_V2</code>, <code>write_gradients_v2</code>) were not opened; the runtime gradient files under <code>sources/workflows/</code> (generated artifacts, not source); <code>docs/concepts/evaluation-pipeline.md</code> (doc claims were not used as evidence). No pytest run and no application run, by the build rules.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git ls-files sources/evaluators/hybrid_verifier</code> returns 0 files (checked 2026-10-02), so this page describes the working tree, not the committed tree.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/gradient.py">sources/evaluators/hybrid_verifier/gradient.py</a> (all 286 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L67 import, L616-L655 artifacts, L682-L762 short circuit, L773-L784 writes), <a href="../../sources/evaluators/hybrid_verifier/claims.py">claims.py</a> (<code>STAGES</code>, L44), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L467-L560, L780-L906, L1845-L1899, L1996-L2048), <a href="../../experiments_verifiers/harness/e19c_eval.py">experiments_verifiers/harness/e19c_eval.py</a> (L41, L197), <a href="../../experiments_verifiers/harness/e35_prime.py">e35_prime.py</a> (L1327, L1430), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code> and greps; text budget and colours per UPDATE_VISUAL_CLONE.md sections 6-7.</p>
+<p class="skips">Skipped: the pair <code>detail</code> rules that produce the deciding stage (they live in <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> and the aggregation card); the E19b harness header constant <code>e19b_dryrun.GRAD_HEADER_V2</code> (checked: it exists at L211) was not read further; runtime gradient files under <code>sources/workflows/</code> (generated artifacts, not source); <code>docs/concepts/evaluation-pipeline.md</code> (not used as evidence). No application run, by the build rules.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes; <code>git status --porcelain</code> lists <code>gradient.py</code> as modified, so this page mixes the committed file with the uncommitted edit.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

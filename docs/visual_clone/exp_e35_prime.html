@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e35_prime - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Experiments &gt; harness &gt; e35_prime">
+<div class="wrap">
+
+<h1 class="hud">e35_prime &mdash; verifier v3, every measured win in one prototype</h1>
+<p class="intro">E35 asks what happens when six already-measured verifier wins are put in one prototype and scored on the frozen E14 arena (19 groups / 148 generations / 667 pairs). The prototype joins the E30 content lever, the E29 T1 firewall, the E26 visual rung placed first, the E24 execution gate and the E19c win-rate reward, then grades the result with the E16v2 gradient judge. Ranking is mixed: <code>e35_online</code> pairs-correct 0.7075 sits below <code>e30_online</code> 0.7585 and <code>e19c_online</code> 0.7415 with every paired CI spanning 0, while gradient relevance 0.690 is the best measured on this population.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Design &mdash; the stage pipeline, its frozen inputs, its written files</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 560" role="img" aria-label="E35 stage pipeline: four frozen cache inputs feed the seven stages 0 to 6, which write the results files">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="i1">
+    <title>E19c format digests, reused cache-first</title>
+    <rect x="20" y="20" width="170" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="40" text-anchor="middle">E19c digests</text>
+    <text class="box-sub" x="105" y="56" text-anchor="middle">cache-first</text>
+  </g>
+  <g class="box" id="i2">
+    <title>Frozen E26 visual claims and scores</title>
+    <rect x="20" y="130" width="170" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="150" text-anchor="middle">E26 visual cache</text>
+    <text class="box-sub" x="105" y="166" text-anchor="middle">8 figure groups</text>
+  </g>
+  <g class="box" id="i3">
+    <title>Frozen E24 per-generation re-execution rows</title>
+    <rect x="20" y="240" width="170" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="260" text-anchor="middle">E24 re-exec rows</text>
+    <text class="box-sub" x="105" y="276" text-anchor="middle">status per gen</text>
+  </g>
+  <g class="box" id="i4">
+    <title>The frozen E14 arena plan and goals</title>
+    <rect x="20" y="350" width="170" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="105" y="370" text-anchor="middle">E14 arena plan</text>
+    <text class="box-sub" x="105" y="386" text-anchor="middle">19 groups</text>
+  </g>
+
+  <a class="box" id="s0" href="file_harness_e35_prime.html">
+    <title>Stage 0 digest: production module, E19c digests reused</title>
+    <rect x="300" y="20" width="260" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="430" y="40" text-anchor="middle">Stage 0 &mdash; digest</text>
+    <text class="box-sub" x="430" y="56" text-anchor="middle">production digest module</text>
+  </a>
+  <a class="box" id="s1" href="file_harness_e35_prime.html">
+    <title>Stage 1 claim extraction with the E29 T1 firewall</title>
+    <rect x="300" y="95" width="260" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="430" y="115" text-anchor="middle">Stage 1 &mdash; claims</text>
+    <text class="box-sub" x="430" y="131" text-anchor="middle">E30 lever + T1 firewall</text>
+  </a>
+  <a class="box" id="s2" href="file_harness_e35_prime.html">
+    <title>Stage 2 visual rung placed first on figure tasks</title>
+    <rect x="300" y="170" width="260" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="430" y="190" text-anchor="middle">Stage 2 &mdash; visual rung early</text>
+    <text class="box-sub" x="430" y="206" text-anchor="middle">ladder visual first</text>
+  </a>
+  <a class="box" id="s3" href="file_harness_e35_prime.html">
+    <title>Stage 3 one deterministic Python policy scorer per claim</title>
+    <rect x="300" y="245" width="260" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="430" y="265" text-anchor="middle">Stage 3 &mdash; policy scorers</text>
+    <text class="box-sub" x="430" y="281" text-anchor="middle">one script per claim</text>
+  </a>
+  <a class="box" id="s4" href="file_harness_e35_prime.html">
+    <title>Stage 4 reward cap from the frozen re-execution status</title>
+    <rect x="300" y="320" width="260" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="430" y="340" text-anchor="middle">Stage 4 &mdash; execution gate</text>
+    <text class="box-sub" x="430" y="356" text-anchor="middle">crash 0.0, divergent 0.5</text>
+  </a>
+  <a class="box" id="s5" href="file_harness_e35_prime.html">
+    <title>Stage 5 aggregation: ladder winner and win-rate reward</title>
+    <rect x="300" y="395" width="260" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="430" y="415" text-anchor="middle">Stage 5 &mdash; aggregation</text>
+    <text class="box-sub" x="430" y="431" text-anchor="middle">win-rate vs predecessors</text>
+  </a>
+  <a class="box" id="s6" href="file_harness_e35_prime.html">
+    <title>Stage 6 the decisive-first textual gradient</title>
+    <rect x="300" y="470" width="260" height="46" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="430" y="490" text-anchor="middle">Stage 6 &mdash; gradient</text>
+    <text class="box-sub" x="430" y="506" text-anchor="middle">decisive-first, no elimination</text>
+  </a>
+
+  <g class="box" id="o1">
+    <title>Files the run writes under experiments_verifiers/results</title>
+    <rect x="640" y="170" width="240" height="270" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="760" y="194" text-anchor="middle">results/ writes</text>
+    <text class="box-sub" x="760" y="216" text-anchor="middle">E35_claims ledger</text>
+    <text class="box-sub" x="760" y="232" text-anchor="middle">E35_scorers + E35_scores</text>
+    <text class="box-sub" x="760" y="248" text-anchor="middle">E35_registries/ (19 + cache)</text>
+    <text class="box-sub" x="760" y="264" text-anchor="middle">E35_prime_gradients/ (148)</text>
+    <text class="box-sub" x="760" y="296" text-anchor="middle">_e35_label_free.json</text>
+    <text class="box-sub" x="760" y="312" text-anchor="middle">E35_gradient_duel.json+md</text>
+    <text class="box-sub" x="760" y="328" text-anchor="middle">_e35_hallucination_audit</text>
+    <text class="box-sub" x="760" y="360" text-anchor="middle">E35_prime.json+md</text>
+    <text class="box-sub" x="760" y="376" text-anchor="middle">_e35_preregistration</text>
+    <text class="box-sub" x="760" y="392" text-anchor="middle">_e35_prompt_iterations</text>
+    <text class="box-sub" x="760" y="408" text-anchor="middle">E35_cost_ledger</text>
+  </g>
+
+  <path class="edge dashed-edge" data-from="i1" data-to="s0" d="M190,43 H300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="245" y="34" text-anchor="middle">digests</text>
+  <path class="edge dashed-edge" data-from="i4" data-to="s1" d="M105,373 H250 V118 H300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="290" y="104" text-anchor="end">goals</text>
+  <path class="edge dashed-edge" data-from="i2" data-to="s2" d="M190,153 H265 V193 H300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="290" y="180" text-anchor="end">scores</text>
+  <path class="edge dashed-edge" data-from="i3" data-to="s4" d="M190,263 H285 V343 H300" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="290" y="330" text-anchor="end">status</text>
+
+  <path class="edge" data-from="s0" data-to="s1" d="M430,66 V95" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="85" text-anchor="start">claims</text>
+  <path class="edge" data-from="s1" data-to="s2" d="M430,141 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="160" text-anchor="start">merge</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M430,216 V245" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="235" text-anchor="start">rules</text>
+  <path class="edge" data-from="s3" data-to="s4" d="M430,291 V320" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="310" text-anchor="start">scores</text>
+  <path class="edge" data-from="s4" data-to="s5" d="M430,366 V395" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="385" text-anchor="start">cap</text>
+  <path class="edge" data-from="s5" data-to="s6" d="M430,441 V470" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="440" y="460" text-anchor="start">reward</text>
+
+  <path class="edge dashed-edge" data-from="s1" data-to="o1" d="M560,118 H590 V200 H640" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="176" text-anchor="start">claims</text>
+  <path class="edge dashed-edge" data-from="s3" data-to="o1" d="M560,268 H640" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="600" y="260" text-anchor="middle">scripts</text>
+  <path class="edge dashed-edge" data-from="s5" data-to="o1" d="M560,418 H610 V340 H640" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="620" y="330" text-anchor="start">reward</text>
+  <path class="edge dashed-edge" data-from="s6" data-to="o1" d="M560,493 H620 V400 H640" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="630" y="452" text-anchor="start">7 files</text>
+
+  <text class="box-sub" x="20" y="530">solid = call  |  dashed = reads / writes  |  rounded = stage  |  12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the stage list is the module docstring of <code class="path">experiments_verifiers/harness/e35_prime.py</code> L4&ndash;L44 (Stage 0 L6, Stage 1 L8, Stage 2 L15, Stage 3 L23, Stage 4 L27, Stage 5 L31, Stage 6 L37). The report groups the same work as &quot;six stages&quot; (<code class="path">results/E35_prime_2026-09-26.md</code> L5), folding aggregation into the reward line. Stage&nbsp;2 runs only on the 8 figure groups (asserted equal to E26's set at L1504 and L2775).</p>
+
+<table>
+<thead><tr><th>Stage</th><th>What it does</th><th>Code</th></tr></thead>
+<tbody>
+<tr><td>0 digest</td><td>Production digest module; E19c digests reused cache-first.</td><td class="sym"><code>load_e19c_digests</code> L705</td></tr>
+<tr><td>1 claims</td><td>E30 content lever plus the E29 T1 firewall (reject and re-extract).</td><td class="sym"><code>extract_for_group</code> L985, <code>t1_violations</code> L376</td></tr>
+<tr><td>2 visual rung</td><td>Figure task when image-bearing gens / total &ge; 0.5; E26 caches reused.</td><td class="sym"><code>figure_groups</code> L743, <code>load_visual_cache</code> L764</td></tr>
+<tr><td>3 policy scorers</td><td>One deterministic script per claim, run on every workspace, repair &le; 3.</td><td class="sym"><code>run_claim_scorer</code> L1093, <code>execute_scorer</code> L953</td></tr>
+<tr><td>4 execution gate</td><td>E24 status to reward cap: <code>crash</code>/<code>no_entry_script</code>/<code>timeout</code> 0.0, <code>divergent</code> 0.5.</td><td class="sym"><code>GATE_CAP</code> L722, <code>gate_cap</code> L726</td></tr>
+<tr><td>5 aggregation</td><td>Ladder winner, then win-rate vs predecessors; generation 1 uses the mean score.</td><td class="sym"><code>cmd_eval</code> L1493, <code>pair_winner</code> L1462</td></tr>
+<tr><td>6 gradient</td><td>E19b-V5 decisive-first losses, then wins, plus execution facts and visual evidence.</td><td class="sym"><code>build_gradient_v3</code> L1327</td></tr>
+</tbody>
+</table>
+<p class="note say">E35 patches the production modules in process only: <code>CLAIMS.CLAIM_CATEGORIES</code> gains the two lever categories at L167 and <code>AGG.STAGES</code> / <code>CLAIMS.STAGES</code> become <code>("visual","script","log","result")</code> at L171&ndash;L174. No production file is edited by the harness (comment L165).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>The subcommands, in run order</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 700" role="img" aria-label="e35_prime.py subcommand chain: main dispatches pilot, prereg, run, eval, duel, audit, confirm, status in order">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="m">
+    <title>argparse dispatch over eight subcommands</title>
+    <rect x="300" y="16" width="300" height="44" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="450" y="36" text-anchor="middle">main &mdash; argparse</text>
+    <text class="box-sub" x="450" y="52" text-anchor="middle">8 choices L2829</text>
+  </g>
+  <a class="box" id="k1" href="file_harness_e35_prime.html">
+    <title>pilot: label-free gate on three pilot groups</title>
+    <rect x="300" y="90" width="300" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="110" text-anchor="middle">pilot &mdash; label-free gate</text>
+    <text class="box-sub" x="450" y="126" text-anchor="middle">writes _e35_prompt_iterations</text>
+  </a>
+  <a class="box" id="k2" href="file_harness_e35_prime.html">
+    <title>prereg: freeze the passing prompt hash</title>
+    <rect x="300" y="160" width="300" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="180" text-anchor="middle">prereg &mdash; freeze hash</text>
+    <text class="box-sub" x="450" y="196" text-anchor="middle">writes _e35_preregistration</text>
+  </a>
+  <a class="box" id="k3" href="file_harness_e35_prime.html">
+    <title>run: phase A extraction, phase B scorers, registries</title>
+    <rect x="300" y="230" width="300" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="250" text-anchor="middle">run &mdash; phase A + B</text>
+    <text class="box-sub" x="450" y="266" text-anchor="middle">claims, scorers, scores, registries</text>
+  </a>
+  <a class="box" id="k4" href="file_harness_e35_prime.html">
+    <title>eval: zero-LLM assembly of the arms and gradients</title>
+    <rect x="300" y="300" width="300" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="320" text-anchor="middle">eval &mdash; label-free assembly</text>
+    <text class="box-sub" x="450" y="336" text-anchor="middle">148 gradients, no LLM</text>
+  </a>
+  <a class="box" id="k5" href="file_harness_e35_prime.html">
+    <title>duel: the E16v2 judge on the frozen 123-generation population</title>
+    <rect x="300" y="370" width="300" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="390" text-anchor="middle">duel &mdash; E16v2 judge</text>
+    <text class="box-sub" x="450" y="406" text-anchor="middle">123 gradients vs 12 sides</text>
+  </a>
+  <a class="box" id="k6" href="file_harness_e35_prime.html">
+    <title>audit: classify the hallucinated requirements</title>
+    <rect x="300" y="440" width="300" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="460" text-anchor="middle">audit &mdash; hallucination quality</text>
+    <text class="box-sub" x="450" y="476" text-anchor="middle">4 categories, gold as input</text>
+  </a>
+  <a class="box" id="k7" href="file_harness_e35_prime.html">
+    <title>confirm: the one-shot label readout</title>
+    <rect x="300" y="510" width="300" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="530" text-anchor="middle">confirm &mdash; labels read once</text>
+    <text class="box-sub" x="450" y="546" text-anchor="middle">writes E35_prime json+md</text>
+  </a>
+  <a class="box" id="k8" href="file_harness_e35_prime.html">
+    <title>status: ledger summary only</title>
+    <rect x="300" y="580" width="300" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="600" text-anchor="middle">status &mdash; ledger summary</text>
+    <text class="box-sub" x="450" y="616" text-anchor="middle">prints counts, writes nothing</text>
+  </a>
+  <path class="edge" data-from="m" data-to="k1" d="M450,60 V90" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k1" data-to="k2" d="M450,134 V160" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k2" data-to="k3" d="M450,204 V230" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k3" data-to="k4" d="M450,274 V300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k4" data-to="k5" d="M450,344 V370" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k5" data-to="k6" d="M450,414 V440" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k6" data-to="k7" d="M450,484 V510" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="k7" data-to="k8" d="M450,554 V580" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the eight <code>cmd</code> choices are declared at L2829&ndash;L2830 and dispatched at L2839&ndash;L2841; <code>StopRun</code> (L194) is caught at L2842 and exits with code 2 at L2844. The usage order is the docstring phase list L46&ndash;L69. The order is enforced by asserts: <code>prereg</code> file present L2763, prompt hash match L2765, digest-cache join L2769, figure-set match L2775, E24 join L2779, snapshot guard clean L2809.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Results &mdash; the measured numbers</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 360" role="img" aria-label="Readout A: pairs-correct on the 147 contrast generation pairs, one bar per arm">
+  <line x1="300" y1="24" x2="300" y2="320" stroke="#1B4B6B" stroke-width="1"/>
+  <line x1="370" y1="24" x2="370" y2="320" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="440" y1="24" x2="440" y2="320" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="510" y1="24" x2="510" y2="320" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="580" y1="24" x2="580" y2="320" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="650" y1="24" x2="650" y2="320" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="720" y1="24" x2="720" y2="320" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="790" y1="24" x2="790" y2="320" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <text class="box-sub" x="294" y="54" text-anchor="end">e30_online</text>
+  <rect x="300" y="42" width="501.9" height="16" fill="rgba(57,255,136,0.25)" stroke="#39FF88"/>
+  <text class="box-sub" x="807.9" y="54" text-anchor="start">0.7585</text>
+  <text class="box-sub" x="294" y="82" text-anchor="end">e19c_online</text>
+  <rect x="300" y="70" width="478.1" height="16" fill="rgba(57,255,136,0.25)" stroke="#39FF88"/>
+  <text class="box-sub" x="784.1" y="82" text-anchor="start">0.7415</text>
+  <text class="box-sub" x="294" y="110" text-anchor="end">e35_online</text>
+  <rect x="300" y="98" width="430.5" height="16" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+  <text class="box-sub" x="736.5" y="110" text-anchor="start">0.7075</text>
+  <text class="box-sub" x="294" y="138" text-anchor="end">e35_mean_diff</text>
+  <rect x="300" y="126" width="416.2" height="16" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+  <text class="box-sub" x="722.2" y="138" text-anchor="start">0.6973</text>
+  <text class="box-sub" x="294" y="166" text-anchor="end">e35_mean_claim</text>
+  <rect x="300" y="154" width="401.9" height="16" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+  <text class="box-sub" x="707.9" y="166" text-anchor="start">0.6871</text>
+  <text class="box-sub" x="294" y="194" text-anchor="end">e19_md</text>
+  <rect x="300" y="182" width="395.9" height="16" fill="rgba(57,255,136,0.25)" stroke="#39FF88"/>
+  <text class="box-sub" x="701.9" y="194" text-anchor="start">0.6828</text>
+  <text class="box-sub" x="294" y="222" text-anchor="end">e35_online_raw</text>
+  <rect x="300" y="210" width="359.1" height="16" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+  <text class="box-sub" x="665.1" y="222" text-anchor="start">0.6565</text>
+  <text class="box-sub" x="294" y="250" text-anchor="end">e35_temporal</text>
+  <rect x="300" y="238" width="335.3" height="16" fill="rgba(0,229,255,0.30)" stroke="#00E5FF"/>
+  <text class="box-sub" x="641.3" y="250" text-anchor="start">0.6395</text>
+  <text class="box-sub" x="294" y="278" text-anchor="end">recorded_reward</text>
+  <rect x="300" y="266" width="220.9" height="16" fill="rgba(255,181,71,0.30)" stroke="#FFB547"/>
+  <text class="box-sub" x="526.9" y="278" text-anchor="start">0.5578</text>
+  <text class="box-sub" x="294" y="306" text-anchor="end">e18</text>
+  <rect x="300" y="294" width="111.4" height="16" fill="rgba(255,77,106,0.25)" stroke="#FF4D6A"/>
+  <text class="box-sub" x="417.4" y="306" text-anchor="start">0.4796</text>
+  <text class="box-sub" x="300" y="344" text-anchor="middle">0.40</text>
+  <text class="box-sub" x="440" y="344" text-anchor="middle">0.50</text>
+  <text class="box-sub" x="580" y="344" text-anchor="middle">0.60</text>
+  <text class="box-sub" x="720" y="344" text-anchor="middle">0.70</text>
+  <text class="box-sub" x="300" y="18" text-anchor="start">x axis: 0.40 to 0.80</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 &mdash; my computation of bar lengths; values are <code>pooled</code> from <code class="path">results/E35_prime_2026-09-26.json</code> keys <code>readout_a_pairs_correct_contrast.arms.&lt;arm&gt;.pooled</code> (L449 onward; <code>e35_online</code> L553, <code>e35_online_raw</code> L573, <code>e30_online</code> L447, <code>e19c_online</code> L445). All bars are the 147 contrast pairs except <code>e19_md</code> (145). <code>uniform</code> 0.6375 is drawn only in the table, because it covers 80 pairs. Green = a prior channel, cyan = an E35 arm, amber = the recorded reward, red = E18.
+
+<table>
+<thead><tr><th>Metric</th><th>Value</th><th>Source file + key</th></tr></thead>
+<tbody>
+<tr><td>Gated online win-rate, <code>e35_online</code></td><td>0.7075 [0.600, 0.858]</td><td class="sym">E35_prime_2026-09-26.json <code>readout_a_pairs_correct_contrast.arms.e35_online</code> L553 &#183; .md L25</td></tr>
+<tr><td>Ungated arm, <code>e35_online_raw</code></td><td>0.6565 [0.519, 0.821]</td><td class="sym">same key <code>...arms.e35_online_raw</code> L573</td></tr>
+<tr><td>Execution gate delta (gated &minus; ungated)</td><td>+0.0494 [&minus;0.161, +0.298]</td><td class="sym"><code>...paired_diffs_boot_ci95.e35_online_minus_e35_online_raw</code></td></tr>
+<tr><td>Generations reward-capped by E24 status</td><td>35 of 148</td><td class="sym"><code>label_free_summary.gens_gated</code> L2410 &#183; .md L26</td></tr>
+<tr><td>e35_online minus e30_online</td><td>&minus;0.0455 [&minus;0.1937, +0.1371]</td><td class="sym"><code>...paired_diffs_boot_ci95.e35_online_minus_e30_online</code></td></tr>
+<tr><td>e35_online minus e19c_online</td><td>&minus;0.0227 [&minus;0.1635, +0.1603]</td><td class="sym"><code>...paired_diffs_boot_ci95.e35_online_minus_e19c_online</code></td></tr>
+<tr><td>e35_online minus e18</td><td>+0.2321 [+0.0974, +0.3906]</td><td class="sym"><code>...paired_diffs_boot_ci95.e35_online_minus_e18</code></td></tr>
+<tr><td>Flat arm <code>e35_mean_diff</code> vs <code>e19_md</code></td><td>0.6973 vs 0.6828</td><td class="sym"><code>...arms.e35_mean_diff</code>, <code>...arms.e19_md</code></td></tr>
+<tr><td>M2 replay: SR shipped</td><td>e35_online 10/19, e30_online 11/19, oracle 12/19</td><td class="sym"><code>readout_b_m2_replay.sr_shipped</code> L1289 &#183; .md L39</td></tr>
+<tr><td>M2 replay: e35_online minus recorded_reward</td><td>+0.1049 [&minus;0.1053, +0.3158]</td><td class="sym"><code>readout_b_m2_replay.boot_diffs</code></td></tr>
+<tr><td>Per-group Spearman, e35_online vs e30_online</td><td>mean 0.5876, median 0.656, n = 19</td><td class="sym"><code>readout_c_independence.e35_online_vs_e30_online</code> &#183; .md L101</td></tr>
+<tr><td>Claims in the final corpus</td><td>250 = 202 text + 48 visual</td><td class="sym"><code>label_free_summary.claims</code> L2390 &#183; .md L92</td></tr>
+<tr><td>Claims surviving the variance filter</td><td>159; flat groups none</td><td class="sym"><code>label_free_summary.claims_surviving</code></td></tr>
+<tr><td>Score cells observed</td><td>1477 of 1589</td><td class="sym"><code>label_free_summary.observed_scores</code> &#183; my computation from the scores JSONL</td></tr>
+<tr><td>T1 firewall corpus audit</td><td>0 claims with numeric answers, 0 rejected</td><td class="sym"><code>prompt.t1_firewall_corpus_audit.claims_with_numeric_answer_constants</code> L318 &#183; .md L85</td></tr>
+<tr><td>Run-1 false positives (archived screen)</td><td>18 across 7 groups, re-extracted</td><td class="sym">E35_claims_2026-09-26_screenv1_archived.jsonl &#183; .md L20</td></tr>
+<tr><td>Total ledger cost</td><td>$0.8113 of a $20.00 cap</td><td class="sym"><code>cost.ledger_total_usd</code> L409 &#183; .md L119</td></tr>
+<tr><td>Pre-registered prompt hash</td><td><code>5a4bcbd6ffcd41de&hellip;</code></td><td class="sym">_e35_preregistration_2026-09-26.json <code>prompt_sha256</code></td></tr>
+</tbody>
+</table>
+<p class="note">Diagram 1, the stage table and Chart 1 use the frozen E14 plan (19 groups / 148 generations / 667 pairs) named in <code class="path">results/E35_prime_2026-09-26.md</code> L7. <code>uniform</code> and <code>e19_md</code> cover fewer pairs, so their point estimates are not on the same denominator as the 147-pair arms.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Gradient quality and the hallucination audit</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 230" role="img" aria-label="Hallucinated requirement categories: 28 actively harmful, 111 misleading, 43 over-reaching, 14 format mismatch">
+  <line x1="300" y1="20" x2="300" y2="180" stroke="#1B4B6B" stroke-width="1"/>
+  <line x1="442.9" y1="20" x2="442.9" y2="180" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="585.7" y1="20" x2="585.7" y2="180" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <line x1="728.6" y1="20" x2="728.6" y2="180" stroke="#1B4B6B" stroke-width="1" stroke-dasharray="2 4"/>
+  <text class="box-sub" x="294" y="46" text-anchor="end">ACTIVELY_HARMFUL</text>
+  <rect x="300" y="34" width="80.0" height="16" fill="rgba(255,77,106,0.25)" stroke="#FF4D6A"/>
+  <text class="box-sub" x="386.0" y="46" text-anchor="start">28 &mdash; 14.3%</text>
+  <text class="box-sub" x="294" y="82" text-anchor="end">MISLEADING</text>
+  <rect x="300" y="70" width="317.1" height="16" fill="rgba(255,181,71,0.25)" stroke="#FFB547"/>
+  <text class="box-sub" x="623.1" y="82" text-anchor="start">111 &mdash; 56.6%</text>
+  <text class="box-sub" x="294" y="118" text-anchor="end">OVER-REACHING</text>
+  <rect x="300" y="106" width="122.9" height="16" fill="rgba(255,181,71,0.25)" stroke="#FFB547"/>
+  <text class="box-sub" x="428.9" y="118" text-anchor="start">43 &mdash; 21.9%</text>
+  <text class="box-sub" x="294" y="154" text-anchor="end">FORMAT_MISMATCH</text>
+  <rect x="300" y="142" width="40.0" height="16" fill="rgba(255,181,71,0.25)" stroke="#FFB547"/>
+  <text class="box-sub" x="346.0" y="154" text-anchor="start">14 &mdash; 7.1%</text>
+  <text class="box-sub" x="300.0" y="200" text-anchor="middle">0</text>
+  <text class="box-sub" x="442.9" y="200" text-anchor="middle">50</text>
+  <text class="box-sub" x="585.7" y="200" text-anchor="middle">100</text>
+  <text class="box-sub" x="728.6" y="200" text-anchor="middle">150</text>
+  <text class="box-sub" x="300" y="16" text-anchor="start">requirement count, of 196</text>
+</svg>
+</div>
+<p class="figcap">Chart 2 &mdash; my computation of bar lengths; shares are <code>share</code> in <code class="path">_e35_hallucination_audit_2026-09-26.json</code> <code>category_summary</code> (L11 of that file; also embedded at L2763 of <code class="path">E35_prime_2026-09-26.json</code>). 60 of 123 gradients were flagged, and 196 hallucinated requirements were classified.</p>
+
+<table>
+<thead><tr><th>Channel</th><th>Relevance</th><th>Hallucination</th><th>Direction toward / unsure / away</th></tr></thead>
+<tbody>
+<tr><td>e35</td><td>0.690</td><td>0.488</td><td>99 / 13 / 11</td></tr>
+<tr><td>e30</td><td>0.634</td><td>0.520</td><td>80 / 17 / 26</td></tr>
+<tr><td>e19c</td><td>0.553</td><td>0.561</td><td>74 / 24 / 25</td></tr>
+<tr><td>e32</td><td>0.702 (n = 46)</td><td>0.500</td><td>38 / 2 / 6</td></tr>
+<tr><td>truman (gold)</td><td>0.651 (n = 60)</td><td>0.200</td><td>41 / 7 / 12</td></tr>
+<tr><td>e18</td><td>0.526</td><td>0.146</td><td>81 / 26 / 16</td></tr>
+</tbody>
+</table>
+<p class="note">Source: <code class="path">results/E35_gradient_duel_2026-09-26.md</code> side table and <code class="path">.json</code> <code>stats</code>. Paired deltas: e35 &minus; e30 relevance <strong>+0.056 [+0.003, +0.118]</strong> (CI excludes 0), e35 &minus; e19c <strong>+0.137 [+0.070, +0.211]</strong>, e35 &minus; truman <strong>+0.019 [&minus;0.125, +0.198]</strong> (at the gold ceiling), e35 &minus; truman hallucination <strong>+0.350 [+0.051, +0.554]</strong> (gold stays the least-hallucinating). The e32 and truman rows are computed on their shared subsets (46 and 60 of 123), so they are adjacent point estimates on different denominators (<code class="path">.md</code> L112&ndash;L117).</p>
+<p class="note flag">The audit file keeps the per-category row lists capped at 40 entries each (28 / 40 / 40 / 14 = 122 rows), so the lists hold 122 of the 196 requirements that <code>category_summary</code> counts. The truncation rule is not recorded in any file I read.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Quoted evidence</h2>
+<details><summary>five verbatim excerpts from the report and the preregistration</summary><div class="dbody">
+
+<p class="sub">1 &#183; <code class="path">results/E35_prime_2026-09-26.md</code> lines 25&ndash;26, the TL;DR deployment and gate lines</p>
+<blockquote>**Deployment channel (gated online win-rate).** e35_online 0.7075 [0.600,0.858] vs e30_online 0.7585 (&#916; -0.0455 [-0.1937,+0.1371]), e19c_online 0.7415 (&#916; -0.0227 [-0.1635,+0.1603]), e19_md 0.6828 (&#916; +0.0280 [-0.0859,+0.1968]), uniform 0.6375 (&#916; +0.1223 [-0.1477,+0.4792]).
+**Execution-gate effect.** gated vs ungated online (&#916; +0.0494 [-0.1613,+0.2982]); 35 of 148 generations reward-capped by E24 re-execution status.</blockquote>
+
+<p class="sub">2 &#183; <code class="path">results/E35_prime_2026-09-26.md</code> line 28, the gradient-quality line</p>
+<blockquote>**Gradient quality (E16v2, n=123).** relevance 0.690, hallucination 0.488, direction {'toward': 99, 'unsure': 13, 'away': 11} &#8212; vs e30 0.634/0.520, e19c 0.553/0.561, e19 0.627/0.252, e32 0.702/0.500 (46 shared), TRUMAN gold 0.651/0.200 (shared subset). **e35 &#8722; e30 relevance +0.056 [+0.003,+0.118] &#8212; CI excludes 0**</blockquote>
+
+<p class="sub">3 &#183; <code class="path">results/E35_prime_2026-09-26.md</code> lines 86&ndash;88, the T1 firewall check</p>
+<blockquote>- claims encoding specific numeric answers (not goal-stated) in the final corpus: **0** (asserted; deterministic screen over statement / scoring_rule / target against the goal's own numbers)
+- claims rejected at extraction by the firewall (with re-extract) in the final run: 0 (run 1, archived: 18 false-positive rejects across 7 groups before the mechanical screen fix &#8212; disclosed in the iteration table)</blockquote>
+
+<p class="sub">4 &#183; <code class="path">results/_e35_preregistration_2026-09-26.json</code>, the frozen hash</p>
+<pre>{
+ "prompt_version": "e35-v2",
+ "prompt_sha256": "5a4bcbd6ffcd41de9f32c9a15bf0718c6944a0ce2a44b995da11be8ee55c65a2",
+ "frozen_before_full_run": true,</pre>
+
+<p class="sub">5 &#183; <code class="path">results/E35_prime_2026-09-26.md</code> lines 109&ndash;112, the ranking verdict</p>
+<blockquote>- **Ranking verdict is MIXED, reported as measured:** e35_online 0.7075 sits BELOW the two prior online point estimates (e30_online 0.7585, e19c_online 0.7415) with every paired CI spanning 0 (9 contrast groups &#8212; underpowered, declared). The execution gate is the one component with a clearly positive point estimate (raw 0.6565 -&gt; gated 0.7075, &#916; +0.049); the flat mean_diff arm (0.6973) also beats e19_md (0.6828).</blockquote>
+</div></details>
+</div>
+
+<p class="sub">Related pages: <a href="file_harness_e35_prime.html">file_harness_e35_prime.html</a> digests the harness; <a href="exp_e19c_online_bt.html">exp_e19c_online_bt.html</a> is the 0.7415 online baseline; <a href="exp_e19c_ratchet.html">exp_e19c_ratchet.html</a> holds the reward choice; <a href="exp_e19b_eval.html">exp_e19b_eval.html</a> is the earlier ladder and content work; <a href="exp_e24_reexec.html">exp_e24_reexec.html</a> is the execution gate; <a href="exp_e16_gradient_audit.html">exp_e16_gradient_audit.html</a> is the judge instrument; <a href="exp_e18_gradient_duel.html">exp_e18_gradient_duel.html</a> and <a href="exp_e19_gradient_duel.html">exp_e19_gradient_duel.html</a> are the earlier duels; <a href="exp_e14_bt_enabler.html">exp_e14_bt_enabler.html</a> builds the arena; <a href="exp_e25_creed.html">exp_e25_creed.html</a> is the nearest predecessor page; <a href="data_experiments.html">data_experiments.html</a> indexes the results folder; <a href="exp_index.html">exp_index.html</a> is the experiment hub.</p>
+
+<footer>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e35_prime.py</code> (2 848 lines; docstring L1&ndash;L76, constants L114&ndash;L215 and L342&ndash;L735 and L1909, every def and class, <code>cmd_run</code> L2759, <code>cmd_confirm</code> L2097, <code>write_md</code> L2448); <code class="path">experiments_verifiers/results/E35_prime_2026-09-26.md</code> (122 lines, read in full) and <code class="path">.json</code> (9 340 lines, keys cited by line); <code class="path">results/E35_gradient_duel_2026-09-26.md</code> (read in full) and <code class="path">.json</code> <code>stats</code>; <code class="path">results/_e35_hallucination_audit_2026-09-26.json</code> <code>category_summary</code> and <code>categories</code> lengths; <code class="path">results/_e35_label_free_2026-09-26.json</code> <code>summary</code>, <code>figure_groups</code> and summed <code>deciding_stage</code>; <code class="path">results/_e35_preregistration_2026-09-26.json</code> and <code class="path">_e35_prompt_iterations_2026-09-26.json</code>; row counts of the five E35 ledgers; <code class="path">experiments_verifiers/README.md</code>, <code class="path">EXPERIMENTS.md</code> and <code class="path">manifest.json</code> for the E35 identity check; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">exp_e25_creed.html</code> and <code class="path">_clone.css</code> for the house style.</p>
+<p class="skips">Skipped: <code class="path">experiments_verifiers/.env</code> and the repo <code class="path">.env</code> &mdash; never opened (rule). The 250 claim texts and the 148 gradient files &mdash; only counts, category mix, deciding stages and file listing were read; the full texts are large. The <code class="path">E35_prime_2026-09-26.json</code> <code>bt_table</code>, per-group vectors, pairs and claims bodies (9 340 lines) &mdash; only the summary keys cited above were read. <code class="path">_e35_label_free_2026-09-26.json</code> (14 967 lines) &mdash; read only its <code>summary</code>, <code>figure_groups</code> and <code>deciding_stage</code> counters. The <code class="path">E35_gradient_duel_2026-09-26.json</code> 123 pair rows (26 935 lines) &mdash; the <code>.md</code> already prints every mean and delta. The 702 cost-ledger rows &mdash; summed by role only. <code class="path">E35_claims_2026-09-26_screenv1_archived.jsonl</code> (19 rows) &mdash; line count, claim count and rejection count only. Other harnesses (<code class="path">e14_bt_enabler.py</code>, <code class="path">e15_bt_eval.py</code>, <code class="path">e18_scripted_bt.py</code>, <code class="path">e19c_ratchet.py</code>, <code class="path">e16_gradient_audit.py</code>) &mdash; read only at the import and call sites named on this page; their own pages own them. <code class="path">datasets/ScienceAgentBench/*</code>, <code class="path">run_notes/</code>, <code class="path">sources/workflows/</code>, <code class="path">workspace_artefacts/</code>, <code class="path">audits/</code>, <code class="path">webui/</code> &mdash; outside this scope. No experiment, application or test was run.</p>
+<p class="skips">E35 identity check: the codename tables in <code class="path">experiments_verifiers/README.md</code> (through E25 &lsquo;CREED&rsquo; and E26 &lsquo;BUMBLEBEE&rsquo;) do <em>not</em> list E35, and <code class="path">experiments_verifiers/EXPERIMENTS.md</code> and <code class="path">experiments_verifiers/manifest.json</code> contain no E35 entry either (greps for <code>e35</code>, <code>E35</code>, <code>PRIME</code>: no hit, except an unrelated uuid in the manifest). The only prose identity I found is outside those three files: <code class="path">experiments_verifiers/REPORT_cycle2_E12-E19.html</code> L1153 titles it &quot;E35 'PRIME' &mdash; Verifier v3: the final production prototype&quot;. The harness itself is the source of record.</p>
+<p class="skips">Volatility: <code>experiments_verifiers/</code> is not tracked by git and its files are dated 2026-09-26; this page is measured at 2026-09-26. The E35 run was already complete when this clone was built (no ledger grew during the build), so the counts here are a final state, not a snapshot in flight. The report says the confirmatory stage was re-run three times and its JSON of record is byte-identical (<code class="path">.md</code> L116).</p>
+<p>Gaps: E35 is a research harness, not production code &mdash; it patches production modules in process (L167&ndash;L174) and writes only into <code class="path">experiments_verifiers/results/</code>. It cannot tell us how the prototype would behave online inside Mimosa's evolution loop: the arena is frozen offline data, only 9 contrast groups carry the ranking CIs (declared underpowered), and the visual layer is a cache read of the frozen E26 run with 0 fresh kimi calls. The gate mapping (E24 <code>timeout</code> to the 0.0 crash cap) is a disclosed choice, not a measurement.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

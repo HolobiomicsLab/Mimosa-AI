@@ -51,6 +51,12 @@ class IndividualRun:
     cost: float = 0.0
     reward: float = 0.0
     reward_uncapped: float = 0.0
+    # True when ``reward`` is a first-generation mean-claim fallback rather
+    # than a pairwise win (see WorkflowInfo.reward_is_fallback). Fallback
+    # rewards live on a different scale and must not compete in the final
+    # capsule-selection argmax (E37 R1: bulk_modulus shipped gen 0's 0.89
+    # fallback over gen 11's winning 0.70 pairwise reward).
+    reward_is_fallback: bool = False
     max_depth: int = 3
     iteration_count: int = 0
     judge: bool = False

@@ -108,10 +108,10 @@
     <title>The returned map and where the caller stores it</title>
     <rect x="20" y="210" width="190" height="110" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
     <text class="box-label" x="115" y="234" text-anchor="middle">out: dict[path, digest]</text>
-    <text class="box-sub" x="115" y="252" text-anchor="middle">registry.digests (layers.py:314)</text>
+    <text class="box-sub" x="115" y="252" text-anchor="middle">registry.digests (layers.py:411)</text>
     <text class="box-sub" x="115" y="268" text-anchor="middle">JSON key "digests"</text>
-    <text class="box-sub" x="115" y="284" text-anchor="middle">read back at layers.py:301</text>
-    <text class="box-sub" x="115" y="300" text-anchor="middle">into scorer prompt (327, 336)</text>
+    <text class="box-sub" x="115" y="284" text-anchor="middle">read back at layers.py:398</text>
+    <text class="box-sub" x="115" y="300" text-anchor="middle">into scorer prompt (424, 433)</text>
   </g>
 
   <g class="box" id="gGuard">
@@ -139,7 +139,7 @@
   <text class="edge-label" x="125" y="190" text-anchor="start">cached next task round</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. The pipeline runs inside <code>ensure_digests</code> (lines 116-175); it calls <code>sample_sections</code> (157), <code>digest_prompt</code> (165), then <code>parse_digests</code> (170). <code>render_digests</code> is not called from <code>ensure_digests</code>: the caller calls it (<code>layers.py:302</code>, <code>315</code>, <code>327</code>). The judge HTTP call sits behind the <code>llm_text</code> callable, so this file makes no network call.</p>
+<p class="figcap">Diagram 1 &mdash; <code>9 boxes</code>. The pipeline runs inside <code>ensure_digests</code> (lines 116-175); it calls <code>sample_sections</code> (157), <code>digest_prompt</code> (165), then <code>parse_digests</code> (170). <code>render_digests</code> is not called from <code>ensure_digests</code>: the caller calls it (<code>layers.py:399</code>, <code>412</code>, <code>424</code>). The judge HTTP call sits behind the <code>llm_text</code> callable, so this file makes no network call.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -165,7 +165,7 @@
     <text class="box-label" x="130" y="54" text-anchor="middle">config field</text>
     <text class="box-sub" x="130" y="72" text-anchor="middle">hybrid_verifier_digest_max_files</text>
     <text class="box-sub" x="130" y="88" text-anchor="middle">default 8 (config.py:88)</text>
-    <text class="box-sub" x="130" y="104" text-anchor="middle">read at evaluator.py:208</text>
+    <text class="box-sub" x="130" y="104" text-anchor="middle">read at evaluator.py:245</text>
   </g>
 
   <a class="box" id="fFn" href="../../sources/evaluators/hybrid_verifier/digest.py">
@@ -192,8 +192,8 @@
     <title>The cache this map lands in</title>
     <rect x="760" y="180" width="200" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="860" y="204" text-anchor="middle">registry.digests</text>
-    <text class="box-sub" x="860" y="222" text-anchor="middle">written by layers.py:314</text>
-    <text class="box-sub" x="860" y="238" text-anchor="middle">JSON key "digests" (registry.py:130)</text>
+    <text class="box-sub" x="860" y="222" text-anchor="middle">written by layers.py:411</text>
+    <text class="box-sub" x="860" y="238" text-anchor="middle">JSON key "digests" (registry.py:132)</text>
     <text class="box-sub" x="860" y="254" text-anchor="middle">loaded at registry.py:92</text>
     <text class="box-sub" x="860" y="270" text-anchor="middle">one judge call per task</text>
   </g>
@@ -202,8 +202,8 @@
     <title>Consumers of the rendered block</title>
     <rect x="380" y="180" width="240" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="500" y="204" text-anchor="middle">scorer prompt</text>
-    <text class="box-sub" x="500" y="222" text-anchor="middle">digests_block argument (layers.py:327)</text>
-    <text class="box-sub" x="500" y="238" text-anchor="middle">scorers.scorer_prompt (336)</text>
+    <text class="box-sub" x="500" y="222" text-anchor="middle">digests_block argument (layers.py:424)</text>
+    <text class="box-sub" x="500" y="238" text-anchor="middle">scorers.scorer_prompt (433)</text>
     <text class="box-sub" x="500" y="254" text-anchor="middle">harness consumer: digest block (e19c_ratchet.py:567)</text>
     <text class="box-sub" x="500" y="270" text-anchor="middle">empty cache: renders the "no digests" line</text>
   </g>
@@ -231,7 +231,7 @@
   <text class="box-sub" x="20" y="318">Config fields: one (hybrid_verifier_digest_max_files). Files written: none.</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. The only config field is <code>hybrid_verifier_digest_max_files</code> (<a href="../../config.py">config.py</a>:88, default 8); it is read by the evaluator (<code>evaluator.py:208</code>) and passed to the layer as <code>max_files</code>. This file writes nothing: the caller stores the returned map in the registry JSON.</p>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. The only config field is <code>hybrid_verifier_digest_max_files</code> (<a href="../../config.py">config.py</a>:88, default 8); it is read by the evaluator (<code>evaluator.py:245</code>) and passed to the layer as <code>max_files</code>. This file writes nothing: the caller stores the returned map in the registry JSON.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -313,7 +313,7 @@
     <rect x="660" y="240" width="300" height="70" rx="2" fill="rgba(57,255,136,0.07)" stroke="#39FF88"/>
     <text class="box-label" x="810" y="266" text-anchor="middle">return cached unchanged (142)</text>
     <text class="box-sub" x="810" y="284" text-anchor="middle">no file read, no judge call</text>
-    <text class="box-sub" x="810" y="300" text-anchor="middle">covered by test at test line 1154</text>
+    <text class="box-sub" x="810" y="300" text-anchor="middle">covered by test at test line 1248</text>
   </g>
 
   <path class="edge" data-from="q0" data-to="q1" d="M135,86 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
@@ -346,15 +346,15 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_digest_max_files</td><td>config.py:88, read at evaluator.py:208</td><td>cap on sampled files, default 8</td></tr>
+<tr><td class="sym">config field</td><td class="sym">hybrid_verifier_digest_max_files</td><td>config.py:88, read at evaluator.py:245</td><td>cap on sampled files, default 8</td></tr>
 <tr><td class="sym">argument</td><td class="sym">workspace, inventory, cached</td><td>lines 117-119</td><td>root, file rows, cache to honour</td></tr>
 <tr><td class="sym">argument</td><td class="sym">llm_text</td><td>line 120, called at 165</td><td>one judge round-trip, injected by the caller</td></tr>
 <tr><td class="sym">argument</td><td class="sym">uuid, max_files, logger</td><td>lines 121-123</td><td>memory scoping, cap, warning sink</td></tr>
 <tr><td class="sym">inventory key</td><td class="sym">info["bytes"]</td><td>line 151</td><td>larger file first inside the same rank</td></tr>
 <tr><td class="sym">inventory key</td><td class="sym">info["signal"]</td><td>lines 160-161</td><td>short shape hint printed in the prompt</td></tr>
 <tr><td class="sym">file read</td><td class="sym">workspace / rel</td><td>line 157, open at 40</td><td>head, middle, tail byte slices</td></tr>
-<tr><td class="sym">state read</td><td class="sym">registry.digests</td><td>passed in as cached (layers.py:307)</td><td>skip the call when the task already has digests</td></tr>
-<tr><td class="sym">state written</td><td class="sym">registry.digests</td><td>layers.py:314 (this file does not write)</td><td>cache for every later generation</td></tr>
+<tr><td class="sym">state read</td><td class="sym">registry.digests</td><td>passed in as cached (layers.py:404)</td><td>skip the call when the task already has digests</td></tr>
+<tr><td class="sym">state written</td><td class="sym">registry.digests</td><td>layers.py:411 (this file does not write)</td><td>cache for every later generation</td></tr>
 <tr><td class="sym">constant</td><td class="sym">SLICE_BYTES</td><td>line 28 = 1200</td><td>bytes per head, middle and tail slice</td></tr>
 <tr><td class="sym">constant</td><td class="sym">MAX_FILES_DEFAULT</td><td>line 29 = 8</td><td>default for the max_files argument</td></tr>
 <tr><td class="sym">constant</td><td class="sym">digest cap</td><td>line 104, text[:400]</td><td>longest digest kept per file</td></tr>
@@ -393,13 +393,13 @@ judge agent name used: "hybrid_format_digest"                           # L165</
 <table>
 <thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>ClaimsEvidenceLayer._ensure_digests</code> and <code>_build_scorer</code></td><td class="sym">import L25; calls 302, 304, 315, 327</td></tr>
-<tr><td class="sym">ClaimsEvidenceLayer._ensure_digests</td><td><code>render_digests</code> on the cache hit path, else <code>ensure_digests</code> with <code>max_files=self.digest_max_files</code></td><td class="sym">layers.py 294-315</td></tr>
-<tr><td class="sym">ClaimsEvidenceLayer.collect</td><td>calls <code>_ensure_digests</code> once per generation, before scoring</td><td class="sym">layers.py 468</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>ClaimsEvidenceLayer._ensure_digests</code> and <code>_build_scorer</code></td><td class="sym">import L33; calls 399, 401, 412, 424</td></tr>
+<tr><td class="sym">ClaimsEvidenceLayer._ensure_digests</td><td><code>render_digests</code> on the cache hit path, else <code>ensure_digests</code> with <code>max_files=self.digest_max_files</code></td><td class="sym">layers.py 391-412</td></tr>
+<tr><td class="sym">ClaimsEvidenceLayer.collect</td><td>calls <code>_ensure_digests</code> once per generation, before scoring</td><td class="sym">layers.py 565</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td><code>ensure_digests</code> with <code>MAX_FILES_DEFAULT</code>, and <code>render_digests</code> for the prompt</td><td class="sym">import L47; 367-371, 567</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_digest_sampling_deterministic_and_bounded</code>: same text twice, byte bound, JSON parsing</td><td class="sym">lines 1160-1178</td></tr>
-<tr><td class="sym">test_format_digest_cached_once_per_task</td><td>runs <code>layer._ensure_digests</code> twice; asserts one LLM call and <code>registry.digests</code> filled</td><td class="sym">lines 1120-1157</td></tr>
-<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>checks the rendered digest text reaches <code>scorers.scorer_prompt</code></td><td class="sym">lines 1181-1191</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>test_digest_sampling_deterministic_and_bounded</code>: same text twice, byte bound, JSON parsing</td><td class="sym">lines 1288-1307</td></tr>
+<tr><td class="sym">test_format_digest_cached_once_per_task</td><td>runs <code>layer._ensure_digests</code> twice; asserts one LLM call and <code>registry.digests</code> filled</td><td class="sym">lines 1248-1286</td></tr>
+<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>checks the rendered digest text reaches <code>scorers.scorer_prompt</code></td><td class="sym">lines 1309-1326</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a></td><td><code>extract_json_payload</code>, the tolerant JSON fence stripper</td><td class="sym">import L23; definition base.py:21</td></tr>
 <tr><td class="sym">digest_prompt / render_digests</td><td>no direct unit test; both run through the layer tests above</td><td class="sym">grep tests/</td></tr>
 </tbody>
@@ -408,9 +408,9 @@ judge agent name used: "hybrid_format_digest"                           # L165</
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/digest.py">sources/evaluators/hybrid_verifier/digest.py</a> (all 175 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L25 import, L294-L315 digest helper, L327-L336 scorer prompt, L468 collect), <a href="../../sources/evaluators/hybrid_verifier/inventory.py">inventory.py</a> (<code>_deliverable_rank</code> L149, <code>scan_workspace</code> L95), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L63, L92, L130 for the <code>digests</code> key), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L204-L211 <code>digest_max_files</code>), <a href="../../config.py">config.py</a> (L88), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L1120-L1191), <a href="../../sources/evaluators/base.py">base.py</a> (L21), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/digest.py">sources/evaluators/hybrid_verifier/digest.py</a> (all 175 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L33 import, L391-L412 digest helper, L424-L433 scorer prompt, L565 collect), <a href="../../sources/evaluators/hybrid_verifier/inventory.py">inventory.py</a> (<code>_deliverable_rank</code> L178, <code>scan_workspace</code> L95), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (L63, L92, L132 for the <code>digests</code> key), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L241-L249 <code>digest_max_files</code>), <a href="../../config.py">config.py</a> (L88), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L1248-L1326), <a href="../../sources/evaluators/base.py">base.py</a> (L21), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code>.</p>
 <p class="skips">Skipped: the full prompt prose of <code>digest_prompt</code> (summarised as four rules with line numbers); the internals of <code>inventory._deliverable_rank</code> (private to <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>); the binary-content handling of files that are not UTF-8 (line 49 uses <code>errors="replace"</code>, not read further); <code>docs/concepts/evaluation-pipeline.md</code> (doc claims were not used as evidence on this page). No pytest run and no application run, by the build rules.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git ls-files sources/evaluators/hybrid_verifier</code> returns 0 files (checked 2026-10-02), so this page describes the working tree, not the committed tree.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

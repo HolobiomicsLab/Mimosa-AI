@@ -20,8 +20,10 @@ Aggregation modes (``hybrid_verifier_pairwise_mode``):
   kept as options (see ``experiments_verifiers/harness/e19b_dryrun.py``).
 
 Also ports E19's ``claim_stats`` variance filter: a claim with no
-observed scores is dead (``all_fail``); a claim whose observed scores are
-all equal (with ≥ 2 observations) is dead (``zero_variance``).
+measured scores is dead (``all_scorer_fail`` — every scorer crashed);
+a claim whose measured scores are all equal (with >= 2 observations)
+is dead (``zero_variance``). Crashed scorers (``None``) never count as
+measurements (E37 R3).
 """
 
 from __future__ import annotations
@@ -55,14 +57,21 @@ MIN_OBS_FOR_VARIANCE = 2
 
 
 def claim_stats(observed: list[float | None]) -> dict[str, Any]:
-    """Per-claim observation stats + drop decision (E19 semantics)."""
+    """Per-claim observation stats + drop decision (E19 semantics, E37 R3).
+
+    ``None`` observations are crashed scorers, not measurements: they are
+    excluded before any verdict, so a crashed scorer is never confused
+    with a measured constant. A claim is ``zero_variance`` only with
+    >= 2 measured observations that are all equal; a claim whose every
+    observation crashed is ``all_scorer_fail`` (could not be verified).
+    """
     obs = [float(s) for s in observed if s is not None]
     if not obs:
         return {
             "n_obs": 0,
             "variance": None,
             "dropped": True,
-            "drop_reason": "all_fail",
+            "drop_reason": "all_scorer_fail",
         }
     if len(obs) < MIN_OBS_FOR_VARIANCE:
         return {

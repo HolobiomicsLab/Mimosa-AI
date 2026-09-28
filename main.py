@@ -74,6 +74,42 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--pushover_token", type=str, help="Override Pushover API token")
     parser.add_argument("--pushover_user", type=str, help="Override Pushover user key")
     parser.add_argument(
+        "--verifier_kind",
+        type=str,
+        choices=["hybrid", "legacy"],
+        help="Verifier channel: 'hybrid' (E19/E19b, default) or 'legacy' (deprecated multi-source verifier)",
+    )
+    parser.add_argument("--hybrid_verifier_num_claims", type=int, help="Override target key-claim count for the hybrid verifier")
+    parser.add_argument("--hybrid_verifier_refinement_rounds", type=int, help="Override max replacement claims per generation (hybrid verifier)")
+    parser.add_argument("--hybrid_verifier_scorer_timeout_s", type=int, help="Override hybrid verifier scorer subprocess timeout (seconds)")
+    parser.add_argument("--hybrid_verifier_digest_max_files", type=int, help="Override max deliverable files sampled by the hybrid verifier format digest")
+    parser.add_argument(
+        "--hybrid_verifier_pairwise_mode",
+        type=str,
+        choices=["temporal", "temporal_strict", "mean_diff", "sign_sum", "escalation"],
+        help="Override hybrid verifier pairwise reward mode (default temporal)",
+    )
+    parser.add_argument(
+        "--hybrid_verifier_reward",
+        type=str,
+        choices=["win_rate", "bradley_terry"],
+        help="Override hybrid verifier reward aggregation (default win_rate — measured best on the frozen arena)",
+    )
+    parser.add_argument(
+        "--hybrid_verifier_visual_rung",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable/disable the E26/E35 visual rung (figure tasks: goal-anchored "
+        "visual claims scored by the vision model, ladder stage before 'script')",
+    )
+    parser.add_argument(
+        "--hybrid_verifier_execution_gate",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable/disable the E24/E35 execution gate (crash/no-entry/timeout "
+        "re-execution caps reward at 0.0; divergent caps it at 0.5)",
+    )
+    parser.add_argument(
         "--planner_human_approve",
         action="store_true",
         default=False,
@@ -92,6 +128,24 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.prompt_workflow_creator = args.prompt_workflow_creator
     if args.runner_default_python_version:
         config.runner_default_python_version = args.runner_default_python_version
+    if getattr(args, "verifier_kind", None):
+        config.verifier_kind = args.verifier_kind
+    if getattr(args, "hybrid_verifier_num_claims", None):
+        config.hybrid_verifier_num_claims = args.hybrid_verifier_num_claims
+    if getattr(args, "hybrid_verifier_refinement_rounds", None):
+        config.hybrid_verifier_refinement_rounds = args.hybrid_verifier_refinement_rounds
+    if getattr(args, "hybrid_verifier_scorer_timeout_s", None):
+        config.hybrid_verifier_scorer_timeout_s = args.hybrid_verifier_scorer_timeout_s
+    if getattr(args, "hybrid_verifier_pairwise_mode", None):
+        config.hybrid_verifier_pairwise_mode = args.hybrid_verifier_pairwise_mode
+    if getattr(args, "hybrid_verifier_reward", None):
+        config.hybrid_verifier_reward = args.hybrid_verifier_reward
+    if getattr(args, "hybrid_verifier_digest_max_files", None):
+        config.hybrid_verifier_digest_max_files = args.hybrid_verifier_digest_max_files
+    if getattr(args, "hybrid_verifier_visual_rung", None) is not None:
+        config.hybrid_verifier_visual_rung = args.hybrid_verifier_visual_rung
+    if getattr(args, "hybrid_verifier_execution_gate", None) is not None:
+        config.hybrid_verifier_execution_gate = args.hybrid_verifier_execution_gate
     if args.runner_default_timeout:
         config.runner_default_timeout = args.runner_default_timeout
     if args.runner_default_max_memory_mb:

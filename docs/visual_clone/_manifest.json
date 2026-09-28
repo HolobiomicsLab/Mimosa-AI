@@ -1,7 +1,7 @@
 {
-  "built_commit": "7e8463b",
-  "built_date": "2026-10-02",
-  "build_note": "First build. HEAD was 7e8463b; the working tree also had uncommitted edits.",
+  "built_commit": "336fe19",
+  "built_date": "2026-09-26",
+  "build_note": "Update build. HEAD is 336fe19 (it committed the sources/evaluators sub-package split: generic/, scenario/, legacy_verifier/); the working tree additionally deletes the 8 flat sources/evaluators/*.py modules and modifies sources/evaluators/evaluator.py plus hybrid_verifier/claims.py and gradient.py. 36 pages (34 edited + 2 new) were re-synced on 2026-09-26.",
   "pages": {
     "area_benchmark_evaluation.html": {
       "covers": [
@@ -18,8 +18,8 @@
       "covers": [
         "sources/cli/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "sources/cli/__pycache__: build artifacts",
         "webui/backend/mimosa_bridge.py: web UI out of scope (Tier D)"
@@ -34,8 +34,8 @@
         "cleanup.sh",
         "workflow_evolution_anim.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "sources/utils/*, sources/cli/*: read only for call targets, owned by area_utils.html / area_cli.html",
         "Tier D: docs/*, webui/, datasets/, run_notes/, runs_capsule/, sources/workflows/, sources/memory/, logs/, audits/, CLA/"
@@ -43,24 +43,22 @@
     },
     "area_evaluators.html": {
       "covers": [
-        "sources/evaluators/*.py"
+        "sources/evaluators/*.py",
+        "sources/evaluators/generic/*.py",
+        "sources/evaluators/scenario/*.py",
+        "sources/evaluators/legacy_verifier/*.py",
+        "sources/evaluators/hybrid_verifier/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "area_evaluators_legacy.html": {
       "covers": [
-        "sources/evaluators/verifier*.py",
-        "sources/evaluators/base.py",
-        "sources/evaluators/evaluator.py",
-        "sources/evaluators/generic.py",
-        "sources/evaluators/scenario.py",
-        "sources/evaluators/bs_detection.py",
-        "sources/evaluators/grounding.py"
+        "sources/evaluators/legacy_verifier/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "per-file cards for verifier*.py: one diagram + one table only",
         "recovery/visual/package-install branch bodies (entry points only)"
@@ -94,16 +92,16 @@
       "covers": [
         "sources/core/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "area_tests.html": {
       "covers": [
         "tests/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "tests/__pycache__/*.pyc: generated output, not source",
         "test bodies: page is a coverage matrix, not per-test text",
@@ -138,10 +136,11 @@
     "data_experiments.html": {
       "covers": [
         "experiments_verifiers/**",
-        "diversity_experiments/**"
+        "experiments_verifiers/results/*",
+        "diversity_experiments/*"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "experiments_verifiers/.env: never opened (secrets rule)",
         "results/_e24_venv/: virtualenv, size counted only",
@@ -168,8 +167,8 @@
         "logs/**",
         "tmp/**"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "sources/workflows/**/workflow_genotype_*.py (20474 files): name and writer only",
         "tmp/mimosa_venv/: ~4.9 GB of installed packages",
@@ -191,8 +190,8 @@
         "sources/evaluators/hybrid_verifier/registry.py",
         "config.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "sources/core/factory.py, workflow_factory.py, single_agent_factory.py, schema.py: builder helpers, not the loop",
         "sources/core/failure_fingerprint.py: written by the verifier, not read by the loop",
@@ -251,8 +250,8 @@
         "sources/evaluators/base.py",
         "sources/evaluators/evaluator.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "sources/evaluators/verifier*.py etc: covered by area_evaluators_legacy.html"
       ]
@@ -261,8 +260,8 @@
       "covers": [
         "docs/visual_clone/*.html"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "mod_core_evolution_engine.html": {
@@ -272,8 +271,8 @@
         "sources/core/failure_fingerprint.py",
         "sources/core/orchestrator.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "sources/utils/* one-line roles only, no cards",
         "sources/core/genotype_embedding.py: only its entry point embed_genotype is shown"
@@ -358,8 +357,8 @@
       "covers": [
         "sources/evaluators/hybrid_verifier/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "sources/evaluators/*.py at folder root: covered by area_evaluators.html / area_evaluators_legacy.html",
         "experiments_verifiers/ harnesses: not opened, out of scope"
@@ -629,10 +628,10 @@
     "exp_index.html": {
       "covers": [
         "experiments_verifiers/harness/*.py",
-        "experiments_verifiers/results/**"
+        "experiments_verifiers/results/*"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "exp_e18_bt_eval.html": {
@@ -1380,8 +1379,8 @@
       "covers": [
         "sources/core/failure_fingerprint.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_core_genotype_embedding.html": {
@@ -1404,8 +1403,8 @@
       "covers": [
         "sources/core/llm_provider.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_core_orchestrator.html": {
@@ -1484,8 +1483,8 @@
       "covers": [
         "sources/core/workflow_runner.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_core_workflow_selection.html": {
@@ -1924,139 +1923,139 @@
       "covers": [
         "sources/evaluators/base.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_eval_bs_detection.html": {
       "covers": [
-        "sources/evaluators/bs_detection.py"
+        "sources/evaluators/generic/bs_detection.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_eval_evaluator.html": {
       "covers": [
         "sources/evaluators/evaluator.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_eval_generic.html": {
       "covers": [
-        "sources/evaluators/generic.py"
+        "sources/evaluators/generic/generic.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_eval_grounding.html": {
       "covers": [
         "sources/evaluators/grounding.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_eval_scenario.html": {
       "covers": [
-        "sources/evaluators/scenario.py"
+        "sources/evaluators/scenario/scenario.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_init.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/__init__.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_aggregation.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/aggregation.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_claims.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/claims.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_digest.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/digest.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_evaluator.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/evaluator.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_gradient.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/gradient.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_inventory.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/inventory.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_layers.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/layers.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_registry.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/registry.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_hybrid_scorers.html": {
       "covers": [
         "sources/evaluators/hybrid_verifier/scorers.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": []
     },
     "file_index.html": {
       "covers": [
         "sources/core/*.py",
-        "experiments_verifiers/harness/*.py",
+        "sources/evaluators/**/*.py",
         "sources/evaluators/*.py",
-        "sources/evaluators/hybrid_verifier/*.py"
+        "experiments_verifiers/harness/*.py"
       ],
-      "commit": "7e8463b",
-      "date": "2026-10-02",
+      "commit": "336fe19",
+      "date": "2026-09-26",
       "skipped": [
         "sources/evaluators/verifier*.py (deprecated)"
       ]
@@ -2083,6 +2082,34 @@
       "commit": "7e8463b",
       "date": "2026-10-02",
       "skipped": []
+    },
+    "exp_e35_prime.html": {
+      "covers": [
+        "experiments_verifiers/harness/e35_prime.py",
+        "experiments_verifiers/results/E35_prime_2026-09-26.json",
+        "experiments_verifiers/results/E35_prime_2026-09-26.md",
+        "experiments_verifiers/results/E35_gradient_duel_2026-09-26.json",
+        "experiments_verifiers/results/E35_gradient_duel_2026-09-26.md",
+        "experiments_verifiers/results/E35_claims_2026-09-26.jsonl",
+        "experiments_verifiers/results/E35_scorers_2026-09-26.jsonl",
+        "experiments_verifiers/results/E35_scores_2026-09-26.jsonl",
+        "experiments_verifiers/results/E35_cost_ledger_2026-09-26.jsonl",
+        "experiments_verifiers/results/E35_registries/*",
+        "experiments_verifiers/results/E35_prime_gradients/*",
+        "experiments_verifiers/results/_e35_*",
+        "experiments_verifiers/results/E35_*_screenv1_archived.jsonl"
+      ],
+      "skipped": [],
+      "commit": "336fe19",
+      "date": "2026-09-26"
+    },
+    "file_harness_e35_prime.html": {
+      "covers": [
+        "experiments_verifiers/harness/e35_prime.py"
+      ],
+      "skipped": [],
+      "commit": "336fe19",
+      "date": "2026-09-26"
     }
   },
   "changelog": [
@@ -2224,6 +2251,49 @@
         "index.html"
       ],
       "note": "E25 update reviewed: 164 numbers re-derived; V2/V3 pilot arms, the 219-row snapshot and the 394-row cost ledger corrected, result-file listing and counts refreshed."
+    },
+    {
+      "date": "2026-09-26",
+      "commit": "336fe19",
+      "pages": [
+        "area_cli.html",
+        "area_entry_config.html",
+        "area_evaluators.html",
+        "area_evaluators_legacy.html",
+        "area_sources_core.html",
+        "area_tests.html",
+        "data_experiments.html",
+        "data_runs.html",
+        "exp_e35_prime.html",
+        "exp_index.html",
+        "file_core_failure_fingerprint.html",
+        "file_core_llm_provider.html",
+        "file_core_workflow_runner.html",
+        "file_eval_base.html",
+        "file_eval_bs_detection.html",
+        "file_eval_evaluator.html",
+        "file_eval_generic.html",
+        "file_eval_grounding.html",
+        "file_eval_scenario.html",
+        "file_harness_e35_prime.html",
+        "file_hybrid_aggregation.html",
+        "file_hybrid_claims.html",
+        "file_hybrid_digest.html",
+        "file_hybrid_evaluator.html",
+        "file_hybrid_gradient.html",
+        "file_hybrid_init.html",
+        "file_hybrid_inventory.html",
+        "file_hybrid_layers.html",
+        "file_hybrid_registry.html",
+        "file_hybrid_scorers.html",
+        "file_index.html",
+        "flow_evolution_loop.html",
+        "flow_verification.html",
+        "index.html",
+        "mod_core_evolution_engine.html",
+        "mod_evaluators_hybrid_verifier.html"
+      ],
+      "note": "Update after the sources/evaluators split and experiment E35. (a) sources/evaluators/ was reorganised at 336fe19 into sub-packages generic/, scenario/ and legacy_verifier/, and the 8 flat modules are deleted in the working tree; the area page, the deprecated-legacy page and the six file digest pages were re-pointed, and 9 pages outside the area had their stale links fixed. (b) sources/evaluators/evaluator.py now selects the verifier channel from config.verifier_kind (default hybrid, 'legacy' lazy-imports .legacy_verifier.VerifierEvaluator). (c) the hybrid_verifier package was committed at 336fe19 much larger than the previous build saw (layers.py 497->1037, evaluator.py 645->784, claims.py 375->701), so 8 file cards plus the L2 page were re-synced; claims.py gained _first_json_block/_as_verdict_list and gradient.py dropped its 3-line 'Generated: verifier v3 PRIME' preamble. The three hub pages (exp_index.html, file_index.html, data_experiments.html) were recounted the same day (harness 54->67 scripts, 28 266->31 115 charted lines over the 55 pages, results/ 145->235 entries, core rows corrected by -1 for factory.py, orchestrator.py, workflow_runner.py). (d) E35 PRIME is new to the clone: exp_e35_prime.html + file_harness_e35_prime.html; E26-E34 and E36 still have no page. 34 pages edited and 2 created; date is the git author date of 336fe19; older changelog rows carry 2026-10-02, the date recorded by the previous build session. An independent reviewer then checked the 36 pages: 0 external refs, 4034 local links resolve, index/manifest/disk 1:1, no secrets, the restructure claims true. It found 13 defects (1 wrong writer, 4 wrong line refs, 6 stale test line refs, over-budget table cells); the polish pass fixed them all, plus 7 further stale test refs found in the same files."
     }
   ],
   "review": {
@@ -2238,7 +2308,9 @@
       "fd-rev-core",
       "fd-rev-eval",
       "fd-rev-harness-a",
-      "fd-rev-harness-b"
+      "fd-rev-harness-b",
+      "reviewer-2026-09-26",
+      "polish-2026-09-26"
     ],
     "numbers_re_derived": 1625,
     "checks": [
@@ -2254,13 +2326,13 @@
     ]
   },
   "counts": {
-    "pages": 174,
-    "html_files": 174,
+    "pages": 176,
+    "html_files": 176,
     "diagrams": 447,
-    "file_digest_pages": 89,
-    "file_digest_files_with_prefix": 90,
-    "experiment_pages": 54,
-    "experiment_files_with_prefix": 55,
+    "file_digest_pages": 90,
+    "file_digest_files_with_prefix": 91,
+    "experiment_pages": 55,
+    "experiment_files_with_prefix": 56,
     "note": "prefix counts include the two hub pages file_index.html and exp_index.html"
   }
 }

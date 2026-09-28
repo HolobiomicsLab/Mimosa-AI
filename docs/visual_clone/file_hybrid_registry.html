@@ -65,8 +65,8 @@
     <title>_migrate_claim_stages: back-fill ladder metadata</title>
     <rect x="630" y="40" width="185" height="115" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="722" y="64" text-anchor="middle">_migrate_claim_stages (104)</text>
-    <text class="box-sub" x="722" y="82" text-anchor="middle">stage missing: "result" (114)</text>
-    <text class="box-sub" x="722" y="98" text-anchor="middle">unknown stage: "result" (115)</text>
+    <text class="box-sub" x="722" y="82" text-anchor="middle">stage missing: "result" (114-115)</text>
+    <text class="box-sub" x="722" y="98" text-anchor="middle">unknown stage: "result" (116-117)</text>
     <text class="box-sub" x="722" y="114" text-anchor="middle">temporal_index = order (118)</text>
     <text class="box-sub" x="722" y="130" text-anchor="middle">runs on load only (94)</text>
   </a>
@@ -85,43 +85,43 @@
     <title>Claim set management methods</title>
     <rect x="10" y="205" width="320" height="120" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="170" y="229" text-anchor="middle">claim set management</text>
-    <text class="box-sub" x="170" y="247" text-anchor="middle">claim (143) lookup by id</text>
-    <text class="box-sub" x="170" y="263" text-anchor="middle">seed_claims (147) first extraction only</text>
-    <text class="box-sub" x="170" y="279" text-anchor="middle">replace_claims (162) drop dead, append new</text>
-    <text class="box-sub" x="170" y="295" text-anchor="middle">mark_dead (185) / mark_alive (192)</text>
-    <text class="box-sub" x="170" y="311" text-anchor="middle">set_scorer (207) caches the script</text>
+    <text class="box-sub" x="170" y="247" text-anchor="middle">claim (145) lookup by id</text>
+    <text class="box-sub" x="170" y="263" text-anchor="middle">seed_claims (149) first extraction only</text>
+    <text class="box-sub" x="170" y="279" text-anchor="middle">replace_claims (164) drop dead, append new</text>
+    <text class="box-sub" x="170" y="295" text-anchor="middle">mark_dead (187) / mark_alive (194)</text>
+    <text class="box-sub" x="170" y="311" text-anchor="middle">set_scorer (237) caches the script</text>
   </a>
 
   <a class="box" id="gGens" href="../../sources/evaluators/hybrid_verifier/registry.py">
     <title>Generation score history methods</title>
     <rect x="355" y="205" width="300" height="120" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="505" y="229" text-anchor="middle">generation history</text>
-    <text class="box-sub" x="505" y="247" text-anchor="middle">record_generation (217) upsert by uuid</text>
-    <text class="box-sub" x="505" y="263" text-anchor="middle">previous_generations (235) comparison set</text>
-    <text class="box-sub" x="505" y="279" text-anchor="middle">observed_scores (239) non-None floats</text>
-    <text class="box-sub" x="505" y="295" text-anchor="middle">exclude_uuid skips the current one (245)</text>
-    <text class="box-sub" x="505" y="311" text-anchor="middle">alive_claims (199) / dead_claims (203)</text>
+    <text class="box-sub" x="505" y="247" text-anchor="middle">record_generation (247) upsert by uuid</text>
+    <text class="box-sub" x="505" y="263" text-anchor="middle">previous_generations (265) comparison set</text>
+    <text class="box-sub" x="505" y="279" text-anchor="middle">observed_scores (269) non-None floats</text>
+    <text class="box-sub" x="505" y="295" text-anchor="middle">exclude_uuid skips the current one (275)</text>
+    <text class="box-sub" x="505" y="311" text-anchor="middle">alive_claims (229) / dead_claims (233)</text>
   </a>
 
   <a class="box" id="gInv" href="../../sources/evaluators/hybrid_verifier/registry.py">
     <title>Union inventory methods</title>
     <rect x="680" y="205" width="320" height="120" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="840" y="229" text-anchor="middle">union inventory</text>
-    <text class="box-sub" x="840" y="247" text-anchor="middle">merge_inventory (256) folds one workspace</text>
-    <text class="box-sub" x="840" y="263" text-anchor="middle">count += 1 per path seen (267)</text>
-    <text class="box-sub" x="840" y="279" text-anchor="middle">first non-empty signal wins (268-269)</text>
-    <text class="box-sub" x="840" y="295" text-anchor="middle">n_inventories += 1 per call (262)</text>
-    <text class="box-sub" x="840" y="311" text-anchor="middle">n_workspaces property (271)</text>
+    <text class="box-sub" x="840" y="247" text-anchor="middle">merge_inventory (286) folds one workspace</text>
+    <text class="box-sub" x="840" y="263" text-anchor="middle">count += 1 per path seen (297)</text>
+    <text class="box-sub" x="840" y="279" text-anchor="middle">first non-empty signal wins (298-299)</text>
+    <text class="box-sub" x="840" y="295" text-anchor="middle">n_inventories += 1 per call (292)</text>
+    <text class="box-sub" x="840" y="311" text-anchor="middle">n_workspaces property (302)</text>
   </a>
 
   <a class="box" id="gSave" href="../../sources/evaluators/hybrid_verifier/registry.py">
     <title>save: write the JSON file</title>
     <rect x="355" y="385" width="220" height="110" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="465" y="409" text-anchor="middle">save (120)</text>
-    <text class="box-sub" x="465" y="427" text-anchor="middle">payload: 9 keys (122-132)</text>
-    <text class="box-sub" x="465" y="443" text-anchor="middle">mkdir parents (134)</text>
-    <text class="box-sub" x="465" y="459" text-anchor="middle">write_text, indent=2 (135)</text>
-    <text class="box-sub" x="465" y="475" text-anchor="middle">OSError: warning only (137)</text>
+    <text class="box-label" x="465" y="409" text-anchor="middle">save (122)</text>
+    <text class="box-sub" x="465" y="427" text-anchor="middle">payload: 9 keys (124-134)</text>
+    <text class="box-sub" x="465" y="443" text-anchor="middle">mkdir parents (136)</text>
+    <text class="box-sub" x="465" y="459" text-anchor="middle">write_text, indent=2 (137)</text>
+    <text class="box-sub" x="465" y="475" text-anchor="middle">OSError: warning only (138-139)</text>
   </a>
 
   <g class="box" id="gFile">
@@ -131,7 +131,7 @@
     <text class="box-sub" x="810" y="427" text-anchor="middle">real example: experiments_verifiers/results/E19c_registries/</text>
     <text class="box-sub" x="810" y="443" text-anchor="middle">hybrid_registry_4a7029eb0b6b62e9.json (8 claims, 13 generations)</text>
     <text class="box-sub" x="810" y="459" text-anchor="middle">one file per distinct goal text</text>
-    <text class="box-sub" x="810" y="475" text-anchor="middle">key check: version, task_key (122-124)</text>
+    <text class="box-sub" x="810" y="475" text-anchor="middle">key check: version, task_key (124-126)</text>
   </g>
 
   <path class="edge dashed-edge" data-from="gIn" data-to="gKey" d="M180,97 H205" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
@@ -152,7 +152,7 @@
   <path class="edge" data-from="gSave" data-to="gFile" d="M575,440 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="597" y="433" text-anchor="middle">writes JSON</text>
 
-  <text class="box-sub" x="10" y="520">All three state blocks reach the same JSON file; save is idempotent and rewrites the whole payload (120-137).</text>
+  <text class="box-sub" x="10" y="520">All three state blocks reach the same JSON file; save is idempotent and rewrites the whole payload (122-139).</text>
 </svg>
 </div>
 <p class="figcap">Diagram 1 &mdash; the load path (top row) and the three state blocks that the caller edits before <code>save</code> writes the single JSON file (bottom row). Solid arrows are calls; dashed arrows pass values.</p>
@@ -182,7 +182,7 @@
     <text class="box-sub" x="110" y="72" text-anchor="middle">root default: workflow_dir/_verifier_tmp</text>
     <text class="box-sub" x="110" y="88" text-anchor="middle">config.temp_dir does not exist</text>
     <text class="box-sub" x="110" y="104" text-anchor="middle">so getattr returns None</text>
-    <text class="box-sub" x="110" y="120" text-anchor="middle">(evaluator.py:191-193)</text>
+    <text class="box-sub" x="110" y="120" text-anchor="middle">(evaluator.py:228)</text>
   </g>
 
   <a class="box" id="kReg" href="../../sources/evaluators/hybrid_verifier/registry.py">
@@ -198,7 +198,7 @@
   <g class="box" id="kJson">
     <title>JSON keys written by save</title>
     <rect x="470" y="30" width="250" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="595" y="54" text-anchor="middle">writes these keys (122-132)</text>
+    <text class="box-label" x="595" y="54" text-anchor="middle">writes these keys (124-134)</text>
     <text class="box-sub" x="595" y="72" text-anchor="middle">version, task_key, goal</text>
     <text class="box-sub" x="595" y="88" text-anchor="middle">claims, generations</text>
     <text class="box-sub" x="595" y="104" text-anchor="middle">inventory, refinements, digests</text>
@@ -221,31 +221,31 @@
     <text class="box-label" x="160" y="224" text-anchor="middle">claim dict fields</text>
     <text class="box-sub" x="160" y="242" text-anchor="middle">id, category, statement, target</text>
     <text class="box-sub" x="160" y="258" text-anchor="middle">scoring_rule, stage, temporal_index</text>
-    <text class="box-sub" x="160" y="274" text-anchor="middle">scorer: script text or None (207)</text>
-    <text class="box-sub" x="160" y="290" text-anchor="middle">state: alive or dead (185-197)</text>
-    <text class="box-sub" x="160" y="306" text-anchor="middle">drop_reason, added_round (176-180)</text>
+    <text class="box-sub" x="160" y="274" text-anchor="middle">scorer: script text or None (237)</text>
+    <text class="box-sub" x="160" y="290" text-anchor="middle">state: alive or dead (187-199)</text>
+    <text class="box-sub" x="160" y="306" text-anchor="middle">drop_reason, added_round (178-182)</text>
   </g>
 
   <g class="box" id="kGen">
     <title>Generation record fields</title>
     <rect x="340" y="200" width="290" height="120" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
-    <text class="box-label" x="485" y="224" text-anchor="middle">generation record (227-232)</text>
+    <text class="box-label" x="485" y="224" text-anchor="middle">generation record (256-262)</text>
     <text class="box-sub" x="485" y="242" text-anchor="middle">uuid: workflow identifier</text>
     <text class="box-sub" x="485" y="258" text-anchor="middle">scores: claim_id -&gt; float or None</text>
     <text class="box-sub" x="485" y="274" text-anchor="middle">evidence: claim_id -&gt; str</text>
     <text class="box-sub" x="485" y="290" text-anchor="middle">reward: float or None</text>
-    <text class="box-sub" x="485" y="306" text-anchor="middle">re-recorded per uuid (225)</text>
+    <text class="box-sub" x="485" y="306" text-anchor="middle">re-recorded per uuid (255)</text>
   </g>
 
   <g class="box" id="kOut">
     <title>What other files read from the registry</title>
     <rect x="660" y="200" width="330" height="120" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="825" y="224" text-anchor="middle">out: state other files use</text>
-    <text class="box-sub" x="825" y="242" text-anchor="middle">inventory.render_union_inventory (241)</text>
-    <text class="box-sub" x="825" y="258" text-anchor="middle">layers._extract reads reg.inventory (198)</text>
-    <text class="box-sub" x="825" y="274" text-anchor="middle">layers._ensure_digests reads reg.digests (301)</text>
-    <text class="box-sub" x="825" y="290" text-anchor="middle">evaluator reads scores and refs (381-391)</text>
-    <text class="box-sub" x="825" y="306" text-anchor="middle">aggregation.claim_stats reads vectors (346)</text>
+    <text class="box-sub" x="825" y="242" text-anchor="middle">inventory.render_union_inventory (270)</text>
+    <text class="box-sub" x="825" y="258" text-anchor="middle">layers._extract reads reg.inventory (219)</text>
+    <text class="box-sub" x="825" y="274" text-anchor="middle">layers._ensure_digests reads reg.digests (398)</text>
+    <text class="box-sub" x="825" y="290" text-anchor="middle">evaluator reads scores and refs (508, 599)</text>
+    <text class="box-sub" x="825" y="306" text-anchor="middle">aggregation.claim_stats reads vectors (467)</text>
   </g>
 
   <path class="edge dashed-edge" data-from="kIn" data-to="kReg" d="M210,85 H240" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
@@ -311,48 +311,48 @@
   <g class="box" id="bMig">
     <title>Per-claim migration rule</title>
     <rect x="780" y="30" width="220" height="85" rx="2" fill="rgba(0,229,255,0.06)" stroke="#00E5FF"/>
-    <text class="box-label" x="890" y="54" text-anchor="middle">"stage" in claim? (113)</text>
+    <text class="box-label" x="890" y="54" text-anchor="middle">"stage" in claim? (114)</text>
     <text class="box-sub" x="890" y="72" text-anchor="middle">no: set "result"</text>
-    <text class="box-sub" x="890" y="88" text-anchor="middle">bad value: set "result" (115)</text>
+    <text class="box-sub" x="890" y="88" text-anchor="middle">bad value: set "result" (116-117)</text>
   </g>
 
   <a class="box" id="bSeed" href="../../sources/evaluators/hybrid_verifier/registry.py">
     <title>seed_claims is a one-shot write</title>
     <rect x="10" y="180" width="230" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="125" y="204" text-anchor="middle">seed_claims (147)</text>
+    <text class="box-label" x="125" y="204" text-anchor="middle">seed_claims (149)</text>
     <text class="box-sub" x="125" y="222" text-anchor="middle">claims already present?</text>
-    <text class="box-sub" x="125" y="238" text-anchor="middle">yes: returns, no change (149)</text>
+    <text class="box-sub" x="125" y="238" text-anchor="middle">yes: returns, no change (151)</text>
     <text class="box-sub" x="125" y="254" text-anchor="middle">no: adds scorer None, state alive</text>
-    <text class="box-sub" x="125" y="270" text-anchor="middle">added_round = 0 (157)</text>
+    <text class="box-sub" x="125" y="270" text-anchor="middle">added_round = 0 (159)</text>
   </a>
 
   <a class="box" id="bUpsert" href="../../sources/evaluators/hybrid_verifier/registry.py">
     <title>record_generation upsert rule</title>
     <rect x="270" y="180" width="230" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="385" y="204" text-anchor="middle">record_generation (217)</text>
-    <text class="box-sub" x="385" y="222" text-anchor="middle">drop any record with same uuid (225)</text>
+    <text class="box-label" x="385" y="204" text-anchor="middle">record_generation (247)</text>
+    <text class="box-sub" x="385" y="222" text-anchor="middle">drop any record with same uuid (255)</text>
     <text class="box-sub" x="385" y="238" text-anchor="middle">append the new record</text>
     <text class="box-sub" x="385" y="254" text-anchor="middle">so re-evaluation replaces</text>
-    <text class="box-sub" x="385" y="270" text-anchor="middle">written at evaluator.py:338, 377</text>
+    <text class="box-sub" x="385" y="270" text-anchor="middle">written at evaluator.py:459, 498</text>
   </a>
 
   <a class="box" id="bObs" href="../../sources/evaluators/hybrid_verifier/registry.py">
     <title>observed_scores filter rule</title>
     <rect x="530" y="180" width="220" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="640" y="204" text-anchor="middle">observed_scores (239)</text>
-    <text class="box-sub" x="640" y="222" text-anchor="middle">skip exclude_uuid (245)</text>
-    <text class="box-sub" x="640" y="238" text-anchor="middle">skip missing and None (248)</text>
+    <text class="box-label" x="640" y="204" text-anchor="middle">observed_scores (269)</text>
+    <text class="box-sub" x="640" y="222" text-anchor="middle">skip exclude_uuid (275)</text>
+    <text class="box-sub" x="640" y="238" text-anchor="middle">skip missing and None (277-278)</text>
     <text class="box-sub" x="640" y="254" text-anchor="middle">keep floats only</text>
-    <text class="box-sub" x="640" y="270" text-anchor="middle">input to claim_stats (346)</text>
+    <text class="box-sub" x="640" y="270" text-anchor="middle">input to claim_stats (467)</text>
   </a>
 
   <a class="box" id="bCount" href="../../sources/evaluators/hybrid_verifier/registry.py">
     <title>Presence count rule</title>
     <rect x="780" y="180" width="220" height="100" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="890" y="204" text-anchor="middle">merge_inventory (256)</text>
-    <text class="box-sub" x="890" y="222" text-anchor="middle">every call: n_inventories += 1 (262)</text>
-    <text class="box-sub" x="890" y="238" text-anchor="middle">every path: count += 1 (267)</text>
-    <text class="box-sub" x="890" y="254" text-anchor="middle">signal set only if empty (268)</text>
+    <text class="box-label" x="890" y="204" text-anchor="middle">merge_inventory (286)</text>
+    <text class="box-sub" x="890" y="222" text-anchor="middle">every call: n_inventories += 1 (292)</text>
+    <text class="box-sub" x="890" y="238" text-anchor="middle">every path: count += 1 (297)</text>
+    <text class="box-sub" x="890" y="254" text-anchor="middle">signal set only if empty (298)</text>
     <text class="box-sub" x="890" y="270" text-anchor="middle">counts are per call, not per file</text>
   </a>
 
@@ -376,47 +376,48 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td>config</td><td class="sym">none directly</td><td class="sym">root passed in (72); evaluator.py:191</td><td>root defaults to workflow_dir/_verifier_tmp</td></tr>
+<tr><td>config</td><td class="sym">none directly</td><td class="sym">root passed in (72); evaluator.py:228</td><td>root defaults to workflow_dir/_verifier_tmp</td></tr>
 <tr><td>reads</td><td class="sym">registry JSON file</td><td class="sym">path.read_text (82)</td><td>claims, generations, inventory, digests</td></tr>
 <tr><td>reads</td><td class="sym">goal text</td><td class="sym">goal attribute (58), hashed at 33</td><td>the task key and the payload</td></tr>
-<tr><td>reads</td><td class="sym">claims passed by callers</td><td class="sym">seed_claims (147), replace_claims (162)</td><td>the live claim set</td></tr>
-<tr><td>reads</td><td class="sym">score vectors passed by callers</td><td class="sym">record_generation (217)</td><td>generation history</td></tr>
-<tr><td>reads</td><td class="sym">workspace inventory dicts</td><td class="sym">merge_inventory (256)</td><td>union inventory counts</td></tr>
-<tr><td>writes</td><td class="sym">registry JSON file</td><td class="sym">path.write_text (135)</td><td>full payload, indent 2</td></tr>
+<tr><td>reads</td><td class="sym">claims passed by callers</td><td class="sym">seed_claims (149), replace_claims (164)</td><td>the live claim set</td></tr>
+<tr><td>reads</td><td class="sym">score vectors passed by callers</td><td class="sym">record_generation (247)</td><td>generation history</td></tr>
+<tr><td>reads</td><td class="sym">workspace inventory dicts</td><td class="sym">merge_inventory (286)</td><td>union inventory counts</td></tr>
+<tr><td>writes</td><td class="sym">registry JSON file</td><td class="sym">path.write_text (137)</td><td>full payload, indent 2</td></tr>
 <tr><td>writes</td><td class="sym">parent directory</td><td class="sym">path.parent.mkdir (134)</td><td>create _verifier_tmp on first run</td></tr>
 <tr><td>writes</td><td class="sym">nothing else</td><td class="sym">no other write call</td><td>no logging to disk beyond the logger</td></tr>
 <tr><td>returns</td><td class="sym">TaskRegistry instance</td><td class="sym">load (102)</td><td>all later reads and edits</td></tr>
 <tr><td>returns</td><td class="sym">claim dict or None</td><td class="sym">claim (145)</td><td>lookups by claim id</td></tr>
 <tr><td>returns</td><td class="sym">float list</td><td class="sym">observed_scores (250)</td><td>variance filter input</td></tr>
-<tr><td>returns</td><td class="sym">int</td><td class="sym">n_workspaces (274)</td><td>denominator in union listing</td></tr>
+<tr><td>returns</td><td class="sym">int</td><td class="sym">n_workspaces (302)</td><td>denominator in union listing</td></tr>
 </tbody>
 </table>
 <p class="note say">Why it matters: the same claim set and cached scorer scripts grade every generation, so a win-rate comparison compares like with like.</p>
-<p class="note">Naming note: the docstring calls the persistence "atomic" (L121), but <code>save</code> writes in place with <code>write_text</code> (135) and does not use a temporary file plus rename. A crash mid-write can leave a truncated file; <code>load</code> then warns and starts from an empty state (83-85).</p>
+<p class="note">Naming note: the docstring calls the persistence "atomic" (L123), but <code>save</code> writes in place with <code>write_text</code> (137) and does not use a temporary file plus rename. A crash mid-write can leave a truncated file; <code>load</code> then warns and starts from an empty state (83-85).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Symbol inventory, callers and tests</h2>
-<details><summary>Full symbol inventory &mdash; 1 class, 17 methods, 1 module function, 2 constants</summary><div class="dbody">
+<details><summary>Full symbol inventory &mdash; 1 class, 18 methods, 1 module function, 2 constants</summary><div class="dbody">
 <pre>task_key(goal: str) -&gt; str                                          # L31  16 hex chars from goal and version
 TaskRegistry (L38)                                                  # load/persist/extend per-task state
   __init__(self, path: Path, goal: str) -&gt; None                     # L56  empty state, logger
   load(cls, root: Path, goal: str, logger=None) -&gt; TaskRegistry      # L72  classmethod: read or start
   _migrate_claim_stages(self) -&gt; None                                # L104 back-fill stage, temporal_index
-  save(self) -&gt; None                                                 # L120 write the 9-key payload
-  claim(self, claim_id: str) -&gt; dict | None                          # L143 lookup by id
-  seed_claims(self, claims: list[dict]) -&gt; None                      # L147 first-set write, no-op later
-  replace_claims(self, dead_ids, replacements, generation) -&gt; list[str]  # L162 drop dead, append new
-  mark_dead(self, claim_id: str, reason: str) -&gt; None                # L185 state dead plus reason
-  mark_alive(self, claim_id: str) -&gt; None                            # L192 clear dead flag
-  alive_claims(self) -&gt; list[dict]                                   # L199 state != dead
-  dead_claims(self) -&gt; list[dict]                                    # L203 state == dead
-  set_scorer(self, claim_id: str, script: str | None) -&gt; None        # L207 cache the policy script
-  record_generation(self, uuid, scores, evidence, reward=None) -&gt; None  # L217 upsert one score vector
-  previous_generations(self, uuid: str) -&gt; list[dict]                # L235 comparison set
-  observed_scores(self, claim_id: str, exclude_uuid=None) -&gt; list[float]  # L239 non-None history
-  merge_inventory(self, current: dict[str, dict]) -&gt; None            # L256 fold one workspace inventory
-  n_workspaces (property, L271) -&gt; int                               # L274 number of merged inventories
+  save(self) -&gt; None                                                 # L122 write the 9-key payload
+  claim(self, claim_id: str) -&gt; dict | None                          # L145 lookup by id
+  seed_claims(self, claims: list[dict]) -&gt; None                      # L149 first-set write, no-op later
+  replace_claims(self, dead_ids, replacements, generation) -&gt; list[str]  # L164 drop dead, append new
+  mark_dead(self, claim_id: str, reason: str) -&gt; None                # L187 state dead plus reason
+  mark_alive(self, claim_id: str) -&gt; None                            # L194 clear dead flag
+  append_claims(self, claims: list[dict], generation=0) -&gt; list[str] # L201 layer-owned claims, skip dup ids
+  alive_claims(self) -&gt; list[dict]                                   # L229 state != dead
+  dead_claims(self) -&gt; list[dict]                                    # L233 state == dead
+  set_scorer(self, claim_id: str, script: str | None) -&gt; None        # L237 cache the policy script
+  record_generation(self, uuid, scores, evidence, reward=None) -&gt; None  # L247 upsert one score vector
+  previous_generations(self, uuid: str) -&gt; list[dict]                # L265 comparison set
+  observed_scores(self, claim_id: str, exclude_uuid=None) -&gt; list[float]  # L269 non-None history
+  merge_inventory(self, current: dict[str, dict]) -&gt; None            # L286 fold one workspace inventory
+  n_workspaces (property, L301) -&gt; int                               # L302 number of merged inventories
 REGISTRY_VERSION = "hybrid-v1-e19b-20260924" (L26)                  # part of the file key
 _DEAD_STATES = ("zero_variance", "all_fail") (L28)                  # defined here, used nowhere
 </pre>
@@ -427,24 +428,24 @@ _DEAD_STATES = ("zero_variance", "all_fail") (L28)                  # defined he
 <thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
 <tbody>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/__init__.py">hybrid_verifier/__init__.py</a></td><td>re-exports <code>TaskRegistry</code></td><td class="sym">import L77</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td><code>TaskRegistry.load</code>, <code>merge_inventory</code>, <code>record_generation</code>, <code>mark_dead</code>, <code>mark_alive</code>, <code>save</code></td><td class="sym">import L65; 312-313, 338, 348-350, 377, 381, 505</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>seed_claims</code>, <code>set_scorer</code>, <code>replace_claims</code>, <code>refinements</code>, <code>digests</code></td><td class="sym">import L28; 216, 231-236, 265-268, 314, 390</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td><code>TaskRegistry.load</code>, <code>merge_inventory</code>, <code>record_generation</code>, <code>mark_dead</code>, <code>mark_alive</code>, <code>save</code></td><td class="sym">import L83; 433-434, 459, 469-471, 498, 644</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>seed_claims</code>, <code>set_scorer</code>, <code>replace_claims</code>, <code>refinements</code>, <code>digests</code></td><td class="sym">import L36; 288, 360-367, 411, 487, 881</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td><code>TaskRegistry</code> and <code>task_key</code> to build its own registry files</td><td class="sym">import L49; 212-215, 642-643</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>TaskRegistry.load</code>, <code>seed_claims</code>, <code>record_generation</code>, <code>merge_inventory</code>, <code>save</code></td><td class="sym">imports L38-48; 486-500</td></tr>
-<tr><td class="sym">test_registry_persistence_and_upsert</td><td>upsert same uuid, inventory count, reload from disk</td><td class="sym">test 485-501</td></tr>
-<tr><td class="sym">test_registry_migrates_untagged_claims</td><td>legacy JSON without <code>stage</code> gets "result" and index order</td><td class="sym">test 1075-1114</td></tr>
-<tr><td class="sym">test_task_key_stability</td><td>same goal gives the same key, different goal differs, length 16</td><td class="sym">test 1018-1021</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>TaskRegistry.load</code>, <code>seed_claims</code>, <code>record_generation</code>, <code>merge_inventory</code>, <code>save</code></td><td class="sym">imports L38-48; 574-590</td></tr>
+<tr><td class="sym">test_registry_persistence_and_upsert</td><td>upsert same uuid, inventory count, reload from disk</td><td class="sym">test 574-590</td></tr>
+<tr><td class="sym">test_registry_migrates_untagged_claims</td><td>legacy JSON without <code>stage</code> gets "result" and index order</td><td class="sym">test 1203-1247</td></tr>
+<tr><td class="sym">test_task_key_stability</td><td>same goal gives the same key, different goal differs, length 16</td><td class="sym">test 1146-1151</td></tr>
 </tbody>
 </table>
 <p class="note">Not tested directly: <code>claim</code>, <code>mark_dead</code> / <code>mark_alive</code>, <code>alive_claims</code>, <code>dead_claims</code>, <code>set_scorer</code>, <code>previous_generations</code> and the <code>n_workspaces</code> property have no test that names them; they run through the evaluator tests (<code>test_full_pipeline_real_subprocess</code>, <code>test_zero_variance_drops_claim_and_triggers_replacement</code>). <code>grep -rn "mark_alive\|dead_claims" tests/</code> returns nothing.</p>
-<p class="note flag">Unused constant: <code>_DEAD_STATES</code> (L28) is defined and never referenced anywhere in the repository (<code>grep -rn _DEAD_STATES .</code> matches only the definition). The real drop reasons come from <code>aggregation.claim_stats</code> (aggregation.py:58, 73).</p>
+<p class="note flag">Unused constant: <code>_DEAD_STATES</code> (L28) is defined and never referenced anywhere in the repository (<code>grep -rn _DEAD_STATES .</code> matches only the definition). The real drop reasons come from <code>aggregation.claim_stats</code> (aggregation.py:65, 80).</p>
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/registry.py">sources/evaluators/hybrid_verifier/registry.py</a> (all 274 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L64-L66, L191-L193, L312-L313, L338-L350, L377-L381, L502-L510), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L28, L216, L228-L236, L264-L272, L294-L315, L388-L390), <a href="../../sources/evaluators/hybrid_verifier/aggregation.py">aggregation.py</a> (L20-L21, L50-L73), <a href="../../config.py">config.py</a> (no <code>temp_dir</code> attribute; <code>runner_temp_dir</code> at L236), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L38-L48, L485-L501, L1018-L1021, L1075-L1114), <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L49, L212-L215), plus a real registry file on disk: <code class="path">experiments_verifiers/results/E19c_registries/hybrid_registry_4a7029eb0b6b62e9.json</code> (keys and counts read with <code>json.load</code>), and greps over <code>sources/</code>, <code>tests/</code> and the repository root. Line counts from <code>wc -l</code>.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/registry.py">sources/evaluators/hybrid_verifier/registry.py</a> (all 304 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L83-L84, L228, L433-L434, L459-L471, L498, L641-L644), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L36, L288, L360-L367, L411, L487, L881), <a href="../../sources/evaluators/hybrid_verifier/aggregation.py">aggregation.py</a> (L57-L82), <a href="../../config.py">config.py</a> (no <code>temp_dir</code> attribute; <code>runner_temp_dir</code> at L245), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L38-L48, L574-L590, L1146-L1151, L1203-L1247), <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L49, L212-L215), plus a real registry file on disk: <code class="path">experiments_verifiers/results/E19c_registries/hybrid_registry_4a7029eb0b6b62e9.json</code> (keys and counts read with <code>json.load</code>), and greps over <code>sources/</code>, <code>tests/</code> and the repository root. Line counts from <code>wc -l</code>.</p>
 <p class="skips">Skipped: the legacy rubric cache that the docstring says uses the same keying scheme (L4-L5) &mdash; that code was not read, so the claim is quoted, not verified; the body of <code>aggregation.claim_stats</code> (only the two drop reasons); every credential file, not opened. No pytest run and no application run, by the build rules.</p>
 <p>Sibling file digests: <a href="file_hybrid_inventory.html">file_hybrid_inventory.html</a>, <a href="file_hybrid_layers.html">file_hybrid_layers.html</a>, <a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a>, <a href="file_hybrid_claims.html">file_hybrid_claims.html</a>, <a href="file_hybrid_digest.html">file_hybrid_digest.html</a>, <a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a>, <a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a>; hub: <a href="file_index.html">file_index.html</a>.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git status --porcelain sources/evaluators/hybrid_verifier</code> reports the whole package as <code>??</code> (untracked), so this page describes the working tree, not the committed tree.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

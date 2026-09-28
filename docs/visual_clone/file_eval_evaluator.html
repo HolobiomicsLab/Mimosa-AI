@@ -52,11 +52,11 @@
     <text class="box-sub" x="345" y="218" text-anchor="middle">stores self.logger 99</text>
   </a>
 
-  <a class="box" id="m3" href="../../sources/evaluators/verifier.py">
-    <title>verifier_kind == "legacy" imports sources/evaluators/verifier.py inside the branch (line 89) and builds VerifierEvaluator (91).</title>
+  <a class="box" id="m3" href="../../sources/evaluators/legacy_verifier/verifier.py">
+    <title>verifier_kind == "legacy" imports sources/evaluators/legacy_verifier/verifier.py inside the branch (line 89) and builds VerifierEvaluator (91).</title>
     <rect x="490" y="30" width="200" height="96" rx="12" fill="rgba(79,116,134,0.10)" stroke="#4F7486"/>
     <text class="box-label" x="590" y="56" text-anchor="middle">legacy branch 86</text>
-    <text class="box-sub" x="590" y="74" text-anchor="middle">lazy import .verifier 89</text>
+    <text class="box-sub" x="590" y="74" text-anchor="middle">lazy import .legacy_verifier 89</text>
     <text class="box-sub" x="590" y="92" text-anchor="middle">VerifierEvaluator(config) 91</text>
     <text class="box-sub" x="590" y="110" text-anchor="middle">deprecated path</text>
   </a>
@@ -80,7 +80,7 @@
     <text class="box-sub" x="835" y="228" text-anchor="middle">requires scenario_rubric 147</text>
   </a>
 
-  <a class="box" id="m6" href="../../sources/evaluators/generic.py">
+  <a class="box" id="m6" href="../../sources/evaluators/generic/generic.py">
     <title>Generic route: generic_evaluator.evaluate(uuid, agent_answers) at lines 158 and 166.</title>
     <rect x="980" y="250" width="200" height="96" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="1080" y="276" text-anchor="middle">generic route</text>
@@ -108,9 +108,9 @@
   </g>
 
   <g class="box" id="m9">
-    <title>Re-export block at lines 15-38: names imported and listed in __all__ for downstream importers.</title>
+    <title>Re-export block at lines 15-22: names imported and listed in __all__ (lines 27-38) for downstream importers.</title>
     <rect x="250" y="280" width="190" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="345" y="306" text-anchor="middle">re-exports 15-38</text>
+    <text class="box-label" x="345" y="306" text-anchor="middle">re-exports 15-22</text>
     <text class="box-sub" x="345" y="326" text-anchor="middle">BaseEvaluator, 5 errors</text>
     <text class="box-sub" x="345" y="342" text-anchor="middle">GenericEvaluator, ScenarioEvaluator</text>
     <text class="box-sub" x="345" y="358" text-anchor="middle">HybridVerifierEvaluator 21</text>
@@ -333,11 +333,11 @@
 <tr><td>state key</td><td class="sym">evaluation.&lt;type&gt;</td><td class="sym">written by the children, not here</td><td>score block of the selected evaluator.</td></tr>
 <tr><td>file read</td><td class="sym">datasets/scenarios/*</td><td class="sym">through <code>ScenarioEvaluator</code></td><td>rubric text for the scenario route.</td></tr>
 <tr><td>file write</td><td class="sym">none</td><td class="sym">whole file</td><td>no <code>open()</code> call exists in this module.</td></tr>
-<tr><td>import</td><td class="sym">sources/evaluators/verifier.py</td><td class="sym">function-level import line 89</td><td>legacy verifier, imported only on that branch.</td></tr>
+<tr><td>import</td><td class="sym">sources/evaluators/legacy_verifier/verifier.py</td><td class="sym">function-level import line 89</td><td>legacy verifier, imported only on that branch.</td></tr>
 </tbody>
 </table>
-<p class="note">Amber: <code>use_bs_penalty</code> defaults to <code>False</code> here (line 54) while the same argument defaults to <code>True</code> in <code>GenericEvaluator.__init__</code> (<code class="path">sources/evaluators/generic.py:41-42</code>). The facade always forwards the flag (line 79), so a facade-built generic evaluator never runs the numerical-fraud penalty. Grep of the repository finds no caller that passes <code>use_bs_penalty=True</code>.</p>
-<p class="note">Amber: the class docstring says the verifier "defaults to the hybrid E19/E19b evaluator" (lines 44-47) and the code uses the string "hybrid" (line 85). <code>Config</code> also defaults to <code>verifier_kind = "hybrid"</code> (<code class="path">config.py:76</code>, <code class="path">config_default.json</code> key <code>verifier_kind</code>).</p>
+<p class="note">Amber: <code>use_bs_penalty</code> defaults to <code>False</code> here (line 54) while the same argument defaults to <code>True</code> in <code>GenericEvaluator.__init__</code> (<code class="path">sources/evaluators/generic/generic.py:41-42</code>). The facade always forwards the flag (line 79), so a facade-built generic evaluator never runs the numerical-fraud penalty. Grep of the repository finds no caller that passes <code>use_bs_penalty=True</code>.</p>
+<p class="note">Amber: the class docstring says the verifier "defaults to the hybrid E19/E19b evaluator" (lines 41-48) and the code uses the string "hybrid" (line 85). <code>Config</code> also defaults to <code>verifier_kind = "hybrid"</code> (<code class="path">config.py:76</code>, <code class="path">config_default.json</code> key <code>verifier_kind</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -350,7 +350,7 @@
   evaluate(self, uuid: str, agent_answers: str | None = None,
            evaluator_type: str = "verifier",
            scenario_rubric: str | None = None) -&gt; dict[str, Any] line 111  routes one evaluation</pre>
-<p>Module-level names, all re-exports: <code>__all__</code> at line 27 lists <code>BaseEvaluator</code>, <code>EvaluatorError</code>, <code>WorkflowDataError</code> (from line 15), <code>GenericEvaluator</code>, <code>LLMEvaluationError</code>, <code>ScoreExtractionError</code> (lines 16-20), <code>HybridVerifierEvaluator</code> (line 21), <code>ScenarioError</code>, <code>ScenarioEvaluator</code> (line 22) and <code>WorkflowEvaluator</code> (line 41). Section comment at lines 24-26 states the legacy <code>VerifierEvaluator</code> is not imported on the default path.</p>
+<p>Module-level names, all re-exports: <code>__all__</code> at line 27 lists <code>BaseEvaluator</code>, <code>EvaluatorError</code>, <code>WorkflowDataError</code> (from line 15), <code>GenericEvaluator</code>, <code>LLMEvaluationError</code>, <code>ScoreExtractionError</code> (lines 16-20), <code>HybridVerifierEvaluator</code> (line 21), <code>ScenarioError</code>, <code>ScenarioEvaluator</code> (line 22) and <code>WorkflowEvaluator</code> (line 41). Section comment at lines 24-26 states the legacy <code>VerifierEvaluator</code> is not imported on the default path. <code>VerifierEvaluator</code> is not in <code>__all__</code> any more; the only import of it sits inside the legacy branch (<code class="path">:89</code>, from <code class="path">.legacy_verifier</code>).</p>
 <p>Module level: <code>if __name__ == "__main__":</code> at line 10 appends the repository root to <code>sys.path</code>; a second <code>__main__</code> block at lines 175-193 loads dotenv, builds <code>Config</code>, overrides <code>memory_dir</code> and <code>workflow_dir</code> with relative paths twice (lines 183-185), then calls <code>evaluate</code> on the hardcoded uuid <code>test-uuid-12345</code> with rubric <code>clintox_nn_rubric</code>. Imports: <code>logging</code>, <code>os</code>, <code>sys</code>, <code>Any</code> at lines 5-8.</p>
 </div></details>
 </div>
@@ -362,7 +362,7 @@
 <thead><tr><th>Importer</th><th>What it calls</th><th>Where</th></tr></thead>
 <tbody>
 <tr><td class="sym"><a href="mod_core_evolution_engine.html">sources/core/evolution_engine.py</a></td><td><code>WorkflowEvaluator(config)</code> once, then <code>judge.evaluate(uuid, agent_answers, evaluator_type="verifier", scenario_rubric)</code> per generation</td><td class="sym">lines 29, 93, 808-810</td></tr>
-<tr><td class="sym"><a href="area_tests.html">tests/hybrid_verifier_test.py</a></td><td>imports the module as <code>evaluator_mod</code>; builds the facade twice; stubs two children</td><td class="sym">lines 36, 886-925, 928-964</td></tr>
+<tr><td class="sym"><a href="area_tests.html">tests/hybrid_verifier_test.py</a></td><td>imports as <code>evaluator_mod</code>; builds the facade twice; stubs two children</td><td class="sym">lines 36, 1013-1052, 1055-1092</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/evaluator_test.py</a></td><td><code>WorkflowEvaluator</code> for the legacy scenario and generic smoke tests</td><td class="sym">line 27 (file skipped at collection, lines 22-26)</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/workflow_evaluator_test.py</a></td><td><code>WorkflowEvaluator</code> in two CLI-style helpers</td><td class="sym">line 25 (module is <code>pytest.mark.skip</code>, lines 27-31)</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/scenario_rubric_test.py</a></td><td><code>ScenarioEvaluator</code>, taken from this module's re-export</td><td class="sym">line 14</td></tr>
@@ -371,18 +371,19 @@
 <p>No module in <code class="path">sources/</code> other than <code class="path">sources/core/evolution_engine.py</code> imports this file. <code class="path">sources/benchmark_evaluation/__init__.py:7</code> names <code>sources.evaluators.evaluator</code> in a comment about a removed re-export block; it does not import it.</p>
 <h3>Tests that exercise it</h3>
 <ul>
-<li><code class="path">tests/hybrid_verifier_test.py:886</code> - <code>test_facade_defaults_to_hybrid</code> asserts <code>facade.verifier_kind == "hybrid"</code> and that the legacy module is never imported (line 925).</li>
-<li><code class="path">tests/hybrid_verifier_test.py:928</code> - <code>test_facade_legacy_escape_hatch</code> builds the facade with <code>verifier_kind="legacy"</code> and asserts the legacy object or the patched factory was taken (line 964).</li>
-<li><code class="path">tests/hybrid_verifier_test.py:967</code> - <code>test_legacy_modules_deprecated_but_importable</code> imports the five legacy verifier modules.</li>
+<li><code class="path">tests/hybrid_verifier_test.py:1013</code> - <code>test_facade_defaults_to_hybrid</code> asserts <code>facade.verifier_kind == "hybrid"</code> and that the legacy module is never imported (line 1052).</li>
+<li><code class="path">tests/hybrid_verifier_test.py:1055</code> - <code>test_facade_legacy_escape_hatch</code> builds the facade with <code>verifier_kind="legacy"</code> and asserts the legacy object or the patched factory was taken (line 1092).</li>
+<li><code class="path">tests/hybrid_verifier_test.py:1095</code> - <code>test_legacy_modules_deprecated_but_importable</code> imports the five legacy verifier modules.</li>
 <li>No test calls <code>evaluate()</code> on a real facade with <code>evaluator_type="scenario"</code> or <code>"generic"</code> and asserts a returned score; the two CLI scripts that do are skipped by <code>pytest.importorskip</code> and <code>pytest.mark.skip</code>.</li>
 </ul>
 <p>Related pages: <a href="file_index.html">file_index.html</a>, <a href="area_evaluators.html">area_evaluators.html</a>, <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>, <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="file_eval_base.html">file_eval_base.html</a>, <a href="file_eval_generic.html">file_eval_generic.html</a>, <a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a>, <a href="flow_verification.html">flow_verification.html</a>.</p>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/evaluator.py</code> (193 lines, every def and class), <code class="path">sources/evaluators/base.py</code> (lines 89-145, 189-227, 288-332), <code class="path">sources/evaluators/generic.py</code> (lines 33-60, 334-345), <code class="path">sources/evaluators/verifier.py</code> (lines 38-70), <code class="path">sources/core/evolution_engine.py</code> (lines 29, 93, 800-815), <code class="path">config.py</code> (lines 65-76), <code class="path">config_default.json</code> (field keys <code>verifier_kind</code>, <code>judge_model</code>), <code class="path">tests/hybrid_verifier_test.py</code> (lines 36-48, 886-964, 967-976), <code class="path">tests/evaluator_test.py</code> (lines 22-27), <code class="path">tests/workflow_evaluator_test.py</code> (lines 25-31), <code class="path">tests/scenario_rubric_test.py</code> (line 14), <code class="path">sources/benchmark_evaluation/__init__.py</code> (line 7), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code> and <code class="path">docs/visual_clone/_clone.js</code> for the page skeleton.</p>
+<p>Sources read: <code class="path">sources/evaluators/evaluator.py</code> (193 lines, every def and class), <code class="path">sources/evaluators/base.py</code> (lines 89-145, 189-227, 288-332), <code class="path">sources/evaluators/generic/generic.py</code> (lines 33-60, 334-345), <code class="path">sources/evaluators/legacy_verifier/verifier.py</code> (lines 38-70), <code class="path">sources/core/evolution_engine.py</code> (lines 29, 93, 800-815), <code class="path">config.py</code> (lines 65-76), <code class="path">config_default.json</code> (field keys <code>verifier_kind</code>, <code>judge_model</code>), <code class="path">tests/hybrid_verifier_test.py</code> (lines 36-48, 1013-1092, 1095-1106), <code class="path">tests/evaluator_test.py</code> (lines 22-27), <code class="path">tests/workflow_evaluator_test.py</code> (lines 25-31), <code class="path">tests/scenario_rubric_test.py</code> (line 14), <code class="path">sources/benchmark_evaluation/__init__.py</code> (line 7), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code> and <code class="path">docs/visual_clone/_clone.js</code> for the page skeleton.</p>
 <p class="skips">Skipped: the bodies of the child evaluators (their own digest pages own them); the hybrid verifier package internals (see <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>); the duplicate assignment of <code>config.workflow_dir</code> at lines 184-185 quoted only in the inventory; the <code>__main__</code> smoke calls themselves (not executed); <code class="path">.env</code>-style files (not opened, only their loader call at line 181 is named); runtime folders <code class="path">sources/workflows/</code> and <code class="path">sources/memory/</code> (not read). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Move note: the channel switch on this page is a working-tree change. At commit <code>336fe19</code> this file imported <code>.verifier</code> directly (line 20) and had no <code>verifier_kind</code> branch (<code>git show 336fe19:sources/evaluators/evaluator.py</code>).</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (the flat evaluator modules are deleted and <code>evaluator.py</code> is modified).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

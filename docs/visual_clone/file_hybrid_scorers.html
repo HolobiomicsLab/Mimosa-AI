@@ -38,7 +38,7 @@
     <text class="box-sub" x="95" y="82" text-anchor="middle">union_inventory text</text>
     <text class="box-sub" x="95" y="98" text-anchor="middle">digests_block (138)</text>
     <text class="box-sub" x="95" y="114" text-anchor="middle">claim stage used (146)</text>
-    <text class="box-sub" x="95" y="130" text-anchor="middle">passed by layers.py:335</text>
+    <text class="box-sub" x="95" y="130" text-anchor="middle">passed by layers.py:432</text>
   </g>
 
   <a class="box" id="sPrompt" href="../../sources/evaluators/hybrid_verifier/scorers.py">
@@ -58,7 +58,7 @@
     <text class="box-sub" x="500" y="82" text-anchor="middle">scorer text ends at 198</text>
     <text class="box-sub" x="500" y="98" text-anchor="middle">repair text ends at 225</text>
     <text class="box-sub" x="500" y="114" text-anchor="middle">goes to llm_text</text>
-    <text class="box-sub" x="500" y="130" text-anchor="middle">(layers.py:344)</text>
+    <text class="box-sub" x="500" y="130" text-anchor="middle">(layers.py:441)</text>
   </g>
 
   <a class="box" id="sRepair" href="../../sources/evaluators/hybrid_verifier/scorers.py">
@@ -80,7 +80,7 @@
     <text class="box-sub" x="100" y="253" text-anchor="middle">longest block wins (232)</text>
     <text class="box-sub" x="100" y="269" text-anchor="middle">bare text needs 80 chars (234)</text>
     <text class="box-sub" x="100" y="285" text-anchor="middle">else None</text>
-    <text class="box-sub" x="100" y="301" text-anchor="middle">called at layers.py:349</text>
+    <text class="box-sub" x="100" y="301" text-anchor="middle">called at layers.py:446</text>
   </a>
 
   <a class="box" id="sScreen" href="../../sources/evaluators/hybrid_verifier/scorers.py">
@@ -102,7 +102,7 @@
     <text class="box-sub" x="522" y="253" text-anchor="middle">CLAIM as JSON string (258)</text>
     <text class="box-sub" x="522" y="269" text-anchor="middle">header then body (259-266)</text>
     <text class="box-sub" x="522" y="285" text-anchor="middle">no argv in this repo (11-14)</text>
-    <text class="box-sub" x="522" y="301" text-anchor="middle">called at 364 and 407</text>
+    <text class="box-sub" x="522" y="301" text-anchor="middle">called at 461 and 504</text>
   </a>
 
   <g class="box" id="sRun">
@@ -134,7 +134,7 @@
     <text class="box-sub" x="530" y="407" text-anchor="middle">{"claim_id": str, "score": float,</text>
     <text class="box-sub" x="530" y="423" text-anchor="middle">"evidence": str} (292-296)</text>
     <text class="box-sub" x="530" y="439" text-anchor="middle">None when the contract broke</text>
-    <text class="box-sub" x="530" y="455" text-anchor="middle">becomes LayerScore (layers.py:425)</text>
+    <text class="box-sub" x="530" y="455" text-anchor="middle">becomes LayerScore (layers.py:522)</text>
   </g>
 
   <a class="box" id="sFeedback" href="../../sources/evaluators/hybrid_verifier/scorers.py">
@@ -144,7 +144,7 @@
     <text class="box-sub" x="105" y="407" text-anchor="middle">stderr then stdout (302)</text>
     <text class="box-sub" x="105" y="423" text-anchor="middle">last 30 non-empty lines (303)</text>
     <text class="box-sub" x="105" y="439" text-anchor="middle">"[exit code N]" or timeout (304)</text>
-    <text class="box-sub" x="105" y="455" text-anchor="middle">called at layers.py:379</text>
+    <text class="box-sub" x="105" y="455" text-anchor="middle">called at layers.py:476, 518</text>
   </a>
 
   <g class="box" id="sOutcome">
@@ -181,7 +181,7 @@
   <path class="edge" data-from="sFeedback" data-to="sRepair" d="M105,365 V175 H705 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="400" y="170" text-anchor="middle">feedback closes the loop</text>
 
-  <text class="box-sub" x="10" y="492">The retry loop itself lives in layers._build_scorer (333-380): this file only builds prompts, screens code, wraps it and parses one line of stdout.</text>
+  <text class="box-sub" x="10" y="492">The retry loop itself lives in layers._build_scorer (430-477): this file only builds prompts, screens code, wraps it and parses one line of stdout.</text>
 </svg>
 </div>
 <p class="figcap">Diagram 1 &mdash; three lanes: the two prompt builders (top), the screen and launcher path (middle), and the output parsing with the feedback edge back into <code>repair_prompt</code> (bottom). Solid edges are calls made in this file; dashed edges pass values or hand work to the caller. Line numbers in brackets.</p>
@@ -398,7 +398,7 @@
   <path class="edge" data-from="xFin" data-to="xKeep" d="M710,247 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="725" y="240" text-anchor="middle">clamped</text>
 
-  <text class="box-sub" x="10" y="350">A violation list is not an exception: the caller turns each violation into feedback text and retries, up to MAX_CODE_ATTEMPTS = 3 in layers.py:333.</text>
+  <text class="box-sub" x="10" y="350">A violation list is not an exception: the caller turns each violation into feedback text and retries, up to MAX_CODE_ATTEMPTS = 3 in layers.py:430.</text>
   <text class="box-sub" x="10" y="372">The screen is textual: it matches snippets and regexes, so it can reject a harmless name that contains a banned substring.</text>
   <text class="box-sub" x="10" y="394">parse_scorer_output clamps rather than rejects: a score of 1.7 becomes 1.0, while NaN or infinity rejects the line (290).</text>
 </svg>
@@ -419,12 +419,12 @@
 <tr><td>reads</td><td class="sym">ExecOutcome fields</td><td class="sym">feedback_lines (301-308)</td><td>repair feedback text</td></tr>
 <tr><td>config</td><td class="sym">none</td><td class="sym">no config import in the file</td><td>timeout text arrives as an argument</td></tr>
 <tr><td>writes</td><td class="sym">none</td><td class="sym">no file open, no subprocess</td><td>all outputs are returned strings or dicts</td></tr>
-<tr><td>returns</td><td class="sym">prompt text</td><td class="sym">scorer_prompt (153-198), repair_prompt (203-225)</td><td>judge call in layers.py:344</td></tr>
+<tr><td>returns</td><td class="sym">prompt text</td><td class="sym">scorer_prompt (153-198), repair_prompt (203-225)</td><td>judge call in layers.py:441</td></tr>
 <tr><td>returns</td><td class="sym">code block or None</td><td class="sym">parse_code (232, 234)</td><td>candidate script body</td></tr>
 <tr><td>returns</td><td class="sym">violation list</td><td class="sym">static_violations (252)</td><td>feedback text, retry decision</td></tr>
 <tr><td>returns</td><td class="sym">launcher script text</td><td class="sym">build_launcher (266)</td><td>input of <code>run_script</code></td></tr>
 <tr><td>returns</td><td class="sym">claim_id, score, evidence</td><td class="sym">parse_scorer_output (292-296)</td><td>LayerScore fields (layers.py:425)</td></tr>
-<tr><td>returns</td><td class="sym">feedback text</td><td class="sym">feedback_lines (309)</td><td>next repair_prompt (layers.py:340)</td></tr>
+<tr><td>returns</td><td class="sym">feedback text</td><td class="sym">feedback_lines (309)</td><td>next repair_prompt (layers.py:437)</td></tr>
 </tbody>
 </table>
 <p class="note say">Why it matters: the same script text grades every workspace, so the measured quantity stays stable across generations.</p>
@@ -456,16 +456,16 @@ _IMPORT_RE (L105), _WRITE_MODE_OPEN_RE (L106) # the two screening regexes
 <table>
 <thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>MAX_CODE_ATTEMPTS</code>, <code>scorer_prompt</code>, <code>repair_prompt</code>, <code>parse_code</code>, <code>static_violations</code>, <code>build_launcher</code>, <code>parse_scorer_output</code>, <code>feedback_lines</code>, <code>ExecOutcome</code></td><td class="sym">imports L27, L29; calls 333-380, 407-421</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td>only the <code>ExecOutcome</code> type for its runner helper</td><td class="sym">import L66</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>MAX_CODE_ATTEMPTS</code>, <code>scorer_prompt</code>, <code>repair_prompt</code>, <code>parse_code</code>, <code>static_violations</code>, <code>build_launcher</code>, <code>parse_scorer_output</code>, <code>feedback_lines</code>, <code>ExecOutcome</code></td><td class="sym">imports L35, L37; calls 430-477, 502-518</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td>only the <code>ExecOutcome</code> type for its runner helper</td><td class="sym">import L84</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">experiments_verifiers/harness/e19c_ratchet.py</a></td><td>the same functions, with its own build loop and sandbox</td><td class="sym">import L50; 449-516, 611-613, 729-731</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>ExecOutcome</code>, <code>parse_scorer_output</code>, <code>static_violations</code>, <code>build_launcher</code></td><td class="sym">import L46; 114-133, 274-330</td></tr>
-<tr><td class="sym">test_parse_scorer_output_contract</td><td>a good line passes; no JSON, empty text and NaN give None</td><td class="sym">test 273-299</td></tr>
-<tr><td class="sym">test_static_violations_catches_write_and_network_apis</td><td>catches <code>requests</code>, <code>to_csv</code>, write-mode open and <code>json.dump</code></td><td class="sym">test 301-311</td></tr>
-<tr><td class="sym">test_launcher_injects_constants</td><td><code>WORKSPACE_ROOT</code> and <code>CLAIM</code> present in the launcher text</td><td class="sym">test 314-330</td></tr>
-<tr><td class="sym">test_scorer_build_repairs_on_bad_output</td><td>a stdout-print body fails, the repair body returns a score</td><td class="sym">test 333-368</td></tr>
-<tr><td class="sym">test_scorer_build_exhausts_attempts_and_soft_fails</td><td>three unparsable runs give a None score</td><td class="sym">test 370-378</td></tr>
-<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>stage text and digest block reach <code>scorer_prompt</code></td><td class="sym">test 1181-1191</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td><code>ExecOutcome</code>, <code>parse_scorer_output</code>, <code>static_violations</code>, <code>build_launcher</code></td><td class="sym">import L46; helpers L114-133; 361-466</td></tr>
+<tr><td class="sym">test_parse_scorer_output_contract</td><td>a good line passes; no JSON, empty text and NaN give None</td><td class="sym">test 361-388</td></tr>
+<tr><td class="sym">test_static_violations_catches_write_and_network_apis</td><td>catches <code>requests</code>, <code>to_csv</code>, write-mode open and <code>json.dump</code></td><td class="sym">test 389-401</td></tr>
+<tr><td class="sym">test_launcher_injects_constants</td><td><code>WORKSPACE_ROOT</code> and <code>CLAIM</code> present in the launcher text</td><td class="sym">test 402-420</td></tr>
+<tr><td class="sym">test_scorer_build_repairs_on_bad_output</td><td>a stdout-print body fails, the repair body returns a score</td><td class="sym">test 421-456</td></tr>
+<tr><td class="sym">test_scorer_build_exhausts_attempts_and_soft_fails</td><td>three unparsable runs give a None score</td><td class="sym">test 457-466</td></tr>
+<tr><td class="sym">test_scorer_prompt_carries_ladder_and_digests</td><td>stage text and digest block reach <code>scorer_prompt</code></td><td class="sym">test 1309-1326</td></tr>
 </tbody>
 </table>
 <p class="note flag">Unused symbol: <code>ScorerAttempt</code> (L122) is defined and never used anywhere in the repository (<code>grep -rn ScorerAttempt .</code> matches only the definition). The build loop in <code>layers.py</code> records plain dicts instead (L342, L372-374).</p>
@@ -473,10 +473,10 @@ _IMPORT_RE (L105), _WRITE_MODE_OPEN_RE (L106) # the two screening regexes
 </div>
 
 <footer>
-<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/scorers.py">sources/evaluators/hybrid_verifier/scorers.py</a> (all 309 lines, line by line, including the constants counted from the source), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L27-L29, L317-L380, L382-L432), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L66, L178-L181, L196-L212), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L46, L114-L133, L273-L378, L1181-L1191), <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L50, L449-L516), plus greps over <code>sources/</code>, <code>tests/</code> and the repository root. Line counts from <code>wc -l</code>.</p>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/scorers.py">sources/evaluators/hybrid_verifier/scorers.py</a> (all 309 lines, line by line, including the constants counted from the source), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L35-L37, L414-L477, L479-L529), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L84, L216-L219, L232-L266), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L46, L114-L133, L361-L466, L1309-L1326), <a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a> (L50, L449-L516), plus greps over <code>sources/</code>, <code>tests/</code> and the repository root. Line counts from <code>wc -l</code>.</p>
 <p class="skips">Skipped: the harness sources named in the docstring (<code>experiments_verifiers/harness/e19b_extract.py</code>, <code>e18_scripted_bt.py</code>, <code>e19_hybrid_bt.py</code>) &mdash; the port is quoted from the docstring, not verified against those files; the internals of <code>WorkflowRunner</code> (the subprocess pinning happens there); the <code>scorer.py</code> scripts generated at runtime, which are not part of this repository. Every credential file, including <code>experiments_verifiers/.env</code>, was skipped, not opened. No pytest run and no application run, by the build rules.</p>
 <p>Sibling file digests: <a href="file_hybrid_inventory.html">file_hybrid_inventory.html</a>, <a href="file_hybrid_layers.html">file_hybrid_layers.html</a>, <a href="file_hybrid_registry.html">file_hybrid_registry.html</a>, <a href="file_hybrid_claims.html">file_hybrid_claims.html</a>, <a href="file_hybrid_digest.html">file_hybrid_digest.html</a>, <a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a>, <a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a>, <a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a>; hub: <a href="file_index.html">file_index.html</a>.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes. <code>git status --porcelain sources/evaluators/hybrid_verifier</code> reports the whole package as <code>??</code> (untracked), so this page describes the working tree, not the committed tree.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

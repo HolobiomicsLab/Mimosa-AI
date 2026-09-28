@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>e35_prime.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; harness &gt; e35_prime.py">
+<div class="wrap">
+
+<h1 class="hud">e35_prime.py</h1>
+<p class="intro">This file is the E35 &quot;PRIME&quot; harness: it builds one verifier prototype from six already-measured wins and grades it on the frozen E14 arena, then judges the gradients it produced. It runs by hand, one subcommand at a time, and calls the production <code>hybrid_verifier</code> modules in process without editing any of them. The text judge is <code>openrouter/deepseek/deepseek-v4.1-flash</code> L149, the vision judge is <code>openrouter/moonshotai/kimi-k3</code> L150, and the HARD cap for all of E35 is $20.00 L156.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; imports and module-level wiring</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="e35_prime.py imports the production hybrid_verifier modules and three frozen harnesses, then patches two module-level constants in process">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="a1">
+    <title>production modules, imported read-only and patched in process</title>
+    <rect x="20" y="30" width="230" height="130" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="54" text-anchor="middle">production modules</text>
+    <text class="box-sub" x="135" y="76" text-anchor="middle">AGG L106 &#183; CLAIMS L107</text>
+    <text class="box-sub" x="135" y="92" text-anchor="middle">GRADIENT L108 &#183; INV L109</text>
+    <text class="box-sub" x="135" y="108" text-anchor="middle">REGISTRY L110 &#183; SCORERS L111</text>
+    <text class="box-sub" x="135" y="124" text-anchor="middle">digest L1213 (inside call)</text>
+    <text class="box-sub" x="135" y="140" text-anchor="middle">extract_json_payload L112</text>
+  </g>
+  <g class="box" id="a2">
+    <title>frozen experiment harnesses imported by name</title>
+    <rect x="20" y="180" width="230" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="135" y="204" text-anchor="middle">frozen harnesses</text>
+    <text class="box-sub" x="135" y="226" text-anchor="middle">e15_bt_eval as E15E L101</text>
+    <text class="box-sub" x="135" y="242" text-anchor="middle">e18_scripted_bt as E18 L102</text>
+    <text class="box-sub" x="135" y="258" text-anchor="middle">e19c_ratchet as RC L103</text>
+    <text class="box-sub" x="135" y="274" text-anchor="middle">e16_gradient_audit L1739, L1955</text>
+  </g>
+  <g class="box" id="b1">
+    <title>process-local patches, no production file edited</title>
+    <rect x="310" y="30" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435" y="54" text-anchor="middle">process-local patches</text>
+    <text class="box-sub" x="435" y="76" text-anchor="middle">CLAIM_CATEGORIES + 2 L167</text>
+    <text class="box-sub" x="435" y="92" text-anchor="middle">AGG.STAGES &#8592; visual first L172</text>
+  </g>
+  <g class="box" id="b2">
+    <title>paths, budgets and prompt text declared at module level</title>
+    <rect x="310" y="140" width="250" height="140" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435" y="164" text-anchor="middle">paths and constants</text>
+    <text class="box-sub" x="435" y="186" text-anchor="middle">ledger paths L117&#8211;L147</text>
+    <text class="box-sub" x="435" y="202" text-anchor="middle">MODEL_TEXT L149 &#183; PRICING L151</text>
+    <text class="box-sub" x="435" y="218" text-anchor="middle">NUM_CLAIMS 10 L154</text>
+    <text class="box-sub" x="435" y="234" text-anchor="middle">SUBPROC_TIMEOUT 60 L155</text>
+    <text class="box-sub" x="435" y="250" text-anchor="middle">HARD_CAP_USD 20.0 L156</text>
+    <text class="box-sub" x="435" y="266" text-anchor="middle">PROMPT_TEMPLATE L215</text>
+  </g>
+  <g class="box" id="b3">
+    <title>process state: spent total, stop flag, five locks</title>
+    <rect x="620" y="30" width="250" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="745" y="54" text-anchor="middle">module state</text>
+    <text class="box-sub" x="745" y="76" text-anchor="middle">SPENT L190 &#183; STOP L191</text>
+    <text class="box-sub" x="745" y="92" text-anchor="middle">5 locks L185&#8211;L189</text>
+  </g>
+  <g class="box" id="b4">
+    <title>two exception classes</title>
+    <rect x="620" y="140" width="250" height="80" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="745" y="164" text-anchor="middle">control-flow exceptions</text>
+    <text class="box-sub" x="745" y="186" text-anchor="middle">StopRun L194 (cost cap)</text>
+    <text class="box-sub" x="745" y="202" text-anchor="middle">CallFailed L198 (call)</text>
+  </g>
+  <path class="edge dashed-edge" data-from="a1" data-to="b1" d="M250,70 H310" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="280" y="62" text-anchor="middle">patch</text>
+  <path class="edge" data-from="b1" data-to="b3" d="M560,70 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="590" y="62" text-anchor="middle">reads</text>
+  <path class="edge" data-from="b2" data-to="b4" d="M560,190 H590 V180 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="578" y="172" text-anchor="middle">raise</text>
+  <path class="edge dashed-edge" data-from="a2" data-to="b2" d="M250,230 H280 V210 H310" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arwD)"/>
+  <text class="edge-label" x="272" y="222" text-anchor="middle">reuse</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the stdlib block is L79&ndash;L95 and the project imports L101&ndash;L112 (after a <code>sys.path</code> insert at L99&ndash;L100); the two patches are at L165&ndash;L174 and the comment at L165 states that no production file is modified. <code>sources.core.workflow_runner</code> is imported at L105 as an import-order anchor only.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; the run, layer by layer</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 470" role="img" aria-label="e35_prime.py run layers: loaders feed phase A extraction and phase B scorers, which feed the zero-LLM assembly, then the judge and audit, then the confirmatory readout">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g class="box" id="l0">
+    <title>arena and cache loaders</title>
+    <rect x="20" y="30" width="200" height="150" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="54" text-anchor="middle">loaders</text>
+    <text class="box-sub" x="120" y="76" text-anchor="middle">load_plan_groups L680</text>
+    <text class="box-sub" x="120" y="92" text-anchor="middle">load_goals L685</text>
+    <text class="box-sub" x="120" y="108" text-anchor="middle">load_e19c_digests L705</text>
+    <text class="box-sub" x="120" y="124" text-anchor="middle">load_e24_gates L714</text>
+    <text class="box-sub" x="120" y="140" text-anchor="middle">load_visual_cache L764</text>
+    <text class="box-sub" x="120" y="156" text-anchor="middle">load_registry L922</text>
+    <text class="box-sub" x="120" y="172" text-anchor="middle">load_spent L471</text>
+  </g>
+  <a class="box" id="l1" href="file_hybrid_scorers.html">
+    <title>phase A extraction with the T1 firewall</title>
+    <rect x="280" y="30" width="220" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="390" y="54" text-anchor="middle">phase A &#8212; claims</text>
+    <text class="box-sub" x="390" y="76" text-anchor="middle">extract_for_group L985</text>
+    <text class="box-sub" x="390" y="92" text-anchor="middle">do_phase_a L1051</text>
+    <text class="box-sub" x="390" y="108" text-anchor="middle">seed_registry L1040</text>
+  </a>
+  <a class="box" id="l2" href="file_hybrid_scorers.html">
+    <title>phase B one policy scorer per claim, run on every workspace</title>
+    <rect x="280" y="150" width="220" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="390" y="174" text-anchor="middle">phase B &#8212; scorers</text>
+    <text class="box-sub" x="390" y="196" text-anchor="middle">run_claim_scorer L1093</text>
+    <text class="box-sub" x="390" y="212" text-anchor="middle">execute_scorer L953</text>
+    <text class="box-sub" x="390" y="228" text-anchor="middle">do_phase_b L1210</text>
+  </a>
+  <g class="box" id="l3">
+    <title>registry finalize and missing score cells</title>
+    <rect x="280" y="270" width="220" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="390" y="294" text-anchor="middle">finalize</text>
+    <text class="box-sub" x="390" y="316" text-anchor="middle">fill_missing_scores L1255</text>
+    <text class="box-sub" x="390" y="332" text-anchor="middle">finalize_registries L1284</text>
+    <text class="box-sub" x="390" y="348" text-anchor="middle">scan_union L937</text>
+  </g>
+  <g class="box" id="l4">
+    <title>zero-LLM assembly of arms and gradients</title>
+    <rect x="560" y="30" width="320" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="54" text-anchor="middle">assembly &#8212; eval</text>
+    <text class="box-sub" x="720" y="76" text-anchor="middle">cmd_eval L1493 &#183; pair_winner L1462</text>
+    <text class="box-sub" x="720" y="92" text-anchor="middle">bt_fit_weighted (E15E)</text>
+    <text class="box-sub" x="720" y="108" text-anchor="middle">win_rate_reward (AGG)</text>
+    <text class="box-sub" x="720" y="124" text-anchor="middle">build_gradient_v3 L1327</text>
+  </g>
+  <g class="box" id="l5">
+    <title>gradient judge and hallucination audit</title>
+    <rect x="560" y="180" width="320" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="204" text-anchor="middle">judge and audit</text>
+    <text class="box-sub" x="720" y="226" text-anchor="middle">run_duel L1736 &#183; load_duel_sides L1701</text>
+    <text class="box-sub" x="720" y="242" text-anchor="middle">run_audit L1951</text>
+    <text class="box-sub" x="720" y="258" text-anchor="middle">HALL_PROMPT L1912</text>
+  </g>
+  <g class="box" id="l6">
+    <title>one-shot confirmatory readout and the reports</title>
+    <rect x="560" y="306" width="320" height="110" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="720" y="330" text-anchor="middle">confirm and report</text>
+    <text class="box-sub" x="720" y="352" text-anchor="middle">cmd_confirm L2097</text>
+    <text class="box-sub" x="720" y="368" text-anchor="middle">load_baselines L2077</text>
+    <text class="box-sub" x="720" y="384" text-anchor="middle">write_md L2448</text>
+    <text class="box-sub" x="720" y="400" text-anchor="middle">writes OUT_JSON L130, OUT_MD L131</text>
+  </g>
+  <g class="box" id="o1">
+    <title>files written under experiments_verifiers/results</title>
+    <rect x="20" y="230" width="200" height="200" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="120" y="254" text-anchor="middle">written files</text>
+    <text class="box-sub" x="120" y="276" text-anchor="middle">E35_claims L117</text>
+    <text class="box-sub" x="120" y="292" text-anchor="middle">E35_scorers L118</text>
+    <text class="box-sub" x="120" y="308" text-anchor="middle">E35_scores L119</text>
+    <text class="box-sub" x="120" y="324" text-anchor="middle">E35_registries/ L124</text>
+    <text class="box-sub" x="120" y="340" text-anchor="middle">E35_prime_gradients/ L125</text>
+    <text class="box-sub" x="120" y="356" text-anchor="middle">_e35_label_free L126</text>
+    <text class="box-sub" x="120" y="372" text-anchor="middle">E35_gradient_duel L127-128</text>
+    <text class="box-sub" x="120" y="388" text-anchor="middle">_e35_hallucination L129</text>
+    <text class="box-sub" x="120" y="404" text-anchor="middle">E35_prime json+md L130-131</text>
+    <text class="box-sub" x="120" y="424" text-anchor="middle">+ pilot/prereg/cost ledgers</text>
+  </g>
+  <path class="edge dashed-edge" data-from="l0" data-to="l1" d="M220,73 H280" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="250" y="65" text-anchor="middle">plan, digests</text>
+  <path class="edge" data-from="l1" data-to="l2" d="M390,116 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="138" text-anchor="start">claims</text>
+  <path class="edge dashed-edge" data-from="l1" data-to="o1" d="M280,60 H230 V250 H220" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="243" y="150" text-anchor="end">claims L149</text>
+  <path class="edge dashed-edge" data-from="l2" data-to="o1" d="M280,200 H250 V300 H220" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="253" y="284" text-anchor="end">rows L1181</text>
+  <path class="edge" data-from="l2" data-to="l3" d="M390,236 V270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="258" text-anchor="start">vectors</text>
+  <path class="edge" data-from="l3" data-to="l4" d="M500,300 H530 V85 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="540" y="200" text-anchor="middle">no LLM</text>
+  <path class="edge" data-from="l4" data-to="l5" d="M720,140 V180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="730" y="164" text-anchor="start">148 gradients</text>
+  <path class="edge" data-from="l5" data-to="l6" d="M720,266 V306" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="730" y="290" text-anchor="start">flags</text>
+  <path class="edge dashed-edge" data-from="l6" data-to="o1" d="M560,330 H530 V420 H220" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arwE)"/>
+  <text class="edge-label" x="540" y="428" text-anchor="middle">writes results</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; the call layers. <code>cmd_run</code> L2759 drives phase A, phase B, the score fill and the registry finalize inside one temp root L2797; <code>cmd_eval</code> L1493 is the only layer that runs with zero LLM calls (docstring L55&ndash;L56); <code>run_duel</code> L1736 and <code>run_audit</code> L1951 call the frozen <code>e16_gradient_audit</code> instrument at L1739 and L1955.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; the two control loops (T1 firewall, scorer repair)</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 500" role="img" aria-label="Left: the T1 firewall loop rejects claims with numeric answers and re-extracts. Right: the scorer repair ladder of at most three code attempts">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arwW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arwR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FF4D6A"/>
+    </marker>
+    <marker id="arwG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <text class="box-sub" x="20" y="24" text-anchor="start">phase A: extract_for_group L985 &#183; attempts L1002</text>
+  <g class="box" id="t1">
+    <rect x="20" y="40" width="390" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="215" y="62" text-anchor="middle">attempt 1..3 L1002</text>
+    <text class="box-sub" x="215" y="80" text-anchor="middle">window 8..12 claims: lo max(3,8) L994, hi 12 L995</text>
+  </g>
+  <g class="box" id="t2">
+    <rect x="20" y="120" width="390" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="215" y="142" text-anchor="middle">prompt / reject feedback L1005</text>
+    <text class="box-sub" x="215" y="160" text-anchor="middle">prompt_text L999, then feedback naming rejected ids</text>
+  </g>
+  <g class="box" id="t3">
+    <rect x="20" y="200" width="390" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="215" y="222" text-anchor="middle">_llm_json L1013, validate_claims L1019</text>
+    <text class="box-sub" x="215" y="240" text-anchor="middle">bad JSON or bad contract: claims dropped, next attempt</text>
+  </g>
+  <g class="box" id="t4">
+    <rect x="20" y="280" width="390" height="52" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="215" y="302" text-anchor="middle">t1_check L1022</text>
+    <text class="box-sub" x="215" y="320" text-anchor="middle">numeric answer constant found?</text>
+  </g>
+  <g class="box" id="t5">
+    <rect x="20" y="360" width="390" height="52" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-label" x="215" y="382" text-anchor="middle">clean set kept L1023&ndash;L1024</text>
+    <text class="box-sub" x="215" y="400" text-anchor="middle">offenders dropped L1025, record L1028</text>
+  </g>
+  <g class="box" id="t6">
+    <rect x="20" y="440" width="390" height="46" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-sub" x="215" y="468" text-anchor="middle">final corpus: 202 text claims, 0 violations (E35_prime json L318)</text>
+  </g>
+
+  <text class="box-sub" x="490" y="24" text-anchor="start">phase B: run_claim_scorer L1093 &#183; MAX_CODE_ATTEMPTS 3 (scorers L108)</text>
+  <g class="box" id="u1">
+    <rect x="490" y="40" width="390" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="62" text-anchor="middle">attempt 1..3 L1103</text>
+    <text class="box-sub" x="685" y="80" text-anchor="middle">attempt 1: new scorer, else repair</text>
+  </g>
+  <g class="box" id="u2">
+    <rect x="490" y="120" width="390" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="142" text-anchor="middle">scorer_prompt L1108 / repair_prompt L1112</text>
+    <text class="box-sub" x="685" y="160" text-anchor="middle">same claim, same script for every workspace</text>
+  </g>
+  <g class="box" id="u3">
+    <rect x="490" y="200" width="390" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="222" text-anchor="middle">_call_llm L1114 &#8594; parse_code L1125</text>
+    <text class="box-sub" x="685" y="240" text-anchor="middle">CallFailed or no code block: next attempt</text>
+  </g>
+  <g class="box" id="u4">
+    <rect x="490" y="280" width="390" height="52" rx="2" fill="rgba(255,181,71,0.08)" stroke="#FFB547"/>
+    <text class="box-label" x="685" y="302" text-anchor="middle">static_violations L1134</text>
+    <text class="box-sub" x="685" y="320" text-anchor="middle">banned API found: feedback, next attempt</text>
+  </g>
+  <g class="box" id="u5">
+    <rect x="490" y="360" width="390" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="685" y="382" text-anchor="middle">execute_scorer on every gen L1144</text>
+    <text class="box-sub" x="685" y="400" text-anchor="middle">60 s timeout L155, snapshot guard L978</text>
+  </g>
+  <g class="box" id="u6">
+    <rect x="490" y="440" width="390" height="46" rx="2" fill="rgba(57,255,136,0.06)" stroke="#39FF88"/>
+    <text class="box-sub" x="685" y="468" text-anchor="middle">best n_ok kept L1161, ledger rows L1181</text>
+  </g>
+
+  <path class="edge" data-from="t1" data-to="t2" d="M215,92 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t2" data-to="t3" d="M215,172 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t3" data-to="t4" d="M215,252 V280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t4" data-to="t5" d="M215,332 V360" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="t5" data-to="t6" d="M215,412 V440" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <path class="edge" data-from="t4" data-to="t2" d="M20,306 H8 V146 H20" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="26" y="230" text-anchor="start">reject &#8594; re-extract</text>
+
+  <path class="edge" data-from="u1" data-to="u2" d="M685,92 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="u2" data-to="u3" d="M685,172 V200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="u3" data-to="u4" d="M685,252 V280" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="u4" data-to="u5" d="M685,332 V360" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="u5" data-to="u6" d="M685,412 V440" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arwG)"/>
+  <path class="edge" data-from="u4" data-to="u2" d="M880,306 H892 V146 H880" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwW)"/>
+  <text class="edge-label" x="850" y="230" text-anchor="end">feedback &#8594; repair</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; left: the T1 firewall rejects a claim and re-extracts with feedback (L1005&ndash;L1025); the last attempt keeps the filtered remainder (comment L1027). Right: at most <code>SCORERS.MAX_CODE_ATTEMPTS</code> 3 code attempts; only a script whose stdout parses on every workspace ends the loop early, otherwise the attempt with the highest <code>n_ok</code> is kept (L1161). Both loops run under the six-thread default <code>WORKERS</code> 6 L157.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<div class="card l2">
+<h4><a href="../../experiments_verifiers/harness/e35_prime.py">experiments_verifiers/harness/e35_prime.py</a></h4>
+<p class="role">Builds the E35 &quot;PRIME&quot; verifier prototype on the frozen arena and grades it, then judges the gradients it wrote.</p>
+<p class="meta">2 848 lines &#183; 2 classes, 66 top-level functions &#183; 8 subcommands &#183; caps: $20.00 L156, 60 s L155, 3 code attempts (scorers L108)</p>
+<details><summary>signatures of the five load-bearing functions</summary><div class="dbody">
+<pre>extract_for_group(group, goal, max_attempts=3) -&gt; dict                     L985
+run_claim_scorer(group, goal, claim, union, digests_block, tmp_root) -&gt; dict  L1093
+execute_scorer(code, ws_root, claim, tmp_root) -&gt; dict                       L953
+build_gradient_v3(gid, uuid, goal, now_scores, evidence, claims, ...) -&gt; str  L1327
+cmd_confirm(_args)                                                          L2097</pre>
+<p>Config fields read: none. <code>Config</code> is never imported; every knob is a module constant L154&ndash;L157 (verified by grep for <code>Config</code>, which returns no hit in this file).</p>
+</div></details>
+</div>
+
+<table>
+<thead><tr><th>Kind</th><th>Path</th><th>Constant / call site</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td>reads</td><td class="sym">results/E19c_digests_2026-09-25.jsonl</td><td class="sym">E19C_DIGESTS L134 &#183; load_e19c_digests L705</td><td>production digests, cache-first</td></tr>
+<tr><td>reads</td><td class="sym">results/_e26_claims_2026-09-25.jsonl</td><td class="sym">E26_CLAIMS L135 &#183; L774</td><td>visual claims, reused</td></tr>
+<tr><td>reads</td><td class="sym">results/E26_visual_scores_2026-09-25.jsonl</td><td class="sym">E26_SCORES L136 &#183; L783</td><td>per-generation visual scores</td></tr>
+<tr><td>reads</td><td class="sym">results/_e26_label_free_2026-09-25.json</td><td class="sym">E26_LABEL_FREE L137 &#183; L1503, L2774</td><td>the 8 figure groups, asserted equal</td></tr>
+<tr><td>reads</td><td class="sym">results/E24_reexec_holdout_2026-09-24.json</td><td class="sym">E24_JSON L138 &#183; L716, L2080</td><td>re-execution status per generation</td></tr>
+<tr><td>reads</td><td class="sym">results/E19_hybrid_bt &#183; E19b_hybrid_bt_v2 &#183; E19c_ratchet &#183; E30_optimus</td><td class="sym">L139&ndash;L142 &#183; load_baselines L2078&ndash;L2082</td><td>the baseline table</td></tr>
+<tr><td>reads</td><td class="sym">results/E19c_gradient_duel &#183; E30_gradient_duel</td><td class="sym">L143&ndash;L144 &#183; load_duel_sides L1704&ndash;L1705</td><td>frozen duel sides</td></tr>
+<tr><td>reads</td><td class="sym">results/_e27_rows &#183; _e32_gradient_judgments &#183; _e33_rows</td><td class="sym">L145&ndash;L147 &#183; L1719, L1725, L1729</td><td>extra duel channels</td></tr>
+<tr><td>reads</td><td class="sym">the E14 arena workspaces (via e19c_ratchet)</td><td class="sym">load_plan_groups L680, scan_union L937</td><td>inventories, goals, generation order</td></tr>
+<tr><td>reads</td><td class="sym">results/E35_cost_ledger_2026-09-26.jsonl</td><td class="sym">COST_LEDGER L120 &#183; load_spent L471</td><td>spent total for the cap</td></tr>
+<tr><td>writes</td><td class="sym">results/E35_claims_2026-09-26.jsonl</td><td class="sym">CLAIMS_LEDGER L117 &#183; append L1085</td><td>one row per group</td></tr>
+<tr><td>writes</td><td class="sym">results/E35_scorers_2026-09-26.jsonl</td><td class="sym">SCORERS_LEDGER L118 &#183; L1181, L1206</td><td>one row per claim scorer</td></tr>
+<tr><td>writes</td><td class="sym">results/E35_scores_2026-09-26.jsonl</td><td class="sym">SCORES_LEDGER L119 &#183; L1184</td><td>one row per claim, generation</td></tr>
+<tr><td>writes</td><td class="sym">results/E35_cost_ledger_2026-09-26.jsonl</td><td class="sym">COST_LEDGER L120 &#183; L531 <code>_call_llm</code></td><td>role, tokens, cost per call</td></tr>
+<tr><td>writes</td><td class="sym">results/_e35_pilot_claims_2026-09-26.jsonl</td><td class="sym">PILOT_LEDGER L121 &#183; L2728</td><td>pilot extraction rows</td></tr>
+<tr><td>writes</td><td class="sym">results/_e35_prompt_iterations_2026-09-26.json</td><td class="sym">ITER_LEDGER L122 &#183; L2727</td><td>label-free prompt iterations</td></tr>
+<tr><td>writes</td><td class="sym">results/_e35_preregistration_2026-09-26.json</td><td class="sym">PREREG_JSON L123 &#183; L2749</td><td>frozen prompt hash</td></tr>
+<tr><td>writes</td><td class="sym">results/E35_registries/ (19 files + _visual_cache.json + _scratch_inventory.json)</td><td class="sym">REG_ROOT L124 &#183; L2791, L2792</td><td>production-layout registries</td></tr>
+<tr><td>writes</td><td class="sym">results/E35_prime_gradients/&lt;gid&gt;/&lt;uuid&gt;.txt (148)</td><td class="sym">GRAD_ROOT L125 &#183; L1644</td><td>the v3 gradients</td></tr>
+<tr><td>writes</td><td class="sym">results/_e35_label_free_2026-09-26.json</td><td class="sym">LF_JSON L126 &#183; L1690</td><td>assembled arms and vectors</td></tr>
+<tr><td>writes</td><td class="sym">results/E35_gradient_duel_2026-09-26.json + .md</td><td class="sym">DUEL_JSON L127, DUEL_MD L128</td><td>judge scores, one row per side</td></tr>
+<tr><td>writes</td><td class="sym">results/_e35_hallucination_audit_2026-09-26.json</td><td class="sym">HALL_JSON L129 &#183; run_audit L1951</td><td>category of each hallucinated requirement</td></tr>
+<tr><td>writes</td><td class="sym">results/E35_prime_2026-09-26.json + .md</td><td class="sym">OUT_JSON L130, OUT_MD L131 &#183; write_md L2448</td><td>the report of record</td></tr>
+<tr><td>state</td><td class="sym">temp scorer script dir</td><td class="sym">tempfile.mkdtemp L956, removed L977</td><td>one temp cwd per scorer run</td></tr>
+<tr><td>state</td><td class="sym">SPENT, STOP, 5 locks</td><td class="sym">L185&ndash;L191</td><td>cost cap, early stop, append safety</td></tr>
+</tbody>
+</table>
+<p class="note say">Every write goes to a new <code>E35_*</code> or <code>_e35_*</code> path under <code class="path">experiments_verifiers/results/</code>; the frozen evidence is opened read-only, and <code>GUARD</code> (from E18) re-hashes the snapshot dirs at L978 and L2808.</p>
+<p class="note flag">The scorer ledger and the cost ledger disagree on call counts for the same two roles. The scorers ledger sums <code>n_llm_calls</code> to 253 over its 202 rows, while the cost ledger holds 223 <code>scorer</code> rows plus 57 <code>repair</code> rows = 280 for those roles (my computation). <code>_call_llm</code> writes one ledger row per transport attempt (L531), so retries inflate the cost ledger; the size of that effect is not recorded in any file I read.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<details><summary>2 classes and 66 top-level functions, line and size (size counts the docstring)</summary><div class="dbody">
+<pre>def prompt_text(goal: str, union: str, previews: str, lo: int, hi: int) -> str L330   4
+def prompt_sha256() -> str                                                     L336   2
+def _nums(text: str) -> set[float]                                             L366   8
+def t1_violations(claim: dict, goal: str) -> list[str]                         L376   43
+def t1_check(claims: list[dict], goal: str) -> dict[str, list[str]]            L421   2
+def composition_counts(claims: list[dict]) -> dict[str, int]                   L425   6
+def stage_counts(claims: list[dict]) -> dict[str, int]                         L433   3
+def gate_report(claims: list[dict], goal: str) -> dict                         L438   18
+def _load_env()                                                                L461   8
+def load_spent() -> float                                                      L471   5
+def _completion_with_watchdog(kw: dict)                                        L483   13
+def _call_llm(model: str, messages: list[dict], max_tokens: int, role: str, meta: dict, temperature: float=0.0) -> tuple[str, dict] L498   56
+def _llm_text(prompt: str, max_tokens: int, role: str, meta: dict) -> str      L556   4
+def _llm_json(prompt: str, role: str, meta: dict, max_tokens: int)             L562   22
+def _kimi_call(prompt: str, images: list[Path], kind: str, meta: dict, max_tokens: int=2000) -> tuple[dict, dict] L586   63
+def append_line(path: Path, lock: threading.Lock, rec: dict)                   L654   3
+def load_jsonl(path: Path) -> list[dict]                                       L659   4
+def claims_done() -> set[str]                                                  L665   2
+def scorers_done() -> set[tuple[str, str]]                                     L669   2
+def scores_done() -> set[tuple[str, str, str]]                                 L673   2
+def load_plan_groups() -> list[dict]                                           L680   3
+def load_goals(groups: list[dict]) -> dict[str, str]                           L685   2
+def gid_of(group: dict) -> str                                                 L689   2
+def ws_root_of(gen: dict) -> Path                                              L693   2
+def most_complete(group: dict)                                                 L697   2
+def evolution_order(group: dict) -> list[str]                                  L701   2
+def load_e19c_digests() -> dict[str, dict]                                     L705   7
+def load_e24_gates() -> dict[tuple[str, str], dict]                            L714   4
+def gate_cap(status: str | None) -> float | None                               L726   2
+def image_bearing(gen: dict) -> bool                                           L738   3
+def figure_groups(groups: list[dict]) -> list[dict]                            L743   9
+def group_images(g: dict) -> dict[str, list[dict]]                             L754   8
+def load_visual_cache() -> dict[str, dict]                                     L764   31
+def vis_file_listing(g: dict, imgs_by_gen: dict[str, list[dict]]) -> str       L840   17
+def fresh_visual_for_group(g: dict, goal: str) -> dict                         L859   54
+def registry_path(goal: str, gid: str) -> Path                                 L918   2
+def load_registry(path: Path, goal: str) -> REGISTRY.TaskRegistry              L922   13
+def scan_union(group: dict) -> tuple[REGISTRY.TaskRegistry, dict, Path]        L937   11
+def execute_scorer(code: str, ws_root: Path, claim: dict, tmp_root: Path) -> dict L953   27
+def extract_for_group(group: dict, goal: str, max_attempts: int=3) -> dict     L985   53
+def seed_registry(group: dict, goal: str, rec: dict, digests: dict) -> None    L1040  9
+def do_phase_a(groups: list[dict], goals: dict, workers: int, e19c_digests: dict) L1051  23
+def _phase_a_one(group: dict, goal: str, e19c_digests: dict) -> dict           L1076  12
+def run_claim_scorer(group: dict, goal: str, claim: dict, union: str, digests_block: str, tmp_root: Path) -> dict L1093  100
+def run_claim_scorer_safe(group, goal, claim, union, digests_block, tmp_root)  L1195  13
+def do_phase_b(groups: list[dict], goals: dict, workers: int, tmp_root: Path, digests_by_gid: dict[str, dict]) L1210  43
+def fill_missing_scores(groups: list[dict], tmp_root: Path) -> int             L1255  27
+def finalize_registries(groups: list[dict], goals: dict) -> int                L1284  38
+def build_gradient_v3(gid: str, uuid: str, goal: str, now_scores: dict[str, float | None], evidence: dict[str, str], claims: list[dict], surviving: list[str], pair_records: list[dict], reward_raw: float, reward_gated: float, mean_score: float, dead_claims: list[dict], exec_status: str | None, runtime_s: float | None, cap: float | None) -> str L1327  130
+def pair_winner(mode: str, now: dict, prev: dict, claims: list[dict])          L1462  7
+def _temporal_detail(a: dict, b: dict, claims: list[dict]) -> str              L1471  5
+def cost_summary() -> dict                                                     L1478  13
+def cmd_eval(_args)                                                            L1493  203
+def load_duel_sides() -> tuple[dict, dict]                                     L1701  33
+def run_duel(_args)                                                            L1736  135
+def _write_duel_md(out)                                                        L1873  32
+def run_audit(_args)                                                           L1951  104
+def pairfn(scorer)                                                             L2068  7
+def load_baselines()                                                           L2077  18
+def cmd_confirm(_args)                                                         L2097  349
+def write_md(out, sumry, readout_a, diffs, raw, m2, m2_diffs, independence, duel, hall, iterations, total_cost, t1_corpus) L2448  241
+def cmd_pilot(args)                                                            L2694  43
+def cmd_prereg(_args)                                                          L2739  18
+def cmd_run(args)                                                              L2759  53
+def cmd_status(_args)                                                          L2814  11
+def main()                                                                     L2827  18</pre>
+<p>Six nested helpers sit inside functions and are not in the list above: <code>srank</code> L1343 in <code>build_gradient_v3</code>; <code>judge_one</code> L1763 and <code>paired</code> L1800 in <code>run_duel</code>; <code>audit_one</code> L1968 in <code>run_audit</code>; <code>f</code> L2069 in <code>pairfn</code>; <code>arm_getter</code> L2175 in <code>cmd_confirm</code>. Count check: <code>grep -c "^def \|^class " e35_prime.py</code> gives 68 = 2 classes + 66 top-level functions, and <code>grep -c "^    def " e35_prime.py</code> gives 6 (my computation).</p>
+<p>Module constants: paths L114&ndash;L147, models and pricing L149&ndash;L152, knobs L154&ndash;L157, modes and arms L159&ndash;L160, lever and fidelity categories L162&ndash;L163, ladder L171, pilot groups L176&ndash;L180, guard L182, locks and state L185&ndash;L191, prompt template L215, T1 patterns and number sets L342&ndash;L363, call watchdog 150 s L480, gate caps L722, visual knobs L732&ndash;L735, visual prompts L799 and L820, audit categories and prompt L1909 and L1912, published anchors L2059 and L2064.</p>
+<p>Imports: <code>argparse</code>, <code>collections</code>, <code>datetime</code>, <code>hashlib</code>, <code>json</code>, <code>os</code>, <code>re</code>, <code>shutil</code>, <code>subprocess</code>, <code>sys</code>, <code>tempfile</code>, <code>threading</code>, <code>time</code> L79&ndash;L93, <code>ThreadPoolExecutor</code>/<code>as_completed</code> L92, <code>Path</code> L93, <code>numpy as np</code> L95.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Who</th><th>How</th><th>Symbols used</th></tr></thead>
+<tbody>
+<tr><td class="sym">command line</td><td><code>uv run python experiments_verifiers/harness/e35_prime.py pilot --note "..."</code></td><td class="sym">main L2827 &#8594; cmd_pilot L2694</td></tr>
+<tr><td class="sym">command line</td><td><code>... prereg</code> then <code>... run --workers 6</code></td><td class="sym">cmd_prereg L2739 &#183; cmd_run L2759</td></tr>
+<tr><td class="sym">command line</td><td><code>... eval</code>, <code>... duel</code>, <code>... audit</code>, <code>... confirm</code>, <code>... status</code></td><td class="sym">cmd_eval L1493 &#183; run_duel L1736 &#183; run_audit L1951 &#183; cmd_confirm L2097</td></tr>
+<tr><td class="sym">no importer found</td><td>grep hits: this file L2736, its bytecode, a report at L1164</td><td class="sym">none</td></tr>
+<tr><td class="sym">tests/</td><td>no test imports or runs it</td><td class="sym">none</td></tr>
+<tr><td class="sym"><a href="file_hybrid_claims.html">claims.py</a></td><td><code>import ... as CLAIMS</code> L107</td><td class="sym">validate_claims L1019 &#183; sort_claims_temporally L1548</td></tr>
+<tr><td class="sym"><a href="file_hybrid_scorers.html">scorers.py</a></td><td><code>import ... as SCORERS</code> L111</td><td class="sym">scorer_prompt L1108 &#183; repair_prompt L1112 &#183; parse_code L1125 &#183; static_violations L1134</td></tr>
+<tr><td class="sym"><a href="file_hybrid_aggregation.html">aggregation.py</a></td><td><code>import ... as AGG</code> L106</td><td class="sym">temporal_winner L1465 &#183; winner_of &#183; win_rate_reward L1603 &#183; mean_claim_score L1630</td></tr>
+<tr><td class="sym"><a href="file_hybrid_inventory.html">inventory.py</a></td><td><code>import ... as INV</code> L109</td><td class="sym">scan_workspace L943 &#183; render_union_inventory L996 &#183; deliverable_previews L998</td></tr>
+<tr><td class="sym"><a href="file_hybrid_registry.html">registry.py</a></td><td><code>import ... as REGISTRY</code> L110</td><td class="sym">TaskRegistry L940 &#183; task_key L919 &#183; seed_claims L1047 &#183; record_generation L1318</td></tr>
+<tr><td class="sym"><a href="file_hybrid_gradient.html">gradient.py</a></td><td><code>import ... as GRADIENT</code> L108</td><td class="sym">_sign L1393 (the only use)</td></tr>
+<tr><td class="sym"><a href="file_hybrid_digest.html">digest.py</a></td><td><code>import ... as DIG</code> inside <code>do_phase_b</code> L1213</td><td class="sym">render_digests L1227</td></tr>
+<tr><td class="sym"><a href="file_harness_e15_bt_eval.html">e15_bt_eval.py</a></td><td><code>import e15_bt_eval as E15E</code> L101</td><td class="sym">bt_fit_weighted L1585 &#183; expit L1591</td></tr>
+<tr><td class="sym"><a href="file_harness_e18_scripted_bt.html">e18_scripted_bt.py</a></td><td><code>import e18_scripted_bt as E18</code> L102</td><td class="sym">GUARD L182 (verify_paths L978, full_baseline L2795, verify_full L2808)</td></tr>
+<tr><td class="sym"><a href="file_harness_e19c_ratchet.html">e19c_ratchet.py</a></td><td><code>import e19c_ratchet as RC</code> L103</td><td class="sym">RC loaders, call sites L681&#8211;L703</td></tr>
+<tr><td class="sym">e16_gradient_audit.py</td><td><code>import e16_gradient_audit as E16</code> inside <code>run_duel</code> L1739 and <code>run_audit</code> L1955</td><td class="sym">_load_env &#183; POP_JSON &#183; trunc &#183; gold_lines &#183; measurement_block</td></tr>
+<tr><td class="sym"><a href="file_index.html">file_index.html</a></td><td>hub table row (added by the coordinator)</td><td class="sym">links to this digest page</td></tr>
+</tbody>
+</table>
+<p>The matching experiment page is <a href="exp_e35_prime.html">exp_e35_prime.html</a>; the hub pages are <a href="index.html">index.html</a>, <a href="exp_index.html">exp_index.html</a> and <a href="file_index.html">file_index.html</a>.</p>
+</div>
+
+<footer>
+<p>See also: <a href="file_index.html">file digest index</a>, <a href="exp_e35_prime.html">exp_e35_prime.html</a>, <a href="exp_index.html">exp_index.html</a>, <a href="data_experiments.html">data_experiments.html</a>, <a href="exp_e25_creed.html">exp_e25_creed.html</a>, <a href="file_harness_e25_creed.html">e25_creed.py</a>, <a href="file_hybrid_claims.html">claims.py</a>, <a href="file_hybrid_scorers.html">scorers.py</a>, <a href="flow_verification.html">flow_verification.html</a>.</p>
+<p>Sources read: <code class="path">experiments_verifiers/harness/e35_prime.py</code> (2 848 lines, whole file read; docstring L1&ndash;L76, every <code>def</code> and <code>class</code> with <code>ast</code>-derived line and size, all module constants, and the call sites cited above); the row counts of <code class="path">results/E35_claims</code> (19), <code class="path">E35_scorers</code> (202), <code class="path">E35_scores</code> (1589), <code class="path">E35_cost_ledger</code> (702), <code class="path">_e35_pilot_claims</code> (2) and the three <code class="path">screenv1_archived</code> ledgers (19, 65, 446); the 148 gradient files and the 20 files in <code class="path">results/E35_registries/</code>; one registry body and the <code class="path">_visual_cache.json</code> key set; <code class="path">results/E35_prime_2026-09-26.json</code> for the T1 audit key; <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code>, <code class="path">file_harness_e25_creed.html</code> and <code class="path">file_hybrid_claims.html</code> for the house style.</p>
+<p class="skips">Skipped: the repo and <code class="path">experiments_verifiers/.env</code> files &mdash; never opened (rule); <code>_load_env</code> L461 only sets defaults from them. The bodies of the imported production modules and the three frozen harnesses &mdash; other files own them; only the imported names and the call sites above were read. The 250 claim texts, the 148 gradient texts and the 1589 score rows &mdash; counts and a few key values only. <code class="path">E35_gradient_duel_2026-09-26.json</code> (26 935 lines) &mdash; the <code>.md</code> companion prints the same means. <code class="path">_e35_label_free_2026-09-26.json</code> (14 967 lines) and <code class="path">_e35_hallucination_audit_2026-09-26.json</code> (2 919 lines) &mdash; summary keys and list lengths only. The long prompt strings <code>PROMPT_TEMPLATE</code> L215, <code>VIS_EXTRACT_PROMPT</code> L799, <code>VIS_SCORE_PROMPT</code> L820 and <code>HALL_PROMPT</code> L1912 &mdash; line numbers only, no quotes. <code class="path">__pycache__/</code> &mdash; compiled bytecode. No experiment, benchmark or pytest run was started; nothing outside the two E35 pages was written.</p>
+<p class="skips">Gaps: this is a research harness, not production code. It reaches into the production modules by reassigning <code>CLAIMS.CLAIM_CATEGORIES</code> L167 and <code>AGG.STAGES</code> / <code>CLAIMS.STAGES</code> L172&ndash;L174 in its own process, and it reads its whole arena from frozen files under <code class="path">experiments_verifiers/results/</code>; it cannot show how the prototype would behave inside a live <code>EvolutionEngine</code> run. There is no test coverage (grep above), so the module is verified only by its own asserts and by the results it wrote.</p>
+<p class="skips">Volatility: <code>experiments_verifiers/</code> is untracked by git; all E35 files are dated 2026-09-26 and none grew during this build, so the counts here are a final state. Working tree: <code>sources/evaluators/hybrid_verifier/claims.py</code> and <code>gradient.py</code> have uncommitted changes at build time (a JSON-array parse fix in <code>claims.py</code>; four removed lines in the <code>build_gradient</code> header in <code>gradient.py</code>). The harness imports these modules as they stand on disk, so its results were produced against whichever working-tree revision was present at 2026-09-26.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

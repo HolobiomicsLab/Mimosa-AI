@@ -25,8 +25,8 @@ from pathlib import Path
 _REPO_ROOT = Path(__file__).parent.parent
 sys.path.append(str(_REPO_ROOT))
 
-from sources.evaluators import verifier as verifier_mod  # noqa: E402
-from sources.evaluators.verifier import VerifierEvaluator  # noqa: E402
+from sources.evaluators.legacy_verifier import verifier as verifier_mod  # noqa: E402
+from sources.evaluators.legacy_verifier.verifier import VerifierEvaluator  # noqa: E402
 
 
 class _StubVerifier(VerifierEvaluator):

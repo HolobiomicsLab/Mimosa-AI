@@ -61,6 +61,107 @@ def _to_jsonable(obj: Any) -> Any:
         return asdict(obj)
     return obj
 
+def _verifier_block(run: "IndividualRun") -> dict:
+    """The run's persisted hybrid-verifier scores (``{}`` when absent)."""
+    evaluation = (run.state_result or {}).get("evaluation") or {}
+    block = evaluation.get("verifier")
+    return block if isinstance(block, dict) else {}
+
+
+def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRun"]) -> bool:
+    """Decide whether *run*'s reward is a mean-claim fallback (N1).
+
+    Three signals, in order of trust:
+
+    1. ``state_result.evaluation.verifier.reward_fallback == "mean_claim"``
+       — the ground truth the verifier persisted next to the score. When
+       it contradicts ``run.reward_is_fallback`` the disk wins and a
+       warning is logged: the engine assigns the flag once, right after
+       evaluation, and any wiring gap there (pains_brenk gen 13: 0.745
+       mean-claim reward shipped over gen 15's 0.25 pairwise win) must
+       not silently re-enter the argmax.
+    2. ``run.reward_is_fallback`` already set by the engine.
+    3. Suspicious signature: a positive reward with ZERO pairwise
+       comparisons recorded (``n_pairs == 0``/``n_wins == 0`` — legacy
+       artifacts without the ``reward_fallback`` key) while sibling
+       candidates DO carry real pairwise records. Scales are
+       incomparable, so it is treated as a fallback with a warning.
+    """
+    verifier = _verifier_block(run)
+    if verifier.get("reward_fallback") == "mean_claim":
+        if not run.reward_is_fallback:
+            logging.getLogger(__name__).warning(
+                "[SELECT] run %s reward_is_fallback was False but its "
+                "state_result records reward_fallback=mean_claim; using "
+                "the persisted record (fallback excluded from the argmax)",
+                run.current_uuid,
+            )
+        return True
+    if run.reward_is_fallback:
+        return True
+    n_pairs = _scalar(verifier.get("n_pairs"))
+    n_wins = _scalar(verifier.get("n_wins"))
+    has_real_pairwise = any(
+        (_scalar(_verifier_block(other).get("n_pairs")) or 0) > 0
+        for other in candidates
+        if other is not run
+    )
+    if (
+        (run.reward or 0.0) > 0.0
+        and (n_pairs or 0) == 0
+        and (n_wins or 0) == 0
+        and has_real_pairwise
+    ):
+        logging.getLogger(__name__).warning(
+            "[SELECT] run %s carries reward %.3f with no pairwise "
+            "comparisons recorded (n_pairs=0, n_wins=0) while sibling "
+            "runs have real pairwise rewards; treating it as a potential "
+            "fallback and excluding it from the argmax",
+            run.current_uuid,
+            run.reward or 0.0,
+        )
+        return True
+    return False
+
+
+def _select_best_run(runs: list[IndividualRun]) -> IndividualRun | None:
+    """Pick the run whose workspace ships as the task capsule.
+
+    First-generation fallback rewards (``reward_is_fallback`` — the mean
+    claim score, not a pairwise win) are excluded from the argmax: they
+    live on a different scale and routinely outrank real pairwise rewards
+    (E37 R1: bulk_modulus shipped gen 0's 0.89 fallback over gen 11's
+    winning 0.70; N1/pains_brenk: gen 13's 0.745 mean-claim fallback
+    shipped over gen 15's 0.25 pairwise win while 13 crashed generations
+    padded the candidate list). The flag is cross-checked against each
+    run's persisted ``state_result`` (see :func:`_run_reward_is_fallback`)
+    so a lost engine-side flag cannot resurrect a fallback. When every
+    run is a fallback (single-generation task) the best fallback ships.
+    Only the final capsule selection is affected — QD archive admission
+    reads rewards unchanged.
+    """
+    candidates = [r for r in runs if r.current_uuid]
+    if not candidates:
+        return None
+    key = lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count)  # noqa: E731
+    pairwise = [r for r in candidates if not _run_reward_is_fallback(r, candidates)]
+
+    # N1-residual (E39: protein_protein/vasp_chgcar, E38: factors): when the
+    # only successful generation is a fallback it was excluded above, leaving
+    # a pool of crashed gens (reward 0/None, verifier never ran — so the
+    # fallback flag is False) whose empty workspaces shipped. A fallback that
+    # scored > 0 at least measured real artifacts; crashed gens measured
+    # nothing. Prefer the measured fallback over an all-zero pool.
+    if pairwise and all((r.reward or 0) == 0 for r in pairwise):
+        measured_fallbacks = [
+            r for r in candidates
+            if _run_reward_is_fallback(r, candidates) and (r.reward or 0) > 0
+        ]
+        if measured_fallbacks:
+            return max(measured_fallbacks, key=key)
+
+    return max(pairwise or candidates, key=key)
+
 
 class EvolutionEngine:
     """Evolution Engine: Handle the evolution of Multi-agents workflows."""
@@ -426,11 +527,7 @@ class EvolutionEngine:
 
         # ── Restore workspace to the best run's saved state ──────────────────
         try:
-            best_run = max(
-                (r for r in runs if r.current_uuid),
-                key=lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count),
-                default=None,
-            )
+            best_run = _select_best_run(runs)
             if best_run and best_run.current_uuid:
                 print_info(
                     f"Best run: {best_run.current_uuid} "
@@ -523,11 +620,18 @@ class EvolutionEngine:
             eval_type, current_iteration_cost = await self._evaluate_and_calculate_cost(
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
             )
-            runs[-1].reward = wf_info.overall_score
-            runs[-1].reward_uncapped = wf_info.overall_score_uncapped
-            runs[-1].code = wf_info.code
 
         if uuid:
+            # Reward wiring (N1): score, uncapped score and the fallback
+            # flag are read back from the run's state_result in ONE pass,
+            # outside the genotype guard — a run whose orchestration
+            # returned no genotype string must not keep a stale
+            # reward_is_fallback=False while its evaluation on disk
+            # records a mean_claim fallback (pains_brenk gen 13).
+            runs[-1].reward = wf_info.overall_score
+            runs[-1].reward_uncapped = wf_info.overall_score_uncapped
+            runs[-1].reward_is_fallback = wf_info.reward_is_fallback
+            runs[-1].code = wf_info.code
             verifier = (wf_info.state_result or {}).get("evaluation", {}).get("verifier", {})
             is_failure = (
                 on_error
@@ -1011,6 +1115,7 @@ class EvolutionEngine:
             "cumulative_cost_usd": float(run.cost),
             "overall_score": _scalar(wf_info.overall_score),
             "overall_score_uncapped": _scalar(wf_info.overall_score_uncapped),
+            "reward_is_fallback": bool(run.reward_is_fallback),
             "on_error": bool(ctx["on_error"]),
             "selection_log": _to_jsonable(run.selection_log),
             "qd_descriptor": list(verdict.get("behaviour_descriptor", [])),

@@ -6,18 +6,18 @@
 <title>Harness experiments - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Experiments > harness > all 54 scripts">
+<body data-crumb="Experiments > harness > all 67 scripts">
 <div class="wrap">
 
 <h1 class="hud">Harness experiments</h1>
-<p class="intro"><code class="path">experiments_verifiers/harness/</code> holds 54 Python scripts that ran the verifier research, from E1 to E25. Each script has its own page here: what it tested, how it ran, and the numbers it produced. The folder is not tracked by git, so every number below is a dated snapshot.</p>
+<p class="intro"><code class="path">experiments_verifiers/harness/</code> holds 67 Python scripts that ran the verifier research, from E1 to E36. 55 of them have a page in this clone: experiment pages for E1-E25 and E35. The folder is not tracked by git, so every number below is a dated snapshot.</p>
 
 <div id="legend" data-auto></div>
 
 <div class="panel"><span class="br"></span>
 <h2>The experiment arc</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 960 300" role="img" aria-label="Experiment arc from E1 to E25">
+<svg class="diagram" viewBox="0 0 1220 300" role="img" aria-label="Experiment arc from E1 to E35, with the ten scripts that have no page yet">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
     <marker id="arwE" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8FB8C9"/></marker>
@@ -66,12 +66,28 @@
     <text class="box-sub" x="932" y="82" text-anchor="middle">depth autopsy,</text>
     <text class="box-sub" x="932" y="96" text-anchor="middle">retrial</text>
   </a>
+  <g class="box" id="cgap">
+    <title>Ten experiments have a script and results but no page yet</title>
+    <rect x="1005" y="40" width="95" height="64" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
+    <text class="box-label" x="1052" y="64" text-anchor="middle">E26 - E34, E36</text>
+    <text class="box-sub" x="1052" y="82" text-anchor="middle">no page yet</text>
+    <text class="box-sub" x="1052" y="96" text-anchor="middle">10 experiments</text>
+  </g>
+  <a class="box" id="c5c" href="exp_e35_prime.html">
+    <title>Verifier v3: six already-measured wins in one prototype</title>
+    <rect x="1120" y="40" width="80" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1160" y="64" text-anchor="middle">E35</text>
+    <text class="box-sub" x="1160" y="82" text-anchor="middle">v3 prototype,</text>
+    <text class="box-sub" x="1160" y="96" text-anchor="middle">gradient judge</text>
+  </a>
 
   <path class="edge" data-from="c1" data-to="c2" d="M190,72 H215" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <path class="edge" data-from="c2" data-to="c3" d="M385,72 H410" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <path class="edge" data-from="c3" data-to="c4" d="M580,72 H605" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <path class="edge" data-from="c4" data-to="c5" d="M775,72 H790" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <path class="edge" data-from="c5" data-to="c5b" d="M870,72 H885" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge dashed-edge" data-from="c5b" data-to="cgap" d="M980,72 H1005" fill="none" stroke="#4F7486" stroke-width="1.25" stroke-dasharray="5 4" marker-end="url(#arwE)"/>
+  <path class="edge" data-from="cgap" data-to="c5c" d="M1100,72 H1120" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw)"/>
 
   <a class="box" id="c6" href="mod_evaluators_hybrid_verifier.html">
     <title>The code that shipped from these experiments</title>
@@ -83,16 +99,16 @@
     <title>Where the raw results live</title>
     <rect x="20" y="150" width="335" height="56" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
     <text class="box-label" x="187" y="172" text-anchor="middle">experiments_verifiers/results/</text>
-    <text class="box-sub" x="187" y="192" text-anchor="middle">145 entries, not tracked by git</text>
+    <text class="box-sub" x="187" y="192" text-anchor="middle">235 entries, not tracked by git</text>
   </a>
   <path class="edge dashed-edge" data-from="c7" data-to="c6" d="M355,178 H605" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arwE)"/>
   <text class="edge-label" x="480" y="171" text-anchor="middle">measured design</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - five experiment tracks and the two folders they connect. Every box links to a page.</p>
+<p class="figcap">Diagram 1 - the experiment arc from E1 to E35, the ten scripts with no page yet, and the two folders they connect. The gap box links nowhere; every other box links to a page.</p>
 
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 995 220" role="img" aria-label="Harness script lines per experiment">
+<svg class="diagram" viewBox="0 0 1035 220" role="img" aria-label="Harness script lines per experiment">
   <defs>
     <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
     <filter id="glow2" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
@@ -172,17 +188,20 @@
   <text class="edge-label" x="881.0" y="46" text-anchor="middle">2591</text>
   <rect x="904" y="81" width="26" height="109" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
   <text class="box-sub" x="917.0" y="205" text-anchor="middle">E25</text>
-  <text class="edge-label" x="917.0" y="76" text-anchor="middle">2038</text>
-  <rect x="940" y="138" width="26" height="52" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
-  <text class="box-sub" x="953.0" y="205" text-anchor="middle">shared</text>
-  <text class="edge-label" x="953.0" y="133" text-anchor="middle">963</text>
+  <text class="edge-label" x="917.0" y="76" text-anchor="middle">2039</text>
+  <rect x="940" y="37" width="26" height="153" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="953.0" y="205" text-anchor="middle">E35</text>
+  <text class="edge-label" x="953.0" y="32" text-anchor="middle">2848</text>
+  <rect x="976" y="138" width="26" height="52" fill="rgba(0,229,255,0.25)" stroke="#00E5FF"/>
+  <text class="box-sub" x="989.0" y="205" text-anchor="middle">shared</text>
+  <text class="edge-label" x="989.0" y="133" text-anchor="middle">963</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - 28 266 Python lines in total; the biggest scripts are the Bradley-Terry evaluators and the E19 family.</p>
+<p class="figcap">Diagram 2 - 31 115 Python lines over the same 55 files the chart already covered (E1-E25, the shared helpers) plus <code>e35_prime.py</code>, now the longest script at 2 848 lines. The 12 scripts of E26-E34 and E36 are not in this chart. My computation (<code>wc -l</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
-<h2>All 54 scripts, one page each</h2>
+<h2>All 67 scripts, 55 pages</h2>
 <table>
 <thead><tr><th>Experiment</th><th>Scripts (lines)</th><th class="size">Lines</th><th>Results artifacts</th><th>Evidence</th></tr></thead>
 <tbody>
@@ -210,12 +229,13 @@
 <tr><td class="sym">E19B</td><td><a href="exp_e19b_diagnose.html">e19b_diagnose.py</a> <a href="exp_e19b_dryrun.html">e19b_dryrun.py</a> <a href="exp_e19b_eval.html">e19b_eval.py</a> <a href="exp_e19b_extract.html">e19b_extract.py</a> <a href="exp_e19b_gradient_duel.html">e19b_gradient_duel.py</a></td><td class="size">2556</td><td>2 md, 5 json, 6 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
 <tr><td class="sym">E19C</td><td><a href="exp_e19c_confirm.html">e19c_confirm.py</a> <a href="exp_e19c_eval.html">e19c_eval.py</a> <a href="exp_e19c_gradient_duel.html">e19c_gradient_duel.py</a> <a href="exp_e19c_online_bt.html">e19c_online_bt.py</a> <a href="exp_e19c_ratchet.html">e19c_ratchet.py</a></td><td class="size">2132</td><td>2 md, 3 json, 6 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
 <tr><td class="sym">E24</td><td><a href="exp_e24_common.html">e24_common.py</a> <a href="exp_e24_eval.html">e24_eval.py</a> <a href="exp_e24_gradient_duel.html">e24_gradient_duel.py</a> <a href="exp_e24_holdout.html">e24_holdout.py</a> <a href="exp_e24_iomap.html">e24_iomap.py</a> <a href="exp_e24_reexec.html">e24_reexec.py</a></td><td class="size">2591</td><td>2 md, 5 json, 6 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
-<tr><td class="sym">E25</td><td><a href="exp_e25_creed.html">e25_creed.py</a></td><td class="size">2038</td><td>1 md, 2 json, 4 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E25</td><td><a href="exp_e25_creed.html">e25_creed.py</a></td><td class="size">2039</td><td>1 md, 2 json, 4 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
+<tr><td class="sym">E35</td><td><a href="exp_e35_prime.html">e35_prime.py</a></td><td class="size">2848</td><td>2 md, 6 json, 8 jsonl, 0 img</td><td><span class="chip ok">numbers</span></td></tr>
 <tr><td class="sym">shared</td><td><a href="exp_harness_init.html">__init__.py</a> <a href="exp_claims_pattern_analysis.html">claims_pattern_analysis.py</a> <a href="exp_claims_pca_3d.html">claims_pca_3d.py</a> <a href="exp_harness_import.html">harness_import.py</a> <a href="exp_metrics.html">metrics.py</a></td><td class="size">963</td><td>0 md, 0 json, 0 jsonl, 0 img</td><td><span class="chip warn">artifacts only</span></td></tr>
 </tbody>
 </table>
 <details><summary>result files per experiment (full names)</summary><div class="dbody">
-<p class="sub">Names as measured on disk on 2026-10-02, under <code class="path">experiments_verifiers/results/</code>. Quote them; never edit them.</p>
+<p class="sub">Names as measured on disk on 2026-09-26, under <code class="path">experiments_verifiers/results/</code>. Quote them; never edit them.</p>
 <pre>.gitkeep
 A_bugfix_fallback_2026-09-22.md
 B2_provisioning_pintest_2026-09-23.json
@@ -349,8 +369,112 @@ _e25_flip_cases_2026-09-25.json
 claims_patterns_asb_full_iterative_1_2026-09-23.html
 claims_pca_3d_asb_full_iterative_1_2026-09-23.csv
 claims_pca_3d_asb_full_iterative_1_2026-09-23.html</pre>
+<p class="sub">Added to <code class="path">experiments_verifiers/results/</code> after that first listing: 102 new entries, 0 removed (my computation, names measured on disk on 2026-09-26).</p>
+<pre>__pycache__
+_e24_runlogs_2026-09-24
+_e24_splits_2026-09-24
+_e24_venv
+_e25_gate_2026-09-25.json
+_e26_claims_2026-09-25.jsonl
+_e26_cost_ledger_run1_archived_2026-09-25.jsonl
+_e26_label_free_2026-09-25.json
+_e26_snapshot_manifest_2026-09-25.json
+_e26_visual_scores_run1_archived_2026-09-25.jsonl
+_e27_call_ledger.jsonl
+_e27_rows_2026-09-25.json
+_e28_call_ledger.jsonl
+_e28_mirror_gradients_v20_trial
+_e28_phase1_2026-09-25.json
+_e28_phase2_2026-09-25.json
+_e28_v20_judgments_2026-09-25.json
+_e28_v2_judgments_2026-09-25.json
+_e30_label_free_2026-09-25.json
+_e30_pilot_claims_2026-09-25.jsonl
+_e30_preregistration_2026-09-25.json
+_e30_prompt_iterations_2026-09-25.json
+_e32_call_ledger_2026-09-25.jsonl
+_e32_detcheck_2026-09-25.json
+_e32_gradient_judgments_2026-09-25.json
+_e32_pilot_2026-09-25.json
+_e32_prereg_2026-09-25.json
+_e33_call_ledger_2026-09-26.jsonl
+_e33_rows_2026-09-26.json
+_e34_template.md
+_e34_template2.md
+_e35_hallucination_audit_2026-09-26.json
+_e35_label_free_2026-09-26.json
+_e35_pilot_claims_2026-09-26.jsonl
+_e35_preregistration_2026-09-26.json
+_e35_prompt_iterations_2026-09-26.json
+_e36_cache
+_e36_perturbed
+_e3_sabotage
+ADVERSARIAL_REVIEW_wave4_2026-09-25.md
+E15_bt_gradients
+E18_bt_gradients
+E19_bt_gradients
+E19b_bt_gradients_v2
+E19c_bt_gradients
+E19c_registries
+E24_bt_gradients
+E25_creED_gradients
+E25_creED_retrial_2026-09-25.json
+E25_creED_retrial_2026-09-25.md
+E26_bumblebee_2026-09-25.json
+E26_bumblebee_2026-09-25.md
+E26_cost_ledger_2026-09-25.jsonl
+E26_visual_gradients
+E26_visual_scores_2026-09-25.jsonl
+E27_arbiter_2026-09-25.json
+E27_arbiter_2026-09-25.md
+E28_mirror_2026-09-25.json
+E28_mirror_2026-09-25.md
+E28_mirror_gradients_v2
+E29_poirot_2026-09-25.json
+E29_poirot_2026-09-25.md
+E30_bt_gradients
+E30_claims_2026-09-25.jsonl
+E30_cost_ledger_2026-09-25.jsonl
+E30_digests_2026-09-25.jsonl
+E30_gradient_duel_2026-09-25.json
+E30_gradient_duel_2026-09-25.md
+E30_optimus_2026-09-25.json
+E30_optimus_2026-09-25.md
+E30_registries
+E30_scorers_2026-09-25.jsonl
+E30_scores_2026-09-25.jsonl
+E31_council_2026-09-25.json
+E31_council_2026-09-25.md
+E32_bt_cost_ledger_2026-09-25.jsonl
+E32_claims_2026-09-25.jsonl
+E32_judgments_2026-09-25.jsonl
+E32_mirror_gradients
+E32_mirror_v2_2026-09-25.json
+E32_mirror_v2_2026-09-25.md
+E33_truman_2026-09-26.json
+E33_truman_2026-09-26.md
+E33_truman_gradients
+E34_forensic_2026-09-26.json
+E34_forensic_2026-09-26.md
+E35_claims_2026-09-26.jsonl
+E35_claims_2026-09-26_screenv1_archived.jsonl
+E35_cost_ledger_2026-09-26.jsonl
+E35_gradient_duel_2026-09-26.json
+E35_gradient_duel_2026-09-26.md
+E35_prime_2026-09-26.json
+E35_prime_2026-09-26.md
+E35_prime_gradients
+E35_registries
+E35_scorers_2026-09-26.jsonl
+E35_scorers_2026-09-26_screenv1_archived.jsonl
+E35_scores_2026-09-26.jsonl
+E35_scores_2026-09-26_screenv1_archived.jsonl
+E36_cost_ledger_2026-09-26.jsonl
+E36_liar_2026-09-26.json
+E36_liar_2026-09-26.md</pre>
 </div></details>
 <p class="note say">Four experiments have results but no script in this tree: E6 (capsule crash audit), E7 (venv divergence), E10 (per-task oracle), E11 (learned-weights theory). Their evidence is on <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p class="note flag">Not yet covered: the harness holds 67 scripts, but this clone has pages for E1-E25 and E35 only. Ten experiments have a script and result files with no page yet: E26 (bumblebee), E27 (arbiter), E28 (mirror), E29 (poirot), E30 (optimus), E31 (council), E32 (mirror_v2), E33 (truman), E34 (forensic), E36 (liar). E26 and E36 also have a second script each (<code>e26_confirm.py</code>, <code>e36_liar_bs.py</code>). Their result files carry 2026-09-25 for E26-E32 and 2026-09-26 for E33, E34 and E36.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -367,9 +491,9 @@ claims_pca_3d_asb_full_iterative_1_2026-09-23.html</pre>
 </div>
 
 <footer>
-<p>Sources: <code class="path">experiments_verifiers/harness/*.py</code> (54 files, 28 266 lines by <code>wc -l</code>), <code class="path">experiments_verifiers/results/</code> (145 entries: 133 files, 12 folders, my computation), <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>.</p>
-<p class="skips">Skipped: every script body (each has its own page), <code>results/_e24_venv/</code> (virtualenv, size only), <code>results/_e3_sabotage/</code> (sabotage control), <code>experiments_verifiers/.env</code> (secrets - never opened), the 7 helper scripts in <code>diversity_experiments/scripts/</code> (covered by <a href="data_experiments.html">data_experiments.html</a>).</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-10-02.</p>
+<p>Sources: <code class="path">experiments_verifiers/harness/*.py</code> (67 files, 43 406 lines by <code>wc -l</code>; the 55 files with a page total 31 115 lines, my computation), <code class="path">experiments_verifiers/results/</code> (235 entries: 211 files, 24 folders, my computation), <code class="path">experiments_verifiers/EXPERIMENTS.md</code>, <code class="path">experiments_verifiers/README.md</code>.</p>
+<p class="skips">Skipped: every script body (each has its own page), the 12 harness scripts of E26-E34 and E36 (no page yet, so no body read here), <code>results/_e24_venv/</code> (virtualenv, size only), <code>results/_e3_sabotage/</code> (sabotage control), <code>experiments_verifiers/.env</code> (secrets - never opened), the 7 helper scripts in <code>diversity_experiments/scripts/</code> (covered by <a href="data_experiments.html">data_experiments.html</a>).</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. experiments_verifiers/ is not tracked by git and changed during this build; measured at 2026-09-26.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

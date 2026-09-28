@@ -10,12 +10,12 @@
 <div class="wrap">
 
 <h1 class="hud">__init__.py</h1>
-<p class="intro">This 89-line file is the front door of the <code>hybrid_verifier</code> package. It defines no function and no class: it carries the design docstring and re-exports 9 names from four submodules. It executes whenever anything imports <code>sources.evaluators.hybrid_verifier</code>, and that import also executes <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a>, <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> and <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a>.</p>
+<p class="intro">This 136-line file is the front door of the <code>hybrid_verifier</code> package. It defines no function and no class: it carries the design docstring and re-exports 12 names from four submodules. It executes whenever anything imports <code>sources.evaluators.hybrid_verifier</code>, and that import also executes <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a>, <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> and <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a>.</p>
 
 <div id="legend" data-auto></div>
 
 <div class="panel"><span class="br"></span>
-<h2>Diagram 1 &mdash; what the file does: run the docstring, import four submodules, publish nine names</h2>
+<h2>Diagram 1 &mdash; what the file does: run the docstring, import four submodules, publish twelve names</h2>
 <div class="canvas">
 <svg class="diagram" viewBox="0 0 1060 440" role="img" aria-label="hybrid_verifier __init__.py: an importer triggers the module body, which imports aggregation, evaluator, layers and registry, then lists nine names in __all__ and exposes them">
   <defs>
@@ -43,47 +43,47 @@
   </a>
 
   <a class="box" id="i2" href="../../sources/evaluators/hybrid_verifier/__init__.py">
-    <title>Docstring L1-L72: the measured design, the module layout, the extra-layer recipe</title>
+    <title>Docstring L1-L110: the measured design, the module layout, the extra-layer recipe</title>
     <rect x="250" y="30" width="220" height="96" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="360" y="56" text-anchor="middle">package docstring</text>
-    <text class="box-sub" x="360" y="74" text-anchor="middle">design summary &#183; L1&#8211;L72</text>
-    <text class="box-sub" x="360" y="92" text-anchor="middle">module layout &#183; L31&#8211;L54</text>
-    <text class="box-sub" x="360" y="110" text-anchor="middle">new layers &#183; L56&#8211;L71</text>
+    <text class="box-sub" x="360" y="74" text-anchor="middle">design summary &#183; L1&#8211;L61</text>
+    <text class="box-sub" x="360" y="92" text-anchor="middle">module layout &#183; L62&#8211;L92</text>
+    <text class="box-sub" x="360" y="110" text-anchor="middle">new layers &#183; L93&#8211;L110</text>
   </a>
 
   <a class="box" id="i3" href="../../sources/evaluators/hybrid_verifier/aggregation.py">
-    <title>Line 74: from .aggregation import claim_stats, decisive, winner_of</title>
+    <title>Line 112: from .aggregation import claim_stats, decisive, winner_of</title>
     <rect x="540" y="20" width="220" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="650" y="46" text-anchor="middle">aggregation.py</text>
-    <text class="box-sub" x="650" y="64" text-anchor="middle">3 of its functions &#183; L74</text>
+    <text class="box-sub" x="650" y="64" text-anchor="middle">3 of its functions &#183; L112</text>
   </a>
 
   <a class="box" id="i4" href="../../sources/evaluators/hybrid_verifier/evaluator.py">
-    <title>Line 75: from .evaluator import HybridVerifierEvaluator</title>
+    <title>Line 113: from .evaluator import HybridVerifierEvaluator</title>
     <rect x="540" y="105" width="220" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="650" y="131" text-anchor="middle">evaluator.py</text>
-    <text class="box-sub" x="650" y="149" text-anchor="middle">the evaluator class &#183; L75</text>
+    <text class="box-sub" x="650" y="149" text-anchor="middle">the evaluator class &#183; L113</text>
   </a>
 
   <a class="box" id="i5" href="../../sources/evaluators/hybrid_verifier/layers.py">
-    <title>Line 76: from .layers import ClaimsEvidenceLayer, EvidenceLayer, LayerContext, LayerScore</title>
+    <title>Line 114: from .layers import the protocol and five layer classes</title>
     <rect x="540" y="190" width="220" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="650" y="216" text-anchor="middle">layers.py</text>
-    <text class="box-sub" x="650" y="234" text-anchor="middle">4 names &#183; L76</text>
+    <text class="box-sub" x="650" y="234" text-anchor="middle">6 names &#183; L114</text>
   </a>
 
   <a class="box" id="i6" href="../../sources/evaluators/hybrid_verifier/registry.py">
-    <title>Line 77: from .registry import TaskRegistry</title>
+    <title>Line 122: from .registry import TaskRegistry</title>
     <rect x="540" y="275" width="220" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="650" y="301" text-anchor="middle">registry.py</text>
-    <text class="box-sub" x="650" y="319" text-anchor="middle">TaskRegistry &#183; L77</text>
+    <text class="box-sub" x="650" y="319" text-anchor="middle">TaskRegistry &#183; L122</text>
   </a>
 
   <a class="box" id="i7" href="../../sources/evaluators/hybrid_verifier/__init__.py">
-    <title>The __all__ list at L79-L89 names 9 symbols</title>
+    <title>The __all__ list at L124-L136 names 12 symbols</title>
     <rect x="250" y="265" width="220" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="360" y="291" text-anchor="middle">__all__</text>
-    <text class="box-sub" x="360" y="309" text-anchor="middle">9 names &#183; L79&#8211;L89</text>
+    <text class="box-sub" x="360" y="309" text-anchor="middle">12 names &#183; L124&#8211;L136</text>
     <text class="box-sub" x="360" y="327" text-anchor="middle">alphabetical, no logic</text>
   </a>
 
@@ -110,7 +110,7 @@
   <text class="edge-label" x="478" y="368" text-anchor="start">lists names</text>
 
   <path class="edge" data-from="i7" data-to="i8" d="M470,345 C620,395 760,380 850,385" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
-  <text class="edge-label" x="650" y="412" text-anchor="middle">exports 9 names</text>
+  <text class="edge-label" x="650" y="412" text-anchor="middle">exports 12 names</text>
 
   <text class="box-sub" x="20" y="330">dotted grey = import only</text>
   <text class="box-sub" x="20" y="352">cyan = binds a name</text>
@@ -118,7 +118,7 @@
   <text class="box-sub" x="20" y="396">no def, no class, no if, no for in the file</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 &mdash; four import statements, one docstring, one name list. <code>aggregation.py</code> L74 contributes only <code>claim_stats</code>, <code>decisive</code> and <code>winner_of</code>; the reward functions stay reachable through the submodule only.</p>
+<p class="figcap">Diagram 1 &mdash; four import statements, one docstring, one name list. <code>aggregation.py</code> L112 contributes only <code>claim_stats</code>, <code>decisive</code> and <code>winner_of</code>; the reward functions stay reachable through the submodule only.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -154,23 +154,23 @@
     <rect x="300" y="80" width="230" height="90" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="415" y="106" text-anchor="middle">module body</text>
     <text class="box-sub" x="415" y="124" text-anchor="middle">docstring + 4 imports</text>
-    <text class="box-sub" x="415" y="142" text-anchor="middle">+ __all__ &#183; 89 lines</text>
+    <text class="box-sub" x="415" y="142" text-anchor="middle">+ __all__ &#183; 136 lines</text>
     <text class="box-sub" x="415" y="160" text-anchor="middle">runs once per session</text>
   </a>
 
   <a class="box" id="j3" href="../../sources/evaluators/hybrid_verifier/evaluator.py">
-    <title>Config keys read later, at instantiation, by evaluator.py L178 and L186</title>
+    <title>Config keys read later, at instantiation, by evaluator.py L213 and L216</title>
     <rect x="600" y="20" width="230" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="715" y="46" text-anchor="middle">config keys, later</text>
     <text class="box-sub" x="715" y="64" text-anchor="middle">hybrid_verifier_pairwise_mode</text>
     <text class="box-sub" x="715" y="82" text-anchor="middle">hybrid_verifier_reward</text>
-    <text class="box-sub" x="715" y="100" text-anchor="middle">read at evaluator.py L178 L186</text>
+    <text class="box-sub" x="715" y="100" text-anchor="middle">read at evaluator.py L213 L216</text>
   </a>
 
   <a class="box" id="j4" href="../../sources/evaluators/hybrid_verifier/__init__.py">
     <title>Nine names bound in the package namespace</title>
     <rect x="600" y="140" width="230" height="86" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="715" y="166" text-anchor="middle">9 names bound</text>
+    <text class="box-label" x="715" y="166" text-anchor="middle">12 names bound</text>
     <text class="box-sub" x="715" y="184" text-anchor="middle">ClaimsEvidenceLayer</text>
     <text class="box-sub" x="715" y="202" text-anchor="middle">HybridVerifierEvaluator</text>
     <text class="box-sub" x="715" y="220" text-anchor="middle">TaskRegistry &#183; claim_stats</text>
@@ -192,8 +192,8 @@
   <text class="edge-label" x="500" y="264" text-anchor="middle">writes none</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 &mdash; the only input is the import statement. The config keys in the upper box are read by <code>HybridVerifierEvaluator.__init__</code> (evaluator.py L178, L186) after this file has finished, and the defaults live in <code class="path">config.py</code> L86 and L95.</p>
-<p class="note say">No control-flow diagram on this page: the file has no <code>if</code>, no loop, no function, no class, so there is no decision rule to draw. The whole file is 72 docstring lines plus 17 code lines.</p>
+<p class="figcap">Diagram 2 &mdash; the only input is the import statement. The config keys in the upper box are read by <code>HybridVerifierEvaluator.__init__</code> (evaluator.py L213, L216) after this file has finished, and the defaults live in <code class="path">config.py</code> L86 and L94.</p>
+<p class="note say">No control-flow diagram on this page: the file has no <code>if</code>, no loop, no function, no class, so there is no decision rule to draw. The whole file is 110 docstring lines plus 26 code lines.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -201,46 +201,51 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
 <tbody>
-<tr><td>reads</td><td class="sym">aggregation.claim_stats, decisive, winner_of</td><td>import from .aggregation</td><td>three helpers published at package level</td><td class="size">L74</td></tr>
-<tr><td>reads</td><td class="sym">evaluator.HybridVerifierEvaluator</td><td>import from .evaluator</td><td>the default verifier class</td><td class="size">L75</td></tr>
-<tr><td>reads</td><td class="sym">layers (4 names)</td><td>import from .layers</td><td>the evidence-layer extension interface</td><td class="size">L76</td></tr>
-<tr><td>reads</td><td class="sym">registry.TaskRegistry</td><td>import from .registry</td><td>the per-task JSON registry class</td><td class="size">L77</td></tr>
+<tr><td>reads</td><td class="sym">aggregation.claim_stats, decisive, winner_of</td><td>import from .aggregation</td><td>three helpers published at package level</td><td class="size">L112</td></tr>
+<tr><td>reads</td><td class="sym">evaluator.HybridVerifierEvaluator</td><td>import from .evaluator</td><td>the default verifier class</td><td class="size">L113</td></tr>
+<tr><td>reads</td><td class="sym">layers (4 names)</td><td>import from .layers</td><td>the evidence-layer extension interface</td><td class="size">L114</td></tr>
+<tr><td>reads</td><td class="sym">registry.TaskRegistry</td><td>import from .registry</td><td>the per-task JSON registry class</td><td class="size">L122</td></tr>
 <tr><td>reads</td><td class="sym">config</td><td>none &mdash; no config import in this file</td><td>config keys are read later, by evaluator.py</td><td class="size">&#8212;</td></tr>
 <tr><td>writes</td><td class="sym">none</td><td>no file handle, no logger, no print</td><td>the file only binds names</td><td class="size">&#8212;</td></tr>
-<tr><td>exposes</td><td class="sym">__all__</td><td>module attribute</td><td>declares the 9 public names for star imports</td><td class="size">L79&#8211;L89</td></tr>
-<tr><td>exposes</td><td class="sym">package docstring</td><td>module attribute __doc__</td><td>the design record other pages cite</td><td class="size">L1&#8211;L72</td></tr>
+<tr><td>exposes</td><td class="sym">__all__</td><td>module attribute</td><td>declares the 9 public names for star imports</td><td class="size">L124&#8211;L136</td></tr>
+<tr><td>exposes</td><td class="sym">package docstring</td><td>module attribute __doc__</td><td>the design record other pages cite</td><td class="size">L1&#8211;L110</td></tr>
 </tbody>
 </table>
-<p class="note">Amber note: <code>__all__</code> L79&#8211;L89 names 9 symbols, while <code>aggregation.py</code> defines 11 public names (5 constants and 6 functions). <code>temporal_winner</code>, <code>win_rate_reward</code>, <code>bradley_terry_reward</code>, <code>mean_claim_score</code>, <code>PAIRWISE_MODES</code>, <code>DEFAULT_PAIRWISE_MODE</code>, <code>STAGES</code>, <code>PASS_THRESHOLD</code> and <code>MIN_OBS_FOR_VARIANCE</code> are not re-exported from the package; callers import the submodule instead (evaluator.py L58&#8211;L62).</p>
-<p class="note">Amber note: the layout list in the docstring (L31&#8211;L54) names nine submodules, and this file re-exports from four of them: <code>aggregation</code>, <code>evaluator</code>, <code>layers</code>, <code>registry</code>. <code>claims</code>, <code>digest</code>, <code>inventory</code>, <code>scorers</code> and <code>gradient</code> are reachable only as submodules, so <code>from sources.evaluators.hybrid_verifier import gradient</code> works while no name of theirs appears in <code>__all__</code>.</p>
+<p class="note">Amber note: <code>__all__</code> L124&#8211;L136 names 12 symbols, while <code>aggregation.py</code> defines 13 public names (6 constants and 7 functions). <code>temporal_winner</code>, <code>win_rate_reward</code>, <code>bradley_terry_reward</code>, <code>mean_claim_score</code>, <code>PAIRWISE_MODES</code>, <code>DEFAULT_PAIRWISE_MODE</code>, <code>STAGES</code>, <code>FIGURE_STAGES</code>, <code>PASS_THRESHOLD</code> and <code>MIN_OBS_FOR_VARIANCE</code> are not re-exported from the package; callers import the submodule instead (evaluator.py L58&#8211;L62).</p>
+<p class="note">Amber note: the layout list in the docstring (L62&#8211;L92) names nine submodules, and this file re-exports from four of them: <code>aggregation</code>, <code>evaluator</code>, <code>layers</code>, <code>registry</code>. <code>claims</code>, <code>digest</code>, <code>inventory</code>, <code>scorers</code> and <code>gradient</code> are reachable only as submodules, so <code>from sources.evaluators.hybrid_verifier import gradient</code> works while no name of theirs appears in <code>__all__</code>.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Full symbol inventory</h2>
-<details><summary>0 classes, 0 functions, 4 imports, 9 exported names &mdash; every line of code</summary><div class="dbody">
-<pre>from .aggregation import claim_stats, decisive, winner_of             L74   three helpers
-from .evaluator import HybridVerifierEvaluator                         L75   the default verifier class
-from .layers import ClaimsEvidenceLayer, EvidenceLayer, LayerContext, LayerScore
-                                                                       L76   layer protocol and default layer
-from .registry import TaskRegistry                                     L77   per-task JSON registry
+<details><summary>0 classes, 0 functions, 4 imports, 12 exported names &mdash; every line of code</summary><div class="dbody">
+<pre>from .aggregation import claim_stats, decisive, winner_of             L112  three helpers
+from .evaluator import HybridVerifierEvaluator                         L113  the default verifier class
+from .layers import (ClaimsEvidenceLayer, EvidenceLayer,
+                     ExecutionGateLayer, LayerContext, LayerScore,
+                     VisualEvidenceLayer)                              L114-121  protocol + three layers
+from .registry import TaskRegistry                                     L122  per-task JSON registry
 
-__all__ = [                                                            L79
-    "ClaimsEvidenceLayer",                                             L80
-    "EvidenceLayer",                                                   L81
-    "HybridVerifierEvaluator",                                         L82
-    "LayerContext",                                                    L83
-    "LayerScore",                                                      L84
-    "TaskRegistry",                                                    L85
-    "claim_stats",                                                     L86
-    "decisive",                                                        L87
-    "winner_of",                                                       L88
-]                                                                      L89</pre>
+__all__ = [                                                            L124
+    "ClaimsEvidenceLayer",                                             L125
+    "EvidenceLayer",                                                   L126
+    "ExecutionGateLayer",                                              L127
+    "HybridVerifierEvaluator",                                         L128
+    "LayerContext",                                                    L129
+    "LayerScore",                                                      L130
+    "TaskRegistry",                                                    L131
+    "VisualEvidenceLayer",                                             L132
+    "claim_stats",                                                     L133
+    "decisive",                                                        L134
+    "winner_of",                                                       L135
+]                                                                      L136</pre>
 <p>Exported names with their home module and role:</p>
 <table>
 <thead><tr><th>Name</th><th>Home</th><th>Role</th></tr></thead>
 <tbody>
 <tr><td class="sym">ClaimsEvidenceLayer</td><td class="sym">layers.py</td><td>the default claims and scorers layer</td></tr>
 <tr><td class="sym">EvidenceLayer</td><td class="sym">layers.py</td><td>the layer protocol a new layer implements</td></tr>
+<tr><td class="sym">ExecutionGateLayer</td><td class="sym">layers.py</td><td>the E24 execution gate that caps the reward</td></tr>
+<tr><td class="sym">VisualEvidenceLayer</td><td class="sym">layers.py</td><td>the E26 visual rung for figure tasks</td></tr>
 <tr><td class="sym">HybridVerifierEvaluator</td><td class="sym">evaluator.py</td><td>the BaseEvaluator subclass in the facade</td></tr>
 <tr><td class="sym">LayerContext</td><td class="sym">layers.py</td><td>the context object passed to collect()</td></tr>
 <tr><td class="sym">LayerScore</td><td class="sym">layers.py</td><td>one claim or layer score entry</td></tr>
@@ -250,7 +255,7 @@ __all__ = [                                                            L79
 <tr><td class="sym">winner_of</td><td class="sym">aggregation.py</td><td>the flat-mode winner sign</td></tr>
 </tbody>
 </table>
-<p>Docstring sections, quoted by path only: design summary L1&#8211;L29, module layout list L31&#8211;L54, the extra-layer recipe L56&#8211;L71. No decorator, no constant, no <code>if __name__</code> block, no logging setup in this file.</p>
+<p>Docstring sections, quoted by path only: design summary L1&#8211;L61, module layout list L62&#8211;L92, the extra-layer recipe L93&#8211;L110. No decorator, no constant, no <code>if __name__</code> block, no logging setup in this file.</p>
 </div></details>
 </div>
 
@@ -260,8 +265,8 @@ __all__ = [                                                            L79
 <thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
 <tbody>
 <tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td><code>from .hybrid_verifier import HybridVerifierEvaluator</code>, the only importer in <code>sources/</code></td><td class="sym">L21</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports <code>ClaimsEvidenceLayer</code>, <code>HybridVerifierEvaluator</code>, <code>TaskRegistry</code> and the <code>aggregation</code> submodule from the package</td><td class="sym">L38&#8211;L46</td></tr>
-<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports the <code>gradient</code> and <code>digest</code> submodules through the package</td><td class="sym">L690 L1161</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports <code>ClaimsEvidenceLayer</code>, <code>HybridVerifierEvaluator</code>, <code>TaskRegistry</code> and the <code>aggregation</code> submodule from the package</td><td class="sym">L38&#8211;L43</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports the <code>gradient</code> and <code>digest</code> submodules through the package</td><td class="sym">L784, L1289</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_eval.py">experiments_verifiers/harness/e19c_eval.py</a></td><td>bypasses this file and imports <code>hybrid_verifier.aggregation</code> directly</td><td class="sym">L39&#8211;L41</td></tr>
 <tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_online_bt.py">experiments_verifiers/harness/e19c_online_bt.py</a></td><td>same bypass, to reach <code>bradley_terry_reward</code></td><td class="sym">L33</td></tr>
 </tbody>
@@ -271,9 +276,9 @@ __all__ = [                                                            L79
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code> (89 lines, whole file), <code class="path">sources/evaluators/evaluator.py</code> (L21, L58&#8211;L62), <code class="path">config.py</code> (L80&#8211;L96), <code class="path">tests/hybrid_verifier_test.py</code> (import block L38&#8211;L46, L690, L1161), <code class="path">experiments_verifiers/harness/e19c_eval.py</code> and <code class="path">e19c_online_bt.py</code> (import lines), <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> (public name count), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers.</p>
+<p>Sources read: <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code> (136 lines, whole file), <code class="path">sources/evaluators/evaluator.py</code> (L21, L58&#8211;L62), <code class="path">config.py</code> (L78&#8211;L94), <code class="path">tests/hybrid_verifier_test.py</code> (import block L38&#8211;L43, L784, L1289), <code class="path">experiments_verifiers/harness/e19c_eval.py</code> and <code class="path">e19c_online_bt.py</code> (import lines), <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> (public name count), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers.</p>
 <p class="skips">Skipped, with reason: <code class="path">.env</code> and <code class="path">experiments_verifiers/.env</code> (never opened, secrets); <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">layers.py</code> and <code class="path">registry.py</code> bodies beyond their import lines (each has its own digest page); the 72 docstring lines are summarised by section, not quoted in full; no pytest run and no script executed, as instructed.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

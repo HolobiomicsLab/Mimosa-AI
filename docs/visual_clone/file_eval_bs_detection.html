@@ -3,23 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>sources/evaluators/bs_detection.py - Mimosa-AI visual clone</title>
+<title>sources/evaluators/generic/bs_detection.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<!-- file_eval_bs_detection.html - file digest: sources/evaluators/bs_detection.py.
+<!-- file_eval_bs_detection.html - file digest: sources/evaluators/generic/bs_detection.py.
      Sources and skip decisions: see the footer. Read-only page, nothing outside docs/visual_clone/ touched. -->
-<body data-crumb="File digests > sources/evaluators > bs_detection.py">
+<body data-crumb="File digests > sources/evaluators > generic/bs_detection.py">
 <div class="wrap">
 
-<h1 class="hud">bs_detection.py</h1>
-<p class="intro"><code>BullshitDetectorNumerical</code> walks the agent memories of one run, collects numeric literal values, and asks an LLM judge to score each value 0-10 for fabricated origin. <code>generate_short_fraud_report</code> and <code>propose_penalty_score</code> turn the high-risk values into one penalty in 0.0-1.0, which <code>generic.py</code> subtracted from the overall score. The module header marks it <code>[DEPRECATED]</code> and "prototype module, now unused"; the only importer is <code class="path">sources/evaluators/generic.py</code>.</p>
+<h1 class="hud">generic/bs_detection.py</h1>
+<p class="intro"><code>BullshitDetectorNumerical</code> walks the agent memories of one run, collects numeric literal values, and asks an LLM judge to score each value 0-10 for fabricated origin. <code>generate_short_fraud_report</code> and <code>propose_penalty_score</code> turn the high-risk values into one penalty in 0.0-1.0, which <code>generic/generic.py</code> subtracted from the overall score. The module header marks it <code>[DEPRECATED]</code> and "prototype module, now unused"; the only importer is <code class="path">sources/evaluators/generic/generic.py</code>.</p>
 
 <div id="legend" data-auto></div>
 
 <div class="panel"><span class="br"></span>
 <h2>Main diagram - memory in, fraud scores out</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1200 450" role="img" aria-label="bs_detection.py: read memories, extract numbers, backtrace them, judge them with an LLM and build the reports">
+<svg class="diagram" viewBox="0 0 1200 450" role="img" aria-label="generic/bs_detection.py: read memories, extract numbers, backtrace them, judge them with an LLM and build the reports">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -34,15 +34,15 @@
   </defs>
 
   <g class="box" id="k1">
-    <title>Entry: one uuid plus a memory root. Called from generic.py line 423 with the evaluator's memory_dir.</title>
+    <title>Entry: one uuid plus a memory root. Called from generic/generic.py line 423 with the evaluator's memory_dir.</title>
     <rect x="20" y="160" width="170" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="105" y="194" text-anchor="middle">uuid + memory_dir</text>
-    <text class="box-sub" x="105" y="214" text-anchor="middle">generic.py:423</text>
+    <text class="box-sub" x="105" y="214" text-anchor="middle">generic/generic.py:423</text>
     <text class="box-sub" x="105" y="230" text-anchor="middle">analyze_all_agents_numerical</text>
     <text class="box-sub" x="105" y="246" text-anchor="middle">uuid, target_roles</text>
   </g>
 
-  <a class="box" id="k2" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="k2" href="../../sources/evaluators/generic/bs_detection.py">
     <title>MemoryExtraction (line 47): lists the memory files of the uuid folder and keeps the entries whose role is wanted.</title>
     <rect x="230" y="150" width="180" height="130" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="320" y="176" text-anchor="middle">MemoryExtraction 47</text>
@@ -53,7 +53,7 @@
     <text class="box-sub" x="320" y="264" text-anchor="middle">file name becomes agent name 74</text>
   </a>
 
-  <a class="box" id="k3" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="k3" href="../../sources/evaluators/generic/bs_detection.py">
     <title>extract_numerical_values (line 244) with its filters: is_csv_content (228) and the four compiled patterns (170-181).</title>
     <rect x="450" y="30" width="210" height="120" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="555" y="56" text-anchor="middle">extract_numerical_values 244</text>
@@ -64,7 +64,7 @@
     <text class="box-sub" x="555" y="140" text-anchor="middle">skips uppercase context 285-292</text>
   </a>
 
-  <a class="box" id="k4" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="k4" href="../../sources/evaluators/generic/bs_detection.py">
     <title>backtrace_numerical_values (line 320) builds the per-value timeline and keeps the code context of coding steps.</title>
     <rect x="450" y="190" width="210" height="130" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="555" y="216" text-anchor="middle">backtrace_numerical_values 320</text>
@@ -75,7 +75,7 @@
     <text class="box-sub" x="555" y="304" text-anchor="middle">skips values_already_found 349</text>
   </a>
 
-  <a class="box" id="k5" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="k5" href="../../sources/evaluators/generic/bs_detection.py">
     <title>_format_numerical_analysis (line 484) writes one prompt block per value, capped at 1024 characters of context.</title>
     <rect x="700" y="190" width="200" height="130" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="800" y="216" text-anchor="middle">_format_numerical_analysis 484</text>
@@ -86,7 +86,7 @@
     <text class="box-sub" x="800" y="304" text-anchor="middle">adds "[FIRST]" markers</text>
   </a>
 
-  <a class="box" id="k6" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="k6" href="../../sources/evaluators/generic/bs_detection.py">
     <title>analyse_backtrace (line 419) sends one block to the judge and parses the reply with extract_json (line 27).</title>
     <rect x="700" y="30" width="200" height="120" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="800" y="56" text-anchor="middle">analyse_backtrace 419</text>
@@ -97,7 +97,7 @@
     <text class="box-sub" x="800" y="140" text-anchor="middle">bad JSON raises ValueError 476</text>
   </a>
 
-  <a class="box" id="k7" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="k7" href="../../sources/evaluators/generic/bs_detection.py">
     <title>analyze_agent_numerical_fraud (line 528) loops values for one agent; analyze_all_agents_numerical (555) loops every agent.</title>
     <rect x="940" y="150" width="230" height="140" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="1055" y="176" text-anchor="middle">per-agent analysis 528</text>
@@ -108,7 +108,7 @@
     <text class="box-sub" x="1055" y="264" text-anchor="middle">bundle: uuid, timestamp, analyses 576-582</text>
   </a>
 
-  <a class="box" id="k8" href="../../sources/evaluators/bs_detection.py">
+  <a class="box" id="k8" href="../../sources/evaluators/generic/bs_detection.py">
     <title>The three report builders: full report (584), short high-risk report (642) and the penalty score (715).</title>
     <rect x="940" y="320" width="230" height="110" rx="12" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
     <text class="box-label" x="1055" y="346" text-anchor="middle">reports</text>
@@ -136,14 +136,14 @@
   <text class="edge-label" x="960" y="310" text-anchor="middle">reads analyses</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - the whole pipeline of the file: memory files become per-role entries, numbers are extracted with filters, backtraced into a timeline, formatted into judge prompts, scored per value, then summarised into reports and one penalty. Line numbers are from <code class="path">sources/evaluators/bs_detection.py</code>.</p>
-<p class="note say">Two values are returned per run: the analysis bundle from <code>analyze_all_agents_numerical</code> (lines 576-582) and the penalty dict from <code>propose_penalty_score</code> (line 786). The penalty is what <code>generic.py</code> subtracts.</p>
+<p class="figcap">Diagram 1 - the whole pipeline of the file: memory files become per-role entries, numbers are extracted with filters, backtraced into a timeline, formatted into judge prompts, scored per value, then summarised into reports and one penalty. Line numbers are from <code class="path">sources/evaluators/generic/bs_detection.py</code>.</p>
+<p class="note say">Two values are returned per run: the analysis bundle from <code>analyze_all_agents_numerical</code> (lines 576-582) and the penalty dict from <code>propose_penalty_score</code> (line 786). The penalty is what <code>generic/generic.py</code> subtracts.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Data flow - what goes in, what comes out</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1000 410" role="img" aria-label="Data flow of bs_detection.py: memory files in, analysis bundle and optional report file out">
+<svg class="diagram" viewBox="0 0 1000 410" role="img" aria-label="Data flow of generic/bs_detection.py: memory files in, analysis bundle and optional report file out">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -212,7 +212,7 @@
     <text class="box-sub" x="800" y="294" text-anchor="middle">only when the caller passes a path, 635</text>
     <text class="box-sub" x="800" y="312" text-anchor="middle">the short report returns a string only 712</text>
     <text class="box-sub" x="800" y="330" text-anchor="middle">judge reply not cached: memory_path omitted 466</text>
-    <text class="box-sub" x="800" y="348" text-anchor="middle">generic.py calls the short report 424-426</text>
+    <text class="box-sub" x="800" y="348" text-anchor="middle">generic/generic.py calls the short report 424-426</text>
     <text class="box-sub" x="800" y="368" text-anchor="middle">dotenv.load_dotenv() runs at import 22</text>
   </g>
 
@@ -226,7 +226,7 @@
   <text class="edge-label" x="605" y="258" text-anchor="middle">optional write</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - inputs, in-memory state and the two kinds of output. The judge call is the only network step; the module keeps no cache of it because <code>analyse_backtrace</code> builds its <code>LLMProvider</code> without a <code>memory_path</code> (<code class="path">sources/evaluators/bs_detection.py:466-470</code>).</p>
+<p class="figcap">Diagram 2 - inputs, in-memory state and the two kinds of output. The judge call is the only network step; the module keeps no cache of it because <code>analyse_backtrace</code> builds its <code>LLMProvider</code> without a <code>memory_path</code> (<code class="path">sources/evaluators/generic/bs_detection.py:466-470</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -344,7 +344,7 @@
   <text class="edge-label" x="960" y="325" text-anchor="middle">clamps</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - the three decision groups: the extraction filters (<code class="path">sources/evaluators/bs_detection.py:257-293</code>), the strict threshold test of the short report (<code class="path">:671</code>), and the penalty fallbacks plus clamp (<code class="path">:730-786</code>).</p>
+<p class="figcap">Diagram 3 - the three decision groups: the extraction filters (<code class="path">sources/evaluators/generic/bs_detection.py:257-293</code>), the strict threshold test of the short report (<code class="path">:671</code>), and the penalty fallbacks plus clamp (<code class="path">:730-786</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -360,13 +360,13 @@
 <tr><td>state key</td><td class="sym">model_input_messages</td><td class="sym">json_content[-1] line 125</td><td>the entry list that is scanned for numbers.</td></tr>
 <tr><td>state key</td><td class="sym">role, content</td><td class="sym">lines 144, 374</td><td>role filter and text extraction.</td></tr>
 <tr><td>value out</td><td class="sym">agent_analyses bundle</td><td class="sym">return at lines 576-582</td><td>per-agent fraud scores and suspicious values.</td></tr>
-<tr><td>value out</td><td class="sym">penalty, rationale</td><td class="sym">return at line 786</td><td>the 0.0-1.0 penalty generic.py subtracts.</td></tr>
+<tr><td>value out</td><td class="sym">penalty, rationale</td><td class="sym">return at line 786</td><td>the 0.0-1.0 penalty generic/generic.py subtracts.</td></tr>
 <tr><td>file write</td><td class="sym">output_path (caller supplied)</td><td class="sym">open(..., "w") line 636</td><td>full report text; no default path exists.</td></tr>
 <tr><td>file write</td><td class="sym">none for the judge call</td><td class="sym">LLMProvider at lines 466-470</td><td>no <code>memory_path</code>, so no cache file.</td></tr>
 </tbody>
 </table>
-<p class="note flag">Red: the header says "prototype module, now unused" (<code class="path">sources/evaluators/bs_detection.py:3</code>) and that matches the repository: the only importer is <code class="path">sources/evaluators/generic.py:31</code>, which builds the detector only when <code>use_bs_penalty</code> is true (lines 55-58), and the facade that owns that flag passes <code>False</code> (<code class="path">sources/evaluators/evaluator.py:54</code>). No caller in <code class="path">sources/</code> enables the penalty, so these three report functions have no live caller.</p>
-<p class="note">Amber: <code>default_llm</code> hardcodes the model <code>z-ai/glm-4.7-flash</code> with provider <code>openrouter</code> (line 25), unlike every other evaluator, which takes its model from <code>config.judge_model</code>. <code>DEFAULT_MEMORY_DIR</code> is the relative path <code>./sources/memory</code> (line 24), resolved against the current working directory, while <code class="path">sources/utils/paths.py</code> supplies <code>config.memory_dir</code>. <code>generic.py</code> passes its own <code>memory_dir</code>, so the constant applies only to direct use of the module, such as the <code>__main__</code> block.</p>
+<p class="note flag">Red: the header says "prototype module, now unused" (<code class="path">sources/evaluators/generic/bs_detection.py:3</code>) and that matches the repository: the only importer is <code class="path">sources/evaluators/generic/generic.py:31</code>, which builds the detector only when <code>use_bs_penalty</code> is true (lines 55-58), and the facade that owns that flag passes <code>False</code> (<code class="path">sources/evaluators/evaluator.py:54</code>). No caller in <code class="path">sources/</code> enables the penalty, so these three report functions have no live caller.</p>
+<p class="note">Amber: <code>default_llm</code> hardcodes the model <code>z-ai/glm-4.7-flash</code> with provider <code>openrouter</code> (line 25), unlike every other evaluator, which takes its model from <code>config.judge_model</code>. <code>DEFAULT_MEMORY_DIR</code> is the relative path <code>./sources/memory</code> (line 24), resolved against the current working directory, while <code class="path">sources/utils/paths.py</code> supplies <code>config.memory_dir</code>. <code>generic/generic.py</code> passes its own <code>memory_dir</code>, so the constant applies only to direct use of the module, such as the <code>__main__</code> block.</p>
 <p class="note">Amber: <code>extract_json</code> is documented as "Extract Python code blocks from text" (lines 28-33) but it collects lines between ```json fences (lines 37-45); the string <code>```python</code> is never matched, and a fence pair of any language tag other than <code>json</code> is ignored. <code>generate_numerical_report</code> prints a timeline summary when an analysis entry holds <code>value_timeline</code> (line 623), but no producer sets that key: <code>analyse_backtrace</code> returns the judge JSON plus <code>agent_name</code> (lines 478-479) and <code>analyze_agent_numerical_fraud</code> returns those dicts (lines 551-553), so the block at lines 623-629 cannot run.</p>
 <p class="note">Amber: <code>self.values_already_found</code> is filled at line 549 and read at line 349, so a value found in the first agent is skipped for every later agent of the same run; the instance is reused across agents inside one <code>analyze_all_agents_numerical</code> call (lines 570-574). In <code>_format_numerical_analysis</code> the literal <code>"[FIRST]"</code> is appended by two separate conditions (lines 514 and 516), so one appearance can carry it twice.</p>
 </div>
@@ -407,23 +407,24 @@ BullshitDetectorNumerical                                         line 148  nume
 <table>
 <thead><tr><th>Importer</th><th>What it calls</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="file_eval_generic.html">sources/evaluators/generic.py</a></td><td>imports <code>BullshitDetectorNumerical</code>; builds it only when <code>use_bs_penalty</code>; calls the three report functions</td><td class="sym">lines 31, 55-58, 423-427</td></tr>
+<tr><td class="sym"><a href="file_eval_generic.html">sources/evaluators/generic/generic.py</a></td><td>builds <code>BullshitDetectorNumerical</code> when <code>use_bs_penalty</code> is set, then calls three report functions</td><td class="sym">lines 31, 55-58, 423-427</td></tr>
 </tbody>
 </table>
 <p>No other file in the repository imports this module. One importer found, and it is conditional on a flag that no caller of that importer sets. Inside the module, <code>propose_penalty_score</code> takes the short report as a string argument and does not call <code>generate_short_fraud_report</code> itself (lines 715-723); the <code>__main__</code> block calls <code>analyze_all_agents_numerical</code> and <code>generate_short_fraud_report</code> (lines 797, 800).</p>
 <h3>Tests that exercise it</h3>
 <ul>
-<li>No test file imports <code class="path">sources/evaluators/bs_detection.py</code> or <code>BullshitDetectorNumerical</code>; a grep of <code class="path">tests/</code> for both names returns nothing.</li>
+<li>No test file imports <code class="path">sources/evaluators/generic/bs_detection.py</code> or <code>BullshitDetectorNumerical</code>; a grep of <code class="path">tests/</code> for both names returns nothing.</li>
 <li>No test builds a memory folder for this module or asserts a fraud score, a report or a penalty.</li>
-<li><code class="path">tests/hybrid_verifier_test.py:893</code> and <code class="path">:933</code> replace <code>GenericEvaluator</code> with a stub before the facade is built, which is the only test-side contact with the code path that would build the detector. It never reaches this file.</li>
+<li><code class="path">tests/hybrid_verifier_test.py:1020</code> and <code class="path">:1060</code> replace <code>GenericEvaluator</code> with a stub before the facade is built, which is the only test-side contact with the code path that would build the detector. It never reaches this file.</li>
 </ul>
 <p>Related pages: <a href="file_index.html">file_index.html</a>, <a href="area_evaluators.html">area_evaluators.html</a>, <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>, <a href="file_eval_generic.html">file_eval_generic.html</a> (only importer), <a href="file_eval_base.html">file_eval_base.html</a>, <a href="file_eval_evaluator.html">file_eval_evaluator.html</a>.</p>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/bs_detection.py</code> (801 lines, every def and class), <code class="path">sources/evaluators/generic.py</code> (lines 29-60, 419-441), <code class="path">sources/evaluators/evaluator.py</code> (lines 50-60, 165-167), <code class="path">sources/core/llm_provider.py</code> (signature lines 168-195, cache write lines 253-262, call guard line 619), <code class="path">sources/utils/paths.py</code> (function name <code>default_memory_dir</code>, referenced by config), <code class="path">config.py</code> (lines 222-223), <code class="path">tests/hybrid_verifier_test.py</code> (lines 886-964), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code> and <code class="path">docs/visual_clone/_clone.js</code> for the page skeleton.</p>
-<p class="skips">Skipped: the long judge system prompt text (lines 189-225 quoted only by title and line range) and the judge analysis prompt (lines 432-465); the <code>__main__</code> block beyond its line numbers and its argument rule; <code class="path">sources/evaluators/generic.py</code> internals (own digest page); runtime folders <code class="path">sources/memory/</code>, <code class="path">sources/workflows/</code> and <code>tmp/</code> (not read, so no memory file was opened); <code class="path">.env</code>, <code>token.json</code> and <code>credentials.json</code> (never opened, only the loader call at line 22 is named). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Sources read: <code class="path">sources/evaluators/generic/bs_detection.py</code> (801 lines, every def and class), <code class="path">sources/evaluators/generic/generic.py</code> (lines 28-31, 419-441), <code class="path">sources/evaluators/evaluator.py</code> (lines 50-60, 165-167), <code class="path">sources/core/llm_provider.py</code> (signature lines 168-195, cache write lines 253-262, call guard line 619), <code class="path">sources/utils/paths.py</code> (function name <code>default_memory_dir</code>, referenced by config), <code class="path">config.py</code> (lines 222-223), <code class="path">tests/hybrid_verifier_test.py</code> (lines 1013-1092), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code> and <code class="path">docs/visual_clone/_clone.js</code> for the page skeleton.</p>
+<p class="skips">Skipped: the long judge system prompt text (lines 189-225 quoted only by title and line range) and the judge analysis prompt (lines 432-465); the <code>__main__</code> block beyond its line numbers and its argument rule; <code class="path">sources/evaluators/generic/generic.py</code> internals (own digest page); runtime folders <code class="path">sources/memory/</code>, <code class="path">sources/workflows/</code> and <code>tmp/</code> (not read, so no memory file was opened); <code class="path">.env</code>, <code>token.json</code> and <code>credentials.json</code> (never opened, only the loader call at line 22 is named). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
+<p>Move note: the working tree moved this file into <code class="path">sources/evaluators/generic/</code> and deleted the flat copy; the body is unchanged apart from the import lines, so the line numbers on this page were recomputed against the new path.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (the flat evaluator modules are deleted and <code>evaluator.py</code> is modified).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

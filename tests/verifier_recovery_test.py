@@ -31,10 +31,10 @@ sys.path.append(str(_REPO_ROOT))
 from sources.core.failure_fingerprint import (  # noqa: E402
     compute_failure_fingerprint,  # noqa: F401
 )
-from sources.evaluators import verifier as verifier_mod  # noqa: E402
-from sources.evaluators import verifier_per_claim as vpc  # noqa: E402
-from sources.evaluators.verifier import VerifierEvaluator  # noqa: E402
-from sources.evaluators.verifier_per_claim import (  # noqa: E402
+from sources.evaluators.legacy_verifier import verifier as verifier_mod  # noqa: E402
+from sources.evaluators.legacy_verifier import verifier_per_claim as vpc  # noqa: E402
+from sources.evaluators.legacy_verifier.verifier import VerifierEvaluator  # noqa: E402
+from sources.evaluators.legacy_verifier.verifier_per_claim import (  # noqa: E402
     RECOVERY_PROMPT_RULES,
     VERIFIER_PROMPT_RULES,
     _VerifierPerClaimMixin,

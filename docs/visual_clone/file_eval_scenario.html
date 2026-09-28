@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>scenario.py - Mimosa-AI visual clone</title>
+<title>scenario/scenario.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests &gt; sources/evaluators &gt; scenario.py">
+<body data-crumb="File digests &gt; sources/evaluators &gt; scenario/scenario.py">
 <div class="wrap">
 
-<h1 class="hud">scenario.py</h1>
-<p class="intro">This 654-line file holds the class <code>ScenarioEvaluator</code>, which scores one workflow uuid against one scenario rubric file. It reads the rubric, sends the workflow execution text to an LLM judge item by item, and writes a score to <code>state_result.json</code> plus a human-readable <code>evaluation.txt</code>. It runs when <code>WorkflowEvaluator.evaluate</code> is asked for the scenario evaluation type; the module docstring states it is not used for ScienceAgentBench evaluation (L2&#8211;L3).</p>
+<h1 class="hud">scenario/scenario.py</h1>
+<p class="intro">This 653-line file holds the class <code>ScenarioEvaluator</code>, which scores one workflow uuid against one scenario rubric file. It reads the rubric, sends the workflow execution text to an LLM judge item by item, and writes a score to <code>state_result.json</code> plus a human-readable <code>evaluation.txt</code>. It runs when <code>WorkflowEvaluator.evaluate</code> is asked for the scenario evaluation type; the module docstring states it is not used for ScienceAgentBench evaluation (L2&#8211;L3).</p>
 
 <div id="legend" data-auto></div>
 
 <div class="panel"><span class="br"></span>
 <h2>Diagram 1 &mdash; what the file does: load rubric, pick a format, judge each item, score</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1080 520" role="img" aria-label="scenario.py: evaluate() loads the rubric, dispatches on the total_points key, loops over rubric items or assertions, calls the LLM judge per item and parses the verdict, then scores and writes results">
+<svg class="diagram" viewBox="0 0 1080 520" role="img" aria-label="scenario/scenario.py: evaluate() loads the rubric, dispatches on the total_points key, loops over rubric items or assertions, calls the LLM judge per item and parses the verdict, then scores and writes results">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -34,88 +34,88 @@
     </filter>
   </defs>
 
-  <a class="box" id="s1" href="../../sources/evaluators/scenario.py">
-    <title>Entry: evaluate(uuid, scenario_rubric) L51, null guard L70, input validation L78-L79</title>
+  <a class="box" id="s1" href="../../sources/evaluators/scenario/scenario.py">
+    <title>Entry: evaluate(uuid, scenario_rubric) L50, null guard L69, input validation L77-L78</title>
     <rect x="20" y="30" width="195" height="66" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="117" y="56" text-anchor="middle">evaluate()</text>
-    <text class="box-sub" x="117" y="74" text-anchor="middle">L51 &#183; guards L70 L78</text>
+    <text class="box-sub" x="117" y="74" text-anchor="middle">L50 &#183; guards L69 L77</text>
   </a>
 
   <a class="box" id="s2" href="../../sources/benchmark_evaluation/scenario_loader.py">
-    <title>ScenarioEvaluator.__init__ builds one ScenarioLoader at L45; load_scenario runs at L87</title>
+    <title>ScenarioEvaluator.__init__ builds one ScenarioLoader at L44; load_scenario runs at L86</title>
     <rect x="265" y="30" width="205" height="66" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
     <text class="box-label" x="367" y="56" text-anchor="middle">load_scenario</text>
-    <text class="box-sub" x="367" y="74" text-anchor="middle">ScenarioLoader &#183; L34 L87</text>
+    <text class="box-sub" x="367" y="74" text-anchor="middle">ScenarioLoader &#183; L33 L86</text>
   </a>
 
-  <a class="box" id="s3" href="../../sources/evaluators/scenario.py">
+  <a class="box" id="s3" href="../../sources/evaluators/scenario/scenario.py">
     <title>Format dispatch: the presence of the total_points key decides rubric vs legacy</title>
     <rect x="520" y="30" width="200" height="66" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="620" y="52" text-anchor="middle">format dispatch</text>
     <text class="box-sub" x="620" y="70" text-anchor="middle">"total_points" in scenario</text>
-    <text class="box-sub" x="620" y="86" text-anchor="middle">L100 &#183; branch L102</text>
+    <text class="box-sub" x="620" y="86" text-anchor="middle">L99 &#183; branch L101</text>
   </a>
 
-  <a class="box" id="s4" href="../../sources/evaluators/scenario.py">
-    <title>Rubric path: five ScienceAgentBench categories collected at L229, items looped at L255</title>
+  <a class="box" id="s4" href="../../sources/evaluators/scenario/scenario.py">
+    <title>Rubric path: five ScienceAgentBench categories collected at L228, items looped at L254</title>
     <rect x="770" y="20" width="290" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="915" y="46" text-anchor="middle">_evaluate_rubric_format</text>
-    <text class="box-sub" x="915" y="64" text-anchor="middle">L209 &#183; 5 categories L229</text>
-    <text class="box-sub" x="915" y="82" text-anchor="middle">items loop L255 L257</text>
+    <text class="box-sub" x="915" y="64" text-anchor="middle">L208 &#183; 5 categories L228</text>
+    <text class="box-sub" x="915" y="82" text-anchor="middle">items loop L254 L256</text>
   </a>
 
-  <a class="box" id="s5" href="../../sources/evaluators/scenario.py">
-    <title>Legacy path: assertions list validated at L127 and looped at L141, one call per assertion</title>
+  <a class="box" id="s5" href="../../sources/evaluators/scenario/scenario.py">
+    <title>Legacy path: assertions list validated at L126 and looped at L140, one call per assertion</title>
     <rect x="770" y="140" width="290" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="915" y="166" text-anchor="middle">_evaluate_legacy_format</text>
-    <text class="box-sub" x="915" y="184" text-anchor="middle">L112 &#183; assertions L127</text>
-    <text class="box-sub" x="915" y="202" text-anchor="middle">loop L141 &#183; call L144</text>
+    <text class="box-sub" x="915" y="184" text-anchor="middle">L111 &#183; assertions L126</text>
+    <text class="box-sub" x="915" y="202" text-anchor="middle">loop L140 &#183; call L143</text>
   </a>
 
-  <a class="box" id="s6" href="../../sources/evaluators/scenario.py">
-    <title>Prompt builders embed the workflow execution text: _build_rubric_item_prompt L418, _build_judge_prompt L539</title>
+  <a class="box" id="s6" href="../../sources/evaluators/scenario/scenario.py">
+    <title>Prompt builders embed the workflow execution text: _build_rubric_item_prompt L417, _build_judge_prompt L538</title>
     <rect x="520" y="200" width="200" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="620" y="226" text-anchor="middle">prompt builders</text>
-    <text class="box-sub" x="620" y="244" text-anchor="middle">L418 &#183; L539</text>
+    <text class="box-sub" x="620" y="244" text-anchor="middle">L417 &#183; L538</text>
     <text class="box-sub" x="620" y="262" text-anchor="middle">ask for verdict JSON</text>
   </a>
 
-  <a class="box" id="s7" href="../../sources/evaluators/scenario.py">
-    <title>Per item: LLMProvider judge call at L371 (rubric) and L502 (legacy)</title>
+  <a class="box" id="s7" href="../../sources/evaluators/scenario/scenario.py">
+    <title>Per item: LLMProvider judge call at L370 (rubric) and L501 (legacy)</title>
     <rect x="265" y="200" width="205" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="367" y="226" text-anchor="middle">LLMProvider judge</text>
-    <text class="box-sub" x="367" y="244" text-anchor="middle">L371 &#183; L502</text>
+    <text class="box-sub" x="367" y="244" text-anchor="middle">L370 &#183; L501</text>
     <text class="box-sub" x="367" y="262" text-anchor="middle">one call per item</text>
   </a>
 
-  <a class="box" id="s8" href="../../sources/evaluators/scenario.py">
+  <a class="box" id="s8" href="../../sources/evaluators/scenario/scenario.py">
     <title>Response parser: regex for a JSON object, then verdict, evidence, confidence</title>
     <rect x="20" y="200" width="195" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="117" y="226" text-anchor="middle">_parse_judge_response</text>
-    <text class="box-sub" x="117" y="244" text-anchor="middle">L587 &#183; regex L611</text>
-    <text class="box-sub" x="117" y="262" text-anchor="middle">verdict L630 &#183; conf L638</text>
+    <text class="box-sub" x="117" y="244" text-anchor="middle">L586 &#183; regex L610</text>
+    <text class="box-sub" x="117" y="262" text-anchor="middle">verdict L629 &#183; conf L637</text>
   </a>
 
   <g class="box" id="s9">
     <title>Failure paths keep a row so the totals stay comparable</title>
     <rect x="520" y="330" width="200" height="72" rx="2" fill="none" stroke="#FF4D6A"/>
     <text class="box-label" x="620" y="356" text-anchor="middle">failed row, score 0</text>
-    <text class="box-sub" x="620" y="374" text-anchor="middle">assertion L147&#8211;L153</text>
-    <text class="box-sub" x="620" y="392" text-anchor="middle">item L270&#8211;L276</text>
+    <text class="box-sub" x="620" y="374" text-anchor="middle">assertion L146&#8211;L152</text>
+    <text class="box-sub" x="620" y="392" text-anchor="middle">item L269&#8211;L275</text>
   </g>
 
-  <a class="box" id="s10" href="../../sources/evaluators/scenario.py">
-    <title>Scoring: passed/total L158-L160 for assertions, points/total_points L284 for rubric items</title>
+  <a class="box" id="s10" href="../../sources/evaluators/scenario/scenario.py">
+    <title>Scoring: passed/total L157-L159 for assertions, points/total_points L283 for rubric items</title>
     <rect x="265" y="330" width="205" height="72" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="367" y="356" text-anchor="middle">score computation</text>
-    <text class="box-sub" x="367" y="374" text-anchor="middle">ratio L158 &#183; points L284</text>
+    <text class="box-sub" x="367" y="374" text-anchor="middle">ratio L157 &#183; points L283</text>
   </a>
 
-  <a class="box" id="s11" href="../../sources/evaluators/scenario.py">
-    <title>Writes: _save_results at L176 and L300, plus evaluation.txt at L182 and L306; returns the metrics dict</title>
+  <a class="box" id="s11" href="../../sources/evaluators/scenario/scenario.py">
+    <title>Writes: _save_results at L175 and L299, plus evaluation.txt at L181 and L305; returns the metrics dict</title>
     <rect x="20" y="330" width="195" height="72" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="117" y="356" text-anchor="middle">writes + returns</text>
-    <text class="box-sub" x="117" y="374" text-anchor="middle">L176 L182 &#183; L300 L306</text>
+    <text class="box-sub" x="117" y="374" text-anchor="middle">L175 L181 &#183; L299 L305</text>
   </a>
 
   <path class="edge" data-from="s1" data-to="s2" d="M215,63 H265" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
@@ -144,17 +144,17 @@
   <text class="edge-label" x="240" y="367" text-anchor="middle">score</text>
 
   <text class="box-sub" x="20" y="450">rounded class box = the public entry; red = failing branch; every edge is a real call in the file</text>
-  <text class="box-sub" x="20" y="472">the loop lives in the two format methods: assertions L141, rubric items L255</text>
+  <text class="box-sub" x="20" y="472">the loop lives in the two format methods: assertions L140, rubric items L254</text>
   <text class="box-sub" x="20" y="494">the LLM judge is the only external service; there is no HTTP call in this file</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 &mdash; the whole file in one graph. <code>scenario.py::evaluate</code> L51 is the only public entry; <code>scenario.py::__init__</code> L31 builds the loader once. Prompt builders call <code>BaseEvaluator.workflow_execution_text</code> (base.py L189) from <code>_build_rubric_item_prompt</code> L424 and <code>_build_judge_prompt</code> L545, which can raise <code>WorkflowDataError</code>.</p>
+<p class="figcap">Diagram 1 &mdash; the whole file in one graph. <code>scenario/scenario.py::evaluate</code> L50 is the only public entry; <code>scenario/scenario.py::__init__</code> L30 builds the loader once. Prompt builders call <code>BaseEvaluator.workflow_execution_text</code> (base.py L189) from <code>_build_rubric_item_prompt</code> L417 and <code>_build_judge_prompt</code> L544, which can raise <code>WorkflowDataError</code>.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Diagram 2 &mdash; data flow: rubric file and workflow text in, score and two files out</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1080 340" role="img" aria-label="scenario.py data flow: config fields and the rubric JSON feed the evaluator, the judge model returns text, and the evaluator writes evaluation.txt and state_result.json under the workflow uuid folder">
+<svg class="diagram" viewBox="0 0 1080 340" role="img" aria-label="scenario/scenario.py data flow: config fields and the rubric JSON feed the evaluator, the judge model returns text, and the evaluator writes evaluation.txt and state_result.json under the workflow uuid folder">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -183,16 +183,16 @@
     <title>The rubric file read by ScenarioLoader.load_scenario; loader default dir differs from this file's default</title>
     <rect x="20" y="180" width="250" height="86" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="145" y="206" text-anchor="middle">scenarios_dir rubric JSON</text>
-    <text class="box-sub" x="145" y="224" text-anchor="middle">datasets/scenarios &#183; L31</text>
+    <text class="box-sub" x="145" y="224" text-anchor="middle">datasets/scenarios &#183; L30</text>
     <text class="box-sub" x="145" y="242" text-anchor="middle">read at loader L34</text>
   </a>
 
-  <a class="box" id="f3" href="../../sources/evaluators/scenario.py">
+  <a class="box" id="f3" href="../../sources/evaluators/scenario/scenario.py">
     <title>The evaluator: one uuid, one rubric id, one score out</title>
     <rect x="350" y="120" width="240" height="96" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="470" y="150" text-anchor="middle">ScenarioEvaluator</text>
     <text class="box-sub" x="470" y="168" text-anchor="middle">uuid + scenario_rubric</text>
-    <text class="box-sub" x="470" y="186" text-anchor="middle">L51 &#183; 654 lines</text>
+    <text class="box-sub" x="470" y="186" text-anchor="middle">L50 &#183; 653 lines</text>
     <text class="box-sub" x="470" y="204" text-anchor="middle">no file handle of its own</text>
   </a>
 
@@ -200,7 +200,7 @@
     <title>workflow_execution_text reads the workflow folder for the goal and the agent answers</title>
     <rect x="670" y="30" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="770" y="56" text-anchor="middle">workflow state</text>
-    <text class="box-sub" x="770" y="74" text-anchor="middle">base L189 &#183; called L432</text>
+    <text class="box-sub" x="770" y="74" text-anchor="middle">base L189 &#183; called L431</text>
     <text class="box-sub" x="770" y="92" text-anchor="middle">workflow_dir/uuid</text>
   </a>
 
@@ -208,24 +208,24 @@
     <title>One LLMProvider per item, memory under memory_dir/uuid</title>
     <rect x="670" y="140" width="200" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="770" y="166" text-anchor="middle">judge LLM calls</text>
-    <text class="box-sub" x="770" y="184" text-anchor="middle">L371 &#183; L502</text>
-    <text class="box-sub" x="770" y="202" text-anchor="middle">memory_dir/uuid L368</text>
+    <text class="box-sub" x="770" y="184" text-anchor="middle">L370 &#183; L501</text>
+    <text class="box-sub" x="770" y="202" text-anchor="middle">memory_dir/uuid L367</text>
   </a>
 
-  <a class="box" id="f6" href="../../sources/evaluators/scenario.py">
+  <a class="box" id="f6" href="../../sources/evaluators/scenario/scenario.py">
     <title>Written files: evaluation.txt and the scenario key inside state_result.json</title>
     <rect x="350" y="250" width="240" height="76" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="470" y="276" text-anchor="middle">evaluation.txt L182 L306</text>
-    <text class="box-sub" x="470" y="294" text-anchor="middle">state_result.json L176 L300</text>
+    <text class="box-label" x="470" y="276" text-anchor="middle">evaluation.txt L181 L305</text>
+    <text class="box-sub" x="470" y="294" text-anchor="middle">state_result.json L175 L299</text>
     <text class="box-sub" x="470" y="312" text-anchor="middle">workflow_dir/uuid</text>
   </a>
 
-  <a class="box" id="f7" href="../../sources/evaluators/scenario.py">
+  <a class="box" id="f7" href="../../sources/evaluators/scenario/scenario.py">
     <title>Returned dict: score plus counts or points, and the rubric id</title>
     <rect x="670" y="250" width="200" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="770" y="276" text-anchor="middle">returns score dict</text>
-    <text class="box-sub" x="770" y="294" text-anchor="middle">L194&#8211;L199</text>
-    <text class="box-sub" x="770" y="312" text-anchor="middle">L328&#8211;L333</text>
+    <text class="box-sub" x="770" y="294" text-anchor="middle">L193&#8211;L198</text>
+    <text class="box-sub" x="770" y="312" text-anchor="middle">L327&#8211;L332</text>
   </a>
 
   <path class="edge dashed-edge" data-from="f1" data-to="f3" d="M270,73 C310,73 320,140 350,150" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#arw4)"/>
@@ -242,13 +242,13 @@
   <text class="edge-label" x="640" y="245" text-anchor="middle">return</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 &mdash; dashed = read or write; solid = return. <code>scenario_loader.py::ScenarioLoader.__init__</code> defaults to <code>datasets/ScienceAgentBench/scoring_rubrics</code> (loader L19), while <code>scenario.py::ScenarioEvaluator.__init__</code> defaults to <code>datasets/scenarios</code> (L31) and forwards that value.</p>
+<p class="figcap">Diagram 2 &mdash; dashed = read or write; solid = return. <code>scenario_loader.py::ScenarioLoader.__init__</code> defaults to <code>datasets/ScienceAgentBench/scoring_rubrics</code> (loader L19), while <code>scenario/scenario.py::ScenarioEvaluator.__init__</code> defaults to <code>datasets/scenarios</code> (L30) and forwards that value.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Diagram 3 &mdash; the decision rules: which format, and what happens when a check fails</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1080 440" role="img" aria-label="scenario.py decision tree: null uuid returns zeros, invalid inputs raise ScenarioError, the total_points key selects rubric or legacy, and every failure inside the loop becomes a zero-point row">
+<svg class="diagram" viewBox="0 0 1080 440" role="img" aria-label="scenario/scenario.py decision tree: null uuid returns zeros, invalid inputs raise ScenarioError, the total_points key selects rubric or legacy, and every failure inside the loop becomes a zero-point row">
   <defs>
     <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -266,28 +266,28 @@
     <title>Null-uuid guard in evaluate</title>
     <rect x="20" y="30" width="220" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="130" y="56" text-anchor="middle">uuid is None?</text>
-    <text class="box-sub" x="130" y="74" text-anchor="middle">evaluate &#183; L70</text>
+    <text class="box-sub" x="130" y="74" text-anchor="middle">evaluate &#183; L69</text>
   </g>
   <g class="box" id="z2">
     <title>Zero result, no exception</title>
     <rect x="300" y="30" width="230" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
     <text class="box-label" x="415" y="56" text-anchor="middle">score 0 returned</text>
-    <text class="box-sub" x="415" y="74" text-anchor="middle">L71&#8211;L75 &#183; no raise</text>
+    <text class="box-sub" x="415" y="74" text-anchor="middle">L70&#8211;L74 &#183; no raise</text>
   </g>
   <path class="edge" data-from="z1" data-to="z2" d="M240,59 H300" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
   <text class="edge-label" x="270" y="50" text-anchor="middle">yes</text>
 
   <g class="box" id="z3">
-    <title>Input validation L76-L79 and the load block L86-L93</title>
+    <title>Input validation L75-L78 and the load block L85-L92</title>
     <rect x="20" y="120" width="220" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="130" y="146" text-anchor="middle">inputs or load bad?</text>
-    <text class="box-sub" x="130" y="164" text-anchor="middle">L79 L88 L91</text>
+    <text class="box-sub" x="130" y="164" text-anchor="middle">L78 L87 L90</text>
   </g>
   <g class="box" id="z4">
     <title>ScenarioError for empty, missing or non-dict scenarios</title>
     <rect x="300" y="120" width="230" height="58" rx="2" fill="none" stroke="#FF4D6A"/>
     <text class="box-label" x="415" y="146" text-anchor="middle">raise ScenarioError</text>
-    <text class="box-sub" x="415" y="164" text-anchor="middle">L80 L88&#8211;L93 L127</text>
+    <text class="box-sub" x="415" y="164" text-anchor="middle">L79 L87&#8211;L92 L126</text>
   </g>
   <path class="edge" data-from="z1" data-to="z3" d="M130,88 V120" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="152" y="112" text-anchor="start">no</text>
@@ -295,10 +295,10 @@
   <text class="edge-label" x="270" y="140" text-anchor="middle">yes</text>
 
   <g class="box" id="z5">
-    <title>The only format test in the file; it returns the chosen path at L103 or L105</title>
+    <title>The only format test in the file; it returns the chosen path at L102 or L104</title>
     <rect x="20" y="225" width="220" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="130" y="251" text-anchor="middle">"total_points" present?</text>
-    <text class="box-sub" x="130" y="269" text-anchor="middle">L100 &#183; branch L102</text>
+    <text class="box-sub" x="130" y="269" text-anchor="middle">L99 &#183; branch L101</text>
   </g>
   <path class="edge" data-from="z3" data-to="z5" d="M130,178 V225" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="152" y="205" text-anchor="start">no</text>
@@ -307,16 +307,16 @@
     <title>Rubric path: five fixed category names, unknown keys ignored</title>
     <rect x="300" y="200" width="230" height="72" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="415" y="226" text-anchor="middle">rubric path, 5 categories</text>
-    <text class="box-sub" x="415" y="244" text-anchor="middle">L229&#8211;L235</text>
-    <text class="box-sub" x="415" y="262" text-anchor="middle">items collected L239&#8211;L245</text>
+    <text class="box-sub" x="415" y="244" text-anchor="middle">L228&#8211;L234</text>
+    <text class="box-sub" x="415" y="262" text-anchor="middle">items collected L238&#8211;L244</text>
   </g>
 
   <g class="box" id="z7">
     <title>Legacy path: the assertions key must exist and be a list</title>
     <rect x="300" y="320" width="230" height="72" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="415" y="346" text-anchor="middle">legacy path, assertions</text>
-    <text class="box-sub" x="415" y="364" text-anchor="middle">L127&#8211;L132</text>
-    <text class="box-sub" x="415" y="382" text-anchor="middle">loop L141</text>
+    <text class="box-sub" x="415" y="364" text-anchor="middle">L126&#8211;L131</text>
+    <text class="box-sub" x="415" y="382" text-anchor="middle">loop L140</text>
   </g>
   <path class="edge" data-from="z5" data-to="z6" d="M240,242 C270,242 275,236 300,236" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="270" y="232" text-anchor="middle">yes</text>
@@ -327,9 +327,9 @@
     <title>Per-item work: prompt build, judge call, response parse</title>
     <rect x="620" y="140" width="250" height="86" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="745" y="166" text-anchor="middle">one item or assertion</text>
-    <text class="box-sub" x="745" y="184" text-anchor="middle">prompt L432 L553</text>
-    <text class="box-sub" x="745" y="202" text-anchor="middle">judge L371 L502</text>
-    <text class="box-sub" x="745" y="220" text-anchor="middle">parse L390 L521</text>
+    <text class="box-sub" x="745" y="184" text-anchor="middle">prompt L431 L552</text>
+    <text class="box-sub" x="745" y="202" text-anchor="middle">judge L370 L501</text>
+    <text class="box-sub" x="745" y="220" text-anchor="middle">parse L389 L520</text>
   </g>
   <path class="edge" data-from="z6" data-to="z8" d="M530,232 C570,232 580,190 620,182" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="566" y="205" text-anchor="middle">each item</text>
@@ -340,9 +340,9 @@
     <title>Every failure inside the loop is caught and stored as a failed row</title>
     <rect x="620" y="275" width="250" height="86" rx="2" fill="none" stroke="#FF4D6A"/>
     <text class="box-label" x="745" y="301" text-anchor="middle">failure becomes a row</text>
-    <text class="box-sub" x="745" y="319" text-anchor="middle">passed false L147&#8211;L153</text>
-    <text class="box-sub" x="745" y="337" text-anchor="middle">points 0 L270&#8211;L276</text>
-    <text class="box-sub" x="745" y="355" text-anchor="middle">parse error L651&#8211;L653</text>
+    <text class="box-sub" x="745" y="319" text-anchor="middle">passed false L146&#8211;L152</text>
+    <text class="box-sub" x="745" y="337" text-anchor="middle">points 0 L269&#8211;L275</text>
+    <text class="box-sub" x="745" y="355" text-anchor="middle">parse error L650&#8211;L652</text>
   </g>
   <path class="edge" data-from="z8" data-to="z9" d="M745,226 V275" fill="none" stroke="#FF4D6A" stroke-width="1.5" marker-end="url(#arwR)"/>
   <text class="edge-label" x="767" y="255" text-anchor="start">any raise</text>
@@ -355,11 +355,11 @@
   <path class="edge" data-from="z9" data-to="z10" d="M745,361 V390" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
   <text class="edge-label" x="767" y="382" text-anchor="start">next</text>
 
-  <text class="box-sub" x="890" y="150">legacy path prints L161</text>
+  <text class="box-sub" x="890" y="150">legacy path prints L160</text>
   <text class="box-sub" x="890" y="170">rubric path prints nothing</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 &mdash; the branching that matters. The outer <code>except ScenarioError: raise</code> at L107&#8211;L108 passes deliberate errors through, and the <code>except Exception</code> at L109&#8211;L110 wraps anything else as <code>ScenarioError</code>. Inside the two loops every exception is swallowed into a failed row (L147, L270), and a judge reply that is not parseable becomes <code>(False, "Parse error: ...", 0.0)</code> L651&#8211;L653.</p>
+<p class="figcap">Diagram 3 &mdash; the branching that matters. The outer <code>except ScenarioError: raise</code> at L106&#8211;L107 passes deliberate errors through, and the <code>except Exception</code> at L108&#8211;L109 wraps anything else as <code>ScenarioError</code>. Inside the two loops every exception is swallowed into a failed row (L146, L269), and a judge reply that is not parseable becomes <code>(False, "Parse error: ...", 0.0)</code> L650&#8211;L652.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -367,58 +367,58 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th><th class="size">Line</th></tr></thead>
 <tbody>
-<tr><td>reads</td><td class="sym">uuid, scenario_rubric</td><td>arguments of evaluate</td><td>key the workflow folder, name the rubric file</td><td class="size">L51</td></tr>
-<tr><td>reads</td><td class="sym">scenarios_dir</td><td>constructor argument, default datasets/scenarios</td><td>builds the one ScenarioLoader</td><td class="size">L31 L34</td></tr>
-<tr><td>reads</td><td class="sym">rubric JSON</td><td>ScenarioLoader.load_scenario</td><td>assertions list or rubric categories</td><td class="size">L87 &#183; loader L34</td></tr>
-<tr><td>reads</td><td class="sym">memory_dir</td><td>config, via BaseEvaluator</td><td>LLM memory folder per uuid</td><td class="size">base L118 &#183; L368 L499</td></tr>
-<tr><td>reads</td><td class="sym">workflow_dir</td><td>config, via BaseEvaluator</td><td>find the uuid folder for input and output</td><td class="size">base L119 &#183; L182 L306</td></tr>
+<tr><td>reads</td><td class="sym">uuid, scenario_rubric</td><td>arguments of evaluate</td><td>key the workflow folder, name the rubric file</td><td class="size">L50</td></tr>
+<tr><td>reads</td><td class="sym">scenarios_dir</td><td>constructor argument, default datasets/scenarios</td><td>builds the one ScenarioLoader</td><td class="size">L30 L33</td></tr>
+<tr><td>reads</td><td class="sym">rubric JSON</td><td>ScenarioLoader.load_scenario</td><td>assertions list or rubric categories</td><td class="size">L86 &#183; loader L34</td></tr>
+<tr><td>reads</td><td class="sym">memory_dir</td><td>config, via BaseEvaluator</td><td>LLM memory folder per uuid</td><td class="size">base L118 &#183; L367 L498</td></tr>
+<tr><td>reads</td><td class="sym">workflow_dir</td><td>config, via BaseEvaluator</td><td>find the uuid folder for input and output</td><td class="size">base L119 &#183; L181 L305</td></tr>
 <tr><td>reads</td><td class="sym">judge_model</td><td>config, via BaseEvaluator</td><td>the judge LLM for every item</td><td class="size">base L125&#8211;L135</td></tr>
 <tr><td>reads</td><td class="sym">reasoning_effort, max_tokens</td><td>config, via BaseEvaluator LLMConfig</td><td>judge call settings</td><td class="size">base L132&#8211;L133</td></tr>
-<tr><td>reads</td><td class="sym">workflow execution text</td><td>BaseEvaluator.workflow_execution_text</td><td>goal and agent answers embedded in prompts</td><td class="size">base L189 &#183; L432 L553</td></tr>
-<tr><td>writes</td><td class="sym">evaluation.txt</td><td>workflow_dir/uuid/, written twice per format</td><td>per-item verdict, evidence, confidence</td><td class="size">L182&#8211;L196 &#183; L306&#8211;L320</td></tr>
-<tr><td>writes</td><td class="sym">state_result.json</td><td>workflow_dir/uuid/, key evaluation.scenario</td><td>the score other parts of the run read back</td><td class="size">L176 L300 &#183; base L249 L272</td></tr>
-<tr><td>returns</td><td class="sym">score dict</td><td>three return statements</td><td>score plus counts or points and the rubric id</td><td class="size">L71 L202 L327</td></tr>
+<tr><td>reads</td><td class="sym">workflow execution text</td><td>BaseEvaluator.workflow_execution_text</td><td>goal and agent answers embedded in prompts</td><td class="size">base L189 &#183; L431 L552</td></tr>
+<tr><td>writes</td><td class="sym">evaluation.txt</td><td>workflow_dir/uuid/, written twice per format</td><td>per-item verdict, evidence, confidence</td><td class="size">L181&#8211;L195 &#183; L305&#8211;L319</td></tr>
+<tr><td>writes</td><td class="sym">state_result.json</td><td>workflow_dir/uuid/, key evaluation.scenario</td><td>the score other parts of the run read back</td><td class="size">L175 L299 &#183; base L249 L272</td></tr>
+<tr><td>returns</td><td class="sym">score dict</td><td>three return statements</td><td>score plus counts or points and the rubric id</td><td class="size">L70 L201 L326</td></tr>
 </tbody>
 </table>
-<p class="note">Amber note: <code>scenario.py::_evaluate_rubric_item</code> computes partial credit for a failed item, <code>item_points * confidence</code> L400, but the caller <code>scenario.py::_evaluate_rubric_format</code> ignores that field and recomputes <code>earned = 0</code> for a failed item at L260&#8211;L265. So the partial credit never reaches the score, and the <code>earned_points</code> written into the per-item result can disagree with the total.</p>
+<p class="note">Amber note: <code>scenario/scenario.py::_evaluate_rubric_item</code> computes partial credit for a failed item, <code>item_points * confidence</code> L399, but the caller <code>scenario/scenario.py::_evaluate_rubric_format</code> ignores that field and recomputes <code>earned = 0</code> for a failed item at L259&#8211;L264. So the partial credit never reaches the score, and the <code>earned_points</code> written into the per-item result can disagree with the total.</p>
 <p class="note">Amber note: <code>import logging</code> L7, <code>from pathlib import Path</code> L10 and <code>LLMConfig</code> L18 are imported but referenced nowhere else in the file; only <code>LLMProvider</code> from L18 is used.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
 <h2>Full symbol inventory</h2>
 <details><summary>1 class, 9 methods, 4 imports that matter &mdash; every signature with a role</summary><div class="dbody">
-<pre>class ScenarioEvaluator(BaseEvaluator)                                  L23   scenario rubric scorer
+<pre>class ScenarioEvaluator(BaseEvaluator)                                  L22   scenario rubric scorer
 
 ScenarioEvaluator.__init__(self, config, scenarios_dir="datasets/scenarios") -&gt; None
-                                                                       L31   base setup + ScenarioLoader
+                                                                       L30   base setup + ScenarioLoader
 ScenarioEvaluator.evaluate(self, uuid, scenario_rubric) -&gt; dict[str, Any]
-                                                                       L51   public entry, format dispatch
+                                                                       L50   public entry, format dispatch
 ScenarioEvaluator._evaluate_legacy_format(self, uuid, scenario_rubric, scenario)
-    -&gt; dict[str, Any]                                                  L112  assertion loop, ratio score
+    -&gt; dict[str, Any]                                                  L111  assertion loop, ratio score
 ScenarioEvaluator._evaluate_rubric_format(self, uuid, scenario_rubric, scenario)
-    -&gt; dict[str, Any]                                                  L209  category loop, points score
+    -&gt; dict[str, Any]                                                  L208  category loop, points score
 ScenarioEvaluator._evaluate_rubric_item(self, uuid, item) -&gt; dict[str, Any]
-                                                                       L334  one rubric item through the judge
-ScenarioEvaluator._build_rubric_item_prompt(self, uuid, item) -&gt; str   L418  item prompt with execution text
+                                                                       L333  one rubric item through the judge
+ScenarioEvaluator._build_rubric_item_prompt(self, uuid, item) -&gt; str   L417  item prompt with execution text
 ScenarioEvaluator._evaluate_assertion(self, uuid, assertion) -&gt; dict[str, Any]
-                                                                       L469  one assertion through the judge
-ScenarioEvaluator._build_judge_prompt(self, uuid, assertion) -&gt; str    L539  assertion prompt with execution text
+                                                                       L468  one assertion through the judge
+ScenarioEvaluator._build_judge_prompt(self, uuid, assertion) -&gt; str    L538  assertion prompt with execution text
 ScenarioEvaluator._parse_judge_response(self, judge_text) -&gt; tuple[bool, str, float]
-                                                                       L587  TRUE/FALSE + evidence + confidence</pre>
+                                                                       L586  TRUE/FALSE + evidence + confidence</pre>
 <p>Module-level parts, in file order:</p>
 <table>
 <thead><tr><th>Part</th><th>Symbol</th><th>Role</th><th class="size">Line</th></tr></thead>
 <tbody>
 <tr><td>docstring</td><td class="sym">module docstring</td><td>says ScienceAgentBench compatibility, other scenarios intended</td><td class="size">L1&#8211;L4</td></tr>
-<tr><td>imports</td><td class="sym">json, logging, re, datetime, Path, Any, sys, os</td><td>stdlib; re used at L611, datetime at L166</td><td class="size">L6&#8211;L13</td></tr>
+<tr><td>imports</td><td class="sym">json, logging, re, datetime, Path, Any, sys, os</td><td>stdlib; re used at L610, datetime at L165</td><td class="size">L6&#8211;L13</td></tr>
 <tr><td>guard</td><td class="sym">sys.path append</td><td>only when run as a script, path fix for imports</td><td class="size">L15&#8211;L16</td></tr>
-<tr><td>imports</td><td class="sym">LLMConfig, LLMProvider</td><td>LLMConfig unused; LLMProvider builds each judge</td><td class="size">L18</td></tr>
-<tr><td>import</td><td class="sym">ScenarioLoader</td><td>loads the rubric file</td><td class="size">L19</td></tr>
-<tr><td>import</td><td class="sym">from .base import *</td><td>BaseEvaluator and the four error classes</td><td class="size">L21</td></tr>
-<tr><td>class</td><td class="sym">ScenarioEvaluator</td><td>the only class in the file</td><td class="size">L23</td></tr>
+<tr><td>imports</td><td class="sym">LLMConfig, LLMProvider</td><td>LLMConfig unused; LLMProvider builds each judge</td><td class="size">L19</td></tr>
+<tr><td>import</td><td class="sym">ScenarioLoader</td><td>loads the rubric file</td><td class="size">L18</td></tr>
+<tr><td>import</td><td class="sym">from sources.evaluators.base import *</td><td>BaseEvaluator and the four error classes</td><td class="size">L20</td></tr>
+<tr><td>class</td><td class="sym">ScenarioEvaluator</td><td>the only class in the file</td><td class="size">L22</td></tr>
 </tbody>
 </table>
-<p>Error classes raised here, all defined in <code class="path">sources/evaluators/base.py</code>: <code>EvaluatorError</code> L64, <code>WorkflowDataError</code> L69, <code>ScenarioError</code> L74, <code>LLMEvaluationError</code> L79, <code>ScoreExtractionError</code> L84. No module-level function, no constant, no decorator.</p>
+<p>Error classes raised here, all defined in <code class="path">sources/evaluators/base.py</code>: <code>EvaluatorError</code> L64, <code>WorkflowDataError</code> L69, <code>ScenarioError</code> L74, <code>LLMEvaluationError</code> L79, <code>ScoreExtractionError</code> L84 (base.py is unchanged, these are its own lines). No module-level function, no constant, no decorator.</p>
 </div></details>
 </div>
 
@@ -436,14 +436,15 @@ ScenarioEvaluator._parse_judge_response(self, judge_text) -&gt; tuple[bool, str,
 <tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>monkeypatches <code>ScenarioEvaluator</code> with a stub to test facade defaults</td><td class="sym">L894 L934</td></tr>
 </tbody>
 </table>
-<p>No offline unit test exercises <code class="path">sources/evaluators/scenario.py</code> directly: the three scenario tests need a finished workflow run and judge credentials. <code class="path">tests/hybrid_verifier_test.py</code> only replaces the class.</p>
+<p>No offline unit test exercises <code class="path">sources/evaluators/scenario/scenario.py</code> directly: the three scenario tests need a finished workflow run and judge credentials. <code class="path">tests/hybrid_verifier_test.py</code> only replaces the class.</p>
 <p>See also: the <a href="area_evaluators.html">evaluators area</a>, <a href="mod_evaluators_hybrid_verifier.html">the hybrid verifier package page</a>, <a href="file_hybrid_init.html">file_hybrid_init.html</a>, <a href="file_eval_grounding.html">file_eval_grounding.html</a>, <a href="flow_verification.html">flow_verification.html</a> and the <a href="file_index.html">file digest index</a>.</p>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/scenario.py</code> (654 lines, whole file), <code class="path">sources/evaluators/base.py</code> (L64&#8211;L90, L96&#8211;L145, L147&#8211;L189, L189&#8211;L226, L227&#8211;L286), <code class="path">sources/benchmark_evaluation/scenario_loader.py</code> (L16&#8211;L40), <code class="path">sources/evaluators/evaluator.py</code> (L21&#8211;L110), <code class="path">config.py</code> (default paths), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
+<p>Sources read: <code class="path">sources/evaluators/scenario/scenario.py</code> (653 lines, whole file), <code class="path">sources/evaluators/base.py</code> (L64&#8211;L90, L96&#8211;L145, L147&#8211;L189, L189&#8211;L226, L227&#8211;L286), <code class="path">sources/benchmark_evaluation/scenario_loader.py</code> (L16&#8211;L40), <code class="path">sources/evaluators/evaluator.py</code> (L21&#8211;L110), <code class="path">config.py</code> (default paths), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
 <p class="skips">Skipped, with reason: <code class="path">.env</code> and <code class="path">experiments_verifiers/.env</code> (never opened, secrets); the rubric JSON bodies under <code class="path">datasets/scenarios/</code> and <code class="path">datasets/ScienceAgentBench/scoring_rubrics/</code> (data, not code needed to describe this file; only the directory names are cited); <code class="path">sources/benchmark_evaluation/csv_mode.py</code> beyond its import site (it delegates to the facade); the body of <code class="path">sources/core/llm_provider.py</code> (the judge call contract only); the remaining evaluator files (grep shows no direct importer); no pytest run and no script executed, as instructed.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Move note: the working tree moved this file into <code class="path">sources/evaluators/scenario/</code> and deleted the flat copy; the body is unchanged apart from the import lines, so the line numbers on this page were recomputed against the new path.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (the flat evaluator modules are deleted and <code>evaluator.py</code> is modified).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

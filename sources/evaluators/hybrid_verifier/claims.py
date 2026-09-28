@@ -24,7 +24,6 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from sources.evaluators.base import extract_json_payload
 CLAIM_CATEGORIES: tuple[str, ...] = (
     "deliverable_path",
     "output_schema",
@@ -57,8 +56,6 @@ FIDELITY_CATEGORIES: tuple[str, ...] = (
 
 # Claim fields every extracted/replacement claim must carry (non-empty str).
 _REQUIRED_FIELDS: tuple[str, ...] = ("statement", "target", "scoring_rule")
-
-CUT
 
 
 def extract_claims_prompt(
@@ -271,6 +268,64 @@ def _flag(verdict: dict[str, Any], key: str) -> bool:
     return str(raw).strip().lower() == "true"
 
 
+def _first_json_block(text: str) -> str:
+    """First balanced JSON block in *text* — an ARRAY when an array
+    opens first, an object otherwise; tolerant of ``` fences and prose.
+
+    Unlike ``base.extract_json_payload`` (object-first) this preserves a
+    top-level verdict ARRAY instead of collapsing it to the object
+    nested inside it. Structural payload parsing, not content judgment.
+    """
+    if not text:
+        return ""
+    fence = re.search(r"```(?:json)?\s*(.*?)```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1)
+    starts = [i for i in (text.find("["), text.find("{")) if i != -1]
+    if not starts:
+        return ""
+    start = min(starts)
+    opener, closer = ("[", "]") if text[start] == "[" else ("{", "}")
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_str = False
+        elif ch == '"':
+            in_str = True
+        elif ch == opener:
+            depth += 1
+        elif ch == closer:
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return ""
+
+
+def _as_verdict_list(parsed: Any) -> list[Any] | None:
+    """Coerce a parsed judge reply to a verdict list.
+
+    Accepts the requested JSON array, or an object wrapping the array
+    under its first list-valued key (``{"verdicts": [...]}``) — judges
+    trained on this pipeline's object-shaped replies may wrap the array
+    despite the instruction.
+    """
+    if isinstance(parsed, list):
+        return parsed
+    if isinstance(parsed, dict):
+        for v in parsed.values():
+            if isinstance(v, list):
+                return v
+    return None
+
+
 def _screen_call(
     llm_text: Callable[[str, str, str], str],
     uuid: str,
@@ -291,14 +346,15 @@ def _screen_call(
             raw = llm_text(uuid, name, cur)
         except Exception:  # noqa: BLE001 — degrade open per screen
             return None
-        payload = extract_json_payload(raw or "")
+        payload = _first_json_block(raw or "")
         if payload:
             try:
                 parsed = json.loads(payload)
             except json.JSONDecodeError:
                 parsed = None
-            if isinstance(parsed, list):
-                return parsed
+            verdicts = _as_verdict_list(parsed)
+            if verdicts is not None:
+                return verdicts
         cur = (
             f"{prompt}\n\nPREVIOUS ATTEMPT FAILED: the reply was not the "
             "strict JSON array requested. Reply with ONLY that array — no "

@@ -6,7 +6,7 @@
 <title>File digests - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests > all 89 files">
+<body data-crumb="File digests > all 90 files">
 <div class="wrap">
 
 <h1 class="hud">File digests</h1>
@@ -30,8 +30,8 @@
 
   <g class="box" id="s0"><title>Scope of the digest set</title>
     <rect x="20" y="24" width="250" height="66" rx="2" fill="none" stroke="url(#hud)"/>
-    <text class="box-label" x="145" y="50" text-anchor="middle">89 file digests</text>
-    <text class="box-sub" x="145" y="70" text-anchor="middle">28 266 + 8 692 + 5 900 python lines</text>
+    <text class="box-label" x="145" y="50" text-anchor="middle">90 file digests</text>
+    <text class="box-sub" x="145" y="70" text-anchor="middle">31 115 + 8 689 + 7 012 python lines</text>
   </g>
 
   <a class="box" id="s1" href="area_sources_core.html">
@@ -44,7 +44,7 @@
     <title>The experiment scripts</title>
     <rect x="620" y="24" width="300" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="770" y="50" text-anchor="middle">experiments_verifiers/harness/</text>
-    <text class="box-sub" x="770" y="70" text-anchor="middle">54 files, 11 digest workers</text>
+    <text class="box-sub" x="770" y="70" text-anchor="middle">67 files, 55 digests</text>
   </a>
 
   <a class="box" id="s3" href="mod_evaluators_hybrid_verifier.html">
@@ -57,7 +57,7 @@
     <title>Other current evaluator files</title>
     <rect x="620" y="140" width="300" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="770" y="166" text-anchor="middle">sources/evaluators/*.py</text>
-    <text class="box-sub" x="770" y="186" text-anchor="middle">6 files, legacy verifier dropped</text>
+    <text class="box-sub" x="770" y="186" text-anchor="middle">9 current files, legacy dropped</text>
   </a>
 
   <path class="edge" data-from="s0" data-to="s1" d="M270,57 H330" fill="none" stroke="url(#hud)" stroke-width="1.75" marker-end="url(#arw)"/>
@@ -68,12 +68,13 @@
   <a class="box" id="s5" href="area_evaluators_legacy.html">
     <title>Excluded from the digest set</title>
     <rect x="620" y="216" width="300" height="36" rx="2" fill="none" stroke="#4F7486" stroke-dasharray="5 4"/>
-    <text class="box-sub" x="770" y="239" text-anchor="middle">verifier*.py (5 files, deprecated) not digested</text>
+    <text class="box-sub" x="770" y="239" text-anchor="middle">legacy_verifier/ (5 files, deprecated) not digested</text>
   </a>
   <path class="edge dotted-edge" data-from="s4" data-to="s5" d="M770,206 V216" fill="none" stroke="#4F7486" stroke-width="1.25" marker-end="url(#arwE)"/>
 </svg>
 </div>
 <p class="figcap">Diagram 1 - the three folders that get a digest page per file, and the deprecated set that does not.</p>
+<p class="note">Scope counts are my computation (<code>wc -l</code>, 2026-09-26): 19 core + 55 harness + 16 evaluator digest pages = 90, and the three line totals are 31 115 (the 55 harness files with a page) + 8 689 (19 core files) + 7 012 (the 16 evaluator files with a page).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -84,12 +85,12 @@
 <tr><td class="sym"><a href="file_core_init.html">file_core_init.html</a></td><td class="sym"><a href="../../sources/core/__init__.py">__init__.py</a></td><td class="size">77</td></tr>
 <tr><td class="sym"><a href="file_core_code_features.html">file_core_code_features.html</a></td><td class="sym"><a href="../../sources/core/code_features.py">code_features.py</a></td><td class="size">37</td></tr>
 <tr><td class="sym"><a href="file_core_evolution_engine.html">file_core_evolution_engine.html</a></td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a></td><td class="size">1109</td></tr>
-<tr><td class="sym"><a href="file_core_factory.html">file_core_factory.html</a></td><td class="sym"><a href="../../sources/core/factory.py">factory.py</a></td><td class="size">208</td></tr>
+<tr><td class="sym"><a href="file_core_factory.html">file_core_factory.html</a></td><td class="sym"><a href="../../sources/core/factory.py">factory.py</a></td><td class="size">207</td></tr>
 <tr><td class="sym"><a href="file_core_failure_fingerprint.html">file_core_failure_fingerprint.html</a></td><td class="sym"><a href="../../sources/core/failure_fingerprint.py">failure_fingerprint.py</a></td><td class="size">195</td></tr>
 <tr><td class="sym"><a href="file_core_genotype_embedding.html">file_core_genotype_embedding.html</a></td><td class="sym"><a href="../../sources/core/genotype_embedding.py">genotype_embedding.py</a></td><td class="size">329</td></tr>
 <tr><td class="sym"><a href="file_core_lineage.html">file_core_lineage.html</a></td><td class="sym"><a href="../../sources/core/lineage.py">lineage.py</a></td><td class="size">173</td></tr>
 <tr><td class="sym"><a href="file_core_llm_provider.html">file_core_llm_provider.html</a></td><td class="sym"><a href="../../sources/core/llm_provider.py">llm_provider.py</a></td><td class="size">643</td></tr>
-<tr><td class="sym"><a href="file_core_orchestrator.html">file_core_orchestrator.html</a></td><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a></td><td class="size">428</td></tr>
+<tr><td class="sym"><a href="file_core_orchestrator.html">file_core_orchestrator.html</a></td><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a></td><td class="size">427</td></tr>
 <tr><td class="sym"><a href="file_core_planner.html">file_core_planner.html</a></td><td class="sym"><a href="../../sources/core/planner.py">planner.py</a></td><td class="size">1053</td></tr>
 <tr><td class="sym"><a href="file_core_schema.html">file_core_schema.html</a></td><td class="sym"><a href="../../sources/core/schema.py">schema.py</a></td><td class="size">163</td></tr>
 <tr><td class="sym"><a href="file_core_selection.html">file_core_selection.html</a></td><td class="sym"><a href="../../sources/core/selection.py">selection.py</a></td><td class="size">842</td></tr>
@@ -98,16 +99,16 @@
 <tr><td class="sym"><a href="file_core_variation_engine.html">file_core_variation_engine.html</a></td><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a></td><td class="size">609</td></tr>
 <tr><td class="sym"><a href="file_core_workflow_factory.html">file_core_workflow_factory.html</a></td><td class="sym"><a href="../../sources/core/workflow_factory.py">workflow_factory.py</a></td><td class="size">514</td></tr>
 <tr><td class="sym"><a href="file_core_workflow_info.html">file_core_workflow_info.html</a></td><td class="sym"><a href="../../sources/core/workflow_info.py">workflow_info.py</a></td><td class="size">271</td></tr>
-<tr><td class="sym"><a href="file_core_workflow_runner.html">file_core_workflow_runner.html</a></td><td class="sym"><a href="../../sources/core/workflow_runner.py">workflow_runner.py</a></td><td class="size">651</td></tr>
+<tr><td class="sym"><a href="file_core_workflow_runner.html">file_core_workflow_runner.html</a></td><td class="sym"><a href="../../sources/core/workflow_runner.py">workflow_runner.py</a></td><td class="size">650</td></tr>
 <tr><td class="sym"><a href="file_core_workflow_selection.html">file_core_workflow_selection.html</a></td><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a></td><td class="size">396</td></tr>
 </tbody>
 </table>
 </div>
 
 <div class="panel"><span class="br"></span>
-<h2>experiments_verifiers/harness (54 files)</h2>
+<h2>experiments_verifiers/harness (67 files)</h2>
 <p class="intro">These pages explain the script itself; <a href="exp_index.html">exp_index.html</a> holds the experiment results pages.</p>
-<details><summary>all 54 harness digests</summary><div class="dbody">
+<details><summary>all 55 harness digests</summary><div class="dbody">
 <table>
 <thead><tr><th>Digest page</th><th>File</th><th class="size">Lines</th></tr></thead>
 <tbody>
@@ -164,14 +165,16 @@
 <tr><td class="sym"><a href="file_harness_metrics.html">file_harness_metrics.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/metrics.py">metrics.py</a></td><td class="size">177</td></tr>
 <tr><td class="sym"><a href="file_harness_run_e1.html">file_harness_run_e1.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/run_e1.py">run_e1.py</a></td><td class="size">543</td></tr>
 <tr><td class="sym"><a href="file_harness_run_e2.html">file_harness_run_e2.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/run_e2.py">run_e2.py</a></td><td class="size">398</td></tr>
-<tr><td class="sym"><a href="file_harness_e25_creed.html">file_harness_e25_creed.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e25_creed.py">e25_creed.py</a></td><td class="size">2038</td></tr>
+<tr><td class="sym"><a href="file_harness_e25_creed.html">file_harness_e25_creed.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e25_creed.py">e25_creed.py</a></td><td class="size">2039</td></tr>
+<tr><td class="sym"><a href="file_harness_e35_prime.html">file_harness_e35_prime.html</a></td><td class="sym"><a href="../../experiments_verifiers/harness/e35_prime.py">e35_prime.py</a></td><td class="size">2848</td></tr>
 </tbody>
 </table>
 </div></details>
+<p class="note flag">Not yet covered: the folder holds 67 scripts, but this clone has digest pages for E1-E25 and E35 only. Ten experiments have a script and result files with no page yet: E26 (bumblebee), E27 (arbiter), E28 (mirror), E29 (poirot), E30 (optimus), E31 (council), E32 (mirror_v2), E33 (truman), E34 (forensic), E36 (liar). E26 and E36 also have a second script each (<code>e26_confirm.py</code>, <code>e36_liar_bs.py</code>). Their result files carry 2026-09-25 for E26-E32 and 2026-09-26 for E33, E34 and E36.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
-<h2>sources/evaluators (16 files)</h2>
+<h2>sources/evaluators (16 digested, 25 on disk)</h2>
 <table>
 <thead><tr><th>Digest page</th><th>File</th><th class="size">Lines</th></tr></thead>
 <tbody>
@@ -186,21 +189,23 @@
 <tr><td class="sym"><a href="file_hybrid_registry.html">file_hybrid_registry.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a></td><td class="size">274</td></tr>
 <tr><td class="sym"><a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a></td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/scorers.py">hybrid_verifier/scorers.py</a></td><td class="size">309</td></tr>
 <tr><td class="sym"><a href="file_eval_base.html">file_eval_base.html</a></td><td class="sym"><a href="../../sources/evaluators/base.py">base.py</a></td><td class="size">380</td></tr>
-<tr><td class="sym"><a href="file_eval_bs_detection.html">file_eval_bs_detection.html</a></td><td class="sym"><a href="../../sources/evaluators/bs_detection.py">bs_detection.py</a></td><td class="size">801</td></tr>
+<tr><td class="sym"><a href="file_eval_bs_detection.html">file_eval_bs_detection.html</a></td><td class="sym"><a href="../../sources/evaluators/generic/bs_detection.py">generic/bs_detection.py</a></td><td class="size">801</td></tr>
 <tr><td class="sym"><a href="file_eval_evaluator.html">file_eval_evaluator.html</a></td><td class="sym"><a href="../../sources/evaluators/evaluator.py">evaluator.py</a></td><td class="size">193</td></tr>
-<tr><td class="sym"><a href="file_eval_generic.html">file_eval_generic.html</a></td><td class="sym"><a href="../../sources/evaluators/generic.py">generic.py</a></td><td class="size">472</td></tr>
+<tr><td class="sym"><a href="file_eval_generic.html">file_eval_generic.html</a></td><td class="sym"><a href="../../sources/evaluators/generic/generic.py">generic/generic.py</a></td><td class="size">471</td></tr>
 <tr><td class="sym"><a href="file_eval_grounding.html">file_eval_grounding.html</a></td><td class="sym"><a href="../../sources/evaluators/grounding.py">grounding.py</a></td><td class="size">55</td></tr>
-<tr><td class="sym"><a href="file_eval_scenario.html">file_eval_scenario.html</a></td><td class="sym"><a href="../../sources/evaluators/scenario.py">scenario.py</a></td><td class="size">654</td></tr>
+<tr><td class="sym"><a href="file_eval_scenario.html">file_eval_scenario.html</a></td><td class="sym"><a href="../../sources/evaluators/scenario/scenario.py">scenario/scenario.py</a></td><td class="size">653</td></tr>
 </tbody>
 </table>
-<p class="note">Five files are excluded because they are deprecated: <code class="path">verifier.py</code>, <code class="path">verifier_claims.py</code>, <code class="path">verifier_claim_sources.py</code>, <code class="path">verifier_per_claim.py</code>, <code class="path">verifier_workspace.py</code> (see <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>).</p>
+<p class="note">Five files are excluded because they are deprecated: <code class="path">legacy_verifier/verifier.py</code>, <code class="path">legacy_verifier/verifier_claims.py</code>, <code class="path">legacy_verifier/verifier_claim_sources.py</code>, <code class="path">legacy_verifier/verifier_per_claim.py</code>, <code class="path">legacy_verifier/verifier_workspace.py</code> (see <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>). Move note: the five files sat flat in <code class="path">sources/evaluators/</code> at commit <code>336fe19</code> and the working tree moved them into <code class="path">legacy_verifier/</code>; none has a digest page.</p>
+<p class="note">The folder was restructured at commit <code>336fe19</code>: <code class="path">generic/bs_detection.py</code>, <code class="path">generic/generic.py</code> and <code class="path">scenario/scenario.py</code> moved into sub-folders, so the three rows above point at the new paths. The other current files with no row are the package <code>__init__.py</code> files: <code class="path">sources/evaluators/__init__.py</code> (52 lines), <code class="path">generic/__init__.py</code> (18 lines) and <code class="path">scenario/__init__.py</code> (14 lines).</p>
 <p class="note">Two included files carry a deprecated docstring: <code class="path">generic.py</code> is still built by <code>WorkflowEvaluator</code>, and <code class="path">bs_detection.py</code> is wired into it but stays unused, because the facade passes <code>use_bs_penalty=False</code> (evaluator.py:54, :79) and no caller passes <code>True</code>.</p>
 </div>
 
 <footer>
-<p>Sources: <code class="path">sources/core/*.py</code> (19), <code class="path">experiments_verifiers/harness/*.py</code> (54), <code class="path">sources/evaluators/*.py</code> (6 current), <code class="path">sources/evaluators/hybrid_verifier/*.py</code> (10). Line counts by <code>wc -l</code>, my computation.</p>
-<p class="skips">Skipped: the 5 deprecated verifier files, <code>__pycache__</code> folders, and the non-Python files in those folders.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes.</p>
+<p>Sources: <code class="path">sources/core/*.py</code> (19), <code class="path">experiments_verifiers/harness/*.py</code> (67, of 55 with a page), <code class="path">sources/evaluators/*.py</code> (4 current flat files), <code class="path">sources/evaluators/generic/*.py</code> (3), <code class="path">sources/evaluators/scenario/*.py</code> (2), <code class="path">sources/evaluators/hybrid_verifier/*.py</code> (10), <code class="path">sources/evaluators/legacy_verifier/*.py</code> (6, deprecated, no page). Line counts by <code>wc -l</code>, my computation.</p>
+<p class="skips">Skipped: the 5 deprecated <code class="path">legacy_verifier/</code> files, the 3 package <code>__init__.py</code> files with no card, the 12 harness scripts of E26-E34 and E36 with no page, <code>__pycache__</code> folders, and the non-Python files in those folders.</p>
+<p class="note">The <code>sources/core</code> rows were not re-measured in this pass. My recomputed total for those 19 files is 8 689 lines, against the 8 692 the rows sum to: <code class="path">factory.py</code>, <code class="path">orchestrator.py</code> and <code class="path">workflow_runner.py</code> each differ by one line.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

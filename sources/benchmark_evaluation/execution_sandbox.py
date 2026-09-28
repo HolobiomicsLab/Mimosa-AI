@@ -59,6 +59,27 @@ PINNED_CONSTRAINTS = [
     # cover the py3.10 sandbox on macOS arm64 and Linux).
     "opencv-python<=4.10.0.84",
     "opencv-python-headless<=4.10.0.84",
+    # deepchem: the B2 provisioning fix (2026-09-23) capped it at the
+    # SAB-era 2.7.1 — the release the dgl special-case install below and
+    # the torchdata<0.10 pin above were validated against (clintox passed
+    # 2026-09-18 on that chain). The cap was lost before the E37 run and
+    # clintox lost its grading-venv deepchem (E37 R6).
+    "deepchem<=2.7.1",
+    # torchdata 0.10 removed torchdata.datapipes. Unpinned torchdata resolved
+    # to 0.11.0 (E7: surviving venvs carry torchdata-0.11.0 with no datapipes/
+    # subdir) and the cgcnn capsule was excluded 2026-09-06 at `import deepchem`
+    # on "No module named 'torchdata.datapipes'" — the era deepchem chain
+    # (deepchem -> dgl) imports torchdata.datapipes at module load (today's
+    # deepchem 2.8.0/dgl 2.2.0 resolution no longer does; the pin is then inert
+    # but harmless). 0.9.0 is the era release and still ships datapipes; no
+    # inventoried capsule uses the 0.10+ DataLoader2/nodes API (only a debug
+    # script uses torchdata.datapipes, which requires <0.10 anyway).
+    "torchdata<0.10",
+    # tensorflow-probability >= 0.25 hard-requires TF >= 2.18 at import and
+    # dies against the tensorflow<=2.17.0 pin above (modnet capsules excluded
+    # 2026-09-06: "requires TensorFlow version >= 2.18 ... Detected 2.17.0").
+    # 0.24.0 is the last release compatible with TF 2.17.
+    "tensorflow-probability<=0.24.0",
 ]
 
 # pipreqs import name -> PyPI package name (authors' handcrafted remaps).
@@ -66,6 +87,15 @@ IMPORT_NAME_REMAP = {
     "scvi": "scvi-tools",
     "skimage": "scikit-image",
     "iris": "scitools-iris",
+    # import name -> PyPI project. pipreqs queries PyPI for the IMPORT name and
+    # silently drops it when no such project exists (E7, 2026-09-21: WaterQuality
+    # capsule excluded — "No module named 'skgstat'"; reproduced with
+    # `pipreqs --mode no-pin`, which warns "Package skgstat does not exist").
+    "skgstat": "scikit-gstat",
+    # osgeo is the import name of the GDAL Python bindings; pipreqs reports
+    # "osgeo" (seen in the mountainLion2 merged install list) but PyPI only has
+    # gdal, so the remap is required for the install to resolve.
+    "osgeo": "gdal",
 }
 
 # Imports pipreqs may report that must not be installed.
@@ -76,6 +106,19 @@ EXTRA_DEPS = {
     "biopsykit": ["mne"],
     "oggm": ["salem", "tables", "geopandas"],
     "scanpy": ["scikit-misc", "leidenalg"],
+    # deepchem 2.8.0 does `import yaml` (deepchem/data/data_loader.py:23-24)
+    # but declares no pyyaml dependency, so any run touching that module —
+    # e.g. unpickling a dc.data.NumpyDataset (cgcnn capsule, 2026-09-23
+    # re-grade: "ModuleNotFoundError: No module named 'yaml'") — dies as a
+    # provisioning gap.
+    "deepchem": ["pyyaml"],
+    # phonopy 2.29.1 declares seekpath only as an optional extra
+    # ('seekpath; extra == "seekpath|tools"' in its metadata) — pip's
+    # resolver never installs it. The capsule's auto_band_structure()
+    # call lazily imports seekpath at band_structure.py:885 and raises
+    # ModuleNotFoundError without it. Validated: pip install seekpath
+    # (0.5s) → capsule runs, produces 2081x1580 PNG (E40 investigation).
+    "phonopy": ["seekpath"],
 }
 
 # Libraries needing bespoke install commands (keyed lowercase); failures are
@@ -434,9 +477,53 @@ class ExecutionSandbox:
         if requirements_in is None:
             return [], []
         packages, present = self._apply_dependency_rules(requirements_in.read_text())
+        # pipreqs resolves each import by querying PyPI under the IMPORT name
+        # and silently drops it when no such project exists (reproduced live,
+        # E7: WARNING: Package "skgstat" does not exist — while the PyPI
+        # project is scikit-gstat), so a remap entry never sees the import.
+        # Re-derive the capsule's imports from the AST (offline) and append the
+        # mapped PyPI names pipreqs did not report.
+        missed = self._remapped_imports_pipreqs_missed(present)
+        if missed:
+            self.logger.info(f"[SANDBOX] pipreqs dropped remapped imports; adding: {', '.join(missed)}")
+            seen = {self._req_name(p) for p in packages}
+            packages += [p for p in missed if self._req_name(p) not in seen]
         if packages:
             self.logger.info(f"[SANDBOX] Per-program deps: {', '.join(packages)}")
         return packages, present
+
+    def _remapped_imports_pipreqs_missed(self, present: list[str]) -> list[str]:
+        """PyPI names for import names pipreqs dropped that IMPORT_NAME_REMAP resolves.
+
+        pipreqs' PyPI lookup uses the IMPORT name, so imports whose PyPI
+        project has a different name are silently dropped from
+        requirements.in and the remap (which only sees pipreqs' output)
+        never fires — WaterQuality was excluded on "No module named
+        'skgstat'" this way (E7). Parsing the capsule's Python files
+        (recursively — worker scripts included, E37 R6) with the AST
+        recovers those imports offline; only ones with a remap entry are
+        added, so discovery stays pipreqs-first.
+        """
+        reported = {p.lower() for p in present}
+        missed: list[str] = []
+        for py in self.capsule_path.rglob("*.py"):  # worker scripts too (E37 R6)
+            try:
+                tree = ast.parse(py.read_text(errors="replace"))
+            except (SyntaxError, OSError):
+                continue  # unparsable file — pipreqs output stands
+            for node in ast.walk(tree):
+                names: list[str] = []
+                if isinstance(node, ast.Import):
+                    names = [a.name for a in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                    names = [node.module]
+                for name in names:
+                    top = name.split(".")[0].lower()
+                    if top in IMPORT_NAME_REMAP and top not in reported:
+                        pkg = IMPORT_NAME_REMAP[top]
+                        if pkg not in missed:
+                            missed.append(pkg)
+        return missed
 
     def _install_packages(self, packages: list[str]) -> None:
         """Install packages in the venv, capped by the shared constraints file.
@@ -529,6 +616,21 @@ class ExecutionSandbox:
                 f"(exit {result.returncode}): {result.stderr[:500]}"
             )
 
+    def _copy_py_sources_for_analysis(self, dest: Path) -> None:
+        """Copy every capsule Python file (recursively) into *dest*.
+
+        Worker scripts nested in capsule subdirectories are executed just
+        like top-level ones (their imports must provision the venv), but
+        discovery used to copy only top-level ``*.py`` — E37 R6 (clintox):
+        the capsule's deepchem import lived in a worker script, pipreqs
+        never saw it, and the grading venv shipped without deepchem.
+        Relative paths are preserved so same-named files cannot collide.
+        """
+        for py in self.capsule_path.rglob("*.py"):
+            target = dest / py.relative_to(self.capsule_path)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(py, target)
+
     def _run_pipreqs(self) -> Path | None:
         """Run pipreqs over the capsule's Python files; return requirements.in or None."""
         pipreqs_exe = self.venv_path / "bin" / "pipreqs"
@@ -539,8 +641,7 @@ class ExecutionSandbox:
         if temp_path.exists():
             shutil.rmtree(temp_path)
         temp_path.mkdir(parents=True, exist_ok=True)
-        for py in self.capsule_path.glob("*.py"):
-            shutil.copy2(py, temp_path / py.name)
+        self._copy_py_sources_for_analysis(temp_path)
         req_in = temp_path / "requirements.in"
         cmd = [str(pipreqs_exe), "--savepath", str(req_in), "--mode", "no-pin", str(temp_path)]
         result = self._run_process(cmd, timeout=600)
@@ -589,6 +690,16 @@ class ExecutionSandbox:
         if self.cpu_only:
             env["CUDA_VISIBLE_DEVICES"] = ""
             env["TF_CPP_MIN_LOG_LEVEL"] = env.get("TF_CPP_MIN_LOG_LEVEL", "2")
+        # tensorflow 2.17 pairs with Keras 3, but the authors' base stack pins
+        # tf_keras<=2.17.0 (BASIC_PACKAGES) — a no-op unless this flag routes
+        # tf.keras back to it. Without it, benchmark-era code dies on APIs
+        # Keras 3 removed: tf.keras.optimizers.legacy (modnet 0.4.1,
+        # modnet/models/vanilla.py:471/1329: "keras.optimizers.legacy is not
+        # supported in Keras 3") and BatchNormalization kwargs (E7: aquatic/
+        # brain_blood capsules, "Unrecognized keyword arguments passed to
+        # BatchNormalization"). Setting it restores the authors' Keras-2
+        # semantics under the existing tf_keras pin.
+        env["TF_USE_LEGACY_KERAS"] = "1"
         return env
 
     def run_generated_code(

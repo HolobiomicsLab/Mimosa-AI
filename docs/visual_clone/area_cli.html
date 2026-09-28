@@ -252,12 +252,13 @@ MemoryChatCLI._handle_reload-&gt; re-reads dir, rebuilds the embedding index</pr
 </tbody>
 </table>
 
-<details><summary>where pretty_print.py is imported (grep, 2026-10-02)</summary><div class="dbody">
+<details><summary>where pretty_print.py is imported (grep, 2026-09-26)</summary><div class="dbody">
 <pre>main.py:28                                  print_err, print_info, print_ok, print_phase, print_warn
 sources/core/evolution_engine.py:15, planner.py:10, orchestrator.py:14, workflow_factory.py:17, variation_engine.py:9, tools_manager.py:14
 sources/benchmark_evaluation/csv_mode.py:23
-sources/evaluators/verifier.py:22, verifier_claims.py:22, verifier_per_claim.py:25, generic.py:24
-sources/evaluators/hybrid_verifier/evaluator.py:46
+sources/evaluators/legacy_verifier/verifier.py:22, verifier_claims.py:22, verifier_per_claim.py:25 (deprecated)
+sources/evaluators/generic/generic.py:23
+sources/evaluators/hybrid_verifier/evaluator.py:57
 sources/transparency/astra_exporter.py:69, sources/utils/pricing.py:331, sources/utils/ensure_env.py:53
 sources/utils/workspace_management.py:19</pre>
 <p><code>theme.py</code> has exactly two importers: <code>onboard_cli.py</code> and <code>evaluation_cli.py</code>. <code>memory_chat_cli.py</code> imports neither; it draws with <code>curses</code> and plain <code>print</code>.</p>
@@ -292,7 +293,8 @@ ask_yn(prompt, default)        y/n, returns bool</pre>
 <footer>
 <p>Sources: <code class="path">sources/cli/onboard_cli.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/cli/memory_chat_cli.py</code>, <code class="path">sources/cli/pretty_print.py</code>, <code class="path">sources/cli/theme.py</code>, <code class="path">sources/cli/__init__.py</code>, <code>main.py</code>, <code>config.py</code>, <code class="path">sources/core/planner.py</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/core/tools_manager.py</code>, <code class="path">sources/core/selection.py</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code>, <code class="path">sources/transparency/memory_trace.py</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/list_files.py</code>, <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">docs/DEVELOPER_GUIDE.md</code>, <code class="path">docs/reference/cli.md</code>, <code class="path">docs/usage/transparency.md</code>, <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>. Line counts from <code>wc -l</code>; <code>pretty_print.py</code> reports 313 because the file has no trailing newline.</p>
 <p class="skips">Skipped: <code class="path">sources/cli/__pycache__/</code> (build artifacts) &#183; <code>tests/*</code> other than the three CLI test files (own page <a href="area_tests.html">area_tests.html</a>) &#183; <code class="path">webui/backend/mimosa_bridge.py</code> (re-uses <code>onboard_cli</code> helpers; web UI is out of scope) &#183; <code>workflow_evolution_anim.py</code> (outside <code class="path">sources/cli/</code>) &#183; <code class="path">docs/site/</code> (generated) &#183; secrets (<code>.env</code>, <code>token.json</code>) never opened.</p>
-<p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time: <code>main.py</code> is modified, so the dispatch lines cited above come from the working tree, not from the commit. The <code>sources/cli/*</code> files are unmodified by that diff (<code>git status --porcelain</code>).</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26. The working tree has uncommitted changes at build time: the flat <code>sources/evaluators/*.py</code> modules are deleted and moved into <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code>, and <code>main.py</code> is modified, so the lines cited above come from the working tree, not from the commit. The <code>sources/cli/*</code> files are unmodified by that diff (<code>git status --porcelain</code>).</p>
+<p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>
