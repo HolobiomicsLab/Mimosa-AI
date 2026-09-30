@@ -1,4 +1,3 @@
-import os
 import json
 import re
 from pathlib import Path
@@ -8,9 +7,13 @@ from statistics import mean
 #: comparable scale and must stay out of the capsule argmax. ``mean_claim``
 #: is the hybrid verifier's first-generation fallback; ``oracle_censored``
 #: marks a full-oracle gold-feedback generation whose benchmark grade was
-#: censored (it only carries the hybrid win-rate). ``short_circuit`` is a
-#: real measured 0.0 and is deliberately absent.
-FALLBACK_REWARD_KINDS = frozenset({"mean_claim", "oracle_censored"})
+#: censored (it only carries the hybrid win-rate); ``unmeasured_prior`` marks
+#: a generation whose scorers all failed on a workspace that produced
+#: artifacts (N9) — its 0.5 is a neutral prior, not a measurement.
+#: ``short_circuit`` is a real measured 0.0 and is deliberately absent.
+FALLBACK_REWARD_KINDS = frozenset(
+    {"mean_claim", "oracle_censored", "unmeasured_prior"}
+)
 
 #: Sidecar written by the gold-feedback (oracle) verifier in every
 #: generation folder it evaluates — the cheap on-disk leak marker.

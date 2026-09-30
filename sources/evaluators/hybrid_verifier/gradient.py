@@ -130,6 +130,7 @@ def build_gradient(
     mean_score: float,
     dead_claims: list[dict[str, Any]],
     exec_facts: dict[str, Any] | None = None,
+    unmeasured: bool = False,
     stages: tuple[str, ...] = STAGES,
 ) -> str:
     """Assemble the E35-PRIME (V5 decisive-first) gradient for one generation.
@@ -138,6 +139,10 @@ def build_gradient(
         exec_facts: The execution-gate record (``{"status", "runtime_s",
             "cap"}`` from ``ExecutionGateLayer.last_facts``) or None when
             the gate is disabled / has no data for this generation.
+        unmeasured: True when no claim scorer produced a reading on this
+            workspace (N9): the reward is a neutral prior, not a measured
+            verdict — the gradient must say so or the mutator reads the
+            placeholder as a regression.
         stages: The ladder order (``FIGURE_STAGES`` for figure tasks —
             visual rows rank earliest).
     """
@@ -231,7 +236,7 @@ def build_gradient(
         reason = c.get("drop_reason", "unknown")
         line = (
             f"- [{c['id']}] (stage {c.get('stage', 'result')}) "
-            f"{c.get('statement', '')[:130]} (dropped: {reason})"
+            f"{c.get('statement', '')[:1024]} (dropped: {reason})"
         )
         if reason in ("all_fail", "all_scorer_fail"):
             line += " — this claim could not be verified (scorer crashed on every workspace)"
@@ -280,6 +285,19 @@ def build_gradient(
         or "(no visual criteria for this task — non-figure deliverable)"
     )
 
+    # N9: when every scorer failed, the reward is a neutral prior — say so
+    # explicitly or the mutator reads the placeholder as a regression.
+    unmeasured_note = (
+        (
+            "\nNOTE — MEASUREMENT FAILURE: no claim scorer produced a reading on\n"
+            "this workspace. The reward above is a NEUTRAL PRIOR (0.5), not a\n"
+            "measured regression: artifacts were produced but never verified.\n"
+            "Treat the comparative sections below as empty of signal.\n"
+        )
+        if unmeasured
+        else ""
+    )
+
     return f"""# Hybrid verifier gradient v3 (PRIME) — {uuid}
 Task goal: {goal[:500]}
 
@@ -287,7 +305,7 @@ Bottom line: reward {reward:.4f} | win-rate (ties=0.5) {win_rate:.3f} over
 {len(pair_records)} comparisons ({wins}W/{losses}L/{ties}T) | {len(surviving)} of
 {len(claims)} claims discriminate the candidates ({len(dead_claims)} dropped as
 non-discriminative) | mean claim score {mean_score:.3f}.
-
+{unmeasured_note}
 ## 1. WHAT TO FIX FIRST — decisive lost claims (earliest ladder stage first)
 {lost_block}
 ## 1b. PERSISTENTLY FAILING CLAIMS (failing for N consecutive generations — likely unfixable at the workflow level or a systematic error)

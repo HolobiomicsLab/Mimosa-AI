@@ -325,7 +325,7 @@ class ClaimsEvidenceLayer:
                 for c in to_replace
             ),
             alive_block="\n".join(
-                f"- [{c['id']}] {c['statement'][:140]}" for c in alive
+                f"- [{c['id']}] {c['statement'][:512]}" for c in alive
             ),
             n_new=n_new,
             next_id=claims_mod.next_claim_id(reg.claims),

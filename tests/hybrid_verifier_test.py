@@ -2554,3 +2554,110 @@ def test_registry_exposes_dead_claim_score_history(tmp_path: Path):
     # crashed scorers are not measurements — same rule as observed_scores
     reg.record_generation("u3", {"C13": 0.0}, {"C13": "scorer raised: boom"})
     assert len(reg.claim_score_history("C13")) == 3
+
+
+# ------------------------------- (N9) unmeasured-workspace degradation ----
+
+
+class _AlwaysFailRunner:
+    """Executor mock: every scorer build/execution attempt crashes."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self, ws, code, eid):
+        self.calls += 1
+        return scorers_mod.ExecOutcome(rc=1, stdout="", stderr="Traceback: boom")
+
+
+class _ExtractOnlyLLM:
+    """Extraction returns 8 claims; every screen passes; digests soft-fail."""
+
+    def __call__(self, uuid: str, agent: str, prompt: str) -> str:
+        if (
+            "GENERIC-CLAIM SCREEN" in prompt
+            or "SMUGGLED-ANSWER SCREEN" in prompt
+            or "EXACT-NAME SCORER SCREEN" in prompt
+        ):
+            return "[]"
+        if "verification rubric" in prompt:
+            return _claims_json(8)
+        if "FORMAT DIGESTS" in prompt:
+            return json.dumps({"digests": []})
+        raise AssertionError(f"unexpected LLM call: {agent}")
+
+
+def test_unmeasured_artifacts_get_neutral_prior_not_zero(tmp_path: Path):
+    """N9 (E41 phonon gen5): every scorer fails on a workspace that produced
+    real artifacts -> the reward is a flagged neutral prior, not a fake 0.0
+    that buries possibly-SR-true generations."""
+    _seed_workspace(tmp_path / "workspace")
+    v = _make_evaluator(tmp_path, _ExtractOnlyLLM(), _AlwaysFailRunner())
+    v._load_workflow_data = lambda uuid: _wf_info(GOAL)  # type: ignore[method-assign]
+
+    result = v.evaluate("u1")
+    assert result["n_scored"] == 0
+    assert result["overall_score"] == pytest.approx(0.5)
+    assert result["reward_fallback"] == "unmeasured_prior"
+    assert result["skipped_reason"] == "all_scorers_failed"
+    assert "MEASUREMENT FAILURE" in result["abstracted_textual_gradient"]
+    state = json.loads((v.workflow_dir / "u1" / "state_result.json").read_text())
+    assert state["evaluation"]["verifier"]["reward_fallback"] == "unmeasured_prior"
+
+
+def test_unmeasured_empty_workspace_stays_zero(tmp_path: Path):
+    """Empty workspace -> nothing was produced; 0.0 stays the honest reward."""
+    v = _make_evaluator(tmp_path, _ExtractOnlyLLM(), _AlwaysFailRunner())
+    v._load_workflow_data = lambda uuid: _wf_info(GOAL)  # type: ignore[method-assign]
+
+    result = v.evaluate("u1")
+    assert result["n_scored"] == 0
+    assert result["overall_score"] == 0.0
+    assert result["reward_fallback"] == "mean_claim"
+    assert "MEASUREMENT FAILURE" not in result["abstracted_textual_gradient"]
+
+
+def test_gate_cap_survives_unmeasured_workspace(tmp_path: Path):
+    """E24 crash cap + all scorers failed -> the cap's verdict stands (the
+    re-execution DID measure the crash); no unmeasured_prior marker."""
+    _seed_workspace(tmp_path / "workspace")
+    v = _make_evaluator(tmp_path, _ExtractOnlyLLM(), _AlwaysFailRunner())
+    v._load_workflow_data = lambda uuid: _wf_info(GOAL)  # type: ignore[method-assign]
+
+    class _CrashGate:
+        name = "crash-gate"
+        last_facts = {"status": "crash", "runtime_s": None, "cap": 0.0}
+
+        def collect(self, context):
+            return []
+
+        def gate(self, context, collected):
+            return 0.0
+
+    v.layers = [v._claims_layer, _CrashGate()]
+    result = v.evaluate("u1")
+    assert result["n_scored"] == 0
+    assert result["overall_score"] == 0.0
+    assert result["reward_fallback"] != "unmeasured_prior"
+
+
+def test_gradient_unmeasured_note_renders_conditionally():
+    from sources.evaluators.hybrid_verifier.gradient import build_gradient
+
+    kwargs = dict(
+        uuid="u1",
+        goal="g",
+        now_scores={"C1": None},
+        evidence={"C1": ""},
+        claims=[_claim("C1")],
+        surviving=[],
+        pair_records=[],
+        reward=0.5,
+        win_rate=0.5,
+        mean_score=0.0,
+        dead_claims=[],
+    )
+    assert "MEASUREMENT FAILURE" not in build_gradient(**kwargs)
+    noted = build_gradient(**kwargs, unmeasured=True)
+    assert "MEASUREMENT FAILURE" in noted
+    assert "NEUTRAL PRIOR" in noted

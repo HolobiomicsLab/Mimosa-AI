@@ -75,8 +75,10 @@ def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRu
     Three signals, in order of trust:
 
     1. ``state_result.evaluation.verifier.reward_fallback`` in
-       ``FALLBACK_REWARD_KINDS`` (``"mean_claim"``, or ``"oracle_censored"``
-       for a censored full-oracle gold-feedback generation)
+       ``FALLBACK_REWARD_KINDS`` (``"mean_claim"``, ``"oracle_censored"``
+       for a censored full-oracle gold-feedback generation, or
+       ``"unmeasured_prior"`` for a generation whose scorers all failed on
+       a workspace that produced artifacts — N9)
        — the ground truth the verifier persisted next to the score. When
        it contradicts ``run.reward_is_fallback`` the disk wins and a
        warning is logged: the engine assigns the flag once, right after

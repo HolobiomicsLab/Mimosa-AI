@@ -243,3 +243,43 @@ def test_n1_residual_fallback_reward_zero_not_preferred():
         _run("fb0", 0.0, 2, fallback=True),
     ]
     assert _select_best_run(runs).current_uuid == "crash1"
+
+
+def _run_verifier(uuid, reward, iteration, verifier, fallback=False):
+    run = _run(uuid, reward, iteration, fallback=fallback)
+    run.state_result = {"evaluation": {"verifier": verifier}}
+    return run
+
+
+def test_unmeasured_prior_excluded_from_argmax_even_when_higher():
+    """N9 (E41 phonon gen5): a scorer-blind generation's reward is a neutral
+    prior, not a measurement — it must not outrank a measured sibling no
+    matter its value."""
+    unmeasured = _run_verifier(
+        "gen5", 0.9, 5, {"reward_fallback": "unmeasured_prior", "n_scored": 0}
+    )
+    measured = _run("gen8", 0.5714, 8)
+    assert _select_best_run([unmeasured, measured]).current_uuid == "gen8"
+
+
+def test_unmeasured_prior_rescues_all_zero_crashed_pool():
+    """N1-residual + N9: an unmeasurable-but-artifact-bearing generation
+    ships over crashed gens whose workspaces are empty."""
+    crashed0 = _run("crash0", 0.0, 1)
+    crashed1 = _run("crash1", 0.0, 2)
+    unmeasured = _run_verifier(
+        "gen2", 0.5, 3, {"reward_fallback": "unmeasured_prior", "n_scored": 0}
+    )
+    assert _select_best_run([crashed0, crashed1, unmeasured]).current_uuid == "gen2"
+
+
+def test_workflow_info_flags_unmeasured_prior(tmp_path: Path):
+    wf = WorkflowInfo(
+        "u1",
+        _wf_dir(
+            tmp_path,
+            {"verifier": {"overall_score": 0.5, "reward_fallback": "unmeasured_prior"}},
+        ),
+    )
+    assert wf.reward_is_fallback is True
+    assert wf.overall_score == 0.5  # same evaluation block backs both reads

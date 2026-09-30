@@ -566,8 +566,26 @@ class HybridVerifierEvaluator(BaseEvaluator):
             pair_records.append(record)
 
         any_measured = any(s is not None for s in now_scores.values())
-        if not any_measured:
-            reward = 0.0
+        unmeasured_prior = None
+        if not any_measured and not caps:
+            if inv_mod.workspace_has_artifacts(inventory):
+                # N9 (E41 phonon gen5): every scorer failed on a workspace
+                # that produced real artifacts — an instrumentation failure,
+                # not a workflow failure. A hard 0.0 buries such generations
+                # (the SR-true gen5 scored 0.0 while SR-false gen8's 0.5714
+                # won the argmax and shipped) and lies to the mutator ("you
+                # regressed to trash" when measurement, not quality,
+                # collapsed). Degrade to the neutral midpoint and flag the
+                # reward as fallback-scale: capsule selection excludes it
+                # from the argmax whenever measured siblings exist, and the
+                # N1-residual branch accepts it over all-zero crashed pools.
+                reward = 0.5
+                unmeasured_prior = "unmeasured_prior"
+            else:
+                # Empty workspace: nothing was produced — 0.0 is fair.
+                reward = 0.0
+        # (n_scored == 0 WITH an applied gate cap keeps the cap's verdict:
+        # the E24 re-execution measured the crash/divergence directly.)
 
         dead_claims = [
             {**c, "drop_reason": c.get("drop_reason") or "non_discriminative"}
@@ -590,7 +608,7 @@ class HybridVerifierEvaluator(BaseEvaluator):
             "execution_gate": exec_facts,
             "bt_strength": (bt_data or {}).get("strength_now"),
             "bt_converged": (bt_data or {}).get("converged"),
-            "reward_fallback": reward_data["fallback"],
+            "reward_fallback": unmeasured_prior or reward_data["fallback"],
             "n_claims": len(registry.claims),
             "n_surviving": len(surviving),
             "n_dropped": len(dead_claims),
@@ -601,10 +619,10 @@ class HybridVerifierEvaluator(BaseEvaluator):
                 {
                     "id": s.claim_id,
                     "category": s.category,
-                    "statement": s.statement[:200],
+                    "statement": s.statement[:512],
                     "score": s.score,
                     "surviving": s.claim_id in surviving,
-                    "evidence": (s.evidence or "")[:200],
+                    "evidence": (s.evidence or "")[:512],
                 }
                 for s in collected
             ],
@@ -626,6 +644,7 @@ class HybridVerifierEvaluator(BaseEvaluator):
             mean_score=mean_score,
             dead_claims=dead_claims,
             exec_facts=exec_facts,
+            unmeasured=unmeasured_prior is not None,
             stages=stage_order,
         )
         scores["abstracted_textual_gradient"] = textual_gradient
