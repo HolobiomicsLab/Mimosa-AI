@@ -142,6 +142,8 @@ Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer by
 
 > **43.1 % success rate on ScienceAgentBench with DeepSeek-V3.2 iterative-learning — +4.9 pp over the single-agent baseline at $1.70 per task.**
 
+> **High cost per task for iterative-learning were mostly caused by Opus 4.5 backbone used for workflow generation and mutation (At the time of V1 evaluation, no low cost model had the capabilities for proper workflow editing. Things have changed. Use GLM-5.3 or Deepseek-v4-pro for lower costs.**
+
 > On ScienceAgentBench with DeepSeek-V3.2, iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
 
 ## Benchmark (V2)
