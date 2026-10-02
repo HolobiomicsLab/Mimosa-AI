@@ -45,8 +45,8 @@ Mimosa stops the moment either condition is met:
 - `overall_score >= learned_score_threshold` (config field, default `0.92`).
 - `iteration ≥ max_learning_evolve_iterations` (default `25`).
 
-The "best" workflow at termination — the one with the highest
-`reward_uncapped` in the archive — has its workspace snapshot restored as
+The "best" workflow at termination — the one with the highest `reward`
+(the capped `overall_score`) — has its workspace snapshot restored as
 the run's final state.
 
 !!! tip "Tuning the threshold"

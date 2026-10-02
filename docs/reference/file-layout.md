@@ -9,7 +9,6 @@ mimosa-ai/
 ├── pyproject.toml                         # Project metadata + dependencies
 ├── cleanup.sh                             # Reset workflows + capsules
 ├── memory_explorer.py                     # Interactive trace replay
-├── memory_timelapse.py                    # Memory growth visualisation
 ├── mkdocs.yml                             # Documentation site config
 │
 ├── sources/

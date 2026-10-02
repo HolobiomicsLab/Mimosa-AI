@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2345,11 +2345,11 @@ previews and literature grounding, with three outcomes:</p>
 <li>Per-claim weights come from the rater-assigned importance (1–10), so an
   importance-10 deliverable claim moves the score ~5× more than a
   low-importance hygiene claim.</li>
-<li><code>hard_fail_cap = _HARD_FAIL_CAP = 0.99</code> — currently set permissively
-  to keep the evolutionary signal smooth; a refuted hard claim still
+<li><code>hard_fail_cap = _HARD_FAIL_CAP = 0.7</code>; a refuted hard claim still
   flags <code>hard_fail_capped = True</code>.</li>
-<li>The engine separately keeps <code>overall_score_uncapped</code> (pre-cap) so QD
-  rank ordering doesn't flatten under hard fails.</li>
+<li>The engine still records <code>overall_score_uncapped</code> (pre-cap) for
+  analysis, but QD ranks on the capped <code>overall_score</code> — a run that
+  refuted a hard claim cannot top the archive on its other claims alone.</li>
 </ul>
 <h2 id="failure-fingerprint-diagnostic">Failure fingerprint (diagnostic)<a class="headerlink" href="#failure-fingerprint-diagnostic" title="Permanent link">&para;</a></h2>
 <p>The verifier also projects the same per-claim verdicts into a <strong>failure
@@ -2424,7 +2424,7 @@ verifier pipeline itself:</p>
 </tr>
 <tr>
 <td>The hard-fail cap collapses ranking among failed runs.</td>
-<td><code>overall_score_uncapped</code> keeps QD ordering meaningful.</td>
+<td>Deliberate: QD ranks on the capped <code>overall_score</code>, with ties at the cap broken by novelty; <code>overall_score_uncapped</code> is still logged for analysis.</td>
 </tr>
 <tr>
 <td>One vantage point misses the failure.</td>
@@ -2622,7 +2622,7 @@ verifier pipeline itself:</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

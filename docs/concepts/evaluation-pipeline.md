@@ -121,11 +121,11 @@ overall_score = min(pre_cap, hard_fail_cap) if any_hard_claim_refuted else pre_c
 - Per-claim weights come from the rater-assigned importance (1–10), so an
   importance-10 deliverable claim moves the score ~5× more than a
   low-importance hygiene claim.
-- `hard_fail_cap = _HARD_FAIL_CAP = 0.99` — currently set permissively
-  to keep the evolutionary signal smooth; a refuted hard claim still
+- `hard_fail_cap = _HARD_FAIL_CAP = 0.7`; a refuted hard claim still
   flags `hard_fail_capped = True`.
-- The engine separately keeps `overall_score_uncapped` (pre-cap) so QD
-  rank ordering doesn't flatten under hard fails.
+- The engine still records `overall_score_uncapped` (pre-cap) for
+  analysis, but QD ranks on the capped `overall_score` — a run that
+  refuted a hard claim cannot top the archive on its other claims alone.
 
 ## Failure fingerprint (diagnostic)
 
@@ -195,7 +195,7 @@ verifier pipeline itself:
 | ------- | ---------- |
 | The judge LLM repeats the agent's claims verbatim. | Per-claim deterministic Python recomputation, with anti-tautology tripwires. |
 | The mutator over-fits to a numeric rubric. | Only the prompt gradient is returned — and it does not name the verified claims. |
-| The hard-fail cap collapses ranking among failed runs. | `overall_score_uncapped` keeps QD ordering meaningful. |
+| The hard-fail cap collapses ranking among failed runs. | Deliberate: QD ranks on the capped `overall_score`, with ties at the cap broken by novelty; `overall_score_uncapped` is still logged for analysis. |
 | One vantage point misses the failure. | Six independent sources, claims merged. |
 | Cosmetic hygiene gets gamed as "quality". | Source E only verifies non-negotiable CS practice; docs/tests/style are forbidden. |
 | Artifact existence checks reward "moved files around". | `_CLAIM_RULES_BLOCK` forbids bare-existence as `hard`; max 2 soft artifact claims. |

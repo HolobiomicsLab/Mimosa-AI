@@ -235,7 +235,7 @@ retries.
 
 
 ## Tips
-- Always use different models for different roles.
+- Always use different models for different roles (when possible).
 -  Do NOT add debate/deliberation unless the critics are grounded in *different
 external evidence or different models.
 - Agents execute in the same workspace and have access to all previous agents artifacts.

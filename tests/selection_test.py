@@ -82,7 +82,7 @@ def test_distinct_genotype_embedding_sibling_is_admitted():
     """
     sp = SelectionPressure(config={}, strategy="qd", population_size=50, novelty_k_neighbours=25)
     seed = PopulationMember(
-        iteration=1, reward=0.97, cost=0.0, uuid="seed", reward_uncapped=1.05,
+        iteration=1, reward=0.97, cost=0.0, uuid="seed",
         behaviour_descriptor=_unit([0.3, -0.2, 0.0, 0.0, -0.1, 0.0]),
         genotype_chars=100,
     )
@@ -168,6 +168,48 @@ def test_cosine_distance_helpers():
     assert _length_penalty(1000, 1000) == 0.0
     assert _length_penalty(2000, 1000) == 1.0
     assert _length_penalty(1500, 1000) == 0.5
+
+
+def test_qd_quality_uses_capped_reward_not_uncapped():
+    """QD ranking must derive from the capped ``reward``, not ``reward_uncapped``.
+
+    Regression for the hard-fail cap intent: a candidate that refuted a
+    hard claim has a high uncapped score (its other claims scored well)
+    but a capped ``reward``. It must NOT outrank a modest candidate with
+    a higher capped score. The stub run still carries ``reward_uncapped``
+    (as the real ``IndividualRun`` does), so this test fails if the
+    selection layer ever ranks on that attribute again.
+    """
+    descriptor = [0.3, -0.2, 0.0, 0.0, -0.1, 0.0]
+
+    # High uncapped score, but hard-fail cap dragged overall down to 0.7.
+    hardfail = _run(reward=0.7, uuid="hardfail", descriptor=descriptor)
+    hardfail.reward_uncapped = 0.95
+    # Lower uncapped score, but the better capped overall score (0.8).
+    modest = _run(reward=0.8, uuid="modest", descriptor=descriptor)
+    modest.reward_uncapped = 0.6
+
+    def _qd_result(run):
+        sp = SelectionPressure(config={}, strategy="qd", population_size=50, novelty_weight=0.4)
+        return sp._validate_open_ended([_run(reward=0.0)], [run], threshold=0.01)
+
+    res_hardfail = _qd_result(hardfail)
+    res_modest = _qd_result(modest)
+
+    # Identical descriptors and code length ⇒ novelty and length penalty are
+    # equal, so the qd_score ordering reflects the quality term only.
+    assert res_hardfail["novelty_score"] == res_modest["novelty_score"]
+    assert res_modest["qd_score"] > res_hardfail["qd_score"]
+    # Quality weight is 1 - 0.4 = 0.6; capped gap is 0.8 - 0.7 = 0.1.
+    assert abs((res_modest["qd_score"] - res_hardfail["qd_score"]) - 0.6 * 0.1) < 1e-9
+
+    # Archive eviction agrees: with capacity 1, the higher-capped candidate
+    # must displace the hard-fail one, not vice versa.
+    sp = SelectionPressure(config={}, strategy="qd", population_size=1, novelty_weight=0.4)
+    sp._validate_open_ended([_run(reward=0.0)], [hardfail], threshold=0.01)
+    assert {m.uuid for m in sp._archive} == {"hardfail"}
+    sp._validate_open_ended([hardfail], [modest], threshold=0.01)
+    assert {m.uuid for m in sp._archive} == {"modest"}
 
 
 if __name__ == "__main__":

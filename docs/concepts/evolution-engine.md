@@ -42,9 +42,9 @@ A more detailed view lives in the source diagram
 1. **Reset** the workspace to the initial state.
 2. **Orchestrate** a workflow run (LLM writes Python → sandbox runs it).
 3. **Snapshot** the workspace.
-4. **Evaluate** — get `overall_score` and `reward_uncapped` (i.e.
-   `overall_score_uncapped` in the persisted JSON) plus an
-   `abstracted_prompt_gradient`.
+4. **Evaluate** — get `overall_score` (which drives QD quality) plus an
+   `abstracted_prompt_gradient`; `overall_score_uncapped` is still
+   persisted for analysis.
 5. **`validate_survivor()`** — admit to the archive when the candidate
    improves over baseline or clears `qd_score > admit_threshold`;
    capacity is curated by lowest-`qd_score` eviction.
@@ -69,8 +69,10 @@ implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
   `w = novelty_weight = 0.25`. Quality and novelty are **additive** — never
   multiplied — so high quality cannot rescue a redundant profile and high
   novelty cannot drag a broken run above peers.
-- Quality is sourced from `reward_uncapped` so the hard-fail cap doesn't
-  flatten rank ordering.
+- Quality is sourced from `reward` (the capped `overall_score`), so a run
+  that refuted a hard claim ranks at its capped score and cannot top the
+  archive on its other claims alone; ties at the cap are broken by the
+  novelty and length-penalty terms.
 - Novelty is cosine-distance k-NN (`k = 15`) in **genotype-embedding**
   space. The descriptor is the L2-normalised embedding of the workflow's
   generated source code (its *genotype*), produced by

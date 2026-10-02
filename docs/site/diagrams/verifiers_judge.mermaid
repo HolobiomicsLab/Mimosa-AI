@@ -66,7 +66,7 @@ flowchart TB
     Mean --> Cap
 
     %% ===== Stage 4: abstracted prompt gradient =====
-    Cap --> Overall["overall_score ∈ [0, 1]<br/>+ overall_score_uncapped<br/>(pre-cap, drives QD ranking)"]
+    Cap --> Overall["overall_score ∈ [0, 1]<br/>+ overall_score_uncapped<br/>(pre-cap, logged for analysis)"]
     Cap --> Diag["Stage 4 — abstracted_prompt_gradient<br/>(rubric-blind code-name + sentence)<br/>→ only signal fed back to mutator"]
     Overall -. drives .-> Loop[/"EvolutionEngine.evolve_generation()"/]
     Diag -. drives .-> Loop

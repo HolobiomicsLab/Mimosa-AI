@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1221,17 +1221,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#memory_timelapsepy-memory-growth-visualisation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        memory_timelapse.py — memory growth visualisation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#reading-state_resultjson" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2112,17 +2101,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#memory_timelapsepy-memory-growth-visualisation" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        memory_timelapse.py — memory growth visualisation
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#reading-state_resultjson" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2362,13 +2340,6 @@ Q&amp;A interface over a single run's memory.</p>
   library, or model name before drawing a conclusion from the score.</li>
 </ul>
 <p>The CLI is read-only — it does not modify any memory file.</p>
-<h2 id="memory_timelapsepy-memory-growth-visualisation"><code>memory_timelapse.py</code> — memory growth visualisation<a class="headerlink" href="#memory_timelapsepy-memory-growth-visualisation" title="Permanent link">&para;</a></h2>
-<p>For longer <code>--learn</code> runs, you may want a coarser view: how the agent's
-memory grew over iterations. Run:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>uv<span class="w"> </span>run<span class="w"> </span>memory_timelapse.py<span class="w"> </span>&lt;uuid&gt;
-</span></code></pre></div>
-<p>It renders an animated frame-by-frame view of the memory state, useful for
-spotting where the agent's understanding shifted.</p>
 <h2 id="reading-state_resultjson">Reading <code>state_result.json</code><a class="headerlink" href="#reading-state_resultjson" title="Permanent link">&para;</a></h2>
 <p>The verifier writes summary scores plus the workflow's final state to
 <code>sources/workflows/&lt;uuid&gt;/state_result.json</code> under
@@ -2383,11 +2354,11 @@ spotting where the agent's understanding shifted.</p>
 <tbody>
 <tr>
 <td><code>overall_score</code></td>
-<td>Capped (≤ <code>_HARD_FAIL_CAP</code>, currently <code>0.99</code>) when a hard claim is refuted.</td>
+<td>Capped (≤ <code>_HARD_FAIL_CAP</code>, currently <code>0.7</code>) when a hard claim is refuted.</td>
 </tr>
 <tr>
 <td><code>overall_score_uncapped</code></td>
-<td>Same score pre-cap — used as <code>reward_uncapped</code> for QD ranking.</td>
+<td>Same score pre-cap — recorded for analysis; QD ranking uses the capped <code>overall_score</code>.</td>
 </tr>
 <tr>
 <td><code>base_mean</code></td>
@@ -2412,7 +2383,7 @@ values) lives in <code>sources/workflows/&lt;uuid&gt;/evaluation.txt</code> alon
 JSON.</p>
 <h2 id="inspecting-the-genotype">Inspecting the genotype<a class="headerlink" href="#inspecting-the-genotype" title="Permanent link">&para;</a></h2>
 <p>The workflow code itself lives at:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sources/workflows/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>sources/workflows/&lt;uuid&gt;/workflow_genotype_&lt;uuid&gt;.py
 </span></code></pre></div>
 <p>It's plain Python — readable end-to-end, no DSL. Look at it when:</p>
 <ul>
@@ -2423,7 +2394,7 @@ JSON.</p>
   starting point.</li>
 </ul>
 <h2 id="inspecting-the-lineage">Inspecting the lineage<a class="headerlink" href="#inspecting-the-lineage" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>sources/workflows/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>sources/workflows/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json
 </span></code></pre></div>
 <p>Tells you which parent(s) produced this generation and via which operator
 (<code>seed | mutation | crossover</code>). Combine with the <code>evolution_prompt_*.md</code>
@@ -2586,7 +2557,7 @@ turn the rubric vocabulary into an optimization target. See
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

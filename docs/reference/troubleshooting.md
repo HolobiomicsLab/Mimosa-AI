@@ -137,10 +137,11 @@ A few likely causes:
 
 - **Verifier hard fails.** If every generation has a refuted hard claim,
   `hard_fail_capped` flips `true` and `overall_score` is capped at
-  `_HARD_FAIL_CAP` (currently `0.99`, kept permissive on purpose).
-  `reward_uncapped` (`overall_score_uncapped` in the JSON) still drives
-  selection, but you may have a structural mismatch between the task
-  description and what the workflow can actually verify against.
+  `_HARD_FAIL_CAP` (currently `0.7`). QD selection ranks on this capped
+  score (`overall_score_uncapped` is still logged for analysis), so
+  capped runs stay below uncapped improvements. You may have a
+  structural mismatch between the task description and what the
+  workflow can actually verify against.
 - **Recurring failure code.** The `abstracted_prompt_gradient` is
   prefixed with a short code name (e.g. `FALLBACK_ECFP_CLASSIFIER`).
   If the same code recurs across generations, the loop is re-discovering
