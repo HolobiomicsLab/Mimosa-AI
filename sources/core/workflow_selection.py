@@ -1,20 +1,95 @@
+import logging
+import re
 import sys
 from pathlib import Path
-from sentence_transformers import SentenceTransformer
 
 sys.path.append(str(Path(__file__).parent.parent.parent))
 
 from config import Config
+from sources.core.selection import PopulationMember, SelectionPressure
 from sources.core.workflow_info import WorkflowInfo
+from sources.core.lineage import scan_all as _scan_lineage
+
+
+logger = logging.getLogger(__name__)
+
+
+class _WorkflowScoreAdapter:
+    """Lightweight wrapper so that :class:`SelectionPressure.select_parent(s)`
+    can rank :class:`WorkflowInfo` objects via their ``overall_score``.
+
+    Attributes:
+        workflow_info: The wrapped :class:`WorkflowInfo`.
+        reward: Mirror of ``workflow_info.overall_score`` exposed under the
+            attribute name expected by selection helpers.
+    """
+
+    __slots__ = ("workflow_info", "reward")
+
+    def __init__(self, wf: WorkflowInfo) -> None:
+        """Bind a :class:`WorkflowInfo` and expose its score as ``reward``.
+
+        Args:
+            wf: Workflow info whose ``overall_score`` becomes the adapter's
+                ``reward`` field.
+        """
+        self.workflow_info = wf
+        self.reward = wf.overall_score
+
 
 class WorkflowSelector:
+    """Discover persisted workflows and pick parents under evolutionary pressure."""
+
     def __init__(self, config: Config) -> None:
+        """Load on-disk workflows and prepare the similarity embedder.
+
+        Args:
+            config: Application configuration providing ``workflow_dir``.
+        """
         self.config = config
         self.workflows_folder = Path(config.workflow_dir)
         self.workflows_info = self.discover_workflows()
-        self.model = SentenceTransformer("all-MiniLM-L6-v2", token=False)
+        # Lazy: downloading all-MiniLM-L6-v2 from huggingface.co at startup
+        # crashes the whole app where HF is unreachable (e.g. mainland China
+        # without VPN). Loaded on first similarity call; falls back to a
+        # lexical similarity when the model cannot be loaded.
+        self._model = None
+        self._model_load_failed = False
+
+    def _get_model(self):
+        """Return the MiniLM embedder, or None when it cannot be loaded."""
+        if self._model is not None or self._model_load_failed:
+            return self._model
+        try:
+            from sources.core.genotype_embedding import load_sentence_transformer
+            self._model = load_sentence_transformer("all-MiniLM-L6-v2")
+        except Exception as exc:
+            logger.warning(
+                "MiniLM embedder unavailable (%s); falling back to lexical "
+                "similarity. Set HF_ENDPOINT=https://hf-mirror.com to "
+                "download through the mirror and restore semantic similarity.",
+                exc,
+            )
+            self._model_load_failed = True
+        return self._model
+
+    @staticmethod
+    def _lexical_similarity(a: str, b: str) -> float:
+        """Jaccard similarity over word tokens; offline fallback for MiniLM."""
+        tokens_a = set(re.findall(r"\w+", a.lower()))
+        tokens_b = set(re.findall(r"\w+", b.lower()))
+        if not tokens_a or not tokens_b:
+            return 0.0
+        return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
 
     def discover_workflows(self) -> dict[str, WorkflowInfo]:
+        """Scan the workflow folder and return valid, scored workflows.
+
+        Returns:
+            Mapping of UUID to :class:`WorkflowInfo` for every folder that is
+            valid, has a non-empty state result and loadable code. Empty when
+            the workflow directory is missing.
+        """
         workflows = {}
 
         if not self.workflows_folder.exists():
@@ -26,6 +101,8 @@ class WorkflowSelector:
                 continue
 
             uuid = workflow_folder.name
+            if "single_agent" in uuid:
+                continue
             workflow_info = WorkflowInfo(uuid, workflow_folder)
 
             if not workflow_info.is_valid():
@@ -44,19 +121,35 @@ class WorkflowSelector:
         return workflows
 
     def cosine_similarity(self, a: str, b: str) -> float:
-        """Calculate cosine similarity between two strings."""
+        """Calculate cosine similarity between two strings.
+
+        Uses MiniLM embeddings when the model is available; otherwise falls
+        back to lexical (Jaccard) similarity so selection keeps working
+        offline.
+
+        Args:
+            a: First text to embed.
+            b: Second text to embed.
+
+        Returns:
+            Similarity between 0.0 and 1.0.
+        """
+        model = self._get_model()
+        if model is None:
+            return self._lexical_similarity(a, b)
+
         import torch.nn.functional as F
 
-        embeddings_a = self.model.encode(
+        embeddings_a = model.encode(
             a, convert_to_tensor=True, show_progress_bar=False
         )
-        embeddings_b = self.model.encode(
+        embeddings_b = model.encode(
             b, convert_to_tensor=True, show_progress_bar=False
         )
         return F.cosine_similarity(embeddings_a, embeddings_b, dim=0).item()
 
     def sort_similar_workflows(
-        self, goal: str, threshold=0.8, debug=False
+        self, goal: str, threshold: float = 0.8, debug: bool = False
     ) -> list[WorkflowInfo]:
         """Find workflows with similar goals using original unwrapped tasks.
 
@@ -98,27 +191,206 @@ class WorkflowSelector:
     def sort_workflows_by_score(
         self, workflows_info: list[WorkflowInfo], threshold: float
     ) -> list[WorkflowInfo]:
-        """Sort workflows by their overall score."""
+        """Sort workflows by their overall score.
+
+        Args:
+            workflows_info: Workflows to rank.
+            threshold: Minimum ``overall_score`` retained in the output.
+
+        Returns:
+            Workflows sorted descending by ``overall_score`` and filtered to
+            those at or above `threshold`.
+        """
         sorted_workflows = sorted(
             workflows_info, key=lambda wf: wf.overall_score, reverse=True
         )
         return [wf for wf in sorted_workflows if wf.overall_score >= threshold]
 
     def select_best_workflows(
-        self, goal: str, threshold_similary=0.7, threshod_score=0.5
+        self, goal: str, threshold_similarity: float = 0.9, threshold_score: float = 0.1
     ) -> list[WorkflowInfo]:
-        """Choose a workflow that matches the goal with a minimum threshold."""
-        similar_workflows = self.sort_similar_workflows(goal, threshold_similary)
-        best_workflows = self.sort_workflows_by_score(similar_workflows, threshod_score)
+        """Choose a workflow that matches the goal with a minimum threshold.
+
+        Args:
+            goal: Task description used for similarity matching.
+            threshold_similarity: Minimum cosine similarity to retain.
+            threshold_score: Minimum workflow score to retain.
+
+        Returns:
+            Workflows that pass both the similarity and score thresholds.
+        """
+        similar_workflows = self.sort_similar_workflows(goal, threshold_similarity)
+        best_workflows = self.sort_workflows_by_score(similar_workflows, threshold_score)
         return best_workflows
+
+    def _rehydrate_workflow_info(self, uuid: str) -> WorkflowInfo | None:
+        """Materialize a WorkflowInfo from disk by UUID. Returns None if invalid.
+
+        Args:
+            uuid: Workflow UUID (folder name) to rehydrate.
+
+        Returns:
+            A valid :class:`WorkflowInfo`, or ``None`` when `uuid` is empty
+            or the on-disk record fails validation.
+        """
+        if not uuid:
+            return None
+        wf = WorkflowInfo(uuid, self.workflows_folder / uuid)
+        return wf if wf.is_valid() else None
+
+    def _count_children_on_disk(self) -> dict[str, int]:
+        """Build ``{parent_uuid: n_children}`` from the on-disk lineage records.
+
+        Used to penalise repeatedly-mined parents during parent draw — without
+        this, a single high-qd ancestor monopolises the offspring stream
+        (observed empirically in early evolution runs).
+
+        Returns:
+            Mapping of parent UUID to the number of recorded direct children.
+        """
+        counts: dict[str, int] = {}
+        for rec in _scan_lineage(self.workflows_folder).values():
+            for parent_uuid in rec.get("parents", []) or []:
+                if parent_uuid:
+                    counts[parent_uuid] = counts.get(parent_uuid, 0) + 1
+        return counts
+
+    def _select_from_archive(
+        self,
+        selection_pressure: SelectionPressure,
+        n_parents: int,
+        crossover_rate: float,
+    ) -> tuple[list[WorkflowInfo], bool]:
+        """Archive-driven parent selection (steady-state, current session).
+
+        Args:
+            selection_pressure: Pressure instance whose ``_archive`` is
+                sampled for parents.
+            n_parents: Maximum parents to draw when crossover fires.
+            crossover_rate: Probability of crossover over mutation.
+
+        Returns:
+            ``(workflows, use_crossover)``. ``workflows`` is empty when
+            rehydration fails for every sampled member; ``use_crossover`` is
+            forced to ``False`` if fewer than two parents survive rehydration.
+        """
+        archive = selection_pressure._archive
+        child_counts = self._count_children_on_disk()
+        selected_members, use_crossover = selection_pressure.select_parents(
+            candidates=archive,
+            n_parents=n_parents,
+            crossover_rate=crossover_rate,
+            child_counts=child_counts,
+        )
+        # Rehydrate PopulationMember -> WorkflowInfo
+        selected_workflows: list[WorkflowInfo] = []
+        for m in selected_members:
+            uuid = m.uuid if isinstance(m, PopulationMember) else None
+            wf = self._rehydrate_workflow_info(uuid)
+            if wf is not None:
+                selected_workflows.append(wf)
+        # If rehydration failed for everyone, treat as cold start (caller falls back)
+        if not selected_workflows:
+            return [], False
+        # Crossover requires ≥ 2 parents post-rehydration
+        if use_crossover and len(selected_workflows) < 2:
+            use_crossover = False
+        return selected_workflows, use_crossover
+
+    def select_parent_workflows(
+        self,
+        goal: str,
+        selection_pressure: SelectionPressure,
+        n_parents: int = 2,
+        crossover_rate: float = 0.1,
+        threshold_similarity: float = 0.8,
+        threshold_score: float = 0.1,
+    ) -> tuple[list[WorkflowInfo], bool]:
+        """Select one or more parent workflows under evolutionary pressure.
+
+        Steady-state path: when `selection_pressure._archive` is populated,
+        sample parents from the live archive (current-session population).
+        Cold-start path: fall back to similarity-filtered disk scan for
+        cross-task transfer when the archive is empty.
+
+        Args:
+            goal: Task description to match against stored workflows.
+            selection_pressure: The SelectionPressure instance that governs strategy and
+                decides crossover vs mutation.
+            n_parents: Maximum number of parents when crossover fires (≥ 2).
+            crossover_rate: Probability ∈ [0, 1] that crossover is attempted.
+            threshold_similarity: Cosine-similarity floor for cold-start candidates.
+            threshold_score: Minimum workflow score for cold-start candidates.
+
+        Returns:
+            (list[WorkflowInfo], use_crossover)
+        """
+        # Steady-state: archive-driven selection
+        if selection_pressure._archive:
+            selected_workflows, use_crossover = self._select_from_archive(
+                selection_pressure, n_parents, crossover_rate
+            )
+            if selected_workflows:
+                uuids = [wf.uuid for wf in selected_workflows]
+                scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
+                mode = "CROSSOVER" if use_crossover else "MUTATION"
+                logger.info(
+                    f"Archive selection ({mode}, strategy={selection_pressure.strategy.value}): "
+                    f"{len(selected_workflows)} parent(s) from archive size={len(selection_pressure._archive)} "
+                    f"— UUIDs={uuids}, scores={scores}"
+                )
+                return selected_workflows, use_crossover
+
+        # Cold start: similarity-filtered disk scan
+        candidates = self.select_best_workflows(
+            goal=goal,
+            threshold_similarity=threshold_similarity,
+            threshold_score=threshold_score,
+        )
+
+        if not candidates:
+            logger.info("No candidate workflows found for parent selection.")
+            return [], False
+
+        adapters = [_WorkflowScoreAdapter(wf) for wf in candidates]
+        child_counts = self._count_children_on_disk()
+        selected_adapters, use_crossover = selection_pressure.select_parents(
+            candidates=adapters,
+            n_parents=n_parents,
+            crossover_rate=crossover_rate,
+            child_counts=child_counts,
+        )
+        selected_workflows = [a.workflow_info for a in selected_adapters]
+        uuids = [wf.uuid for wf in selected_workflows]
+        scores = [f"{wf.overall_score:.2f}" for wf in selected_workflows]
+        mode = "CROSSOVER" if use_crossover else "MUTATION"
+        logger.info(
+            f"Cold-start selection ({mode}, strategy={selection_pressure.strategy.value}): "
+            f"{len(selected_workflows)} parent(s) from {len(candidates)} disk candidates "
+            f"— UUIDs={uuids}, scores={scores}"
+        )
+
+        return selected_workflows, use_crossover
 
 
 if __name__ == "__main__":
     config = Config()
     config.workflow_dir = "../workflows"
     mcts = WorkflowSelector(config)
-    goal = "Compare reproduction results with original paper results and generate comprehensive validation report. Steps: (1) Load all evaluation metrics from results/metrics/ JSON files, (2) Extract original paper results from reproduction_gernermed.md (all tables with F1, precision, recall by dataset and entity type), (3) Create detailed comparison tables matching paper's format: overall performance table, per-entity-type performance table, per-dataset performance table, (4) Calculate absolute and relative differences between reproduced and original results for each metric, (5) Perform statistical significance tests where appropriate if multiple runs were conducted, (6) Generate visualizations: bar charts comparing F1-scores across models and datasets, confusion matrices if possible, entity-type performance heatmaps, (7) Create 'validation_report.html' in results/ directory with: executive summary (reproduction success percentage), side-by-side comparison tables (original vs reproduced), visualization plots embedded, detailed metric breakdowns, assessment of reproduction fidelity (successful/partial/failed), (8) Analyze and document any significant discrepancies (>5% difference in F1) in 'results/discrepancies_analysis.md' including: specific metrics that differ, potential explanations (dataset version differences, random seed variations, implementation details, hardware differences), (9) Document model behavior on different medical entity types (medication vs diagnosis vs symptoms, etc.), (10) Create summary statistics in 'results/summary_statistics.csv' with columns: dataset, entity_type, original_f1, reproduced_f1, absolute_diff, relative_diff, status. Include overall assessment of whether GERNERMED's claimed performance on German medical NER was successfully validated."
+    goal = "Given the HP sequence HPHPPHHPHPPHPHHPPHPH, find a conformation with energy ≤ −7"
     matching_workflow = mcts.select_best_workflows(goal)
     print("Best matching workflow:")
     for wf in matching_workflow:
         print(f"UUID: {wf.uuid}, Goal: {wf.goal}, Score: {wf.overall_score:.4f}")
+    print("\n=== Evolutionary parent selection ===")
+    sp = SelectionPressure(config={}, strategy="tournament")
+    selected, crossover = mcts.select_parent_workflows(
+        goal=goal,
+        selection_pressure=sp,
+        n_parents=2,
+        crossover_rate=0.1,
+    )
+    mode = "CROSSOVER" if crossover else "MUTATION"
+    print(f"  Mode: {mode}, Parents: {len(selected)}")
+    for wf in selected:
+        print(f"    UUID: {wf.uuid}, Score: {wf.overall_score:.4f}")

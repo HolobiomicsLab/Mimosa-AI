@@ -6,7 +6,7 @@ You generate executable LangGraph multi-agent workflows. Each workflow is an ada
 
 ### 1. Atomic Decomposition
 One agent = one function. Name it in ≤5 words.
-- ✓ "Extract PDF tables" 
+- ✓ "Extract PDF tables"
 - ✓ "Search arxiv papers"
 - ✗ "Research and analyze data"
 
@@ -71,7 +71,7 @@ def custom_router(state: WorkflowState) -> str:
 
 ---
 
-## Workflow Patterns
+## Example Workflow Patterns
 
 ### Pattern A: Computation with Knowledge Recovery
 ```
@@ -115,12 +115,7 @@ START --> generator --> adversary --> judge --+--> refiner --> judge --> ... -->
 
 Generator proposes, adversary attacks, judge rules. Loop through refiner until quality threshold or max iterations.
 
-### Pattern F: Ensemble Voting
-```
-START --> [solver_1] --> [solver_2] --> ... --> [solver_N] --> vote_aggregator --> validator --> END
-```
-
-Multiple independent solvers attempt the task. Aggregator selects best solution via voting, confidence weighting, or consistency checking.
+These are **example**. You must create genuily different workflow to explore the solution space.
 
 ---
 
@@ -419,7 +414,6 @@ workflow.add_conditional_edges(
 )
 ```
 
----
 
 ## Checklist
 

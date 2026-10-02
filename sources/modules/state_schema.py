@@ -116,17 +116,17 @@ def master_router(state: WorkflowState) -> str:
 
     current_agent = state["step_name"][-1]
 
-    if "SUCCESS" in last_answer.status:
+    if "SUCCESS" in last_answer.status or "SUCCESS" in last_answer.message:
         print(f"✅ Success from '{current_agent}'. Proceeding.")
         return "next_node"
-    elif "FALLBACK" in last_answer.status:
+    elif "FALLBACK" in last_answer.status or "FALLBACK" in last_answer.message:
         retry_count = state["step_name"][-5:].count(current_agent)
         if retry_count >= MAX_CONSECUTIVE_FALLBACKS:
             print(f"❌ Detected fallback infinite loop: {retry_count} out of {MAX_CONSECUTIVE_FALLBACKS}. Aborting.")
             return END
         print(f"⏪ Fallback from '{current_agent}' to previous agent..")
         return "fallback_node"
-    elif "RETRY" in last_answer.status:
+    elif "RETRY" in last_answer.status or "RETRY" in last_answer.message:
         retry_count = state["step_name"][-5:].count(current_agent)
         if retry_count >= MAX_CONSECUTIVE_RETRY:
             print(f"❌ Detected retry infinite loop: {retry_count} out of {MAX_CONSECUTIVE_RETRY}. Aborting.")

@@ -5,11 +5,14 @@ OpenRouter API client for real-time model pricing
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
 import requests
+
+from sources.utils import paths
 
 
 @dataclass
@@ -27,8 +30,40 @@ class PricingCalculator:
         self.workflow_dir = Path(config.workflow_dir)
         self.model_pricing = config.model_pricing
 
+    # Used whenever a model id cannot be matched to the pricing table.
+    DEFAULT_PRICING = {"input": 3.0, "output": 15.0}
+
     # Common routing prefixes that should be stripped for matching
     ROUTING_PREFIXES = ['openrouter/', 'litellm/', 'together/', 'anyscale/']
+
+    def _collect_verifier_calls(self, memory_path: Path) -> list[TokenUsage]:
+        """One `TokenUsage` per `verifier_*.json` file in `memory_path`.
+
+        Same shape as `workflow_creator.json` / `judge.json`: single LLMProvider
+        call with top-level `model` and `usage.{prompt,completion,total}_tokens`.
+        """
+        calls: list[TokenUsage] = []
+        for file in sorted(os.listdir(memory_path)):
+            if not (file.startswith("verifier_") and file.endswith(".json")):
+                continue
+            try:
+                with open(memory_path / file) as f:
+                    data = json.load(f)
+            except (OSError, json.JSONDecodeError) as e:
+                print(f"⚠️  Could not read verifier memory {file}: {e}")
+                continue
+            usage = data.get("usage") or {}
+            model = data.get("model")
+            if not model or "prompt_tokens" not in usage:
+                continue
+            calls.append(TokenUsage(
+                file[:-len(".json")],
+                model,
+                usage.get("prompt_tokens", 0) or 0,
+                usage.get("completion_tokens", 0) or 0,
+                usage.get("total_tokens", 0) or 0,
+            ))
+        return calls
 
     def _strip_routing_prefix(self, model_name: str) -> str:
         """Strip common routing prefixes from model name.
@@ -157,14 +192,23 @@ class PricingCalculator:
         # 2. Try exact match after stripping routing prefix
         stripped_name = self._strip_routing_prefix(model_name)
         if stripped_name != model_name and stripped_name in self.model_pricing:
-            print(f"📊 Using pricing for {stripped_name} (stripped prefix from {model_name})")
             return self.model_pricing[stripped_name]
 
         # 3. Try substring matching (includes normalization and prefix stripping)
         pattern_match = self._find_model_by_substring(model_name)
         if pattern_match:
-            print(f"📊 Using pricing for {pattern_match} (pattern matched from {model_name})")
             return self.model_pricing[pattern_match]
+
+        # Headless-safe: this runs on the hot path of every evolution iteration
+        # (evolution_engine._evaluate_and_calculate_cost), so a batch or cron
+        # run must never block here waiting for a keystroke that cannot arrive.
+        # Same rationale as csv_mode._prompt_with_default.
+        if not sys.stdin.isatty():
+            print(
+                f"⚠️  No pricing match for {model_name} (stdin is not a TTY) — "
+                f"using default pricing. The reported cost is a lower bound."
+            )
+            return dict(self.DEFAULT_PRICING)
 
         print(f"⚠️  No match found for {model_name}, please enter model cost manually:")
         try:
@@ -177,9 +221,9 @@ class PricingCalculator:
                 "output": output_cost
             }
             return self.model_pricing[model_name]
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError, EOFError) as e:
             print(f"❌ Invalid input: {e}. Using default pricing.")
-            return {"input": 3.0, "output": 15.0}
+            return dict(self.DEFAULT_PRICING)
 
     def calculate_cost(self, uuid: str) -> float:
         """Calculate the cost of a workflow run based on token usage.
@@ -224,52 +268,46 @@ class PricingCalculator:
         if not orchestrator_calls_found:
             print("📊 Single agent mode detected - calculating agent execution costs only")
 
+        # Verifier LLM calls (claim extraction, importance, file selection, script gen, soft eval).
+        # Saved by LLMProvider as `verifier_<stem>.json`, same shape as workflow_creator.json.
+        llm_calls.extend(self._collect_verifier_calls(memory_path))
+
         workflow_path = Path(self.workflow_dir) / uuid
 
         if not workflow_path.exists():
             print(f"❌ Workflow directory not found: {workflow_path}")
             return 0.0
 
-        model_id = None
+        model = "unknown"
         try:
-            with open(workflow_path / "state_result.json") as f:
-                state_results = json.load(f)
-                model_id = state_results.get("model_id", None)
-        except FileNotFoundError:
-            print(f"⚠️  State result file not found for UUID {uuid} - workflow may have failed during execution.")
-            print("📊 Will calculate costs for workflow generation and judge calls only.")
-
-        # Only process SmolAgent costs if workflow execution succeeded and we have model_id
-        if model_id:
-            try:
-                for file in os.listdir(memory_path):
-                    if (file.startswith("task_") or file.startswith("single_agent")) and file.endswith(".json"):
-                        with open(memory_path / file) as f:
-                            steps = json.load(f)
-                            token_usage = {
-                                "input_tokens": 0,
-                                "output_tokens": 0,
-                                "total_tokens": 0,
-                            }
-                            for step in steps:
-                                step_usage = step.get("token_usage", None)
-                                if token_usage:
-                                    token_usage = {
-                                        key: token_usage[key] + step_usage[key]
-                                        for key in step_usage
-                                    }
-                            llm_calls.append(
-                                TokenUsage(
-                                    file.replace("task_", "").replace(".json", ""),
-                                    model_id,
-                                    *token_usage.values(),
-                                )
+            for file in os.listdir(memory_path):
+                if file.startswith("task_") and file.endswith(".json"):
+                    with open(memory_path / file) as f:
+                        steps = json.load(f)
+                        token_usage = {
+                            "input_tokens": 0,
+                            "output_tokens": 0,
+                            "total_tokens": 0,
+                        }
+                        for step in steps:
+                            step_usage = step.get("token_usage", None)
+                            model = step.get("model", model) or model
+                            if token_usage:
+                                token_usage = {
+                                    key: token_usage[key] + step_usage[key]
+                                    for key in step_usage
+                                }
+                        llm_calls.append(
+                            TokenUsage(
+                                file.replace("task_", "").replace(".json", ""),
+                                model,
+                                *token_usage.values(),
                             )
-            except Exception as e:
-                print(f"❌ Error reading workflow steps: {str(e)}")
-                # Don't return 0.0 here - we can still calculate workflow generation costs
+                        )
+        except Exception as e:
+            print(f"❌ Error reading workflow steps: {str(e)}")
         else:
-            print("📊 Skipping SmolAgent cost calculation (workflow execution failed)")
+            print("📊 Skipping SmolAgent cost calculation")
 
         total_cost = 0.0
         total_input_tokens = 0
@@ -291,7 +329,13 @@ class PricingCalculator:
             total_all_tokens += call.total_tokens
 
         from sources.cli.pretty_print import (
-            BOLD, CYAN, DIM, GREEN, MAGENTA, RESET, YELLOW,
+            BOLD,
+            CYAN,
+            DIM,
+            GREEN,
+            MAGENTA,
+            RESET,
+            YELLOW,
         )
 
         W = 64
@@ -330,10 +374,10 @@ class PricingCalculator:
 class OpenRouterPricingClient:
     """Client for fetching real-time model pricing from OpenRouter API."""
 
-    def __init__(self, cache_duration_hours: int = 24):
+    def __init__(self, cache_duration_hours: int = 24, cache_file: str | None = None):
         self.base_url = "https://openrouter.ai/api/v1"
         self.cache_duration = timedelta(hours=cache_duration_hours)
-        self.cache_file = "sources/cache/openrouter_pricing.json"
+        self.cache_file = cache_file or paths.pricing_cache_file()
         self._ensure_cache_dir()
 
     def _ensure_cache_dir(self):

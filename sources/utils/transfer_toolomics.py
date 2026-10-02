@@ -16,12 +16,21 @@ class LocalTransfer:
         self.workspace_path = workspace_path
         self.runs_capsule_dir = runs_capsule_dir
         provider, model = extract_model_pattern(config.capsule_namer_model)
-        self.config_llm = LLMConfig.from_dict({"model": model, "provider": provider})
+        # max_tokens kept small (256) — we only need a short folder name.
+        self.config_llm = LLMConfig.from_dict({
+            "model": model,
+            "provider": provider,
+            "max_tokens": 256,
+        })
 
-    def create_capsule_name(self, goal: str) -> str:
+    def create_capsule_name(self, goal: str, task_token: str | None = None) -> str:
         """
         Generate a unique lowercase folder name from goal using LLM.
+
+        A whitespace-only LLM reply sanitizes to "" — fall back to a
+        deterministic name instead of writing into the capsule root.
         """
+        fallback = "capsule_" + (task_token or str(abs(hash(goal))))
         system_prompt = """Generate a concise, unique lowercase folder name (max 7 words, underscore-separated) from the goal sentence. Only output the folder name, nothing else."""
 
         try:
@@ -30,21 +39,23 @@ class LocalTransfer:
                 system_msg=system_prompt,
                 config=self.config_llm
             )(f"generate a unique folder name for sentence: {goal}")
+            if not raw_output:
+                return fallback
             name = raw_output.strip().lower()
             name = re.sub(r'^["\']|["\']$', '', name)  # Remove quotes
             name = re.sub(r'[^a-z0-9_]', '_', name)    # Sanitize
             name = re.sub(r'_+', '_', name)             # Collapse multiple underscores
             name = name.strip('_')                      # Remove leading/trailing
-            if not name or len(name) < 5:
-                raise ValueError("LLM output too short")
-            if len(name) > 50:
-                parts = name.split('_')[:7]
-                name = '_'.join(parts)
-            return name
+            return name if name else fallback
         except Exception as e:
-            raise e
+            return fallback
 
     def create_capsule_folder(self, capsule_name) -> str:
+        if not capsule_name or not str(capsule_name).strip():
+            raise ValueError(
+                "capsule_name must be non-empty — an empty name would target "
+                "the capsule root itself and contaminate every other capsule"
+            )
         path = f"{self.runs_capsule_dir}/{capsule_name}"
         os.makedirs(path, exist_ok=True)
         return path
@@ -156,8 +167,12 @@ class LocalTransfer:
 
         return files_copied
 
-    def transfer_workspace_files_to_capsule(self, goal) -> str:
-        capsule_name = self.create_capsule_name(goal)
+    def transfer_workspace_files_to_capsule(self, goal, task_token: str | None = None) -> str:
+        capsule_name = self.create_capsule_name(goal, task_token=task_token)
+        # Belt-and-braces: suffix with a run/task token so same-goal queued
+        # runs (multi-seed) never collide on the LLM-generated name.
+        if task_token:
+            capsule_name = f"{capsule_name}_{task_token}"
         path_capsule = Path(self.create_capsule_folder(capsule_name))
         path_workspace = Path(self.workspace_path)
         self.copy_files_recursive(path_workspace, path_capsule)
@@ -175,6 +190,8 @@ class LocalTransfer:
                     item.unlink(missing_ok=True)
 
 if __name__ == "__main__":
-    trans = LocalTransfer(workspace_path="/Users/cnrs/Documents/repository/toolomics/workspace", runs_capsule_dir="/Users/cnrs/Documents/repository/Mimosa-AI/runs_capsule")
+    from config import Config
+    conf = Config()
+    trans = LocalTransfer(conf, workspace_path=conf.workspace_dir, runs_capsule_dir="./runs_capsule")
     goal = "you are assigned Low-Light Image Enhancement with Wavelet-based Diffusion Models to replicate. You need to ACTUALLY EXECUTE the experiment only for the LOLv1 dataset. Paper is availableat this link https://arxiv.org/pdf/2306.00306. Reproduction without model training (inference only using available evaluation script is allowed). Looking for existing model weight if necessary is allowed. make sure plan is within json"
     trans.transfer_workspace_files_to_capsule(goal)
