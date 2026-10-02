@@ -40,9 +40,22 @@ MCP server, and at least one LLM API key.
     pip install .
     ```
 
+=== "uv tool (standalone command)"
+
+    ```bash
+    uv tool install git+https://github.com/HolobiomicsLab/Mimosa-AI.git
+    mimosa                              # runs from any directory
+    ```
+
+    Installs an isolated `mimosa` executable on your `PATH`. Settings persist
+    to `~/.config/mimosa/config.json`, API keys can live in
+    `~/.config/mimosa/.env`, and runtime state (memory, workflows, run
+    capsules) is kept under `~/.local/share/mimosa/`.
+
 ## 2. Set API keys
 
-Create a `.env` file at the project root with at least one of:
+Create a `.env` file at the project root (or `~/.config/mimosa/.env` for the
+standalone command) with at least one of:
 
 ```env
 ANTHROPIC_API_KEY=...       # Claude — recommended for workflow orchestration

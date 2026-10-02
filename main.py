@@ -12,29 +12,40 @@ import sys
 
 import dotenv
 
-
 # Prevent tokenizers parallelism warnings when forking processes
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Ensure the default memory directory exists before local imports that may read it.
-os.makedirs(os.path.join("sources", "memory"), exist_ok=True)
+from sources.utils import paths
 
-from sources.cli.pretty_print import print_ok, print_warn, print_err, print_info
+# Ensure the default memory directory exists before local imports that may read it.
+os.makedirs(paths.default_memory_dir(), exist_ok=True)
 
 from config import Config
+from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
+from sources.benchmark_evaluation.eval_workflow_generation import WorkflowEval
+from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
+from sources.cli import EvaluationCLI, MemoryChatCLI, OnboardCLI
+from sources.cli.pretty_print import (
+    print_err,
+    print_info,
+    print_ok,
+    print_phase,
+    print_warn,
+)
 from sources.core.evolution_engine import EvolutionEngine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.cli import OnboardCLI, EvaluationCLI, MemoryChatCLI
-from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
-from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
-from sources.benchmark_evaluation.eval_workflow_generation import WorkflowEval
+from sources.utils.ensure_env import ensure_environment
 from sources.utils.logging import setup_logging
-from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
-from sources.security.check_package import PackageCheck
+from sources.utils.transfer_toolomics import LocalTransfer
+from sources.utils.workspace_management import WorkspaceManager
 
-dotenv.load_dotenv()
+# Search for .env from the current working directory upward (usecwd is
+# required for installed runs, where main.py lives in site-packages).
+dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
+# Fallback: user-level env file (shell env and a CWD .env take precedence).
+dotenv.load_dotenv(paths.user_env_file())
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -62,6 +73,12 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--runner_temp_dir", type=str, help="Override temp directory path for runners")
     parser.add_argument("--pushover_token", type=str, help="Override Pushover API token")
     parser.add_argument("--pushover_user", type=str, help="Override Pushover user key")
+    parser.add_argument(
+        "--planner_human_approve",
+        action="store_true",
+        default=False,
+        help="Show the generated plan and wait for approval before executing it (interactive --goal runs only)",
+    )
 
 def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     """Apply CLI argument overrides to config."""
@@ -87,6 +104,8 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.pushover_token = args.pushover_token
     if args.pushover_user:
         config.pushover_user = args.pushover_user
+    if getattr(args, "planner_human_approve", False):
+        config.planner_human_approve = True
     if args.max_evolve_iterations:
         config.max_learning_evolve_iterations = args.max_evolve_iterations
 
@@ -125,7 +144,7 @@ async def science_bench_papers_mode(args, config):
         task_start_delay=task_start_delay
     )
     if args.single_agent:
-        print(f"⚠️ Starting in single agent mode")
+        print("⚠️ Starting in single agent mode")
     await papers.start_evaluation(
         dataset_type="science_agent_bench",
         dataset_path="datasets/ScienceAgentBench.csv",
@@ -153,7 +172,7 @@ def load_goal_from_file_or_string(goal_input: str) -> str:
     """
     if goal_input and os.path.isfile(goal_input):
         try:
-            with open(goal_input, 'r', encoding='utf-8') as f:
+            with open(goal_input, encoding='utf-8') as f:
                 content = f.read().strip()
                 print_ok(f"Loaded goal from file: {goal_input}")
                 return content
@@ -185,6 +204,7 @@ async def normal_execution_mode(args, config):
         goal_content = load_goal_from_file_or_string(args.goal)
         await planner.start_planner(goal=goal_content,
                                     judge=not args.disable_judge,
+                                    human_approve=config.planner_human_approve,
                                    )
         trs = LocalTransfer(config=config, workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
         trs.transfer_workspace_files_to_capsule(args.goal or args.task)
@@ -259,14 +279,28 @@ async def main():
     add_config_arguments(parser, config)
     args = parser.parse_args()
 
-    # Load config from file if provided
+    # Load config from file if provided. Installed runs fall back to the
+    # persisted user config; repo checkouts keep the historical behaviour
+    # (no implicit config) so dev runs never pick up installed-tool settings.
     if args.config:
         config.load(args.config)
         print(f"Configuration loaded from: {args.config}")
+    elif not paths.is_repo_checkout() and paths.user_config_file().is_file():
+        config.load(str(paths.user_config_file()))
+        print(f"Configuration loaded from: {paths.user_config_file()}")
 
     # security check
     # Setup logging with debug flag
     setup_logging(debug=args.debug, disable=not args.verbose)
+
+    # ── Environment precheck phase ────────────────────────────────────────
+    # Ensure the host has Python 3.12 + pip available for Mimosa, auto-installing
+    # them when missing. Abort early if the environment cannot be provisioned.
+    print_phase("ENVIRONMENT PRECHECK")
+    if not ensure_environment(auto_install=True):
+        print_err("Environment precheck failed: Python 3.12 / pip could not be ensured.")
+        sys.exit(1)
+
 
     # Detect interactive (no-argument) mode early so we can skip pre-checks
     no_mode_selected = not any([
@@ -319,26 +353,35 @@ async def main():
     config.create_paths()
     config.validate_paths()
 
+    manager = WorkspaceManager(config)
 
     try:
         if (args.manual):
             await manual_mode(args, config)
         elif (args.papers):
-            PreCheck(config).run()
+            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await papers_mode(args, config)
         elif (args.science_agent_bench):
-            PreCheck(config).run()
+            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
-            PreCheck(config).run()
+            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await normal_execution_mode(args, config)
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)
     except KeyboardInterrupt:
+        manager.cleanup()
         raise
     except Exception as e:
+        manager.cleanup()
         print(f"❌ Error during execution: {e}")
         raise
+    print_info("Cleaning up...")
+    manager.cleanup()
+
+def cli_main() -> None:
+    """Synchronous console-script entry point (see [project.scripts])."""
+    asyncio.run(main())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    cli_main()

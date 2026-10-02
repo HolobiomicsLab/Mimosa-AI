@@ -4,10 +4,7 @@ Evaluation of LLM for Workflow generation
 
 import asyncio
 import csv
-import json
-import logging
 import time
-from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Dict
 
@@ -24,14 +21,11 @@ class WorkflowEval:
         self.csv_runs_limit = csv_runs_limit
         self.orchestrator = WorkflowOrchestrator(config)
         self.model_lists = [
-            "openrouter/mistralai/mistral-large-2512",
-            "anthropic/claude-opus-4-5",
-            #"openrouter/deepseek/deepseek-v3.2",
-            #"openrouter/openrouter/inception/mercury-2",
-            #"openrouter/minimax/minimax-m2.5",
-            #"openrouter/moonshotai/kimi-k2.5",
-            #"openrouter/moonshotai/kimi-k2-thinking",
-            #"anthropic/claude-opus-4-5"
+            "openrouter/deepseek/deepseek-v3.2",
+            "openrouter/openrouter/inception/mercury-2",
+            "openrouter/minimax/minimax-m2.5",
+            "openrouter/moonshotai/kimi-k2.5",
+            "openrouter/moonshotai/kimi-k2-thinking"
         ]
         self.model_results: Dict[str, List[Tuple[str, bool]]] = {}
         self.model_timeouts: Dict[str, int] = {}

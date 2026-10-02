@@ -118,11 +118,17 @@ class WorkspaceManager:
         Safe to call even if begin_session() was never called.
         """
         if self._session_id is None:
+            # Never glob without the session prefix: /tmp may hold snapshots
+            # from other live sessions (concurrent eval workers).
+            self.logger.info("[WORKSPACE] cleanup() skipped: no active session.")
             return
 
-        candidates = [Path(f"/tmp/mimosa_initial_{self._session_id}")]
+        candidates = []
         candidates.extend(
             Path("/tmp").glob(f"mimosa_run_{self._session_id}_*")
+        )
+        candidates.extend(
+            Path("/tmp").glob(f"mimosa_initial_{self._session_id}")
         )
         for p in candidates:
             if p.exists():

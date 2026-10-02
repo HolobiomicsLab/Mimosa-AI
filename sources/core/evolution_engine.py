@@ -91,18 +91,29 @@ class EvolutionEngine:
         self.orchestrator = WorkflowOrchestrator(config)
         self.variation = VariationEngine(config)
         self.judge = WorkflowEvaluator(config)
+        self.workspace_mgr = WorkspaceManager(self.config, self.logger)
         self.selection = SelectionPressure(
-            min_improvement_threshold=0.01,
-            strategy="qd", # quality-diversity selection
-            population_size=50, # max individuals to keep in the selection pool
-            novelty_k_neighbours=15,
-            novelty_weight=0.25,
+            config,
+            min_improvement_threshold=getattr(config, "min_improvement_threshold", 0.01),
+            strategy=getattr(config, "selection_strategy", "qd"),
+            population_size=getattr(config, "population_size", 50), # max individuals to keep in the selection pool
+            novelty_k_neighbours=getattr(config, "novelty_k_neighbours", 15),
+            novelty_weight=getattr(config, "novelty_weight", 0.25),
+            admit_threshold=getattr(config, "admit_threshold", 0.3),
             novelty_comparison=getattr(config, "novelty_comparison", "archive_knn"),
             previous_n=getattr(config, "novelty_previous_n", 5),
             length_penalty_baseline_chars=getattr(config, "length_penalty_baseline_chars", 5000),
             length_penalty_lambda=getattr(config, "length_penalty_lambda", 0.05),
         )
-        self.initial_population = 2 # number of initial random workflows before enabling mutation
+        self.initial_population = getattr(config, "initial_population", 2) # number of initial random workflows before enabling mutation
+    
+    def get_workspace_manager_session_id(self) -> str | None:
+        """Session id of the current WorkspaceManager session (None if none started).
+
+        Used by the evaluation harness to locate this run's per-iteration
+        workspace snapshots in /tmp (mimosa_run_<session_id>_<run_uuid>).
+        """
+        return self.workspace_mgr.session_id
 
     async def mockup(self, wf: WorkflowInfo | None, goal: str) -> list[IndividualRun]:
         """Use existing workflow data instead of orchestrating a fresh run.
@@ -248,8 +259,8 @@ class EvolutionEngine:
         self,
         goal: str,
         template_uuid: str | None = None,
-        crossover_rate: float = 0.4,
-        n_parents: int = 2,
+        crossover_rate: float | None = None,
+        n_parents: int | None = None,
     ) -> tuple[list[WorkflowInfo], bool]:
         """Select one or more parent workflows under evolutionary pressure.
 
@@ -280,13 +291,18 @@ class EvolutionEngine:
             wf = WorkflowInfo(template_uuid, Path(f"{self.workflow_dir}/{template_uuid}"))
             return [wf], False
 
+        if crossover_rate is None:
+            crossover_rate = getattr(self.config, "crossover_rate", 0.4)
+        if n_parents is None:
+            n_parents = getattr(self.config, "n_parents", 2)
+
         selected, use_crossover = self.workflow_selector.select_parent_workflows(
             goal=goal,
             selection_pressure=self.selection,
             n_parents=n_parents,
             crossover_rate=crossover_rate,
-            threshold_similarity=0.8,
-            threshold_score=0.01,
+            threshold_similarity=getattr(self.config, "parent_threshold_similarity", 0.8),
+            threshold_score=getattr(self.config, "parent_threshold_score", 0.01),
         )
 
         mode = "CROSSOVER" if use_crossover else "MUTATION"
@@ -352,9 +368,18 @@ class EvolutionEngine:
         """
         wf = None
         max_iteration = self.config.max_learning_evolve_iterations if enable_evolution else 1
+        enable_evolution = enable_evolution and not single_agent_mode
+        judge = judge and not single_agent_mode
+        max_iteration = (
+            self.config.max_learning_evolve_iterations if enable_evolution else 1
+        )
 
-        # Reset archive at session start
+        # Reset archive and variation history at session start so each task
+        # starts with a clean slate (prevents boldness contamination across rows).
         self.selection._archive = []
+        self.variation.score_history.clear()
+        self.variation.textual_gradient_history.clear()
+        self.variation.agent_count_history.clear()
 
         parents, _ = self.select_parent_workflow(
             goal, template_uuid=template_uuid
@@ -365,8 +390,7 @@ class EvolutionEngine:
             return await self.mockup(wf, goal)
 
         # ── Workspace lifecycle: snapshot → clean → restore before first run ─
-        workspace_mgr = WorkspaceManager(self.config, self.logger)
-        workspace_mgr.begin_session()
+        self.workspace_mgr.begin_session()
 
         craft_instructions = self.get_genotype_instructions(goal, wf, max_iterations=max_iteration)
 
@@ -396,7 +420,7 @@ class EvolutionEngine:
             assertion_history=assertion_history,
             enable_evolution=enable_evolution,
             single_agent_mode=single_agent_mode,
-            workspace_mgr=workspace_mgr,
+            workspace_mgr=self.workspace_mgr,
         )
 
         # ── Restore workspace to the best run's saved state ──────────────────
@@ -411,12 +435,18 @@ class EvolutionEngine:
                     f"Best run: {best_run.current_uuid} "
                     f"(score={f'{best_run.reward:.3f}' if best_run.reward is not None else 'N/A'})"
                 )
-                workspace_mgr.restore_best(best_run.current_uuid)
+                self.workspace_mgr.restore_best(best_run.current_uuid)
+                try:
+                    self._export_astra(best_run.current_uuid, goal)
+                except Exception as e:
+                    print_err(f"Error in Astra Export: {str(e)}")
+                    pass
             else:
                 print_warn("No successful run found; workspace restored to initial state.")
-                workspace_mgr.restore_best("")  # triggers fallback inside WorkspaceManager
-        finally:
-            workspace_mgr.cleanup()
+                self.workspace_mgr.restore_best("")  # triggers fallback 
+        except Exception as e:
+            print_err(f"Unknown error in workspace restauration defaulting to latest workspace state.")
+            pass
 
         return runs
 
@@ -518,11 +548,13 @@ class EvolutionEngine:
             )
 
         runs[-1].current_uuid = uuid
-        runs[-1].answers = wf_info.answers
-        runs[-1].state_result = wf_info.state_result
-        agents_answers = self.extract_agents_behavior(wf_info.state_result)
+        runs[-1].answers = wf_info.answers if wf_info else []
+        runs[-1].state_result = wf_info.state_result if wf_info else {}
+        agents_answers = self.extract_agents_behavior(wf_info.state_result) if wf_info else ""
         self.show_answers(agents_answers)
-        rewards_history.append(wf_info.overall_score)
+
+        if rewards_history is not None and wf_info is not None:
+            rewards_history.append(wf_info.overall_score)
 
         # ── Survivor validation: gate + populate _archive (steady-state population)
         if uuid and not on_error:
@@ -547,6 +579,7 @@ class EvolutionEngine:
             runs[-1].goal, runs[-1].scenario_rubric, uuid
         )
         self._refresh_evolution_tree(runs[-1].goal, uuid)
+        self._refresh_archive_projection(uuid)
 
         # Calculate cumulative cost and update runs[-1].cost for accurate tracking
         runs[-1].cost = runs[-1].cost + current_iteration_cost
@@ -567,16 +600,17 @@ class EvolutionEngine:
             )
 
         # Log and notify completion (show per-iteration cost, not cumulative)
-        self._log_iteration_completion(
-            runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
-            wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
-        )
-
-        # Check termination conditions
+        if wf_info:
+            self._log_iteration_completion(
+                runs[-1].iteration_count, runs[-1].max_depth, iteration_start_time,
+                wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
+            )
+        
         if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
             print_info("Maximum recursive depth reached.")
             return runs
-        if enable_evolution:
+        
+        if wf_info and enable_evolution:
             if wf_info.overall_score >= self.config.learned_score_threshold:
                 print_ok("Evolution engine reached learning threshold.")
                 self._save_final_plots(assertion_history, rewards_history, uuid)
@@ -649,12 +683,12 @@ class EvolutionEngine:
             cost=runs[-1].cost,  # Correct cumulative cost
             current_uuid=uuid,
             template_uuid=None,
-            workflow_template=runs[-1].workflow_template if wf_info.state_result else None,
+            workflow_template=runs[-1].workflow_template if (wf_info and wf_info.state_result) else None,
             iteration_count=runs[-1].iteration_count + 1,
             max_depth=runs[-1].max_depth,
             judge=runs[-1].judge,
-            answers=wf_info.answers,
-            state_result=wf_info.state_result,
+            answers=wf_info.answers if wf_info else [],
+            state_result=wf_info.state_result if wf_info else {},
             scenario_rubric=runs[-1].scenario_rubric,
             original_task=runs[-1].original_task,  # PRESERVE original_task for workflow selection
             parent_uuids=next_parent_uuids,
@@ -676,6 +710,23 @@ class EvolutionEngine:
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)
         return runs
+
+    def _export_astra(self, best_uuid: str, goal: str) -> None:
+        """Best-effort post-run ASTRA export of the best workflow's trace.
+
+        Gated on ``config.export_astra`` (opt-in, off by default). Failure is
+        non-fatal: a missing memory directory, an LLM hiccup, or a YAML write
+        error must not break the evolution loop. See
+        :class:`sources.transparency.AstraExporter` for the pipeline.
+        """
+        if not getattr(self.config, "export_astra", False):
+            return
+        try:
+            from sources.transparency import AstraExporter
+            AstraExporter(self.config, self.logger).export(best_uuid, goal)
+        except Exception as exc:
+            self.logger.warning(f"[ASTRA] export skipped: {exc}")
+            print_warn(f"ASTRA export failed (non-fatal): {exc}")
 
     def _get_human_validation(self) -> bool:
         """Get human validation for continuing the workflow.
@@ -893,6 +944,28 @@ class EvolutionEngine:
                 self.logger.info(f"Evolution tree refreshed: {output}")
         except Exception as e:
             self.logger.warning(f"Failed to refresh evolution tree: {e}")
+
+    def _refresh_archive_projection(self, uuid: str | None = None) -> None:
+        """Re-render the PCA projection PNG of the QD archive after each iteration.
+
+        Projects the SelectionPressure archive's behaviour descriptors and writes
+        ``<workflow_dir>/archive_pca.png``, starring *uuid* when it is present.
+
+        Best-effort: rendering failures are logged and swallowed so an archive
+        image issue never aborts an iterative refinement run. The renderer is
+        imported lazily to avoid a circular import via ``sources.utils``.
+        """
+        try:
+            from sources.utils.archive_projection import render_archive_pca
+            output = render_archive_pca(
+                self.selection.archive,
+                self.workflow_dir,
+                highlight_uuid=uuid,
+            )
+            if output is not None:
+                self.logger.info(f"Archive projection refreshed: {output}")
+        except Exception as e:
+            self.logger.warning(f"Failed to refresh archive projection: {e}")
 
     def _save_evolution_prompt_artifact(self, uuid: str, prompt: str) -> None:
         """Persist the variation/seed prompt that produced this workflow into its folder.

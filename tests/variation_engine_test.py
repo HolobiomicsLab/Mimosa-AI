@@ -11,16 +11,35 @@ sys.path.append(str(Path(__file__).parent.parent))
 from sources.core.variation_engine import VariationEngine
 
 
+class _FakeConfig:
+    """Minimal stand-in for the real Config, just enough to satisfy
+    VariationEngine.setup_llm without touching any network/provider code."""
+
+    workflow_llm_model = "openai/gpt-4o-mini"
+    reasoning_effort = "low"
+    max_tokens = 8192
+
+    def openrouter_provider_for(self, model):
+        return None
+
+    def openrouter_quantizations_for(self, model):
+        return None
+
+
+def _make_engine():
+    return VariationEngine(_FakeConfig())
+
+
 # ── _iters_since_improvement ──────────────────────────────────────────────
 
 
 def test_iters_since_improvement_empty_history_is_zero():
-    ve = VariationEngine()
+    ve = _make_engine()
     assert ve._iters_since_improvement() == 0
 
 
 def test_iters_since_improvement_no_scored_entries_is_zero():
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(4):
         ve.record_offspring_gradient("crash", is_failure=True)
     ve.record_offspring_gradient("no scores attached")  # child_score = None
@@ -28,7 +47,7 @@ def test_iters_since_improvement_no_scored_entries_is_zero():
 
 
 def test_iters_since_improvement_counts_consecutive_non_improvers():
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("up",   child_score=0.30, best_before=0.20)
     ve.record_offspring_gradient("flat", child_score=0.30, best_before=0.30)
     ve.record_offspring_gradient("flat", child_score=0.30, best_before=0.30)
@@ -37,7 +56,7 @@ def test_iters_since_improvement_counts_consecutive_non_improvers():
 
 
 def test_iters_since_improvement_resets_after_strict_improvement():
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(4):
         ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     ve.record_offspring_gradient("up", child_score=0.6, best_before=0.5)
@@ -47,7 +66,7 @@ def test_iters_since_improvement_resets_after_strict_improvement():
 def test_iters_since_improvement_skips_failures_and_none_entries():
     """Failures and unscored entries are transparent: they neither break nor
     extend the streak. The streak walks through them as if they weren't there."""
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     ve.record_offspring_gradient("crash", is_failure=True)
     ve.record_offspring_gradient("nul",   child_score=None, best_before=0.5)
@@ -58,7 +77,7 @@ def test_iters_since_improvement_skips_failures_and_none_entries():
 def test_iters_since_improvement_tie_is_not_an_improvement():
     """``c == b`` is a tie, not a strict improvement: the streak must NOT
     reset on equality."""
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     assert ve._iters_since_improvement() == 2
@@ -68,13 +87,13 @@ def test_iters_since_improvement_tie_is_not_an_improvement():
 
 
 def test_compute_success_rate_none_when_no_scored_history():
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("only a gradient, no score")
     assert ve._compute_success_rate() is None
 
 
 def test_compute_success_rate_counts_strict_improvements():
-    ve = VariationEngine()
+    ve = _make_engine()
     # 2 improvements out of 4 ⇒ success_rate = 0.5
     ve.record_offspring_gradient("a", child_score=0.30, best_before=0.20)
     ve.record_offspring_gradient("b", child_score=0.30, best_before=0.30)  # tie ≠ improvement
@@ -84,7 +103,7 @@ def test_compute_success_rate_counts_strict_improvements():
 
 
 def test_compute_success_rate_excludes_failures():
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("ok", child_score=0.50, best_before=0.40)
     ve.record_offspring_gradient(
         "crash", is_failure=True, child_score=0.99, best_before=0.40
@@ -97,7 +116,7 @@ def test_compute_success_rate_excludes_failures():
 
 
 def test_failure_entries_persist_in_history_for_audit():
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("crash", is_failure=True)
     ve.record_offspring_gradient("real diag")
     assert ve.textual_gradient_history == [("crash", True), ("real diag", False)]
@@ -108,7 +127,7 @@ def test_failure_entries_persist_in_history_for_audit():
 
 def test_step_size_damped_when_recent_offspring_improve():
     """When success_rate ≥ 0.80, boldness collapses regardless of plateau."""
-    ve = VariationEngine()
+    ve = _make_engine()
     prev_best = 0.5
     for inc in (0.05, 0.07, 0.09, 0.11, 0.13):
         ve.record_offspring_gradient(
@@ -119,14 +138,14 @@ def test_step_size_damped_when_recent_offspring_improve():
         prev_best += inc
     block = ve._get_prompt_step_size(parent_score=0.97)
     assert ve.last_variation_state["effective_boldness"] < 0.35, ve.last_variation_state
-    assert "EXPLOITATION" in block, block
+    assert "Slight mutation" in block, block
 
 
 def test_step_size_plateau_escalates_but_hysteresis_blocks_respeciation():
     """Plateau at high parent_score: scope must lift past EXPLOITATION but
     must not reach RE-SPECIATION on a 5-iteration streak — the hysteresis
     gate requires iters_since_improvement ≥ 8."""
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(5):
         ve.record_offspring_gradient(
             "DATA_LEAKAGE: same diagnosis again",
@@ -138,11 +157,11 @@ def test_step_size_plateau_escalates_but_hysteresis_blocks_respeciation():
     assert state["effective_boldness"] >= 0.35, state
     assert state["effective_boldness"] < 0.90, state
     assert state["respeciation_gate_open"] is False, state
-    assert "RE-SPECIATION" not in block, block
+    assert "Bolder mutation" not in block, block
 
 
 def test_step_size_low_parent_and_stuck_lifts_scope():
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(5):
         ve.record_offspring_gradient(
             "repeating failure",
@@ -158,7 +177,7 @@ def test_step_size_low_parent_and_stuck_lifts_scope():
 def test_hysteresis_gate_opens_after_eight_consecutive_non_improvers():
     """RE-SPECIATION fires only when iters_since_improvement ≥ 8 AND
     success_rate ∈ {None, 0.0}."""
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(8):
         ve.record_offspring_gradient(
             "stuck", child_score=0.5, best_before=0.5,
@@ -166,12 +185,12 @@ def test_hysteresis_gate_opens_after_eight_consecutive_non_improvers():
     block = ve._get_prompt_step_size(parent_score=0.5)
     state = ve.last_variation_state
     assert state["respeciation_gate_open"] is True, state
-    assert "RE-SPECIATION" in block, block
+    assert "Bolder mutation" in block, block
 
 
 def test_cold_start_boldness_capped_at_thirty_percent():
     """No scored offspring → success_rate is None → effective ≤ 0.3 · plateau."""
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(20):
         ve.record_offspring_gradient("just a diagnosis, no score")
     ve._get_prompt_step_size(parent_score=0.5)
@@ -183,7 +202,7 @@ def test_cold_start_boldness_capped_at_thirty_percent():
 def test_step_size_parent_score_clipped_to_unit_interval():
     """Out-of-range parent_score must be clipped to [0, 1]; the reported
     boldness percentage stays inside [0, 100]."""
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(4):
         ve.record_offspring_gradient(
             "stuck", child_score=0.5, best_before=0.5,
@@ -197,7 +216,7 @@ def test_step_size_parent_score_clipped_to_unit_interval():
 
 
 def test_mutation_prompt_does_not_touch_gradient_history():
-    ve = VariationEngine()
+    ve = _make_engine()
 
     class _FakeWfInfo:
         overall_score = 0.5

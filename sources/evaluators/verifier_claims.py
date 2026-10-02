@@ -8,7 +8,6 @@ import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import replace
 from typing import Any
 
 
@@ -108,6 +107,17 @@ class _VerifierClaimExtractionMixin:
                 "importance_rationale": "literal deliverable; absent here",
                 "likely_relevant_files": [],
             }]
+
+        task_key = self._task_cache_key(goal)
+        cached = self._load_cached_rubric(task_key)
+        if cached is not None:
+            adapted = self._adapt_rubric_to_workspace(cached)
+            print_ok(
+                f"Rubric cache HIT for {uuid}: reusing {len(adapted)} claims "
+                f"(skipped extraction, dedup, importance)"
+            )
+            return adapted
+
         per_source_min, per_source_max = self._per_source_targets(n_sources=len(SOURCES))
         base_ctx = ClaimContext(
             goal=goal,
@@ -117,32 +127,25 @@ class _VerifierClaimExtractionMixin:
             grounding=grounding,
             execution_text=execution_text,
         )
-        task_key = self._task_cache_key(goal)
         merged: list[dict[str, Any]] = []
         seen_ids: set[str] = set()
         per_source_elapsed: list[tuple[str, float, int]] = []
         t_sources = time.time()
         for source in SOURCES:
             label = source.label
-            prior_text = self._load_prior_claims_text(task_key, label)
-            source_ctx = replace(base_ctx, prior_claims=prior_text)
-            prompt = source.build(source_ctx)
+            prompt = source.build(base_ctx)
             t_src = time.time()
             data, err = self._call_judge_for_json(
                 uuid, f"verifier_extract_claims_{label}", prompt
             )
             if err is not None:
+                print_warn(f"Claim extraction source {label} failed for {uuid}: {err}")
                 self.logger.warning(
                     f"Claim extraction source {label} failed for {uuid}: {err}"
                 )
                 per_source_elapsed.append((label, time.time() - t_src, 0))
                 continue
             new_claims = self._parse_and_filter_claims(uuid, data)
-            # Seed the cache from the FIRST workflow that produces a non-empty
-            # claim list for this source. Subsequent extractions (cache file
-            # already exists) read the seed via _load_prior_claims_text above;
-            # _persist_claims_for_source is then a no-op.
-            self._persist_claims_for_source(task_key, label, new_claims)
             for claim in new_claims:
                 print_info(f"Extracted claim {claim['id']} from source {label} for {uuid}")
                 claim_id = claim["id"]
@@ -175,6 +178,7 @@ class _VerifierClaimExtractionMixin:
             f"Importance rating for {uuid}: {len(ranked)} claims kept "
             f"in {time.time() - t_rate:.1f}s"
         )
+        self._persist_rubric(task_key, ranked)
         return ranked
 
     def _per_source_targets(self, n_sources: int = 3) -> tuple[int, int]:
@@ -390,6 +394,7 @@ cluster. Do NOT drop claims that check different facets — only true duplicates
 If nothing is duplicated, return an empty list.
 Also remove any claim that's only about the sources dataset files. (eg: the file data/train.csv has duplicate rows)
 Do not remove claims about the output artefacts, even if they mention input files, as long as they check a property of the output (eg: the output predictions.csv has duplicate rows)
+Also drop any claim that in it's claims assume a "_prob"  at the end of a prediction data column.
 
 Return STRICT JSON only, in this exact shape:
 {{"drop_ids": ["<id>", ...]}}
@@ -412,7 +417,7 @@ Return STRICT JSON only, in this exact shape:
         )
         return f"""You are rating verification claims by how much they matter for the task success.
 You assign an IMPORTANCE weight (1–10) to each claim. Importance answers ONE
-question: if this claim turns out false or missing, how much does result break? 
+question: if this claim turns out false or missing, how much does result break?
 
 WORKFLOW GOAL:
 {goal}

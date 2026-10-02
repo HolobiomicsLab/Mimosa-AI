@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
@@ -2817,8 +2817,9 @@ judge / evaluation.</p>
 <li>Layer <code>3</code> executes those workflows in a sandboxed runner with
   SmolAgents.</li>
 <li>Layer <code>4</code> runs the multi-source per-claim verifier and reports
-  <code>overall_score</code>, <code>reward_uncapped</code>, and <code>abstracted_prompt_gradient</code>
-  back into the loop.</li>
+  <code>overall_score</code>, <code>overall_score_uncapped</code> (logged for analysis), and
+  <code>abstracted_prompt_gradient</code> back into the loop; QD selection ranks on
+  the capped <code>overall_score</code>.</li>
 </ul>
 <hr />
 <h2 id="directory-structure">Directory Structure<a class="headerlink" href="#directory-structure" title="Permanent link">&para;</a></h2>
@@ -2828,16 +2829,16 @@ judge / evaluation.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├── pyproject.toml                         # Project metadata + deps
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>├── cleanup.sh                             # Reset workflows + capsules
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>├── memory_explorer.py                     # Interactive trace replay
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>├── memory_timelapse.py                    # Memory growth visualisation
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>│
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>├── sources/
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│   ├── core/
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│   │   ├── evolution_engine.py            # Top-level evolutionary loop (depth-first recursion)
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│   │   ├── selection.py                   # SelectionPressure (greedy/tournament/novelty/QD)
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│   │   ├── variation_engine.py            # Mutation/crossover prompt assembly + annealing
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│   │   ├── workflow_selection.py          # Parent retrieval (archive draw / disk scan)
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   │   ├── failure_fingerprint.py         # Verifier verdicts → QD behaviour descriptor (6-D, centered)
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   │   ├── code_features.py               # Legacy structural descriptor (offline analysis only)
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>│
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>├── sources/
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>│   ├── core/
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>│   │   ├── evolution_engine.py            # Top-level evolutionary loop (depth-first recursion)
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>│   │   ├── selection.py                   # SelectionPressure (greedy/tournament/novelty/QD)
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>│   │   ├── variation_engine.py            # Mutation/crossover prompt assembly + annealing
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>│   │   ├── workflow_selection.py          # Parent retrieval (archive draw / disk scan)
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>│   │   ├── genotype_embedding.py          # Code-genotype embedding backend → QD behaviour descriptor
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>│   │   ├── code_features.py               # genotype_embedding_descriptor shim (QD novelty)
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>│   │   ├── failure_fingerprint.py         # Verifier verdicts → failure fingerprint (persisted diagnostic, 6-D centered)
 </span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>│   │   ├── lineage.py                     # parent → child sidecar records
 </span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>│   │   ├── orchestrator.py                # Grounding → factory → sandbox pipeline
 </span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>│   │   ├── workflow_factory.py            # Multi-agent workflow synthesis
@@ -2975,9 +2976,9 @@ judge / evaluation.</p>
 1. resets the workspace to the initial state,
 2. orchestrates a workflow run (LLM → sandbox),
 3. snapshots the workspace,
-4. evaluates → <code>overall_score</code> / <code>reward_uncapped</code>,
-5. calls <code>validate_survivor()</code> and admits to the archive if non-dominated
-   on <code>(reward_uncapped, novelty)</code>,
+4. evaluates → <code>overall_score</code> (surfaced as <code>reward</code> on the run),
+5. calls <code>validate_survivor()</code> and admits to the archive on improvement
+   or <code>qd_score &gt; admit_threshold</code> (quality term from the capped <code>reward</code>),
 6. selects the next parent(s) and chooses mutation vs crossover,
 7. recurses.</p>
 <p>Termination: <code>overall_score &gt;= learned_score_threshold</code> (default 0.9) in
@@ -2988,9 +2989,11 @@ judge / evaluation.</p>
 <p>Four strategies: <code>greedy</code>, <code>tournament</code>, <code>novelty</code>, <code>qd</code> (default). In
 QD mode it maintains a session archive of up to <code>population_size</code>
 members, weighted by <code>qd_score = (1-w)·quality_norm + w·novelty_norm</code>
-(<code>w = novelty_weight = 0.25</code>). Quality is sourced from <code>reward_uncapped</code>
-so the hard-fail cap (<code>_HARD_FAIL_CAP</code>, currently <code>0.99</code>) doesn't
-flatten rank ordering. Admission is
+(<code>w = novelty_weight = 0.25</code>). Quality is sourced from <code>reward</code> (the
+capped <code>overall_score</code>), so a run that refuted a hard claim ranks at the
+cap (<code>_HARD_FAIL_CAP</code>, currently <code>0.7</code>) and cannot top the archive on its
+other claims alone; ties at the cap are broken by novelty and the length
+penalty. Admission is
 gated by the validity check (improvement over baseline or
 <code>qd_score &gt; admit_threshold</code>); when capacity is hit, the lowest-
 <code>qd_score</code> member is evicted. Parent draw applies an inverse-child-count
@@ -3065,6 +3068,32 @@ success rate of recent offspring — not a fixed phase schedule.</p>
 <p>Scope is an advisory line injected into the mutation prompt; the LLM
 may still pick any topology. The hard control is the agent-count
 budget carried in the same block.</p>
+<p><code>llm_think_mutation_directive(agent_answers, textual_gradient_block,
+step_block, goal)</code> runs a dedicated LLM call between
+<code>_get_prompt_step_size</code> and the orchestrator. It consumes the
+parent's per-agent answers, the rubric-blind verifier diagnosis, and
+the boldness/scope block, and emits a <strong>≤ 3-sentence directive</strong>
+naming exactly one issue, the kind of mutation it implies (prompt
+tweak, persona change, agent add/remove, topology change), and the
+rationale. The system prompt fixes trust ranks (verifier diagnosis
+trusted, agent self-reports not), and hard limits (one agent
+add/remove per step, never above the boldness band, default to small
+incremental changes).</p>
+<p><code>mutation_prompt(...)</code> is therefore now a thin wrapper: it passes the
+parent code plus that one directive to the orchestrator inside a
+<code>&lt;directive&gt;...&lt;/directive&gt;</code> block, with explicit instructions to
+<strong>follow the directive exactly</strong>, <strong>add/remove at most one agent per
+step</strong>, <strong>not change topology</strong> unless the directive says so, <strong>not
+edit prompts outside the directive's scope</strong>, and <strong>keep ≥ 90 % of the
+previous code and prompts unchanged</strong>. The verifier diagnosis and raw
+agent answers are no longer injected into the orchestrator's
+context — they were only ever needed to <em>decide</em> the change, and that
+decision is now made upstream. This split keeps orchestrator
+cognitive load on synthesis (write valid LangGraph + agent code), not
+on diagnosis. If the previous attempt failed to produce code at all
+(<code>genotype is None</code>), the directive-LLM is skipped and a fixed
+"Previous attempt failed completely. Fix syntax errors." directive is
+substituted.</p>
 <h3 id="4-workflowselector-sourcescoreworkflow_selectionpy">4. <code>WorkflowSelector</code> — <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py"><code>sources/core/workflow_selection.py</code></a><a class="headerlink" href="#4-workflowselector-sourcescoreworkflow_selectionpy" title="Permanent link">&para;</a></h3>
 <p>Two-mode parent retrieval:</p>
 <ul>
@@ -3151,7 +3180,7 @@ calls it with <code>evaluator_type="verifier"</code>.</p>
 <hr />
 <h2 id="execution-flow">Execution Flow<a class="headerlink" href="#execution-flow" title="Permanent link">&para;</a></h2>
 <h3 id="mode-1-task-mode-task">Mode 1: Task mode (<code>--task</code>)<a class="headerlink" href="#mode-1-task-mode-task" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>main.py --task &quot;&lt;task&gt;&quot; [--learn] [--single_agent]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>main.py --task "&lt;task&gt;" [--learn] [--single_agent]
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    ↓
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>EvolutionEngine.start_workflow_evolution(goal)
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    ├─ reset session archive
@@ -3162,7 +3191,7 @@ calls it with <code>evaluator_type="verifier"</code>.</p>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        │   ├─ Perspicacite grounding
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        │   ├─ workflow_factory.craft_workflow()
 </span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        │   └─ workflow_runner.execute() (sandbox)
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        ├─ WorkflowEvaluator.evaluate(evaluator_type=&quot;verifier&quot;)
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>        ├─ WorkflowEvaluator.evaluate(evaluator_type="verifier")
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>        ├─ SelectionPressure.validate_survivor() → archive admit?
 </span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>        ├─ record_lineage()
 </span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>        ├─ select next parent (archive QD-roulette)
@@ -3172,7 +3201,7 @@ calls it with <code>evaluator_type="verifier"</code>.</p>
 </span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>WorkspaceManager.restore_best(best_uuid)
 </span></code></pre></div>
 <h3 id="mode-2-goal-mode-goal">Mode 2: Goal mode (<code>--goal</code>)<a class="headerlink" href="#mode-2-goal-mode-goal" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>main.py --goal &quot;Reproduce paper X&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>main.py --goal "Reproduce paper X"
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    ↓
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>Planner.start_planner(goal)
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    ├─ generate multi-step plan
@@ -3219,19 +3248,15 @@ calls it with <code>evaluator_type="verifier"</code>.</p>
    pre-installed (lazy one-shot install per process). Soft claims get a
    <code>pass/unsure/fail</code> LLM verdict against workspace previews + literature
    grounding (mapped to <code>1.0 / 0.5 / 0.0</code>).</li>
-<li><strong>Independent cheat detector</strong>: present in the codebase but currently
-   <strong>disabled</strong> pending a rewrite. The aggregation path still has a slot
-   for <code>cheat_penalty</code>. Behavioral anti-cheat pressure today comes from
-   Source C's recompute-from-disk verifiers, the inverted-score "Used
-   fallback" claim type, and the anti-tautology tripwires.</li>
+<li><strong>Behavioral pressure against shortcut workflows</strong> comes from Source
+   C's recompute-from-disk verifiers, the inverted-score "Used fallback"
+   claim type, and the anti-tautology tripwires.</li>
 <li><strong>Aggregation</strong>:
-   <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>overall = clamp(base_mean + info_bonus, 0, 1)
+   <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>overall = clamp(base_mean, 0, 1)
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>if any hard claim refuted:
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    overall = min(overall, 0.99)        # _HARD_FAIL_CAP (soft, for now)
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>overall = max(0, overall - cheat_penalty)  # cheat_penalty = 0.0 today
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    overall = min(overall, 0.7)         # _HARD_FAIL_CAP
 </span></code></pre></div>
-   where <code>info_bonus(n_hard_pass) = 0.05 · (1 - exp(-n_hard_pass / 8))</code>
-   (saturating reward for thoroughness).</li>
+   <code>base_mean</code> is the importance-weighted mean of per-claim scores.</li>
 <li><strong>Prompt gradient</strong> — plain-language single-sentence diagnosis
    prefixed with a short code name (e.g. <code>FALLBACK_ECFP_CLASSIFIER</code>). It
    is the <strong>only</strong> verifier signal the mutator sees, and recent history
@@ -3453,7 +3478,7 @@ calls it with <code>evaluator_type="verifier"</code>.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

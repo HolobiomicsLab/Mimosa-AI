@@ -9,7 +9,6 @@ mimosa-ai/
 ├── pyproject.toml                         # Project metadata + dependencies
 ├── cleanup.sh                             # Reset workflows + capsules
 ├── memory_explorer.py                     # Interactive trace replay
-├── memory_timelapse.py                    # Memory growth visualisation
 ├── mkdocs.yml                             # Documentation site config
 │
 ├── sources/
@@ -18,8 +17,9 @@ mimosa-ai/
 │   │   ├── selection.py                   # QD archive + admission gate
 │   │   ├── variation_engine.py            # Mutation / crossover prompt assembly
 │   │   ├── workflow_selection.py          # Parent retrieval (archive / disk)
-│   │   ├── failure_fingerprint.py         # Verifier verdicts → QD behaviour descriptor (6-D, centered)
-│   │   ├── code_features.py               # Legacy structural descriptor (offline analysis only)
+│   │   ├── genotype_embedding.py          # Code-genotype embedding backend → QD behaviour descriptor
+│   │   ├── code_features.py               # genotype_embedding_descriptor shim (QD novelty)
+│   │   ├── failure_fingerprint.py         # Verifier verdicts → failure fingerprint (persisted diagnostic, 6-D centered)
 │   │   ├── lineage.py                     # Parent → child sidecar records
 │   │   ├── orchestrator.py                # Grounding → factory → sandbox
 │   │   ├── workflow_factory.py            # Multi-agent workflow synthesis

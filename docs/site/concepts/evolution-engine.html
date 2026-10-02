@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -882,10 +882,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#behaviour-descriptor-failure-fingerprint" class="md-nav__link">
+  <a href="#behaviour-descriptor-genotype-embedding" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Behaviour descriptor: failure fingerprint
+        Behaviour descriptor: genotype embedding
       
     </span>
   </a>
@@ -905,6 +905,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Variation: evidence-driven mutation scope (Rechenberg ⅕ rule)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mutation-directive-offloading-reasoning-from-the-orchestrator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mutation directive: offloading reasoning from the orchestrator
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -931,10 +948,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#visualisations" class="md-nav__link">
+  <a href="#watching-evolution-happen" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Visualisations
+        Watching evolution happen
       
     </span>
   </a>
@@ -2063,10 +2080,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#behaviour-descriptor-failure-fingerprint" class="md-nav__link">
+  <a href="#behaviour-descriptor-genotype-embedding" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Behaviour descriptor: failure fingerprint
+        Behaviour descriptor: genotype embedding
       
     </span>
   </a>
@@ -2086,6 +2103,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="Variation: evidence-driven mutation scope (Rechenberg ⅕ rule)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mutation-directive-offloading-reasoning-from-the-orchestrator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mutation directive: offloading reasoning from the orchestrator
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2112,10 +2146,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#visualisations" class="md-nav__link">
+  <a href="#watching-evolution-happen" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Visualisations
+        Watching evolution happen
       
     </span>
   </a>
@@ -2226,9 +2260,10 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
     Seed -- yes --&gt; SeedPrompt[Seed genome prompt&lt;br/&gt;or template mutation]
     Seed -- no --&gt; Pick[Pick parents via QD-roulette&lt;br/&gt;fallback to disk similarity scan]
     SeedPrompt --&gt; Orch[Orchestrate workflow&lt;br/&gt;LLM → sandbox]
-    Pick --&gt; Decide{Crossover ≈ 0.1?}
-    Decide -- mutation --&gt; Mut[Mutation prompt&lt;br/&gt;stagnation-scoped]
+    Pick --&gt; Decide{Crossover ≈ 0.4?}
+    Decide -- mutation --&gt; Think[Directive LLM&lt;br/&gt;diagnosis + boldness&lt;br/&gt;→ 3-sentence directive]
     Decide -- crossover --&gt; Cross[Crossover prompt&lt;br/&gt;best-parent-first]
+    Think --&gt; Mut[Mutation prompt&lt;br/&gt;parent code + directive]
     Mut --&gt; Orch
     Cross --&gt; Orch
     Orch --&gt; Eval[multi-source per-claim verifier&lt;br/&gt;reward + prompt gradient]
@@ -2247,9 +2282,9 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
 <li><strong>Reset</strong> the workspace to the initial state.</li>
 <li><strong>Orchestrate</strong> a workflow run (LLM writes Python → sandbox runs it).</li>
 <li><strong>Snapshot</strong> the workspace.</li>
-<li><strong>Evaluate</strong> — get <code>overall_score</code> and <code>reward_uncapped</code> (i.e.
-   <code>overall_score_uncapped</code> in the persisted JSON) plus an
-   <code>abstracted_prompt_gradient</code>.</li>
+<li><strong>Evaluate</strong> — get <code>overall_score</code> (which drives QD quality) plus an
+   <code>abstracted_prompt_gradient</code>; <code>overall_score_uncapped</code> is still
+   persisted for analysis.</li>
 <li><strong><code>validate_survivor()</code></strong> — admit to the archive when the candidate
    improves over baseline or clears <code>qd_score &gt; admit_threshold</code>;
    capacity is curated by lowest-<code>qd_score</code> eviction.</li>
@@ -2258,69 +2293,89 @@ runs a <strong>depth-first recursion</strong> seeded from a Quality-Diversity (Q
 </ol>
 <p>Termination:</p>
 <ul>
-<li><code>overall_score &gt;= learned_score_threshold</code> (default <code>0.9</code>) in <code>--learn</code> mode, <em>or</em></li>
+<li><code>overall_score &gt;= learned_score_threshold</code> (default <code>0.92</code>) in <code>--learn</code> mode, <em>or</em></li>
 <li><code>max_depth</code> reached — <code>1</code> in single-shot mode, <code>max_learning_evolve_iterations</code>
-  (default <code>20</code>) in <code>--learn</code> mode.</li>
+  (default <code>25</code>) in <code>--learn</code> mode.</li>
 </ul>
 <h2 id="selection-quality-diversity-qd">Selection: Quality-Diversity (QD)<a class="headerlink" href="#selection-quality-diversity-qd" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py"><code>SelectionPressure</code></a>
 implements four strategies — <code>greedy</code>, <code>tournament</code>, <code>novelty</code>, and <code>qd</code>
-(default). In QD mode:</p>
+(default, set via config's <code>selection_strategy</code>). In QD mode:</p>
 <ul>
-<li>A <strong>session archive</strong> holds up to <code>population_size = 50</code> members.</li>
+<li>A <strong>session archive</strong> holds up to <code>population_size = 20</code> members
+  (config field, ablation-tunable).</li>
 <li>Each member has <code>qd_score = (1−w)·quality_norm + w·novelty_norm</code>, with
   <code>w = novelty_weight = 0.25</code>. Quality and novelty are <strong>additive</strong> — never
   multiplied — so high quality cannot rescue a redundant profile and high
   novelty cannot drag a broken run above peers.</li>
-<li>Quality is sourced from <code>reward_uncapped</code> so the hard-fail cap doesn't
-  flatten rank ordering.</li>
-<li>Novelty is k-NN distance (<code>k = 15</code>) in <strong>failure-fingerprint</strong> space.
-  The descriptor is the centered per-source pass-rate vector produced by
-  <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py"><code>failure_fingerprint.py</code></a>
-  from the verifier's per-claim verdicts (see below).</li>
+<li>Quality is sourced from <code>reward</code> (the capped <code>overall_score</code>), so a run
+  that refuted a hard claim ranks at its capped score and cannot top the
+  archive on its other claims alone; ties at the cap are broken by the
+  novelty and length-penalty terms.</li>
+<li>Novelty is cosine-distance k-NN (<code>k = 15</code>) in <strong>genotype-embedding</strong>
+  space. The descriptor is the L2-normalised embedding of the workflow's
+  generated source code (its <em>genotype</em>), produced by
+  <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/genotype_embedding.py"><code>genotype_embedding.py</code></a>
+  through the <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py"><code>code_features.py</code></a>
+  shim (see below).</li>
 <li>Admission gate: candidate is admitted when it either improves over
-  baseline by <code>min_improvement_threshold</code> or clears
-  <code>qd_score &gt; admit_threshold</code>. When the archive reaches capacity, the
-  lowest-<code>qd_score</code> member is evicted.</li>
+  baseline by <code>min_improvement_threshold</code> (default <code>0.01</code>) or clears
+  <code>qd_score &gt; admit_threshold</code> (default <code>0.3</code>). When the archive reaches
+  capacity, the lowest-<code>qd_score</code> member is evicted.</li>
 <li>Parent draw applies an inverse-child-count penalty
   <code>÷ (1 + n_children_already)</code>, and parents are hard-capped at
-  <code>MAX_CHILDREN_PER_PARENT = 2</code> before that penalty kicks in, so the
+  <code>MAX_CHILDREN_PER_PARENT = 8</code> before that penalty kicks in, so the
   offspring stream stays spread across the archive.</li>
 </ul>
+<p>All of the above — <code>min_improvement_threshold</code>, <code>population_size</code>,
+<code>novelty_k_neighbours</code>, <code>novelty_weight</code>, <code>admit_threshold</code> — are <code>Config</code>
+fields (see <a href="../reference/configuration.html#qd-novelty-selection-variation">Configuration reference</a>),
+not hardcoded constants; touch them only for ablation studies.</p>
 <p>When the archive is empty (cold start), <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py"><code>WorkflowSelector</code></a>
-falls back to a <strong>similarity-filtered disk scan</strong> (<code>cosine ≥ 0.8</code> on MiniLM
-embeddings of <code>original_task</code>, <code>score ≥ 0.1</code>) — this lets useful workflows
-transfer across tasks.</p>
-<h3 id="behaviour-descriptor-failure-fingerprint">Behaviour descriptor: failure fingerprint<a class="headerlink" href="#behaviour-descriptor-failure-fingerprint" title="Permanent link">&para;</a></h3>
-<p>The novelty signal compares candidates in <strong>failure-fingerprint</strong> space.
-Per source A–F (literature, user goal, agent narration, math invariants,
-computational reproducibility, statistical fingerprint), the verifier
-records a pass rate. Sources with zero claims get the neutral value
-<code>0.5</code> and a presence-mask entry of <code>0</code>. The vector is then <strong>centered</strong>:
-the mean pass rate across present sources is subtracted from every entry.</p>
-<p>The centering is the <em>quality firewall</em>. Without it, an all-pass run sits
-at <code>[1,1,1,1,1,1]</code> and an all-fail run at <code>[0,0,0,0,0,0]</code> — Euclidean
-distance between them is large, and quality silently leaks into novelty.
-After centering, <strong>both</strong> runs collapse to the zero profile and novelty
-encodes only the <em>shape</em> of which sources fail relative to the others.
-Two workflows that fail in the same way are redundant regardless of how
-different their DAGs look; two that fail in different ways explore
-different basins and both deserve a seat in the archive.</p>
-<p>The fingerprint is computed at the end of <code>VerifierEvaluator.evaluate()</code>
-and persisted in <code>state_result.json</code> under
-<code>evaluation.verifier.failure_fingerprint.vector</code>. The full audit trail —
-which variable comes from where, the failure modes the descriptor must
-survive, and the centering invariant asserted by the tests — lives in
-<a href="../info-flow/failure_fingerprint.html"><code>docs/info-flow/failure_fingerprint.md</code></a>.</p>
-<p>When a run has no usable fingerprint (verifier short-circuit on a fully
-failed workflow), <code>SelectionPressure._extract_behaviour_descriptor</code>
-returns a neutral zero vector so distance lookups stay well-defined and
-the cold path doesn't artificially win or lose on novelty.</p>
-<p>The legacy structural descriptor (<code>[n_agents, n_edges, n_branches,
-prompt_chars]</code>) shipped by
-<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py"><code>code_features.py</code></a>
-is retained for ablations and offline analysis but is <strong>no longer used</strong>
-for QD novelty — empirical work showed it barely co-varies with outcomes.</p>
+falls back to a <strong>similarity-filtered disk scan</strong> (<code>cosine ≥
+parent_threshold_similarity</code> — default <code>0.8</code> — on MiniLM embeddings of
+<code>original_task</code>, <code>score ≥ parent_threshold_score</code> — default <code>0.01</code>) — this
+lets useful workflows transfer across tasks.</p>
+<h3 id="behaviour-descriptor-genotype-embedding">Behaviour descriptor: genotype embedding<a class="headerlink" href="#behaviour-descriptor-genotype-embedding" title="Permanent link">&para;</a></h3>
+<p>The novelty signal compares candidates in <strong>genotype-embedding</strong> space.
+Each workflow's generated source code (its <em>genotype</em>) is embedded into a
+dense vector and L2-normalised; novelty is the mean <strong>cosine distance</strong>
+(<code>1 − cosine_similarity</code>, range <code>[0, 2]</code>) from a candidate to its
+comparison set. Two workflows whose code is semantically similar collapse
+to nearly the same point and are treated as redundant; two that explored
+different approaches land far apart, and both earn a seat in the archive.
+This reads "how different is the generated approach" directly, rather
+than inferring it from a proxy.</p>
+<p>The embedding backend is pluggable
+(<a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/genotype_embedding.py"><code>genotype_embedding.py</code></a>):</p>
+<ul>
+<li><strong>Default — local <code>all-MiniLM-L6-v2</code></strong> (sentence-transformers): no
+  network at runtime, deterministic, free. Embeddings are cached per
+  process by the SHA-1 of the source, so the QD inner loop stays cheap
+  even when archive refresh walks dozens of members.</li>
+<li><strong>Optional — OpenAI <code>text-embedding-3-small</code></strong>, used only when both
+  <code>MIMOSA_GENOTYPE_EMBEDDING_BACKEND=openai</code> and <code>OPENAI_API_KEY</code> are
+  set; it falls back to MiniLM if the client can't be constructed.</li>
+</ul>
+<p>The descriptor dimension is whatever the backend emits (384 for MiniLM),
+not a fixed width — drain the archive if you switch backends mid-run.</p>
+<p>When a genotype is degenerate — missing, empty, or the backend errors —
+the embedder returns <code>None</code> and
+<code>SelectionPressure._extract_behaviour_descriptor</code> treats the missing
+signal as <strong>neutral</strong> (no novelty) rather than max-novel, so broken
+offspring are never rewarded merely for being "different".</p>
+<blockquote>
+<p><strong>The failure fingerprint is no longer the novelty signal.</strong> Earlier
+versions derived QD novelty from a <em>failure fingerprint</em> — a 6-D
+centered vector of per-source verifier pass rates — and, before that,
+from a structural descriptor <code>[n_agents, n_edges, n_branches,
+prompt_chars]</code>. Both have been retired as the behaviour descriptor. The
+failure fingerprint is <strong>still computed and persisted</strong> by the verifier
+under <code>state_result.json</code> → <code>evaluation.verifier.failure_fingerprint</code>,
+but only as a diagnostic — selection no longer reads it. The structural
+descriptor is gone entirely; <code>code_features.py</code> is now the
+genotype-embedding shim.</p>
+</blockquote>
 <h2 id="variation-evidence-driven-mutation-scope-rechenberg-15-rule">Variation: evidence-driven mutation scope (Rechenberg &#8533; rule)<a class="headerlink" href="#variation-evidence-driven-mutation-scope-rechenberg-15-rule" title="Permanent link">&para;</a></h2>
 <p><a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py"><code>VariationEngine</code></a>
 assembles mutation and crossover prompts. There is no fixed phase
@@ -2407,14 +2462,63 @@ chosen by <code>effective</code>:</p>
 <p>The bands are advisory text steered to the LLM, not hard gates: the
 LLM can still pick any topology. The hard control is the agent-count
 budget passed in the same prompt block.</p>
+<h3 id="mutation-directive-offloading-reasoning-from-the-orchestrator">Mutation directive: offloading reasoning from the orchestrator<a class="headerlink" href="#mutation-directive-offloading-reasoning-from-the-orchestrator" title="Permanent link">&para;</a></h3>
+<p>The orchestrator LLM has one job: write the next workflow's Python
+code. Earlier revisions dumped the raw diagnosis, the per-agent
+answers, <em>and</em> the boldness/scope band into the orchestrator prompt and
+asked it to figure out the right intervention while also coding it.
+That mixed two very different kinds of reasoning into one call —
+diagnosis ("what went wrong, and what kind of change does that imply?")
+and synthesis ("emit valid LangGraph + agent code") — and the
+orchestrator routinely either over-edited (rewriting unrelated agents
+because it re-litigated the diagnosis) or under-edited (touching only
+phrasing while the diagnosis pointed at a missing agent).</p>
+<p><code>VariationEngine.llm_think_mutation_directive()</code> splits these two
+reasoning steps. Before the orchestrator is invoked, a dedicated LLM
+call reads:</p>
+<ul>
+<li>the parent's per-agent answers (<code>&lt;agents_answers&gt;</code>),</li>
+<li>the rubric-blind textual gradient from the verifier
+  (<code>&lt;diagnosis&gt;</code> — trusted as ground truth),</li>
+<li>the boldness/scope block produced by <code>_get_prompt_step_size</code>
+  (<code>&lt;boldness&gt;</code> — caps how big a change is allowed),</li>
+<li>and the goal,</li>
+</ul>
+<p>and emits a <strong>≤ 3-sentence directive</strong> that names exactly one issue,
+the kind of mutation it implies (prompt tweak, persona change, agent
+add/remove, topology change), and the rationale. The system prompt is
+explicit about trust ranks — the verifier diagnosis is trusted; agent
+self-reports may mislead — and about action limits — add or remove at
+most one agent per step, do not exceed the boldness band, and prefer
+small incremental changes unless the diagnosis says the approach is
+fundamentally flawed.</p>
+<p>The orchestrator then receives only the parent code and that single
+directive, wrapped in <code>&lt;directive&gt;...&lt;/directive&gt;</code> with hard
+instructions:</p>
+<ul>
+<li><strong>follow the directive exactly</strong> as the only change-guideline,</li>
+<li><strong>do not add or remove more than 1 agent at a time</strong> and never beyond
+  the budget,</li>
+<li><strong>do not change topology</strong> unless the directive says so,</li>
+<li><strong>do not edit prompt instructions outside the directive's scope</strong>,</li>
+<li><strong>keep ≥ 90 % of the previous workflow code and prompts unchanged</strong>.</li>
+</ul>
+<p>The pre-digested directive is grounded — every claim it makes is
+sourced from the boldness signals and the verifier diagnosis, never
+from the orchestrator's own re-reading of the rubric — and precise —
+the orchestrator is no longer asked to weigh evidence, only to
+implement one named change. This consistently reduces drift between
+generations and prevents the boldness budget from leaking into
+unintended structural rewrites.</p>
 <h2 id="crossover">Crossover<a class="headerlink" href="#crossover" title="Permanent link">&para;</a></h2>
-<p>With probability <code>crossover_rate</code> per generation (default <code>0.1</code>, and only
-once at least <code>initial_population = 2</code> runs have happened), two parents
-are combined instead of one being mutated. The crossover prompt is
-<strong>best-parent-first</strong>: the strongest parent's code structure leads,
-weaker parents contribute specific improvements rather than competing
-for the skeleton, and the offspring is hard-capped at the highest
-parent agent count to prevent runaway complexity.</p>
+<p>With probability <code>crossover_rate</code> per generation (default <code>0.4</code>, and only
+once at least <code>initial_population</code> — default <code>2</code> — runs have happened),
+<code>n_parents</code> (default <code>2</code>) parents are combined instead of one being
+mutated. The crossover prompt is <strong>best-parent-first</strong>: the strongest
+parent's code structure leads, weaker parents contribute specific
+improvements rather than competing for the skeleton, and the offspring
+is hard-capped at the highest parent agent count to prevent runaway
+complexity.</p>
 <h2 id="lineage-reproducibility">Lineage &amp; reproducibility<a class="headerlink" href="#lineage-reproducibility" title="Permanent link">&para;</a></h2>
 <p>After each generation, <a href="https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/lineage.py"><code>lineage.py</code></a>
 writes a sidecar record <code>sources/workflows/&lt;uuid&gt;/lineage_&lt;uuid&gt;.json</code>
@@ -2422,14 +2526,31 @@ with the parents and the operator used (<code>seed | mutation | crossover</code>
 Combined with <code>evolution_prompt_&lt;uuid&gt;.md</code> (the exact LLM prompt used),
 runs are fully reproducible — same prompt, same code path, same seed
 yields the same code.</p>
-<h2 id="visualisations">Visualisations<a class="headerlink" href="#visualisations" title="Permanent link">&para;</a></h2>
-<p>When the loop finishes, Mimosa emits two artifacts in
-<code>sources/workflows/&lt;uuid&gt;/</code>:</p>
-<ul>
-<li><code>reward_progress.png</code> — reward over iterations.</li>
-<li><code>evolution_tree.png</code> — rendered lineage tree.</li>
-</ul>
-<p><img alt="Reward progress example" src="../images/evolve_example.png" width="80%" /></p>
+<h2 id="watching-evolution-happen">Watching evolution happen<a class="headerlink" href="#watching-evolution-happen" title="Permanent link">&para;</a></h2>
+<p>The Rechenberg schedule, the directive-LLM, the QD archive, the
+crossover roll — none of it is visible inside a single generation.
+The shape of the search only emerges when you step back across a
+whole run, and that's what the lineage tree in
+<code>sources/workflows/&lt;best_uuid&gt;/evolution_tree.png</code> is for: it lays
+every workflow the engine produced on the same canvas, with the
+operator that linked each pair drawn explicitly. It's the most
+direct way to confirm that the mechanics on this page are doing
+something on your task.</p>
+<p><img alt="Evolution tree example" src="../images/evolution_tree.png" width="60%" /></p>
+<p>Generation depth runs down the y-axis, each node is a workflow
+coloured by its <code>overall_score</code> (red → green), solid edges are
+mutation parents and dashed edges are crossover parents. Failed runs
+stay in the picture as labelled red nodes off the main trunk so you
+can see <em>where</em> a branch died, not just that it did. Read top-down
+to follow the ratchet — a 0.48 seed branching into 0.64 and 0.62
+children, those crossing over into the 0.67/0.69 generation, then a
+0.73 mutation finally bridging into a 0.74 leaf — and watch for the
+dashed edges that span the tree horizontally: those are the
+recombinations that pulled in a structural idea the local mutation
+chain wouldn't have reached on its own. Long mutation runs at the
+same colour are the plateau signal feeding back into the boldness
+schedule; the colour jump that follows them is what an unstuck
+EXPLORATION-band mutation actually looks like.</p>
 <h2 id="run-metrics-artifacts">Run metrics artifacts<a class="headerlink" href="#run-metrics-artifacts" title="Permanent link">&para;</a></h2>
 <p>Each iteration also writes structured metrics for post-hoc analysis:</p>
 <ul>
@@ -2440,7 +2561,7 @@ yields the same code.</p>
   <code>novelty_score</code>, the <code>selection_log</code>, and the
   <code>variation_state</code> (<code>iters_since_improvement</code>, <code>plateau</code>,
   <code>success_rate</code>, <code>effective_boldness</code>, <code>parent_score</code>,
-  <code>respeciation_gate_open</code>, <code>agent_budget</code>) that produced
+  <code>respeciation_gate_open</code>, , <code>agent_budget</code>) that produced
   this offspring.</li>
 <li><code>sources/workflows/qd_archive.jsonl</code> — append-only, one line per
   <code>validate_survivor</code> call. Records the candidate's descriptor,
@@ -2591,7 +2712,7 @@ but never aborts a run.</p>
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

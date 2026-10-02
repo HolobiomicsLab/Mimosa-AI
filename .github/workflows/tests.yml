@@ -1,0 +1,36 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, mimosa_v2]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    name: pytest (Python 3.11, ubuntu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.11"
+          enable-cache: true
+
+      - name: Install project and test dependencies
+        run: uv sync --group dev
+
+      - name: Run the suite
+        # Tests listed in .github/known-failing-tests.txt already fail on the
+        # base branch for reasons unrelated to any pull request. They are
+        # deselected so that a regression elsewhere stays visible. Delete a
+        # line as soon as its test passes again.
+        run: |
+          DESELECT=$(grep -v '^#' .github/known-failing-tests.txt | grep -v '^[[:space:]]*$' | sed 's/^/--deselect /' | tr '\n' ' ')
+          echo "Deselected: ${DESELECT:-none}"
+          uv run pytest tests/ -q $DESELECT

@@ -193,7 +193,7 @@ class LLMProvider:
         self.agent_name = agent_name
         self.memory_path = memory_path
         self.use_flat_cache = use_flat_cache
-        self.max_retries = 3
+        self.max_retries = 100
         self.logger = logging.getLogger(__name__)
 
     def _supports_reasoning_tokens(self) -> bool:
@@ -215,6 +215,40 @@ class LLMProvider:
             contains ``"claude"``, False otherwise.
         """
         return self.config.provider == "anthropic" or "claude" in self.config.model.lower()
+
+    def _supports_prompt_caching(self) -> bool:
+        """True for providers that honour Anthropic-style ``cache_control`` hints.
+
+        Anthropic direct caches the marked prefix; OpenRouter forwards the
+        hint to upstreams that support it and silently ignores it elsewhere.
+        OpenAI caches long prompts automatically and needs no flag.
+        """
+        return self.config.provider in ("anthropic", "openrouter")
+
+    def _apply_cache_control(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Return a copy of ``messages`` with an ephemeral breakpoint on the system block.
+
+        Leaves the input list untouched so persistence and the exact-match
+        disk cache keep their plain-string shape. Only the system message is
+        marked — one of Anthropic's four allowed breakpoints.
+        """
+        if not self.sys_msg or not self._supports_prompt_caching():
+            return messages
+
+        out: list[dict[str, Any]] = []
+        for msg in messages:
+            if msg.get("role") == "system" and isinstance(msg.get("content"), str):
+                out.append({
+                    "role": "system",
+                    "content": [{
+                        "type": "text",
+                        "text": msg["content"],
+                        "cache_control": {"type": "ephemeral"},
+                    }],
+                })
+            else:
+                out.append(msg)
+        return out
 
     def save_call(self, call: dict[str, Any]) -> None:
         """Save the API call details to a JSON file.
@@ -320,6 +354,19 @@ class LLMProvider:
         """True when the API rejected ``temperature``, read from ``error.param``."""
         return getattr(error, "param", None) == "temperature"
 
+    @staticmethod
+    def _is_quantization_routing_error(error: Exception) -> bool:
+        """True when OpenRouter found no live endpoint for the requested quantizations.
+
+        OpenRouter answers 404 ("No endpoints found for the request with
+        quantization: ...") when the ``quantizations`` routing filter excludes
+        every provider currently serving the model — e.g. stale precheck data
+        or an endpoint that was requantized. Dropping the filter lets
+        OpenRouter route to any available endpoint.
+        """
+        error_str = str(error).lower()
+        return "no endpoints found" in error_str and "quantization" in error_str
+
     def _is_retryable_error(self, error: Exception) -> bool:
         """Check if an error is retryable (temporary/transient).
 
@@ -410,12 +457,15 @@ class LLMProvider:
             try:
                 completion_params = {
                     "model": f"{self.config.provider}/{self.config.model}",
-                    "messages": message,
-                    "temperature": effective_temperature,
+                    "messages": self._apply_cache_control(message),
                     "timeout": timeout,
                     "max_tokens": self.config.max_tokens,
                     "drop_params": True,
                 }
+                # Anthropic models reject (Opus 4.x) or ignore an explicit
+                # temperature; omit it for all of them rather than version-gate.
+                if not self._is_claude_model():
+                    completion_params["temperature"] = effective_temperature
                 completion_params["api_key"] = self.config.key
                 # Add reasoning effort if supported (not for Claude models)
                 if self._supports_reasoning_tokens() and not self._is_claude_model():
@@ -445,7 +495,11 @@ class LLMProvider:
                 break
 
             except TimeoutError as e:
-                # Timeout is retryable
+                # Timeout is retryable, up to the max_retries ceiling.
+                if attempt >= self.max_retries:
+                    raise RuntimeError(
+                        f"❌ LLM API error: timed out after {self.max_retries} retries"
+                    ) from e
                 wait_time = self._calculate_backoff_wait(attempt, max_wait)
                 self.logger.warning(
                     f"⌛ Timeout on attempt {attempt + 1}. Retrying in {wait_time:.1f}s..."
@@ -460,6 +514,19 @@ class LLMProvider:
                         f"falling back to 1.0 and retrying."
                     )
                     effective_temperature = 1.0
+                    continue
+
+                # OpenRouter 404: the `quantizations` routing filter excluded
+                # every live endpoint for this model. Drop the filter once and
+                # retry — subsequent calls on this provider skip it from the
+                # start (config is mutated), avoiding one doomed request per call.
+                if self._is_quantization_routing_error(e) and self.config.openrouter_quantizations:
+                    self.logger.warning(
+                        f"⚠️  OpenRouter found no endpoint matching "
+                        f"quantizations={self.config.openrouter_quantizations}; "
+                        f"dropping the quantization filter and retrying."
+                    )
+                    self.config.openrouter_quantizations = None
                     continue
 
                 # Check if this is a retryable error
@@ -483,7 +550,13 @@ class LLMProvider:
                             )
                         attempt += 1
                     else:
-                        # Regular retry with backoff for other retryable errors
+                        # Regular retry with backoff for other retryable errors,
+                        # bounded by the max_retries ceiling so a persistently
+                        # failing provider cannot loop forever.
+                        if attempt >= self.max_retries:
+                            raise RuntimeError(
+                                f"❌ LLM API error after {self.max_retries} retries: {str(e)}"
+                            ) from e
                         wait_time = self._calculate_backoff_wait(attempt, max_wait)
                         self.logger.warning(
                             f"⚠️  Retryable error on attempt {attempt + 1}: {str(e)[:512]}. "
@@ -496,6 +569,12 @@ class LLMProvider:
                     raise RuntimeError(f"❌ LLM API error: {str(e)}") from e
 
         res = response.choices[0].message.content
+        if res is None:
+            self.logger.warning(
+                "LLM returned null content (finish_reason=%s); returning empty string.",
+                getattr(response.choices[0], "finish_reason", None),
+            )
+            res = "<LLM response error>"
 
         # Log token usage for debugging
         usage = getattr(response, 'usage', None)
@@ -503,9 +582,21 @@ class LLMProvider:
             prompt_tokens = getattr(usage, 'prompt_tokens', 0) or 0
             completion_tokens = getattr(usage, 'completion_tokens', 0) or 0
             total_tokens = getattr(usage, 'total_tokens', 0) or 0
+            # Anthropic surfaces cache hits as cache_{read,creation}_input_tokens via
+            # litellm; OpenAI's automatic cache appears under prompt_tokens_details.
+            cache_read = getattr(usage, 'cache_read_input_tokens', 0) or 0
+            cache_creation = getattr(usage, 'cache_creation_input_tokens', 0) or 0
+            if not cache_read:
+                details = getattr(usage, 'prompt_tokens_details', None)
+                if details is not None:
+                    cache_read = getattr(details, 'cached_tokens', 0) or 0
+            cache_suffix = (
+                f", Cache read: {cache_read}, Cache creation: {cache_creation}"
+                if (cache_read or cache_creation) else ""
+            )
             self.logger.info(
                 f"📊 Token usage - Prompt: {prompt_tokens}, Completion: {completion_tokens}, "
-                f"Total: {total_tokens} (max_tokens: {self.config.max_tokens})"
+                f"Total: {total_tokens}{cache_suffix} (max_tokens: {self.config.max_tokens})"
             )
 
         # Check for truncation due to max_tokens limit

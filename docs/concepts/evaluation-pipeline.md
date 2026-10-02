@@ -20,11 +20,11 @@ fingerprint). The single signal that flows back to the mutator is a short
 **prompt gradient** that summarizes failure modes without leaking the
 verified claims themselves.
 
-The same per-claim verdicts are projected into a 6-dim **failure
-fingerprint** that the [evolution engine](evolution-engine.md#behaviour-descriptor-failure-fingerprint)
-uses as the behaviour descriptor for QD novelty. The descriptor is
-centered so overall quality cannot leak into novelty — see the firewall
-section below.
+The same per-claim verdicts are also projected into a 6-dim **failure
+fingerprint** — a centered vector of per-source pass rates that records
+*how* a run failed. It is persisted as a diagnostic but is **not** the QD
+behaviour descriptor: novelty is measured in genotype-embedding space
+(see [Selection](evolution-engine.md#behaviour-descriptor-genotype-embedding)).
 
 ![Evaluation pipeline](../images/evaluation_pipeline.png){ width="100%" }
 
@@ -121,44 +121,46 @@ overall_score = min(pre_cap, hard_fail_cap) if any_hard_claim_refuted else pre_c
 - Per-claim weights come from the rater-assigned importance (1–10), so an
   importance-10 deliverable claim moves the score ~5× more than a
   low-importance hygiene claim.
-- `hard_fail_cap = _HARD_FAIL_CAP = 0.99` — currently set permissively
-  to keep the evolutionary signal smooth; a refuted hard claim still
+- `hard_fail_cap = _HARD_FAIL_CAP = 0.7`; a refuted hard claim still
   flags `hard_fail_capped = True`.
-- The engine separately keeps `overall_score_uncapped` (pre-cap) so QD
-  rank ordering doesn't flatten under hard fails.
+- The engine still records `overall_score_uncapped` (pre-cap) for
+  analysis, but QD ranks on the capped `overall_score` — a run that
+  refuted a hard claim cannot top the archive on its other claims alone.
 
-## Failure fingerprint (QD behaviour descriptor)
+## Failure fingerprint (diagnostic)
 
-The verifier doesn't just emit a score — the same per-claim verdicts feed
-the QD novelty signal as a **failure fingerprint**: a centered vector
-of per-source pass rates that tells the archive *how* a candidate fails,
-not *whether* it failed.
+The verifier also projects the same per-claim verdicts into a **failure
+fingerprint**: a centered vector of per-source pass rates that records
+*how* a candidate fails, not *whether* it failed.
 
 ```python
 # Per source A..F (six entries, always — absent sources get a neutral value).
 pass_rate[s] = passes[s] / total[s]              if total[s] > 0  else 0.5
 presence[s]  = 1.0                                if total[s] > 0  else 0.0
-# Center so the descriptor encodes profile shape, not quality level.
+# Center so the vector encodes profile shape, not quality level.
 mean_present = mean(pass_rate[s] for s where presence[s] == 1)
 vector[s]    = pass_rate[s] - mean_present       if presence[s] == 1
              = 0                                  otherwise
 ```
 
-**The quality firewall.** An all-pass run and an all-fail run both yield
-the zero profile. This is intended and asserted in the tests
-(`test_all_pass_yields_zero_profile`,
-`test_all_fail_yields_zero_profile`). The QD score combines quality and
-novelty *additively* — `(1 − w)·quality_norm + w·novelty_norm` — so
-quality already drives `quality_norm`. If quality also leaked into
-novelty, QD would collapse back into greedy search. The centering step
-is what keeps these two terms separable.
+Centering means an all-pass run and an all-fail run both collapse to the
+zero profile (asserted by `test_all_pass_yields_zero_profile` and
+`test_all_fail_yields_zero_profile`), so the vector captures the *shape*
+of which sources fail rather than the overall quality level.
 
-The fingerprint is persisted under
-`state_result.json` → `evaluation.verifier.failure_fingerprint.vector`
-and consumed by
-[`SelectionPressure._extract_behaviour_descriptor`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py).
-Full info-flow audit:
-[`docs/info-flow/failure_fingerprint.md`](../info-flow/failure_fingerprint.md).
+The fingerprint is computed by
+[`compute_failure_fingerprint`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py)
+at the end of `VerifierEvaluator.evaluate()` and persisted under
+`state_result.json` → `evaluation.verifier.failure_fingerprint`.
+
+> **Diagnostic only — not the novelty descriptor.** The QD behaviour
+> descriptor is the **genotype embedding** of the workflow's source code,
+> and novelty is cosine distance in that space (see
+> [Selection](evolution-engine.md#behaviour-descriptor-genotype-embedding)).
+> `SelectionPressure` no longer reads the failure fingerprint; it remains
+> persisted so failure profiles can be inspected offline.
+Full info-flow audit of the QD behaviour descriptor:
+[`docs/info-flow/genotype_embedding.md`](../info-flow/genotype_embedding.md).
 
 ## Prompt gradient
 
@@ -193,7 +195,7 @@ verifier pipeline itself:
 | ------- | ---------- |
 | The judge LLM repeats the agent's claims verbatim. | Per-claim deterministic Python recomputation, with anti-tautology tripwires. |
 | The mutator over-fits to a numeric rubric. | Only the prompt gradient is returned — and it does not name the verified claims. |
-| The hard-fail cap collapses ranking among failed runs. | `overall_score_uncapped` keeps QD ordering meaningful. |
+| The hard-fail cap collapses ranking among failed runs. | Deliberate: QD ranks on the capped `overall_score`, with ties at the cap broken by novelty; `overall_score_uncapped` is still logged for analysis. |
 | One vantage point misses the failure. | Six independent sources, claims merged. |
 | Cosmetic hygiene gets gamed as "quality". | Source E only verifies non-negotiable CS practice; docs/tests/style are forbidden. |
 | Artifact existence checks reward "moved files around". | `_CLAIM_RULES_BLOCK` forbids bare-existence as `hard`; max 2 soft artifact claims. |

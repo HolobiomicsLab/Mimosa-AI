@@ -147,7 +147,14 @@ class _VerifierWorkspaceMixin:
         return printable / len(sample)
 
     def _preview_file(self, rel_path: str) -> str:
-        """Cached LLM-friendly preview: text head+tail, binary magic bytes, fenced.
+        """LLM-friendly preview: text head+tail, binary magic bytes, fenced.
+
+        Reads from disk on every call — deliberately NOT cached. A previous
+        path-keyed cache (``_preview_cache``) was never invalidated across
+        ``evaluate(uuid)`` calls on the reused evaluator instance, so the first
+        workflow's files (e.g. its ``report.txt``) leaked into every later
+        workflow's verifier generation, producing verifiers matched to the
+        wrong workspace. Previews must always reflect the current workspace.
 
         Args:
             rel_path: Workspace-relative path to the file to preview.
@@ -155,34 +162,23 @@ class _VerifierWorkspaceMixin:
         Returns:
             Fenced preview string suitable for inclusion in a judge prompt.
         """
-        if rel_path in self._preview_cache:
-            return self._preview_cache[rel_path]
-
         # Reject anything escaping the workspace.
         ws = self.workspace_dir.resolve()
         candidate = (self.workspace_dir / rel_path).resolve()
         try:
             candidate.relative_to(ws)
         except ValueError:
-            rendered = f"=== {rel_path} ===\n(refusing to preview file outside workspace)\n"
-            self._preview_cache[rel_path] = rendered
-            return rendered
+            return f"=== {rel_path} ===\n(refusing to preview file outside workspace)\n"
 
         if not candidate.exists():
-            rendered = f"=== {rel_path} ===\n(file not found in workspace)\n"
-            self._preview_cache[rel_path] = rendered
-            return rendered
+            return f"=== {rel_path} ===\n(file not found in workspace)\n"
         if candidate.is_dir():
-            rendered = f"=== {rel_path} ===\n(path is a directory, not a file)\n"
-            self._preview_cache[rel_path] = rendered
-            return rendered
+            return f"=== {rel_path} ===\n(path is a directory, not a file)\n"
 
         try:
             size = candidate.stat().st_size
         except OSError as e:
-            rendered = f"=== {rel_path} ===\n(stat failed: {e})\n"
-            self._preview_cache[rel_path] = rendered
-            return rendered
+            return f"=== {rel_path} ===\n(stat failed: {e})\n"
 
         head_budget = max(self.preview_head_bytes, _BINARY_SNIFF_BYTES)
         try:
@@ -194,17 +190,13 @@ class _VerifierWorkspaceMixin:
                 else:
                     tail_bytes = b""
         except OSError as e:
-            rendered = f"=== {rel_path} ===\n(read failed: {e})\n"
-            self._preview_cache[rel_path] = rendered
-            return rendered
+            return f"=== {rel_path} ===\n(read failed: {e})\n"
 
         try:
             head_text = head_bytes[: self.preview_head_bytes].decode("utf-8", errors="replace")
             tail_text = tail_bytes.decode("utf-8", errors="replace") if tail_bytes else ""
         except Exception as e:
-            rendered = f"=== {rel_path} ===\n(decode failed: {e})\n"
-            self._preview_cache[rel_path] = rendered
-            return rendered
+            return f"=== {rel_path} ===\n(decode failed: {e})\n"
 
         if tail_text:
             elided = size - self.preview_head_bytes - self.preview_tail_bytes
@@ -216,9 +208,7 @@ class _VerifierWorkspaceMixin:
         else:
             body = head_text
 
-        rendered = f"=== {rel_path} ({size} bytes, text) ===\n{body}\n"
-        self._preview_cache[rel_path] = rendered
-        return rendered
+        return f"=== {rel_path} ({size} bytes, text) ===\n{body}\n"
 
     def _render_relevant_previews(self, rel_paths: list[str]) -> str:
         """Concatenate file previews under ``preview_per_claim_cap``.

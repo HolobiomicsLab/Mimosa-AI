@@ -1,29 +1,46 @@
 import json
-import time
 import os
 import re
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any
-from .evolution_engine import EvolutionEngine
-from .llm_provider import LLMProvider, LLMConfig, extract_model_pattern
-from .schema import Task, Plan, PlanStep, TaskStatus, IndividualRun
-from .workflow_selection import WorkflowSelector
-from sources.utils.notify import PushNotifier
-from sources.utils.planner_visualization import PlannerVisualizer
-from sources.utils.list_files import list_files
-from sources.extensibility.text_to_speech import create_tts_service
-from sources.cli.pretty_print import (
-    print_ok, print_warn, print_err, print_info,
-    print_phase, print_section, print_summary,
-    CYAN, BOLD, DIM, RESET,
-)
 
+from sources.cli.pretty_print import (
+    BOLD,
+    CYAN,
+    DIM,
+    RESET,
+    print_err,
+    print_info,
+    print_ok,
+    print_phase,
+    print_section,
+    print_summary,
+    print_warn,
+)
+from sources.extensibility.text_to_speech import create_tts_service
+from sources.utils.list_files import list_files
+from sources.utils.notify import PushNotifier
 from sources.utils.perspicacite_client import (
-    format_scientific_context,
     query_perspicacite,
 )
+from sources.utils.planner_visualization import PlannerVisualizer
+
+from .evolution_engine import EvolutionEngine
+from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
+from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
+from .workflow_selection import WorkflowSelector
+
+
+class UserInterventionRequired(Exception):
+    """A decision needs a human, and no human is reachable.
+
+    Raised instead of blocking on ``input()`` when stdin is not a TTY, so an
+    unattended run fails with the question it could not ask rather than with
+    ``EOF when reading a line``.
+    """
 
 
 class PlanValidationError(Exception):
@@ -117,7 +134,7 @@ CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain convention
         try:
             response = query_perspicacite(prompt) or "No relevant scientific context."
             return response
-        except Exception as e:
+        except Exception:
             return "Query failed. Unable to help with scientific litterature"
 
     def make_scientific_grounded_prompt(self, goal: str) -> str:
@@ -129,7 +146,7 @@ CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain convention
             str: Enhanced prompt with scientific context
         """
         print_phase(
-            f"🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
+            "🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
         )
         scientific_context = self.perspicacite_grounding(goal)
         print(f"🔍 Scientific knowledge retrieved:\n{scientific_context[:2048]}...\n---")
@@ -162,13 +179,16 @@ Important: Every task description should be very detailled and specific with the
 
         last_error = None
 
-        prompt = self.make_scientific_grounded_prompt(goal_prompt)
+        base_prompt = self.make_scientific_grounded_prompt(goal_prompt)
+        prompt = base_prompt
         for attempt in range(1, max_retries + 1):
             try:
                 print_info(f"Plan generation attempt {attempt}/{max_retries}")
 
-                memory_path = getattr(self.config, 'memory_path', 'sources/memory')
-                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=True)
+                memory_path = self.config.memory_dir
+                # Retries bypass the flat cache: with an unchanged prompt a
+                # cached unparseable response would be replayed verbatim.
+                raw_plan = LLMProvider("plan_creator", memory_path=memory_path, system_msg=system_prompt, config=self.config_llm, use_flat_cache=True)(prompt, use_cache=(attempt == 1))
 
                 if not raw_plan or not isinstance(raw_plan, str):
                     raise ValueError("LLM returned empty or invalid response")
@@ -197,8 +217,9 @@ Important: Every task description should be very detailled and specific with the
                     print_info(f"Waiting {wait_time}s before retry…")
                     time.sleep(wait_time)
 
-                    if attempt > 1:
-                        goal_prompt = self._enhance_prompt_with_error(goal_prompt, error_msg)
+                    # Feed the error back into the retry prompt so the LLM can
+                    # correct its output format on the next attempt.
+                    prompt = self._enhance_prompt_with_error(base_prompt, error_msg)
                 else:
                     print_err(f"All {max_retries} attempts failed")
 
@@ -276,35 +297,58 @@ Important: Every task description should be very detailled and specific with the
 
     @staticmethod
     def _extract_json_from_code_block(text: str) -> dict[str, Any] | None:
-        """Extract JSON from markdown code blocks (```json ... ```).
+        """Extract a JSON object from an LLM response.
+
+        Tries, in order: each fenced code block (```` ```json ```` or plain
+        ```` ``` ````), the whole response when it starts with ``{``/``[``,
+        and decoding from each ``{`` (to tolerate surrounding prose and
+        earlier broken blocks). The first candidate that parses as a JSON
+        object is returned.
 
         Args:
-            text: Raw text potentially containing a fenced JSON code block.
+            text: Raw LLM response potentially containing a JSON plan.
 
         Returns:
-            The decoded JSON object, or ``None`` when no JSON code block is
-            found.
+            The decoded JSON object, or ``None`` when the text contains no
+            JSON-looking candidate at all.
 
         Raises:
-            json.JSONDecodeError: If the extracted block is not valid JSON.
+            json.JSONDecodeError: If JSON-looking candidates were found but
+                none of them parse (the last decode error is re-raised so
+                callers can detect e.g. truncation).
         """
-        code_blocks = []
-        in_code_block = False
+        candidates = []
+        for match in re.finditer(r"```[ \t]*(?:json)?[ \t]*\r?\n(.*?)```", text, re.DOTALL | re.IGNORECASE):
+            block = match.group(1).strip()
+            if block:
+                candidates.append(block)
 
-        for line in text.splitlines():
-            line_stripped = line.strip()
-            if line_stripped.startswith("```json") or line_stripped.startswith("```JSON"):
-                in_code_block = True
-                continue
-            if line_stripped.startswith("```") and in_code_block:
-                in_code_block = False
-                continue
-            if in_code_block:
-                code_blocks.append(line)
+        stripped = text.strip()
+        if stripped.startswith(("{", "[")):
+            candidates.append(stripped)
 
-        if code_blocks:
-            json_str = "\n".join(code_blocks)
-            return json.loads(json_str)
+        last_decode_error = None
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError as e:
+                last_decode_error = e
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+
+        decoder = json.JSONDecoder()
+        for match in re.finditer(r"\{", text):
+            try:
+                parsed, _ = decoder.raw_decode(text, match.start())
+            except json.JSONDecodeError as e:
+                last_decode_error = e
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+
+        if last_decode_error is not None:
+            raise last_decode_error
         return None
 
     @staticmethod
@@ -422,7 +466,17 @@ Original request:
             tuple[bool, str]: (is_approved, feedback)
                 - is_approved: True if human pressed Enter (approve), False otherwise.
                 - feedback: User's correction/feedback if plan not approved.
+
+        Raises:
+            UserInterventionRequired: If stdin is not a TTY, so the prompt
+                could not be answered.
         """
+        if not sys.stdin.isatty():
+            raise UserInterventionRequired(
+                "Plan approval was requested but stdin is not a TTY, so nobody "
+                "can answer the prompt. Run interactively or unset "
+                "planner_human_approve."
+            )
         print_section("👤 HUMAN VALIDATION REQUIRED")
         print(f"  {DIM}Please review the plan above.{RESET}")
         print(f"  {DIM}Press [ENTER] to approve  ·  Type feedback and [ENTER] to regenerate{RESET}\n")
@@ -656,6 +710,14 @@ Original request:
             dep_task = next((task for task in self.task_history if task.name == dep_name), None)
             if dep_task is None or dep_task.status != TaskStatus.COMPLETED:
                 missing_deps.append(dep_name)
+                continue
+            expected_outputs = getattr(dep_task, "expected_outputs", None)
+            if expected_outputs:
+                outputs_ok, missing_outputs = self._verify_expected_outputs(dep_task)
+                if not outputs_ok:
+                    missing_deps.append(
+                        f"{dep_name}[missing_outputs:{','.join(missing_outputs)}]"
+                    )
         return len(missing_deps) == 0, missing_deps
 
     def request_user_exit(self, msg: str) -> None:
@@ -891,7 +953,8 @@ Original request:
         self,
         goal: str,
         judge: bool = True,
-        max_task_retry: int = 5
+        max_task_retry: int = 5,
+        human_approve: bool = False,
     ) -> list[Task]:
         """
         Start the planner with a given goal with comprehensive error handling.
@@ -899,20 +962,35 @@ Original request:
             goal: The goal description for the planner
             judge: Whether to use a judge for evaluation
             max_task_retry: Maximum number of retries for each task
+            human_approve: When True, show the plan and wait for the operator
+                to approve it (Enter) or send it back with feedback before
+                any step runs. Interactive runs only.
         Returns:
             List[Task]: List of executed tasks
         Raises:
             ValueError: If goal is invalid or planning fails
+            UserInterventionRequired: If approval was requested but stdin is
+                not a TTY
         """
         if not goal or not isinstance(goal, str):
             raise ValueError("❌ Planner: Goal must be a non-empty string")
+
+        if human_approve and not sys.stdin.isatty():
+            # Refuse before the planning LLM call: otherwise the plan is
+            # generated, printed into a log, and the run dies on input().
+            raise UserInterventionRequired(
+                "planner_human_approve is set but stdin is not a TTY, so the "
+                "plan could not be approved. Run interactively or unset it."
+            )
 
         goal = "\nAvailable files:\n" + list_files(self.config.workspace_dir) + "\n" + goal
         print_info(f"Starting planner with goal: {goal[:80]}…")
 
         try:
             # Generate plan with human validation loop
-            self.current_plan = self._generate_plan_with_human_validation(goal)
+            self.current_plan = self._generate_plan_with_human_validation(
+                goal, human_approve=human_approve
+            )
 
             if self.current_plan is None:
                 raise ValueError("❌ Planner: Failed to generate a valid plan")

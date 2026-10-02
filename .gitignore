@@ -8,12 +8,12 @@ token.json
 *.log
 *.tmp
 *.safetensors
-.asingle_agent_tests
 *.egg-info
 cookies.json
 .env
 .env.*
 */.env
+CLAUDE.md
 workflows/*
 runs_capsule/*
 runs_notes/*
@@ -35,6 +35,7 @@ datasets/**/*.tif"
 datasets/ScienceAgentBench/datasets/
 runs_notes/*
 docs/*.tex
+docs/communication_strategy/*
 *.wav
 ### react ###
 .DS_*

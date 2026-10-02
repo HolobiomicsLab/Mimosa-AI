@@ -10,7 +10,7 @@ from typing import Any, Iterable
 # Canonical claim-source order. The verifier emits ``"source_a"`` … through
 # the six independent extractor prompts; expected letters are kept here so
 # the descriptor stays a fixed-length vector even if a source is silenced.
-SOURCES: tuple[str, ...] = ("a", "b", "c", "d", "e", "f")
+SOURCES: tuple[str, ...] = ("a", "b", "c", "d", "e", "f", "g")
 DESCRIPTOR_DIM: int = len(SOURCES)
 
 _NEUTRAL_PASS_RATE: float = 0.5
@@ -175,8 +175,8 @@ if __name__ == "__main__":
     ])
     assert mixed["vector"][0] > 0.0 and mixed["vector"][1] < 0.0
     assert mixed["presence_mask"][:2] == [1.0, 1.0]
-    assert mixed["presence_mask"][2:] == [0.0] * 4
-    assert mixed["vector"][2:] == [0.0] * 4
+    assert mixed["presence_mask"][2:] == [0.0] * 5
+    assert mixed["vector"][2:] == [0.0] * 5
 
     # Source label normalisation across forms.
     norm = compute_failure_fingerprint([

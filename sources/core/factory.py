@@ -47,22 +47,46 @@ class Factory:
         """
         tools_code = ""
         existing_tool_prompt = ""
+        import asyncio as _asyncio
+        import time as _time
         tool_manager = ToolManager(self.config)
-        try:
-            tool_setup = False
-            while tool_setup == False:
+        # MCP servers can take minutes to come up (Docker image builds, cold
+        # starts, a server brought up by hand). Bound on total wait, not on a
+        # fixed attempt count. Exponential backoff capped at 30 s per wait.
+        max_wait_seconds = 300.0
+        backoff = 1.0
+        deadline = _time.monotonic() + max_wait_seconds
+        attempt = 0
+        mcps = []
+        while True:
+            attempt += 1
+            try:
                 mcps = await tool_manager.discover_mcp_servers()
                 tool_setup = await tool_manager.verify_tools()
-        except Exception as e:
-            self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
-            raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
+                if tool_setup and mcps:
+                    break
+                reason = "MCP servers not ready yet"
+            except Exception as e:
+                reason = str(e)
+            if _time.monotonic() >= deadline:
+                self.logger.error(
+                    f"load_tools_code: MCP discovery failed after {max_wait_seconds:.0f}s "
+                    f"({attempt} attempts): {reason}"
+                )
+                raise RuntimeError(
+                    f"MCP servers did not become ready within {max_wait_seconds:.0f}s: {reason}"
+                )
+            self.logger.warning(
+                f"MCP discovery attempt {attempt} failed ({reason}). Retrying in {backoff:.1f}s…"
+            )
+            await _asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 30.0)
         if not mcps:
             raise ValueError(
                 "\n" + "=" * 80 +
                 "\n🚨  FATAL ERROR: No MCP Servers Found! 🚨"
                 "\n" + "-" * 80 +
                 "\nPlease ensure at least one MCP instance is running on Toolomics."
-                "\nRetrying until MCPs detected.... use CTRL+C to stop."
                 "\n" + "=" * 80 + "\n"
             )
         for mcp in mcps:

@@ -29,6 +29,38 @@ _DEFAULT_LOCAL_MODEL: str = "all-MiniLM-L6-v2"
 _DEFAULT_OPENAI_MODEL: str = "text-embedding-3-small"
 
 
+def _hub_model_id(model_name: str) -> str:
+    """Map a bare sentence-transformers name to its hub id."""
+    return model_name if "/" in model_name else f"sentence-transformers/{model_name}"
+
+
+def _cached_snapshot_path(model_name: str) -> str | None:
+    """Return the local HF cache snapshot dir for ``model_name``, else None.
+
+    ``snapshot_download(local_files_only=True)`` resolves purely from the
+    on-disk cache and never issues an HTTP request.
+    """
+    try:
+        from huggingface_hub import snapshot_download
+        return snapshot_download(_hub_model_id(model_name), local_files_only=True)
+    except Exception:
+        return None
+
+
+def load_sentence_transformer(model_name: str):
+    """Load a SentenceTransformer, preferring the local HF cache.
+    """
+    from sentence_transformers import SentenceTransformer
+
+    snapshot = _cached_snapshot_path(model_name)
+    if snapshot is not None:
+        try:
+            return SentenceTransformer(snapshot)
+        except Exception:
+            pass  # partial/incompatible cache — fall through to hub load
+    return SentenceTransformer(model_name, token=False)
+
+
 class _Embedder(Protocol):
     """Minimal interface for a text-to-unit-vector backend."""
 
@@ -47,8 +79,7 @@ class _LocalMiniLMEmbedder:
     """sentence-transformers all-MiniLM-L6-v2 backend."""
 
     def __init__(self, model_name: str = _DEFAULT_LOCAL_MODEL) -> None:
-        from sentence_transformers import SentenceTransformer
-        self._model = SentenceTransformer(model_name, token=False)
+        self._model = load_sentence_transformer(model_name)
 
     def encode(self, text: str) -> np.ndarray:
         """Encode ``text`` and return an L2-normalised float32 vector."""

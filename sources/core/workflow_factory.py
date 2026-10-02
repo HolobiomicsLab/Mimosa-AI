@@ -127,7 +127,6 @@ class WorkflowFactory(Factory):
             The raw LLM completion (typically containing one or more
             ```` ```python ``` ```` blocks).
         """
-
         prompt = f"""
 # INSTRUCTIONS:
 
@@ -265,6 +264,12 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         nodes = set(re.findall(patterns["nodes"], workflow_genotype_code))
         if not nodes:
             raise ValueError("No workflow nodes found")
+        import keyword as _keyword
+        invalid_ids = {n for n in nodes if _keyword.iskeyword(n) or not n.isidentifier()}
+        if invalid_ids:
+            raise ValueError(
+                f"Workflow node names are Python keywords or invalid identifiers: {sorted(invalid_ids)}"
+            )
         self.logger.debug(f"Workflow nodes discovered: {', '.join(sorted(nodes))}")
 
         # Validate START edge target exists
@@ -314,11 +319,15 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         script_dir = Path(__file__).resolve().parent.parent.parent
         memory_path = str((script_dir / memory_path).resolve())
         workflow_path = str((script_dir / workflow_path).resolve())
+        default_model = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
+        # `WorkflowState.model_id` is a single string and is persisted to
+        # `state_result.json`, where cost accounting reads it back; store the
+        # resolved default rather than the raw (possibly list) config value.
         initial_state = {
             key: (
                 uuid_str
                 if key == "workflow_uuid"
-                else self.config.smolagent_model_id
+                else default_model
                 if key == "model_id"
                 else goal
                 if key == "goal"
@@ -326,6 +335,8 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             )
             for key in state_schema.WorkflowState.__annotations__
         }
+        providers = self.config.openrouter_provider_for(default_model) if self.config.orchestrator_choose_model == False else None
+        engine = "mlx" if "mlx-community/" in default_model else self.config.engine_name
         return f"""
 import os
 import sys
@@ -342,10 +353,11 @@ from typing import Annotated
 
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
-MODEL_ID = {self.config.smolagent_model_id!r}
-ENGINE_NAME = {self.config.engine_name!r}
-OPENROUTER_PROVIDER = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
+MODEL_ID = {default_model!r}
+ENGINE_NAME = {engine!r}
+OPENROUTER_PROVIDER = {providers!r}
 AGENT_EXECUTION_TIMEOUT = {self.config.agent_execution_timeout!r}
+SAVE_LOGPROBS = {self.config.save_logprobs!r}
 GOAL = {goal!r}
 SYSTEM_PROMPT = {smolagent_system_prompt!r}
 
@@ -388,8 +400,11 @@ print("workflow run: workflow execution completed for UUID:", "{uuid_str}")
 if WORKFLOW_PATH:
     print("workflow run: saving workflow state JSON at :", WORKFLOW_PATH)
     try:
-        with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
+        _state_path = os.path.join(WORKFLOW_PATH, "state_result.json")
+        _tmp_path = _state_path + ".tmp"
+        with open(_tmp_path, "w") as f:
             json.dump(result_state, f, indent=2)
+        os.replace(_tmp_path, _state_path)
     except Exception as e:
         raise(Exception(f"Could not save workflow data:" + str(e)))
 """
@@ -485,6 +500,11 @@ if WORKFLOW_PATH:
             goal,
             smolagent_system_prompt
         )
+
+        try:
+            compile(complete_code, "<assembled_workflow>", "exec")
+        except SyntaxError as e:
+            raise ValueError(f"UUID:{uuid_str}|Assembled workflow has invalid syntax: {e}") from e
 
         self.logger.info("Workflow generation completed")
 

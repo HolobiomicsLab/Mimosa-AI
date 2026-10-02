@@ -83,8 +83,9 @@ Source: [diagrams/architecture_overall.mermaid](diagrams/architecture_overall.me
 - Layer `3` executes those workflows in a sandboxed runner with
   SmolAgents.
 - Layer `4` runs the multi-source per-claim verifier and reports
-  `overall_score`, `reward_uncapped`, and `abstracted_prompt_gradient`
-  back into the loop.
+  `overall_score`, `overall_score_uncapped` (logged for analysis), and
+  `abstracted_prompt_gradient` back into the loop; QD selection ranks on
+  the capped `overall_score`.
 
 ---
 
@@ -97,7 +98,6 @@ mimosa-ai/
 ├── pyproject.toml                         # Project metadata + deps
 ├── cleanup.sh                             # Reset workflows + capsules
 ├── memory_explorer.py                     # Interactive trace replay
-├── memory_timelapse.py                    # Memory growth visualisation
 │
 ├── sources/
 │   ├── core/
@@ -105,8 +105,9 @@ mimosa-ai/
 │   │   ├── selection.py                   # SelectionPressure (greedy/tournament/novelty/QD)
 │   │   ├── variation_engine.py            # Mutation/crossover prompt assembly + annealing
 │   │   ├── workflow_selection.py          # Parent retrieval (archive draw / disk scan)
-│   │   ├── failure_fingerprint.py         # Verifier verdicts → QD behaviour descriptor (6-D, centered)
-│   │   ├── code_features.py               # Legacy structural descriptor (offline analysis only)
+│   │   ├── genotype_embedding.py          # Code-genotype embedding backend → QD behaviour descriptor
+│   │   ├── code_features.py               # genotype_embedding_descriptor shim (QD novelty)
+│   │   ├── failure_fingerprint.py         # Verifier verdicts → failure fingerprint (persisted diagnostic, 6-D centered)
 │   │   ├── lineage.py                     # parent → child sidecar records
 │   │   ├── orchestrator.py                # Grounding → factory → sandbox pipeline
 │   │   ├── workflow_factory.py            # Multi-agent workflow synthesis
@@ -250,9 +251,9 @@ Each recursive step:
 1. resets the workspace to the initial state,
 2. orchestrates a workflow run (LLM → sandbox),
 3. snapshots the workspace,
-4. evaluates → `overall_score` / `reward_uncapped`,
-5. calls `validate_survivor()` and admits to the archive if non-dominated
-   on `(reward_uncapped, novelty)`,
+4. evaluates → `overall_score` (surfaced as `reward` on the run),
+5. calls `validate_survivor()` and admits to the archive on improvement
+   or `qd_score > admit_threshold` (quality term from the capped `reward`),
 6. selects the next parent(s) and chooses mutation vs crossover,
 7. recurses.
 
@@ -266,9 +267,11 @@ Termination: `overall_score >= learned_score_threshold` (default 0.9) in
 Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
 QD mode it maintains a session archive of up to `population_size`
 members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
-(`w = novelty_weight = 0.25`). Quality is sourced from `reward_uncapped`
-so the hard-fail cap (`_HARD_FAIL_CAP`, currently `0.99`) doesn't
-flatten rank ordering. Admission is
+(`w = novelty_weight = 0.25`). Quality is sourced from `reward` (the
+capped `overall_score`), so a run that refuted a hard claim ranks at the
+cap (`_HARD_FAIL_CAP`, currently `0.7`) and cannot top the archive on its
+other claims alone; ties at the cap are broken by novelty and the length
+penalty. Admission is
 gated by the validity check (improvement over baseline or
 `qd_score > admit_threshold`); when capacity is hit, the lowest-
 `qd_score` member is evicted. Parent draw applies an inverse-child-count
@@ -321,6 +324,34 @@ success rate of recent offspring — not a fixed phase schedule.
 Scope is an advisory line injected into the mutation prompt; the LLM
 may still pick any topology. The hard control is the agent-count
 budget carried in the same block.
+
+`llm_think_mutation_directive(agent_answers, textual_gradient_block,
+step_block, goal)` runs a dedicated LLM call between
+`_get_prompt_step_size` and the orchestrator. It consumes the
+parent's per-agent answers, the rubric-blind verifier diagnosis, and
+the boldness/scope block, and emits a **≤ 3-sentence directive**
+naming exactly one issue, the kind of mutation it implies (prompt
+tweak, persona change, agent add/remove, topology change), and the
+rationale. The system prompt fixes trust ranks (verifier diagnosis
+trusted, agent self-reports not), and hard limits (one agent
+add/remove per step, never above the boldness band, default to small
+incremental changes).
+
+`mutation_prompt(...)` is therefore now a thin wrapper: it passes the
+parent code plus that one directive to the orchestrator inside a
+`<directive>...</directive>` block, with explicit instructions to
+**follow the directive exactly**, **add/remove at most one agent per
+step**, **not change topology** unless the directive says so, **not
+edit prompts outside the directive's scope**, and **keep ≥ 90 % of the
+previous code and prompts unchanged**. The verifier diagnosis and raw
+agent answers are no longer injected into the orchestrator's
+context — they were only ever needed to *decide* the change, and that
+decision is now made upstream. This split keeps orchestrator
+cognitive load on synthesis (write valid LangGraph + agent code), not
+on diagnosis. If the previous attempt failed to produce code at all
+(`genotype is None`), the directive-LLM is skipped and a fixed
+"Previous attempt failed completely. Fix syntax errors." directive is
+substituted.
 
 ### 4. `WorkflowSelector` — [`sources/core/workflow_selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
 
@@ -478,7 +509,7 @@ For each generation:
    ```
    overall = clamp(base_mean, 0, 1)
    if any hard claim refuted:
-       overall = min(overall, 0.99)        # _HARD_FAIL_CAP (soft, for now)
+       overall = min(overall, 0.7)         # _HARD_FAIL_CAP
    ```
    `base_mean` is the importance-weighted mean of per-claim scores.
 5. **Prompt gradient** — plain-language single-sentence diagnosis
