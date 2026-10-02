@@ -3,6 +3,7 @@ import { api, workspaceFileUrl } from '../api'
 import { useAsync } from '../hooks'
 import type { WorkspaceListing } from '../types'
 import { Spinner, fmtBytes } from '../ui'
+import { SmartText } from '../render'
 
 const TEXTY = new Set(['report', 'code', 'json', 'data'])
 
@@ -106,7 +107,7 @@ function FilePreview({ scope, file, kind }: { scope: string; file: string; kind:
         {kind !== 'image' && loading && <Spinner />}
         {kind !== 'image' && !loading && (
           TEXTY.has(kind)
-            ? <pre className="code">{text}</pre>
+            ? <SmartText text={text ?? ''} filename={file} kind={kind} />
             : <div className="hint">Binary file — <a href={url} target="_blank" rel="noreferrer">download</a>.</div>
         )}
       </div>

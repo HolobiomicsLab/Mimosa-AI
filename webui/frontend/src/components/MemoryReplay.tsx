@@ -3,6 +3,7 @@ import { api } from '../api'
 import { useAsync } from '../hooks'
 import type { CallDetail, StepDetail } from '../types'
 import { Spinner, fmtCost, fmtDuration, fmtEpoch } from '../ui'
+import { CodeView, JsonTree, MarkdownView, stripAnsi } from '../render'
 
 function agentHue(name: string): number {
   let h = 0
@@ -123,10 +124,10 @@ function StepView({ runId, agent, index }: { runId: string; agent: string; index
           <pre className="code" style={{ color: '#ef9a9a' }}>{data.error.message}</pre>
         </Block>
       )}
-      {data.code && <Block title="executed code"><pre className="code tight">{data.code}</pre></Block>}
-      {data.output_text && <Block title="reasoning / model output"><pre className="code">{data.output_text}</pre></Block>}
-      {data.observations && <Block title="observations"><pre className="code">{data.observations}</pre></Block>}
-      {data.action_output && <Block title="action output"><pre className="code">{data.action_output}</pre></Block>}
+      {data.code && <Block title="executed code"><CodeView text={data.code} lang="python" wrap={false} /></Block>}
+      {data.output_text && <Block title="reasoning / model output"><MarkdownView text={data.output_text} /></Block>}
+      {data.observations && <Block title="observations"><pre className="code">{stripAnsi(data.observations)}</pre></Block>}
+      {data.action_output && <Block title="action output"><JsonTree text={data.action_output} /></Block>}
       {data.input_messages.length > 0 && (
         <details>
           <summary className="hint" style={{ cursor: 'pointer', padding: '6px 0' }}>
@@ -154,9 +155,9 @@ function CallView({ runId, name }: { runId: string; name: string }) {
         <div className="stat"><b>{data.reasoning_effort || '—'}</b><span>effort</span></div>
       </div>
       {data.messages.map((m, i) => (
-        <Block key={i} title={`prompt · ${m.role}`}><pre className="code">{m.content}</pre></Block>
+        <Block key={i} title={`prompt · ${m.role}`}><MarkdownView text={m.content} /></Block>
       ))}
-      <Block title="response"><pre className="code">{data.response}</pre></Block>
+      <Block title="response"><MarkdownView text={data.response} /></Block>
     </div>
   )
 }

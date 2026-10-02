@@ -17,7 +17,7 @@ from fastapi import (
 )
 from fastapi.responses import FileResponse
 
-from . import bridge, config_store, lineage, memory, store, workspace
+from . import atlas, bridge, config_store, evolution, lineage, memory, provenance, store, workspace
 from .launcher import launcher
 from .live import hub
 
@@ -76,6 +76,38 @@ def get_tree(run_id: str) -> dict[str, Any]:
     if result is None:
         raise HTTPException(status_code=404, detail="no lineage for run")
     return result
+
+
+@router.get("/runs/{run_id}/provenance")
+def get_provenance(run_id: str) -> dict[str, Any]:
+    """The run's ASTRA capsule (decisions + universes) and every independent
+    asb_eval evaluation capsule that names it. Empty sections are normal —
+    only a family's best run has a capsule, and evaluations exist only after
+    ``asb_eval`` has been run against the workspace."""
+    _require_run(run_id)
+    return provenance.provenance(run_id)
+
+
+@router.get("/runs/{run_id}/evolution")
+def get_evolution(run_id: str) -> dict[str, Any]:
+    """The family tree annotated per node with metrics, claim counts, the
+    textual-gradient snippet, and the selection log — one payload for the
+    animated evolution replay."""
+    _require_run(run_id)
+    result = evolution.family_evolution(run_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="no lineage for run")
+    return result
+
+
+@router.get("/atlas/{space}")
+def get_atlas(space: str) -> dict[str, Any]:
+    """Every run projected to 2-D (PCA), one point per run. ``qd`` = Mimosa's
+    behaviour descriptor (task-level); ``genotype`` = TF-IDF of the evolved
+    workflow code (shows within-family drift the QD space cannot)."""
+    if space not in ("qd", "genotype"):
+        raise HTTPException(status_code=404, detail="unknown atlas space")
+    return atlas.atlas_view(space)
 
 
 @router.get("/runs/{run_id}/series")

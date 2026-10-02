@@ -122,6 +122,20 @@ def series(run_id: str) -> dict[str, Any]:
     return {"focus": run_id, "points": points}
 
 
+def families() -> dict[str, int]:
+    """uuid → family label for every run, one label per connected component."""
+    idx = _index()
+    fam: dict[str, int] = {}
+    label = 0
+    for uuid in idx:
+        if uuid in fam:
+            continue
+        for member in _component(uuid, idx):
+            fam[member] = label
+        label += 1
+    return fam
+
+
 def qd_archive(limit: int | None = None) -> list[dict[str, Any]]:
     """Parse the append-only shared QD archive (drops the 384-float vector)."""
     path: Path = get_settings().workflow_dir / "qd_archive.jsonl"
