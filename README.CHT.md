@@ -110,7 +110,6 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 工作流程是**完整的 Python 程式**，以原始碼形式進行突變。**程式碼即基因型 (code-as-genotype)** 即為工作流程檔案；表現型則為其於工作區內所產生的一切。
 
 - **選擇：品質-多樣性 (QD) 檔案庫** —— **非結構化檔案庫**（單一名單，而非離散網格），族群大小上限為 20，以單一標量化目標 `qd_score = (1−w)·quality + w·novelty`（`w = novelty_weight = 0.25`）評分；額滿時淘汰 `qd_score` 最低的成員。**新穎性搜尋 (novelty search)** 以**基因型嵌入 (genotype embedding)** 行為描述子——對工作流程生成原始碼做 L2 正規化的嵌入（預設使用本機 `all-MiniLM-L6-v2`，可選 OpenAI `text-embedding-3-small`）——上的餘弦距離 k-NN（`k = 15`）衡量。親代以反向子代數量輪盤選取，以促使檔案庫均勻擴散（`MAX_CHILDREN_PER_PARENT = 8`）。
-- **變異：Rechenberg-1/5 + 高原驅動的範圍** —— 突變的大膽程度結合了最近 5 個已評分子代的成功率（Rechenberg 1/5 規則，閾值 `0.20`）與 `iters_since_improvement` 高原計數器（耐心值 `6`）。接近獲勝者（親代分數 > 0.95）會受到阻尼保護。範圍從 `EXPLOITATION`（點突變）到 `RE-SPECIATION`（全新重新設計），由有效大膽程度閾值（`< 0.35 / 0.50 / 0.65 / 0.90 / 1.01`）決定。
 - **交配** —— 預設約 40% 的世代會組合兩個親代，依強者優先，子代智能體數量以上限較高的親代為硬上限。
 - **冷啟動** —— 當檔案庫為空時，以磁碟上過往執行的相似度過濾掃描（MiniLM 餘弦 ≥ 0.8）為搜尋播種。可用的工作流程能跨任務遷移。
 
