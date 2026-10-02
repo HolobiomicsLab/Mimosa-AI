@@ -108,7 +108,6 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 工作流是**完整的 Python 程序**,作为源代码被变异。**代码即基因型 (code-as-genotype)** 是工作流文件;表现型是它在工作空间中产生的任何东西。
 
 - **选择:质量-多样性归档** —— **非结构化归档**(单一名单,而非离散网格),种群规模上限 20,以单一标量化目标 `qd_score = (1−w)·quality + w·novelty`(`w = novelty_weight = 0.25`)评分;满员时淘汰 `qd_score` 最低的成员。**新颖性搜索 (novelty search)** 使用**基因型嵌入 (genotype embedding)** 行为描述符——对工作流生成源代码做 L2 归一化的嵌入(默认使用本地 `all-MiniLM-L6-v2`,可选 OpenAI `text-embedding-3-small`)——上的余弦距离 k-NN(`k=15`)。父代通过子代数量倒数轮盘抽取,使归档分布开来(`MAX_CHILDREN_PER_PARENT = 8`)。
-- **变异:Rechenberg-1/5 + 停滞驱动尺度** —— 变异大胆程度综合了过去 5 个已评分后代的成功率(Rechenberg 1/5 规则,阈值 `0.20`)与 `iters_since_improvement` 停滞计数器(耐心值 `6`)。接近优胜者的个体(父代分数 > 0.95)会得到阻尼。变异尺度从 `EXPLOITATION`(点突变)到 `RE-SPECIATION`(全新重设计),由有效大胆度阈值(`< 0.35 / 0.50 / 0.65 / 0.90 / 1.01`)控制。
 - **交叉** —— 默认约 40% 的代次以强者优先的方式组合两个父代,子代智能体数量上限取最高父代的智能体数。
 - **冷启动** —— 当归档为空时,会基于相似度过滤,从磁盘上过往运行进行扫描(MiniLM 余弦相似度 ≥ 0.8)以种子化搜索。有用的工作流可在任务之间迁移。
 
