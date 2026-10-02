@@ -137,7 +137,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 在 **ScienceAgentBench**(102 个任务,`task` 模式 —— 规划层被绕过,因此工作流合成与精化以隔离方式进行评估)上进行评估:
 
-| 模式                                    | 成功率       | Code-BLEU | 单任务成本   |
+| 模式                                    | 成功率       | CBS | 单任务成本   |
 | --------------------------------------- | ------------ | --------- | ----------- |
 | DeepSeek-V3.2 single-agent              | 38.2 %       | 0.898     | $0.05       |
 | DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |

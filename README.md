@@ -134,7 +134,7 @@ Full pipeline: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluati
 
 Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer bypassed so workflow synthesis and refinement are evaluated in isolation):
 
-| Mode                                    | Success Rate | Code-BLEU | Cost / task |
+| Mode                                    | Success Rate | CBS | Cost / task |
 | --------------------------------------- | ------------ | --------- | ----------- |
 | DeepSeek-V3.2 single-agent              | 38.2 %       | 0.898     | $0.05       |
 | DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
