@@ -194,7 +194,7 @@ def build_gradient(
         row = (
             f"- [{cid}] (stage {stage}) REQUIREMENT (from the task goal): "
             f"{c.get('statement', '')}\n"
-            f"  this workspace: {s:.3f} (measured evidence: {ev[:160]})\n"
+            f"  this workspace: {s:.3f} (measured evidence: {ev[:2000]})\n"
             f"  decisive balance vs predecessors: {bal:+d} ("
             + ("LOSING" if bal < 0 else "WINNING")
             + " this claim)"
@@ -236,7 +236,7 @@ def build_gradient(
         reason = c.get("drop_reason", "unknown")
         line = (
             f"- [{c['id']}] (stage {c.get('stage', 'result')}) "
-            f"{c.get('statement', '')[:1024]} (dropped: {reason})"
+            f"{c.get('statement', '')[:2048]} (dropped: {reason})"
         )
         if reason in ("all_fail", "all_scorer_fail"):
             line += " — this claim could not be verified (scorer crashed on every workspace)"
@@ -245,9 +245,9 @@ def build_gradient(
     dropped = "\n".join(_dropped_line(c) for c in dead_claims) or "(none)"
 
     lost_block = (
-        "\n".join(r for _, _, r in lost_rows[:5]) or "(none — no decisive losses)"
+        "\n".join(r for _, _, r in lost_rows[:12]) or "(none — no decisive losses)"
     )
-    won_block = "\n".join(r for _, _, r in won_rows[:5]) or "(none yet)"
+    won_block = "\n".join(r for _, _, r in won_rows[:12]) or "(none yet)"
     claim_block = "\n".join(claim_lines) or "(none)"
 
     # E24 execution facts (stage 5 gate): status, wall-clock, cap applied.
@@ -299,7 +299,7 @@ def build_gradient(
     )
 
     return f"""# Hybrid verifier gradient v3 (PRIME) — {uuid}
-Task goal: {goal[:500]}
+Task goal: {goal[:8000]}
 
 Bottom line: reward {reward:.4f} | win-rate (ties=0.5) {win_rate:.3f} over
 {len(pair_records)} comparisons ({wins}W/{losses}L/{ties}T) | {len(surviving)} of

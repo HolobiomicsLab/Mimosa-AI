@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>policy_bt_verifier - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview &gt; sources/evaluators &gt; policy_bt_verifier" data-built="7da1f5e+wt" data-built-date="2026-10-10">
+<div class="wrap">
+
+<h1 class="hud">policy_bt_verifier &mdash; the BT policy verifier (opt-in)</h1>
+<p class="intro">Twelve files turn one generation's workspace into a deterministic digest, re-execute it in a verifier-owned sandbox, then compare it head-to-head with every predecessor through an LLM-written policy and return a win-rate reward. This page follows one generation end to end: twelve diagrams cover the sandbox, the digest schema, the policy build loop, the metric ledger, the registry caches, the reward guards and the gradient fold. Longer explanations are collapsed under each diagram, with the code quoted verbatim and cited by file and line.</p>
+
+<div id="legend" data-auto></div>
+<p class="sub">Diagrams: <a href="#d1">1 package</a> &#183; <a href="#d2">2 stages</a> &#183; <a href="#ladder">3 pair ladder</a> &#183; <a href="#d4">4 re-execution</a> &#183; <a href="#d5">5 digest</a> &#183; <a href="#d6">6 policy build</a> &#183; <a href="#d7">7 recon</a> &#183; <a href="#d8">8 metric ledger</a> &#183; <a href="#d9">9 registry</a> &#183; <a href="#d10">10 reward</a> &#183; <a href="#d11">11 gradient</a> &#183; <a href="#d12">12 crash rung</a> &#183; <a href="#knobs">knobs</a> &#183; <a href="#writes">what it writes</a> &#183; <a href="#cards">file cards</a> &#183; <a href="#notes">notes</a></p>
+
+
+<div class="panel"><span class="br"></span>
+<h2 id="d1">Diagram 1 &mdash; package files (12) and who imports whom</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 420" role="img" aria-label="policy_bt_verifier package box graph">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="arwDim" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="bEval" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>PolicyBTVerifierEvaluator.evaluate(uuid): the whole pipeline for one generation</title>
+    <rect x="330" y="18" width="290" height="76" rx="12" fill="rgba(125,249,199,0.12)" stroke="#7DF9C7" stroke-width="2" filter="url(#glow)"/>
+    <text class="box-label" x="475" y="46" text-anchor="middle">evaluator.py</text>
+    <text class="box-sub" x="475" y="66" text-anchor="middle">PolicyBTVerifierEvaluator.evaluate()</text>
+    <text class="box-sub" x="475" y="82" text-anchor="middle">1 664 lines &#183; the pipeline</text>
+  </a>
+
+  <a class="box" id="bReexec" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>Fresh re-execution: copy the workspace, build a venv, run the main script</title>
+    <rect x="20" y="58" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="82" text-anchor="middle">reexec.py</text>
+    <text class="box-sub" x="110" y="99" text-anchor="middle">fresh run &#183; ledger</text>
+  </a>
+
+  <a class="box" id="bDigest" href="../../sources/evaluators/policy_bt_verifier/digest.py">
+    <title>build_digest: one deterministic JSON per generation</title>
+    <rect x="20" y="148" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="172" text-anchor="middle">digest.py</text>
+    <text class="box-sub" x="110" y="189" text-anchor="middle">workspace facts</text>
+  </a>
+
+  <a class="box" id="bRecon" href="../../sources/evaluators/policy_bt_verifier/recon.py">
+    <title>One judge call per task builds the TASK CONFIG: metrics, pitfalls, tie policy</title>
+    <rect x="20" y="238" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="262" text-anchor="middle">recon.py</text>
+    <text class="box-sub" x="110" y="279" text-anchor="middle">task config</text>
+  </a>
+
+  <a class="box" id="bMetrics" href="../../sources/evaluators/policy_bt_verifier/metrics.py">
+    <title>resolve_primary_values: one deterministic metric ledger per digest</title>
+    <rect x="20" y="328" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="352" text-anchor="middle">metrics.py</text>
+    <text class="box-sub" x="110" y="369" text-anchor="middle">metric ledger</text>
+  </a>
+
+  <a class="box" id="bPolicy" href="../../sources/evaluators/policy_bt_verifier/policy.py">
+    <title>LLM writes a deterministic pairwise policy; screen, smoke test, repair</title>
+    <rect x="740" y="58" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="830" y="82" text-anchor="middle">policy.py</text>
+    <text class="box-sub" x="830" y="99" text-anchor="middle">write &#183; screen &#183; smoke</text>
+  </a>
+
+  <a class="box" id="bVerdicts" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>Pair verdicts (crash rung, code pair) and the win-rate / BT rewards</title>
+    <rect x="740" y="148" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="830" y="172" text-anchor="middle">verdicts.py</text>
+    <text class="box-sub" x="830" y="189" text-anchor="middle">pair verdict &#183; reward</text>
+  </a>
+
+  <a class="box" id="bVisual" href="../../sources/evaluators/policy_bt_verifier/visual.py">
+    <title>Kimi per-pair figure comparison, judged in both orders</title>
+    <rect x="740" y="238" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="830" y="262" text-anchor="middle">visual.py</text>
+    <text class="box-sub" x="830" y="279" text-anchor="middle">kimi figures</text>
+  </a>
+
+  <a class="box" id="bGradient" href="../../sources/evaluators/policy_bt_verifier/gradient.py">
+    <title>fold_gradient: losses first, then ties, then wins; optional refiner</title>
+    <rect x="740" y="328" width="180" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="830" y="352" text-anchor="middle">gradient.py</text>
+    <text class="box-sub" x="830" y="369" text-anchor="middle">fold &#183; refiner</text>
+  </a>
+
+  <a class="box" id="bRegistry" href="../../sources/evaluators/policy_bt_verifier/registry.py">
+    <title>Per-task JSON: digests, ledgers, verdict caches, recon and policy</title>
+    <rect x="345" y="248" width="130" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="410" y="272" text-anchor="middle">registry.py</text>
+    <text class="box-sub" x="410" y="289" text-anchor="middle">TaskRegistry</text>
+  </a>
+
+  <a class="box" id="bLog" href="../../sources/evaluators/policy_bt_verifier/logging_utils.py">
+    <title>StageLogger: one stdout line and one JSON record per stage</title>
+    <rect x="495" y="248" width="130" height="56" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="560" y="272" text-anchor="middle">logging_utils.py</text>
+    <text class="box-sub" x="560" y="289" text-anchor="middle">StageLogger</text>
+  </a>
+
+  <a class="box" id="bInit" href="../../sources/evaluators/policy_bt_verifier/__init__.py">
+    <title>Re-exports of the public names; no logic</title>
+    <rect x="400" y="345" width="150" height="54" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="475" y="369" text-anchor="middle">__init__.py</text>
+    <text class="box-sub" x="475" y="386" text-anchor="middle">re-exports only</text>
+  </a>
+
+  <path class="edge" d="M330,52 H205" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <text class="edge-label" x="255" y="46" text-anchor="middle">imports</text>
+  <path class="edge" d="M340,92 L205,166" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M336,94 L203,252" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M336,94 L205,344" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M600,52 H735" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M620,80 L735,166" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M620,88 L735,256" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M620,94 L735,344" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M430,94 V248" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M520,94 V248" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+  <path class="edge" d="M530,94 L500,345" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#arwDim)"/>
+
+  <path class="edge" d="M110,204 V238" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw7)"/>
+  <text class="edge-label" x="146" y="226" text-anchor="middle">is_infra_name</text>
+
+  <text class="box-sub" x="20" y="410">dotted = import  |  solid mint = call inside the package  |  every box links to its file under <tspan class="sym">sources/evaluators/policy_bt_verifier/</tspan></text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; the twelve files and the imports <code>evaluator.py</code> makes. <code>policy.py</code> also imports <code>recon.py</code> (<code>RECON_PROMPT_VERSION</code>) and <code>recon.py</code> is called by <code>digest.py</code>; that second edge is drawn, the long crossing one is left out. Not drawn: <code>sources/benchmark_evaluation/execution_sandbox.py::PINNED_CONSTRAINTS</code>, which <code>reexec.py</code> imports for the era pins.</p>
+
+<table>
+<thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py</a></td><td>Runs the 9 stages of one generation; owns the pair loop.</td><td class="size">1 664</td><td class="sym">PolicyBTVerifierEvaluator.evaluate</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/reexec.py">reexec.py</a></td><td>Copies the workspace, builds a venv, runs the main script.</td><td class="size">879</td><td class="sym">ReexecRunner.run</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/digest.py">digest.py</a></td><td>One deterministic JSON of what the workspace delivered.</td><td class="size">630</td><td class="sym">build_digest</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/policy.py">policy.py</a></td><td>Writes, screens, smoke-tests and repairs the pairwise policy.</td><td class="size">569</td><td class="sym">ensure_policy</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/gradient.py">gradient.py</a></td><td>Folds pair feedback into one gradient; optional refiner.</td><td class="size">480</td><td class="sym">fold_gradient</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/metrics.py">metrics.py</a></td><td>Resolves the recon primary metrics to values, never guesses.</td><td class="size">365</td><td class="sym">resolve_primary_values</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/recon.py">recon.py</a></td><td>One judge call per task builds the TASK CONFIG.</td><td class="size">364</td><td class="sym">ensure_shape</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/verdicts.py">verdicts.py</a></td><td>Crash rung, code pair verdict, win-rate and BT rewards.</td><td class="size">362</td><td class="sym">crash_rung</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/visual.py">visual.py</a></td><td>Kimi compares the figures of a pair, both orders.</td><td class="size">318</td><td class="sym">VisualChannel.judge_pair</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/registry.py">registry.py</a></td><td>Per-task JSON: digests, ledgers, caches, recon, policy.</td><td class="size">258</td><td class="sym">TaskRegistry</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/logging_utils.py">logging_utils.py</a></td><td>One stdout line and one JSON record per stage.</td><td class="size">186</td><td class="sym">StageLogger.stage</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/__init__.py">__init__.py</a></td><td>Re-exports; no logic of its own.</td><td class="size">56</td><td class="sym">__all__</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="d2">Diagram 2 &mdash; the 9 stages of one generation</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 260" role="img" aria-label="policy_bt stage pipeline">
+  <defs>
+    <marker id="aaw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="aaw7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="flow_policy_bt_verification.html"><title>Stage 1: fresh re-execution of this generation</title>
+    <rect x="20" y="40" width="164" height="56" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="102" y="64" text-anchor="middle">REEXEC</text>
+    <text class="box-sub" x="102" y="81" text-anchor="middle">copy + venv + run</text>
+  </a>
+  <a class="box" href="flow_policy_bt_verification.html"><title>Stage 2: deterministic digest of the re-execution copy</title>
+    <rect x="200" y="40" width="164" height="56" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="282" y="64" text-anchor="middle">DIGEST</text>
+    <text class="box-sub" x="282" y="81" text-anchor="middle">one JSON per gen</text>
+  </a>
+  <a class="box" href="flow_policy_bt_verification.html"><title>Stage 3: ONE judge call per task builds the TASK CONFIG</title>
+    <rect x="380" y="40" width="164" height="56" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="462" y="64" text-anchor="middle">RECON</text>
+    <text class="box-sub" x="462" y="81" text-anchor="middle">metrics + pitfalls</text>
+  </a>
+  <a class="box" href="flow_policy_bt_verification.html"><title>Stage 4: write, screen, smoke-test and repair the policy</title>
+    <rect x="560" y="40" width="164" height="56" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="642" y="64" text-anchor="middle">POLICY</text>
+    <text class="box-sub" x="642" y="81" text-anchor="middle">screen + smoke</text>
+  </a>
+  <a class="box" href="flow_policy_bt_verification.html"><title>Stage 5: kimi pair calls on figure-dominant tasks only</title>
+    <rect x="740" y="40" width="164" height="56" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="822" y="64" text-anchor="middle">VISUAL</text>
+    <text class="box-sub" x="822" y="81" text-anchor="middle">figure-dominant only</text>
+  </a>
+
+  <a class="box" href="#ladder"><title>Stage 6: one verdict per predecessor (diagram 3)</title>
+    <rect x="740" y="170" width="164" height="56" rx="26" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="822" y="194" text-anchor="middle">PAIRS</text>
+    <text class="box-sub" x="822" y="211" text-anchor="middle">vs every predecessor</text>
+  </a>
+  <a class="box" href="flow_policy_bt_verification.html"><title>Stage 7: arrival-moment win-rate (or a BT fit)</title>
+    <rect x="560" y="170" width="164" height="56" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="642" y="194" text-anchor="middle">REWARD</text>
+    <text class="box-sub" x="642" y="211" text-anchor="middle">wins + 0.5 ties</text>
+  </a>
+  <a class="box" href="flow_policy_bt_verification.html"><title>Stage 8: fold the feedback, then the optional refiner</title>
+    <rect x="380" y="170" width="164" height="56" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="462" y="194" text-anchor="middle">GRADIENT</text>
+    <text class="box-sub" x="462" y="211" text-anchor="middle">losses first</text>
+  </a>
+  <a class="box" href="flow_policy_bt_verification.html"><title>Final stage: write artifacts, return the scores dict</title>
+    <rect x="200" y="170" width="164" height="56" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="282" y="194" text-anchor="middle">DONE</text>
+    <text class="box-sub" x="282" y="211" text-anchor="middle">evaluation.txt written</text>
+  </a>
+
+  <path class="edge" d="M184,68 H200" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#aaw)"/>
+  <path class="edge" d="M364,68 H380" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#aaw)"/>
+  <path class="edge" d="M544,68 H560" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#aaw)"/>
+  <path class="edge" d="M724,68 H740" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#aaw)"/>
+  <path class="edge" d="M822,96 V170" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#aaw)"/>
+  <path class="edge" d="M740,198 H724" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#aaw)"/>
+  <path class="edge" d="M560,198 H544" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#aaw)"/>
+  <path class="edge" d="M380,198 H364" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#aaw)"/>
+  <path class="edge dashed-edge" d="M200,198 H120" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#aaw7)"/>
+  <text class="edge-label" x="90" y="190" text-anchor="middle">reward +</text>
+  <text class="edge-label" x="90" y="216" text-anchor="middle">gradient</text>
+  <text class="box-sub" x="20" y="246">stage tags and their order come from <tspan class="sym">logging_utils.py::STAGES</tspan>; every stage writes one stdout line and one JSON record</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; each stage box links to <a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a>. <code>VISUAL</code> runs only when the pooled deliverables are figure-dominant (<code>digest.py::is_figure_dominant</code>, 50 % image share). The dashed arrow leaves the verifier: <code>evolution_engine.py</code> consumes the reward and the gradient.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="ladder">Diagram 3 &mdash; how one pair is decided</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 210" role="img" aria-label="pair decision ladder">
+  <defs>
+    <marker id="law" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py"><title>crash_rung: deterministic, no LLM, runs first</title>
+    <rect x="20" y="50" width="164" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="102" y="74" text-anchor="middle">crash rung</text>
+    <text class="box-sub" x="102" y="91" text-anchor="middle">exec facts only</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/visual.py"><title>figure_rung: which side delivered figures at all</title>
+    <rect x="210" y="50" width="164" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="292" y="74" text-anchor="middle">figure rung</text>
+    <text class="box-sub" x="292" y="91" text-anchor="middle">digest figures</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/visual.py"><title>VisualChannel.judge_pair: kimi-k3, both orders</title>
+    <rect x="400" y="50" width="164" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="482" y="74" text-anchor="middle">kimi visual pair</text>
+    <text class="box-sub" x="482" y="91" text-anchor="middle">A,B and B,A</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/policy.py"><title>run_policy on both digests, both orders, subprocess with timeout</title>
+    <rect x="590" y="50" width="164" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="672" y="74" text-anchor="middle">code policy</text>
+    <text class="box-sub" x="672" y="91" text-anchor="middle">both orders</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py"><title>Honest tie when nothing decides</title>
+    <rect x="780" y="50" width="140" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="850" y="74" text-anchor="middle">tie</text>
+    <text class="box-sub" x="850" y="91" text-anchor="middle">no_policy / error</text>
+  </a>
+  <path class="edge" d="M184,80 H210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#law)"/>
+  <path class="edge" d="M374,80 H400" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#law)"/>
+  <path class="edge" d="M564,80 H590" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#law)"/>
+  <path class="edge" d="M754,80 H780" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#law)"/>
+  <text class="box-sub" x="20" y="140">the first rung that answers decides; the next rung runs only when the previous one returns nothing</text>
+  <text class="box-sub" x="20" y="162">order and rules: <tspan class="sym">evaluator.py::PolicyBTVerifierEvaluator._pair_verdict</tspan> (docstring: "Ladder: ... -&gt; honest tie")</text>
+  <text class="box-sub" x="20" y="184">both orders disagree on the winner -&gt; tie + WARNING, never a coin flip (<tspan class="sym">policy.py::mirrored</tspan>, <tspan class="sym">verdicts.py::code_pair_verdict</tspan>)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; the ladder applies to both channels: a kimi verdict and a policy verdict have the same shape (<code>winner</code>, <code>confidence</code>, per-side feedback), so the fold and the tournament stay channel-agnostic.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="d4">Diagram 4 &mdash; where the fresh execution happens</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="re-execution sandbox and ledger">
+  <defs>
+    <marker id="d4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="d4s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/core/workflow_runner.py">
+    <title>The agents' workspace: read once, never mutated</title>
+    <rect x="20" y="40" width="180" height="58" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="110" y="64" text-anchor="middle">live workspace</text>
+    <text class="box-sub" x="110" y="82" text-anchor="middle">source of truth</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>frozen_manifest: size + head-hash of every file, before and after</title>
+    <rect x="240" y="40" width="200" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="340" y="64" text-anchor="middle">frozen_manifest</text>
+    <text class="box-sub" x="340" y="82" text-anchor="middle">size + head hash</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>clone_tree: the verifier's own copy of the workspace</title>
+    <rect x="480" y="40" width="200" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="580" y="64" text-anchor="middle">sandbox copy</text>
+    <text class="box-sub" x="580" y="82" text-anchor="middle">runs/&lt;uuid&gt;/</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>Local venv, fingerprinted by the era pins and the interpreter version</title>
+    <rect x="720" y="40" width="200" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="820" y="64" text-anchor="middle">venv/</text>
+    <text class="box-sub" x="820" y="82" text-anchor="middle">.mimosa_venv_fp</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>contract_commands: run.sh or README python lines; the .py heuristic is fallback only</title>
+    <rect x="480" y="170" width="200" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="580" y="194" text-anchor="middle">contract_commands</text>
+    <text class="box-sub" x="580" y="212" text-anchor="middle">run.sh &gt; largest .py</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>subprocess run with a wall-clock timeout and a whole-process-group kill</title>
+    <rect x="240" y="170" width="200" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="340" y="194" text-anchor="middle">run main script</text>
+    <text class="box-sub" x="340" y="212" text-anchor="middle">timeout + group kill</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>_fresh_artifacts: files whose mtime is newer than the run start</title>
+    <rect x="20" y="170" width="180" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="194" text-anchor="middle">fresh artifacts</text>
+    <text class="box-sub" x="110" y="212" text-anchor="middle">mtime &gt;= start</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>write_ledger_file: one JSON of execution facts per generation</title>
+    <rect x="720" y="170" width="200" height="58" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="820" y="194" text-anchor="middle">ledger JSON</text>
+    <text class="box-sub" x="820" y="212" text-anchor="middle">policy_bt_ledger_&lt;uuid&gt;</text>
+  </a>
+  <path class="edge" d="M200,69 H240" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d4a)"/>
+  <text class="edge-label" x="220" y="62" text-anchor="middle">hash</text>
+  <path class="edge" d="M440,69 H480" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d4a)"/>
+  <text class="edge-label" x="460" y="62" text-anchor="middle">copy</text>
+  <path class="edge" d="M680,69 H720" fill="none" stroke="#5E8CA3" stroke-width="1.25" stroke-dasharray="2 3" marker-end="url(#d4s)"/>
+  <text class="edge-label" x="700" y="62" text-anchor="middle">venv</text>
+  <path class="edge" d="M580,98 V170" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d4a)"/>
+  <text class="edge-label" x="620" y="140" text-anchor="middle">scan</text>
+  <path class="edge" d="M480,199 H440" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d4a)"/>
+  <text class="edge-label" x="460" y="192" text-anchor="middle">command</text>
+  <path class="edge" d="M240,199 H200" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d4a)"/>
+  <text class="edge-label" x="220" y="192" text-anchor="middle">mtime</text>
+  <path class="edge" d="M110,170 V130 H720 V170" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d4a)"/>
+  <path class="edge dashed-edge" d="M340,170 V120 H240 V98" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#d4s)"/>
+  <text class="edge-label" x="290" y="146" text-anchor="middle">assert intact</text>
+  <text class="box-sub" x="20" y="262">the executed program comes from the deliverable contract of the copy, so a missing run.sh does not hide the real entry point</text>
+  <text class="box-sub" x="20" y="284">the live workspace is hashed again after the run; a mutation WARNs and makes the ledger class manifest_mutated</text>
+</svg>
+</div>
+<p class="figcap">Diagram 4 &mdash; <code>reexec.py::ReexecRunner.run</code>. The sandbox root is <code>&lt;scratch&gt;/policy_bt/&lt;task_key&gt;/</code>, the copy is <code>&lt;root&gt;/runs/&lt;uuid&gt;/</code>, and the venv is shared across generations of the same task when <code>policy_bt_venv_reuse</code> is on.</p>
+
+<details><summary>ledger keys, quoted from <code class="path">reexec.py::ReexecRunner.run</code></summary><div class="dbody">
+<pre>ledger = {
+  "uuid", "source_manifest_intact", "n_files_copied",
+  "main_script_source",   # "run.sh" | "readme" | "shell_run_sh" | "fallback"
+  "main_script", "commands",       # [{"script", "args"}]
+  "venv_created", "packages_installed", "install_source",
+  "exit_code", "wall_time_s", "timed_out",
+  "error_signature", "log_tail",   # last LOG_TAIL_LINES = 40 lines
+  "fresh_artifacts",               # {relpath: {"bytes", "sha256"}}
+  "produced_pred_results",
+  "launch_error",                  # copy/venv/entry-point failures
+}
+</pre>
+<p>Quoted keys from <code class="path">sources/evaluators/policy_bt_verifier/reexec.py</code> (the <code>run</code> body, from line 489) and the same file's constants (lines 76&ndash;80): <code>HASH_HEAD = 64 KiB</code>, <code>FRESH_SHA_CAP = 8 MiB</code>, <code>LOG_TAIL_LINES = 40</code>, <code>MANIFEST_SKIP_DIRS</code>, <code>NON_MAIN_PREFIXES = ("test_", "verify_", "probe_", "conftest")</code>.</p>
+<p>Venv identity, quoted from <code class="path">reexec.py::ReexecRunner.venv_fingerprint</code>:</p>
+<pre>h = hashlib.sha256()
+h.update("\n".join(PINNED_CONSTRAINTS).encode("utf-8"))
+h.update(self._python_version().encode("utf-8"))
+return h.hexdigest()[:16]</pre>
+<p>Section 5 of <code class="path">reexec.py</code>: a fresh artifact is a file under the copy whose <code>st_mtime &gt;= t0_wall - 1</code>; infrastructure names and manifest-skip directories are excluded first. A full <code>sha256</code> is stored only for files up to <code>FRESH_SHA_CAP</code>.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="d5">Diagram 5 &mdash; the digest: one fixed-shape JSON per generation</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 340" role="img" aria-label="digest schema tree">
+  <defs>
+    <marker id="d5a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py">
+    <title>build_digest(uuid, ws, ledger, goal): the only digest builder</title>
+    <rect x="380" y="14" width="180" height="46" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="470" y="42" text-anchor="middle">digest dict</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>execution block copied from the ledger</title>
+    <rect x="20" y="110" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="105" y="132" text-anchor="middle">exec</text>
+    <text class="box-sub" x="105" y="150" text-anchor="middle">exit, errors, log tail</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>contract_files: goal-named files and whether they exist</title>
+    <rect x="210" y="110" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="295" y="132" text-anchor="middle">contract_files</text>
+    <text class="box-sub" x="295" y="150" text-anchor="middle">present / absent</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>deliverables: every produced file with its freshness flag</title>
+    <rect x="400" y="110" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="485" y="132" text-anchor="middle">deliverables</text>
+    <text class="box-sub" x="485" y="150" text-anchor="middle">produced_this_run</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>tables: parsed prediction CSVs with column statistics</title>
+    <rect x="590" y="110" width="150" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="665" y="132" text-anchor="middle">tables</text>
+    <text class="box-sub" x="665" y="150" text-anchor="middle">12 numeric cols</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>arrays: npy shapes, dtypes and stats</title>
+    <rect x="760" y="110" width="160" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="840" y="132" text-anchor="middle">arrays</text>
+    <text class="box-sub" x="840" y="150" text-anchor="middle">shape, dtype, stats</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>figures: png pixel size and mode</title>
+    <rect x="20" y="210" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="105" y="232" text-anchor="middle">figures</text>
+    <text class="box-sub" x="105" y="250" text-anchor="middle">width, height, mode</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>log_metrics: metric lines scraped from the run logs</title>
+    <rect x="210" y="210" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="295" y="232" text-anchor="middle">log_metrics</text>
+    <text class="box-sub" x="295" y="250" text-anchor="middle">max 40 lines</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>json_metrics: flattened numeric leaves of workspace JSON</title>
+    <rect x="400" y="210" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="485" y="232" text-anchor="middle">json_metrics</text>
+    <text class="box-sub" x="485" y="250" text-anchor="middle">dotted keys</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/digest.py"><title>inputs and train_used: in-workspace data statistics</title>
+    <rect x="590" y="210" width="150" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="665" y="232" text-anchor="middle">inputs, train_used</text>
+    <text class="box-sub" x="665" y="250" text-anchor="middle">target stats</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/metrics.py"><title>primary_values: added by the metric ledger, not by build_digest</title>
+    <rect x="760" y="210" width="160" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7" stroke-dasharray="4 3"/>
+    <text class="box-label" x="840" y="232" text-anchor="middle">primary_values</text>
+    <text class="box-sub" x="840" y="250" text-anchor="middle">added later</text>
+  </a>
+  <path class="edge" d="M470,60 V92 H105 V110" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d5a)"/>
+  <path class="edge" d="M470,60 V110" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d5a)"/>
+  <path class="edge" d="M480,60 V92 H840 V110" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d5a)"/>
+  <path class="edge" d="M470,60 V180 H105 V210" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d5a)"/>
+  <path class="edge" d="M480,60 V180 H840 V210" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d5a)"/>
+  <text class="box-sub" x="20" y="300">determinism: sorted iteration, fixed caps, rounded floats, no timestamps &mdash; the same workspace always yields the same digest</text>
+  <text class="box-sub" x="20" y="322">gold firewall: no labels, no rewards, no grader output ever enters the digest</text>
+</svg>
+</div>
+<p class="figcap">Diagram 5 &mdash; the schema is the contract between the digest builder, the recon prompt and the policy. The dashed <code>primary_values</code> block is written by <code>metrics.py</code> after recon, not by <code>build_digest</code>.</p>
+
+<details><summary>the schema as the recon prompt states it (verbatim)</summary><div class="dbody">
+<blockquote>- exec: fresh re-execution facts (exit_code, wall_time_s, timed_out,
+  error_signature, produced_pred_results, log_tail lines)
+- deliverables: [{path, bytes, kind, produced_this_run}] (produced_this_run=false
+  means the file is STALE - present in the workspace but not written by a fresh run)
+- contract_files: [{path, present, bytes, sha256, head}] - files the goal
+  names verbatim; present=false is a contract violation regardless of freshness
+- tables: parsed CSVs [{path, n_rows, columns, num_stats{col:{min,max,mean,std,
+  n_nan,n_unique}}, first_col_head, id_order_match{test_file,test_col,pred_col,match}}]
+- arrays: npy [{path, shape, dtype, stats}]
+- figures: png [{path, width_px, height_px, mode}]
+- log_metrics: metric lines scraped from logs [{metric, value(null=nan), context,
+  raw_line, source}]
+- json_metrics: {filename: {dotted.key: numeric_value}}
+- inputs: in-workspace train/test input stats (train target distributions!)
+- train_used: rows of training data actually consumed</blockquote>
+<p>Path: <code class="path">sources/evaluators/policy_bt_verifier/recon.py</code>, <code>RECON_PROMPT</code> (lines 29&ndash;60). The braces are doubled in the source because the prompt is a <code>str.format</code> template; they are unfolded here.</p>
+<p>Caps that keep the digest small, quoted from <code class="path">digest.py</code> lines 39&ndash;48: <code>MAX_NUM_COLS = 12</code>, <code>MAX_JSON_KEYS = 80</code>, <code>MAX_METRIC_LINES = 40</code>, <code>MAX_TRAIN_COLS = 10</code>, <code>JSON_FILE_CAP = 64 * 1024</code> (lines 39&ndash;43), <code>MAX_JSON_SCAN = 8 &lt;&lt; 20</code> (line 48), <code>CONTEXT_LEN = 34</code> (line 53). Logs read: <code>output.log</code> plus every <code>*.txt</code>, first 8 files, first 400 000 characters each. JSON read: <code>*.json</code> plus <code>pred_results/*.json</code>, first 16 files; a file over <code>JSON_FILE_CAP</code> keeps only its top-level scalars; a file over <code>MAX_JSON_SCAN</code> is skipped.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2 id="d6">Diagram 6 &mdash; how the comparison policy is built and accepted</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 330" role="img" aria-label="policy write screen smoke repair loop">
+  <defs>
+    <marker id="d6a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="d6e" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="d6x" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/policy.py">
+    <title>write_prompt(goal, task_config, repair): the writer prompt</title>
+    <rect x="20" y="40" width="170" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="105" y="64" text-anchor="middle">write prompt</text>
+    <text class="box-sub" x="105" y="82" text-anchor="middle">goal + task config</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/policy.py">
+    <title>The judge model writes one compare(dA, dB) function</title>
+    <rect x="230" y="40" width="170" height="58" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="315" y="64" text-anchor="middle">judge model</text>
+    <text class="box-sub" x="315" y="82" text-anchor="middle">12 000 tokens</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/policy.py">
+    <title>static_screen: AST allow-list, banned names, no dunder, no reflection</title>
+    <rect x="440" y="40" width="180" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="530" y="64" text-anchor="middle">static screen</text>
+    <text class="box-sub" x="530" y="82" text-anchor="middle">AST allow-list</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/policy.py">
+    <title>smoke_test: real digest pairs, both orders, mirrored winners</title>
+    <rect x="660" y="40" width="260" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="790" y="64" text-anchor="middle">runtime smoke</text>
+    <text class="box-sub" x="790" y="82" text-anchor="middle">up to 6 digests, both orders</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/policy.py">
+    <title>Repair loop: the exact screen or smoke error goes back into the prompt</title>
+    <rect x="230" y="160" width="170" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="315" y="184" text-anchor="middle">repair round</text>
+    <text class="box-sub" x="315" y="202" text-anchor="middle">max 3 by default</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/registry.py">
+    <title>The accepted policy and its sha are stored in the task registry</title>
+    <rect x="440" y="160" width="180" height="58" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="530" y="184" text-anchor="middle">accepted policy</text>
+    <text class="box-sub" x="530" y="202" text-anchor="middle">POLICY_SHA keyed</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>Every attempt failed: pairs fall to the crash rung and honest ties</title>
+    <rect x="660" y="160" width="260" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="790" y="184" text-anchor="middle">no policy</text>
+    <text class="box-sub" x="790" y="202" text-anchor="middle">crash rung + ties</text>
+  </a>
+  <path class="edge" d="M190,69 H230" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d6a)"/>
+  <path class="edge" d="M400,69 H440" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d6a)"/>
+  <text class="edge-label" x="420" y="62" text-anchor="middle">source</text>
+  <path class="edge" d="M620,69 H660" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d6a)"/>
+  <path class="edge" d="M780,98 V160" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d6a)"/>
+  <text class="edge-label" x="812" y="132" text-anchor="middle">pass</text>
+  <path class="edge" d="M660,189 H620" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d6e)"/>
+  <text class="edge-label" x="640" y="182" text-anchor="middle">fail</text>
+  <path class="edge" d="M440,189 H400" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d6e)"/>
+  <text class="edge-label" x="420" y="182" text-anchor="middle">error</text>
+  <path class="edge" d="M315,160 V98" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d6e)"/>
+  <text class="edge-label" x="348" y="130" text-anchor="middle">fix</text>
+  <path class="edge" d="M400,189 H920 V69 H920" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d6x)"/>
+  <text class="edge-label" x="700" y="240" text-anchor="middle">all attempts used up</text>
+  <text class="box-sub" x="20" y="286">a truncated JSON reply is never used as code: the token budget escalates once to 32 768, then the attempt fails loudly</text>
+  <text class="box-sub" x="20" y="308">a cached policy is re-smoked on the new generation's digest shape; a policy that only ever self-compared cannot be reused blindly</text>
+</svg>
+</div>
+<p class="figcap">Diagram 6 &mdash; <code>policy.py::ensure_policy</code>. <span class="chip warn">the build can fail</span> Cache identity is <code>POLICY_SHA + "_" + recon_version[:8]</code> (<code>evaluator.py:785-788</code>), so a changed recon config invalidates the policy and every cached verdict.</p>
+
+<details><summary>the E48 safeguards, quoted from <code class="path">policy.py</code></summary><div class="dbody">
+<blockquote>Port of the E45 v3 policy writer with ALL E48 fixes baked in:
+
+- <b>Token cap + truncation rejection</b> (safeguard 1): policy-writing calls
+  use ``max_tokens`` 9000 with escalation to 12000; a non-dict / truncated
+  JSON response is NEVER used as code - it fails loudly into the repair
+  loop as a screen-failing sentinel (the E48 regression where a truncated
+  raw JSON text became the policy source).
+- <b>Real repair plumbing</b> (safeguard 2): every retry passes the exact
+  screen/runtime errors in the prompt AND uses a cache-busting agent role
+  (``_fix&lt;n&gt;``) so a cached broken artifact can never be re-served.
+- <b>Runtime smoke before acceptance</b> (safeguard 3): a policy must
+  correctly compare 2 real digest pairs (both orders, mirrored winners)
+  before it is used.
+- <b>AST screen</b> (safeguard 4): stdlib import allowlist + banned builtin
+  names; execution happens in a subprocess with a timeout, cwd = temp dir.</blockquote>
+<p>Path: <code class="path">sources/evaluators/policy_bt_verifier/policy.py</code>, module docstring (lines 1&ndash;22). The token constants in the shipped code are <code>MAX_TOKENS_FIRST = 12000</code> and <code>MAX_TOKENS_ESCALATED = 32768</code> (lines 78&ndash;79), so the docstring's older 9000/12000 pair no longer matches the code.</p>
+<p>The screen itself, quoted from <code class="path">policy.py::static_screen</code> (line 239): the source must define <code>compare(dA, dB)</code>; every <code>import</code> root must be in <code>ALLOWED_IMPORTS</code> (<code>json, math, statistics, re, itertools, collections, functools, copy, typing</code>); a loaded name from <code>BANNED_NAMES</code> (<code>open, exec, eval, compile, __import__, input, breakpoint, exit, quit, globals, locals, vars</code>) is a violation; so is any call to <code>getattr</code>, <code>setattr</code> or <code>delattr</code>, and any <code>__dunder__</code> name or attribute.</p>
+<p>Smoke caps, quoted from <code class="path">policy.py</code> lines 81&ndash;88: <code>SMOKE_MAX_DIGESTS = 6</code>, <code>SMOKE_TIMEOUT_S = 30</code>, <code>SMOKE_MAX_PAIRS_CACHE_HIT = 3</code>. The smoke stops at the first failure and includes a self-pair that must return <code>tie</code>.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="d7">Diagram 7 &mdash; the recon TASK CONFIG and what the cache does to it</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="recon task config schema and cache lifecycle">
+  <defs>
+    <marker id="d7a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py">
+    <title>ensure_shape: the TASK CONFIG a second engineer follows</title>
+    <rect x="330" y="14" width="280" height="46" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="470" y="42" text-anchor="middle">TASK CONFIG (one call per task)</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>what the deliverables are, in 120 words</title>
+    <rect x="20" y="100" width="150" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="95" y="122" text-anchor="middle">schema_map</text>
+    <text class="box-sub" x="95" y="140" text-anchor="middle">deliverable shape</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>expected paths, schema and format notes from the goal text only</title>
+    <rect x="185" y="100" width="150" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="260" y="122" text-anchor="middle">deliverable_contract</text>
+    <text class="box-sub" x="260" y="140" text-anchor="middle">goal-named files</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>properties a strict checker would verify, <=12 words each</title>
+    <rect x="350" y="100" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="435" y="122" text-anchor="middle">graded_surface_vocabulary</text>
+    <text class="box-sub" x="435" y="140" text-anchor="middle">explicit goal demands</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>Primary metrics with ids, direction, role, aliases, bounds</title>
+    <rect x="535" y="100" width="170" height="54" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7"/>
+    <text class="box-label" x="620" y="122" text-anchor="middle">primary_metrics</text>
+    <text class="box-sub" x="620" y="140" text-anchor="middle">id, aliases, bounds</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>Dynamic-range and degeneracy rules</title>
+    <rect x="720" y="100" width="200" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="820" y="122" text-anchor="middle">value_sanity</text>
+    <text class="box-sub" x="820" y="140" text-anchor="middle">range, distribution rules</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>How crashes, timeouts and stale artifacts should count</title>
+    <rect x="20" y="190" width="150" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="95" y="212" text-anchor="middle">execution_rules</text>
+    <text class="box-sub" x="95" y="230" text-anchor="middle">crash handling</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>When the honest verdict is tie</title>
+    <rect x="185" y="190" width="150" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="260" y="212" text-anchor="middle">tie_policy</text>
+    <text class="box-sub" x="260" y="230" text-anchor="middle">honest ties</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>Comparability traps specific to this task</title>
+    <rect x="350" y="190" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="435" y="212" text-anchor="middle">pitfalls</text>
+    <text class="box-sub" x="435" y="230" text-anchor="middle">semantic drift</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/recon.py"><title>The one humility line the gradient may append</title>
+    <rect x="535" y="190" width="170" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="620" y="212" text-anchor="middle">coverage_footer</text>
+    <text class="box-sub" x="620" y="230" text-anchor="middle">max 400 chars</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/registry.py"><title>Stored once per task; a schema error triggers a refresh</title>
+    <rect x="720" y="190" width="200" height="54" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="820" y="212" text-anchor="middle">registry.recon</text>
+    <text class="box-sub" x="820" y="230" text-anchor="middle">refresh on SchemaError</text>
+  </a>
+  <path class="edge" d="M420,60 V82 H95 V100" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d7a)"/>
+  <path class="edge" d="M470,60 V100" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d7a)"/>
+  <path class="edge" d="M520,60 V82 H820 V190" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d7a)"/>
+  <path class="edge" d="M420,60 V170 H95 V190" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d7a)"/>
+</svg>
+</div>
+<p class="figcap">Diagram 7 &mdash; the recon prompt asks for exactly these keys (<code class="path">recon.py</code>, <code>RECON_PROMPT</code> section 3). The task key is <code>sha256(goal + REGISTRY_VERSION)[:16]</code> (<code>registry.py::task_key</code>), so the same goal text always finds the same registry.</p>
+
+<details><summary>cache lifecycle, quoted from <code class="path">evaluator.py</code> and <code class="path">recon.py</code></summary><div class="dbody">
+<pre>RECON_PROMPT_VERSION = ("recon-v2-ledger-" + hashlib.sha256(
+    b"policy_bt_recon_v2_metric_ledger"
+).hexdigest()[:12])          # recon.py:25-27
+
+if recon_cfg is None:        # first generation: build from this digest alone
+    recon_cfg = recon_mod.ensure_shape(self._llm_json(uuid, "recon", prompt, 4000, log))
+    registry.set_recon(recon_cfg, RECON_PROMPT_VERSION, recon_version=...)
+                             # evaluator.py:693-708</pre>
+<p>Refresh rule, quoted from <code>evaluator.py</code> (lines 1078&ndash;1150): when a cached policy signals <code>SchemaError</code> on a pair and <code>self._gens_since_refresh &gt;= self.recon_refresh_gap</code>, the recon is rebuilt from ALL digests (last 12, <code>_RECON_MAX_DIGESTS</code>), the policy is rewritten, and the affected pairs are re-evaluated.</p>
+<p class="note flag">Red note (review 2026-10-10): the comment above <code>pending_recon</code> promises N6/P2.3 behaviour &mdash; a refreshed recon held in memory and committed only after the policy rewrite passes &mdash; but <code>pending_recon</code> is assigned once (<code>null</code>, line 692) and never set to a tuple, so that hold path is dead code. In the schema-error refresh the new recon is persisted first (<code>registry.set_recon</code>, lines 1103&ndash;1107) and then the policy is rewritten (line 1117); when the rewrite fails the code logs <code>schema-refresh policy rewrite FAILED; keeping old</code> and keeps the old policy while the new recon stays persisted.</p>
+<p><code>coverage_footer</code> strips infrastructure names (<code>run.sh</code>, <code>requirements.txt</code>, <code>__pycache__</code>, <code>*.pyc</code>) before it reaches the gradient tail (<code>recon.py::coverage_footer</code>).</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2 id="d8">Diagram 8 &mdash; how the metric ledger resolves one metric</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 260" role="img" aria-label="metric resolution ladder">
+  <defs>
+    <marker id="d8a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/metrics.py">
+    <title>Step 1: exact alias hits in json_metrics, ranked by freshness</title>
+    <rect x="20" y="40" width="180" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="64" text-anchor="middle">1 &#183; alias hits</text>
+    <text class="box-sub" x="110" y="82" text-anchor="middle">file + exact dotted key</text>
+    <text class="box-sub" x="110" y="98" text-anchor="middle">fresh file first</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/metrics.py">
+    <title>Step 1b: the LLM reads the raw program output when aliases fail</title>
+    <rect x="220" y="40" width="180" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="310" y="64" text-anchor="middle">1b &#183; LLM extract</text>
+    <text class="box-sub" x="310" y="82" text-anchor="middle">raw text output</text>
+    <text class="box-sub" x="310" y="98" text-anchor="middle">replaces regex</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/metrics.py">
+    <title>Step 2: strict lexical fallback, every query token must match</title>
+    <rect x="420" y="40" width="180" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="510" y="64" text-anchor="middle">2 &#183; lexical fallback</text>
+    <text class="box-sub" x="510" y="82" text-anchor="middle">all query tokens</text>
+    <text class="box-sub" x="510" y="98" text-anchor="middle">verification keys out</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/metrics.py">
+    <title>Step 3: log_metrics context matching</title>
+    <rect x="620" y="40" width="180" height="64" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="710" y="64" text-anchor="middle">3 &#183; log context</text>
+    <text class="box-sub" x="710" y="82" text-anchor="middle">scraped metric lines</text>
+    <text class="box-sub" x="710" y="98" text-anchor="middle">last resort</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/metrics.py">
+    <title>Two equal-preference candidates with different values: never guess</title>
+    <rect x="300" y="165" width="180" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="390" y="189" text-anchor="middle">ambiguous</text>
+    <text class="box-sub" x="390" y="207" text-anchor="middle">candidates listed</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/metrics.py">
+    <title>No candidate anywhere: reported missing, never invented</title>
+    <rect x="510" y="165" width="180" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#8FB8C9"/>
+    <text class="box-label" x="600" y="189" text-anchor="middle">missing</text>
+    <text class="box-sub" x="600" y="207" text-anchor="middle">status only</text>
+  </a>
+  <path class="edge" d="M200,72 H220" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d8a)"/>
+  <path class="edge" d="M400,72 H420" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d8a)"/>
+  <path class="edge" d="M600,72 H620" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d8a)"/>
+  <path class="edge" d="M510,104 V165" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d8a)"/>
+  <path class="edge" d="M710,104 V140 H600 V165" fill="none" stroke="#8FB8C9" stroke-width="1.5" marker-end="url(#d8a)"/>
+  <text class="edge-label" x="640" y="134" text-anchor="middle">no hit</text>
+  <text class="box-sub" x="20" y="238">each resolved metric carries status, value, source and freshness; the policy, the gradient fold and the engine all read this one record</text>
+</svg>
+</div>
+<p class="figcap">Diagram 8 &mdash; <code>metrics.py::_resolve_one</code>. <span class="chip warn">ambiguous is not a guess</span> The resolution order is: (1) exact alias hits, (1b) LLM text extraction, (2) strict lexical fallback, (3) log context matching &mdash; then <code>ambiguous</code> or <code>missing</code>. The statuses are <code>resolved</code>, <code>ambiguous</code>, <code>missing</code>.</p>
+
+<details><summary>the ledger contract, quoted from <code class="path">metrics.py</code></summary><div class="dbody">
+<blockquote>The ledger replaces three independent metric-comparison implementations
+that could silently disagree (the LLM policy's free-form key search, the
+gradient fold's tie regex, and the evaluator's fuzzy lookup - review
+&#167;2.2): the policy, the fold and any exploration logic all read
+``digest["primary_values"]``.
+
+Resolution order per metric (review &#167;4.1):
+
+1. Exact alias hits (file + key), preferring a file that is
+   ``produced_this_run=True``, then a non-verification file (not
+   ``independent_*``/``verif*``/``check*``), then the alias order.
+2. Strict lexical fallback only when no alias hits: EVERY core query
+   token (from the metric id) must be present in the candidate key,
+   verification-echo keys are excluded, and ``log_metrics`` are searched
+   too.
+3. Several candidates with different values -&gt; ``ambiguous`` (never guess).
+4. Nothing -&gt; ``missing``.</blockquote>
+<p>Path: <code class="path">sources/evaluators/policy_bt_verifier/metrics.py</code>, module docstring (lines 1&ndash;28). The code adds step 1b (LLM extraction from the raw output text) between 1 and 2, which the docstring's four-step list does not name.</p>
+<p>Where it is called: <code>evaluator.py:742-755</code> resolves the current generation and re-resolves every predecessor whose <code>primary_values_version</code> differs from the current recon version. The METRICS stage line reports <code>resolved=&#8230; ambiguous=&#8230; missing=&#8230;</code> with the resolved values and their sources.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="d9">Diagram 9 &mdash; the registry: what generation N+1 reads instead of re-running</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="registry layout and cache keys">
+  <defs>
+    <marker id="d9a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/registry.py">
+    <title>One JSON file per task goal, under the verifier scratch root</title>
+    <rect x="330" y="14" width="290" height="48" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="475" y="36" text-anchor="middle">policy_bt_registry_&lt;task_key&gt;.json</text>
+    <text class="box-sub" x="475" y="53" text-anchor="middle">REGISTRY_VERSION policy_bt-v1-e48-20261005</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/registry.py">
+    <title>Arrival-ordered per-generation records: digest, ledger, reward, stats, session</title>
+    <rect x="20" y="110" width="170" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="105" y="134" text-anchor="middle">generations</text>
+    <text class="box-sub" x="105" y="152" text-anchor="middle">digest + ledger</text>
+    <text class="box-sub" x="105" y="166" text-anchor="middle">reward never rewritten</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/registry.py">
+    <title>Code-policy pair verdict cache</title>
+    <rect x="210" y="110" width="170" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="295" y="134" text-anchor="middle">verdicts</text>
+    <text class="box-sub" x="295" y="152" text-anchor="middle">key</text>
+    <text class="box-sub" x="295" y="166" text-anchor="middle">&lt;policy_sha&gt;|&lt;a&gt;|&lt;b&gt;</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/registry.py">
+    <title>Kimi pair-call cache, append only, self-heal scan</title>
+    <rect x="400" y="110" width="180" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="490" y="134" text-anchor="middle">visual</text>
+    <text class="box-sub" x="490" y="152" text-anchor="middle">key</text>
+    <text class="box-sub" x="490" y="166" text-anchor="middle">&lt;prompt&gt;|&lt;a&gt;|&lt;b&gt;|&lt;order&gt;|&lt;hash&gt;</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/registry.py">
+    <title>The TASK CONFIG plus the version it was built under</title>
+    <rect x="600" y="110" width="150" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="675" y="134" text-anchor="middle">recon</text>
+    <text class="box-sub" x="675" y="152" text-anchor="middle">config</text>
+    <text class="box-sub" x="675" y="166" text-anchor="middle">+ version</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/registry.py">
+    <title>The accepted policy source, its sha and its build metadata</title>
+    <rect x="770" y="110" width="150" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="845" y="134" text-anchor="middle">policy</text>
+    <text class="box-sub" x="845" y="152" text-anchor="middle">source + sha</text>
+    <text class="box-sub" x="845" y="166" text-anchor="middle">+ meta</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>Saved right after the reward, before the gradient and the refiner</title>
+    <rect x="330" y="210" width="290" height="58" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7"/>
+    <text class="box-label" x="475" y="234" text-anchor="middle">registry.save()</text>
+    <text class="box-sub" x="475" y="252" text-anchor="middle">before the optional stages</text>
+  </a>
+  <path class="edge" d="M475,62 V80 H105 V110" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d9a)"/>
+  <path class="edge" d="M475,62 V110" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d9a)"/>
+  <path class="edge" d="M480,62 V80 H845 V110" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d9a)"/>
+  <path class="edge" d="M490,170 V210" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d9a)"/>
+  <text class="box-sub" x="20" y="290">a version mismatch warns and keeps the loaded state; the visual cache is scanned so a healed entry wins over an old parse-fail</text>
+</svg>
+</div>
+<p class="figcap">Diagram 9 &mdash; <code>registry.py::TaskRegistry</code>. Verdict keys come from <code>code_verdict_key(policy_sha, uuid_a, uuid_b)</code> and <code>visual_key(prompt_version, uuid_a, uuid_b, order, img_hash)</code>; the visual channel builds its key inline in <code>visual.py::VisualChannel.one_order</code>, so <code>visual_key</code> is used by the tests, not by the runtime path.</p>
+
+<details><summary>what the registry means for generation 2, quoted from <code class="path">registry.py</code></summary><div class="dbody">
+<blockquote>The registry is the PRIMARY artifact store (plan &#167;5b): each generation's digest is computed ONCE at its evaluation and
+read from here for every later comparison; predecessor comparisons never
+touch ``/tmp`` snapshots or the live workspace again.</blockquote>
+<p>Path: <code class="path">sources/evaluators/policy_bt_verifier/registry.py</code>, module docstring (lines 1&ndash;22).</p>
+<p>Persistence order, quoted from <code>evaluator.py</code> lines 1218&ndash;1231: the generation record (digest, ledger, capped reward, pair stats, session tag) is written and saved immediately after the reward, so a later refiner or artifact failure cannot lose it. A predecessor with no registered digest is rebuilt from a <code>/tmp</code> snapshot when one exists (a bootstrap digest with <code>exec</code> facts marked as bootstrap), and excluded with a WARN when none exists.</p>
+</div></details>
+</div>
+<div class="panel"><span class="br"></span>
+<h2 id="d10">Diagram 10 &mdash; from pair outcomes to the reward the engine sees</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="reward path and weak evidence guard">
+  <defs>
+    <marker id="d10a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="d10w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>One outcome per predecessor: win, loss or tie</title>
+    <rect x="20" y="40" width="170" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="105" y="64" text-anchor="middle">outcomes</text>
+    <text class="box-sub" x="105" y="82" text-anchor="middle">win / loss / tie</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>win_rate_reward: (wins + 0.5 * ties) / n, 0.5 with no pairs</title>
+    <rect x="230" y="40" width="200" height="58" rx="26" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7"/>
+    <text class="box-label" x="330" y="64" text-anchor="middle">win_rate_reward</text>
+    <text class="box-sub" x="330" y="82" text-anchor="middle">(W + 0.5T) / n</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>Optional Bradley-Terry fit over the arrival-ordered prefix</title>
+    <rect x="230" y="150" width="200" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7" stroke-dasharray="4 3"/>
+    <text class="box-label" x="330" y="174" text-anchor="middle">bradley_terry_reward</text>
+    <text class="box-sub" x="330" y="192" text-anchor="middle">opt-in, ridge 1.0</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>Every decisive pair rested on self-reported metrics: cap the reward</title>
+    <rect x="470" y="40" width="200" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="570" y="64" text-anchor="middle">weak-evidence guard</text>
+    <text class="box-sub" x="570" y="82" text-anchor="middle">cap at 0.75</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>overall_score: the capped reward the engine and the early stop read</title>
+    <rect x="710" y="40" width="210" height="58" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="815" y="64" text-anchor="middle">overall_score</text>
+    <text class="box-sub" x="815" y="82" text-anchor="middle">clipped to 0-1, 4 decimals</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>Normalised outcomes for the engine and the stop controller</title>
+    <rect x="470" y="150" width="200" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="570" y="174" text-anchor="middle">pair_outcomes</text>
+    <text class="box-sub" x="570" y="192" text-anchor="middle">won / lost / tie</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/metrics.py">
+    <title>Compact metric ledger summary for the frontier probe</title>
+    <rect x="710" y="150" width="210" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="815" y="174" text-anchor="middle">metric_summary</text>
+    <text class="box-sub" x="815" y="192" text-anchor="middle">status + value per metric</text>
+  </a>
+  <path class="edge" d="M190,69 H230" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d10a)"/>
+  <path class="edge" d="M430,69 H470" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d10a)"/>
+  <path class="edge" d="M670,69 H710" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d10a)"/>
+  <path class="edge" d="M330,150 V98" fill="none" stroke="#7DF9C7" stroke-width="1.25" stroke-dasharray="4 3" marker-end="url(#d10a)"/>
+  <text class="edge-label" x="368" y="130" text-anchor="middle">if opted in</text>
+  <path class="edge" d="M815,98 V150" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#d10a)"/>
+  <text class="box-sub" x="20" y="252">the weak-evidence guard keeps a spurious 1.0 from tripping the learned early-stop threshold (P0.7)</text>
+  <text class="box-sub" x="20" y="276">the reward is written at arrival time and never rewritten by a later generation (E19c online convention)</text>
+</svg>
+</div>
+<p class="figcap">Diagram 10 &mdash; two aggregation modes, one reward. <span class="chip warn">cap on weak evidence</span> The default is the raw win-rate: E19c measured it at 0.742 on the frozen arena against 0.643 for the Bradley-Terry fit, which is why the fit is opt-in (<code>policy_bt_reward = "bradley_terry"</code>).</p>
+
+<details><summary>the two reward functions and the cap, quoted</summary><div class="dbody">
+<pre>def win_rate_reward(outcomes: list[str]) -&gt; dict[str, Any]:
+    """Raw win-rate vs predecessors (ties count half; default mode)."""
+    n = len(outcomes)
+    if n == 0:
+        return {"reward": 0.5, "wins": 0, "losses": 0, "ties": 0, "n_pairs": 0}
+    wins = sum(1 for o in outcomes if o == "win")
+    losses = sum(1 for o in outcomes if o == "loss")
+    ties = sum(1 for o in outcomes if o == "tie")
+    reward = (wins + 0.5 * ties) / n
+    return {"reward": reward, "wins": wins, "losses": losses,
+            "ties": ties, "n_pairs": n}</pre>
+<p>Path: <code class="path">verdicts.py::win_rate_reward</code> (lines 305&ndash;320); <code>bradley_terry_reward</code> sits at line 323 and the frozen <code>bt_fit_weighted</code> MLE at line 39.</p>
+<pre>WEAK_EVIDENCE_REWARD_CAP = 0.75
+_SELF_REPORTED_KEY = re.compile(r"(log_metrics|json_metrics)", re.I)
+_FRESHNESS_KEY = re.compile(r"produced_this_run", re.I)
+_CONTRACT_KEY = re.compile(r"contract_files", re.I)
+
+reward_weak_evidence = bool(pair_records) and n_decisive &gt; 0 and (
+    n_weak == n_decisive
+)
+if reward_weak_evidence:
+    reward = min(reward, WEAK_EVIDENCE_REWARD_CAP)</pre>
+<p>Path: <code class="path">evaluator.py</code> lines 78&ndash;88 and 1198&ndash;1202. The comment beside the constant names the case it exists for: <code>P0.7 - HP gen 4's reward 1.0 crossed the early-stop threshold on a boolean-vs-coordinate artifact</code>.</p>
+<pre>{"wins": ..., "losses": ..., "ties": ..., "n_pairs": ..., "n_predecessors": ...,
+ "n_excluded_predecessors": ..., "pair_outcomes": {prev_uuid: "won|lost|tie"},
+ "figure_task": ..., "visual_pairs": ..., "policy_sha": ...,
+ "metric_summary": {id: {"status": ..., "value": ...}},
+ "reexec": {"exit_code", "wall_time_s", "timed_out", "source_manifest_intact",
+            "n_fresh_artifacts"},
+ "bt_pick": ..., "bt_ratings": ...,
+ "llm_calls": ..., "llm_spend_usd": ...,
+ "abstracted_textual_gradient": ..., "abstractec_textual_gradient": ...}</pre>
+<p>Quoted score keys from <code class="path">evaluator.py::PolicyBTVerifierEvaluator.evaluate</code>, the <code>scores</code> dict (lines 1310&ndash;1365). <code>pair_outcomes</code> is the only key the engine's stop controller reads.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="d11">Diagram 11 &mdash; the gradient the mutator receives</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 300" role="img" aria-label="gradient fold and refiner">
+  <defs>
+    <marker id="d11a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="d11s" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/gradient.py">
+    <title>Decisive losses first, sorted by descending confidence</title>
+    <rect x="20" y="40" width="170" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="105" y="64" text-anchor="middle">WHAT TO FIX FIRST</text>
+    <text class="box-sub" x="105" y="82" text-anchor="middle">losses, by confidence</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/gradient.py">
+    <title>Then the ties: evidence invisible or balanced</title>
+    <rect x="230" y="40" width="170" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="330" y="64" text-anchor="middle">UNRESOLVED</text>
+    <text class="box-sub" x="330" y="82" text-anchor="middle">ties</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/gradient.py">
+    <title>Then what beats predecessors, so the mutator keeps it</title>
+    <rect x="440" y="40" width="170" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="530" y="64" text-anchor="middle">KEEP</text>
+    <text class="box-sub" x="530" y="82" text-anchor="middle">wins</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/gradient.py">
+    <title>A deterministic METRICS section rendered from the ledger, not from feedback text</title>
+    <rect x="650" y="40" width="270" height="58" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="785" y="64" text-anchor="middle">METRICS (from the ledger)</text>
+    <text class="box-sub" x="785" y="82" text-anchor="middle">measured values, tie verdicts</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/gradient.py">
+    <title>One humility line, capped at 400 characters, only when something was left unassessed</title>
+    <rect x="650" y="150" width="270" height="58" rx="26" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="785" y="174" text-anchor="middle">coverage footer line</text>
+    <text class="box-sub" x="785" y="192" text-anchor="middle">max 400 chars</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/gradient.py">
+    <title>The optional E47 refiner rewrites the fold against file previews</title>
+    <rect x="230" y="150" width="380" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="420" y="174" text-anchor="middle">refiner (default on)</text>
+    <text class="box-sub" x="420" y="192" text-anchor="middle">raw gradient + file previews (6 000 chars)</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>The final text is written to textual_gradient.txt for the next mutation</title>
+    <rect x="20" y="150" width="170" height="58" rx="2" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7"/>
+    <text class="box-label" x="105" y="174" text-anchor="middle">textual_gradient.txt</text>
+    <text class="box-sub" x="105" y="192" text-anchor="middle">consumed by the mutator</text>
+  </a>
+  <path class="edge" d="M190,69 H230" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d11a)"/>
+  <path class="edge" d="M400,69 H440" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d11a)"/>
+  <path class="edge" d="M610,69 H650" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d11a)"/>
+  <path class="edge" d="M785,98 V150" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d11a)"/>
+  <path class="edge" d="M650,179 H610" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d11a)"/>
+  <path class="edge" d="M230,179 H190" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#d11a)"/>
+  <path class="edge dashed-edge" d="M105,150 V98 H610" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#d11s)"/>
+  <text class="edge-label" x="300" y="128" text-anchor="middle">raw fold is the refiner input</text>
+  <text class="box-sub" x="20" y="252">a refiner failure is caught: the run keeps the raw fold and logs a WARN (N7), because the reward and verdicts are already saved</text>
+  <text class="box-sub" x="20" y="276">the fold renders its METRICS section from the ledger, so a metric tie can no longer be missed by a regex over feedback text</text>
+</svg>
+</div>
+<p class="figcap">Diagram 11 &mdash; <code>gradient.py::fold_gradient</code> then <code>refine_gradient</code>. The fold always runs; the refiner runs when <code>policy_bt_refiner</code> is true (default).</p>
+
+<details><summary>the fold and the refiner contract, quoted</summary><div class="dbody">
+<pre>lines = [f"GEN {uuid} - verdicts vs predecessors ({len(pair_records)} pairs: "
+         f"{len(wins)}W/{len(losses)}L/{len(ties)}T):", ""]
+lines.append("WHAT TO FIX FIRST (decisive losses):")
+if losses:
+    for f in sorted(losses, key=_conf, reverse=True):
+        lines.append(f"- vs {_other(f)}: {f['feedback']}")
+if ties:
+    lines.append("UNRESOLVED (ties - evidence invisible or balanced):")
+    ...
+if wins:
+    lines.append("KEEP (what beats predecessors):")
+    ...</pre>
+<p>Path: <code class="path">gradient.py::fold_gradient</code> (lines 83&ndash;188; the quoted block starts at line 132).</p>
+<pre>REFINER_KEYS = (
+    "refined_gradient", "verified_issues", "likely_explanations",
+    "missing_files", "unverified_from_raw", "corrections",
+)</pre>
+<p>Path: <code class="path">gradient.py</code> lines 73&ndash;80. The refiner prompt calls the raw gradient <b>GROUND TRUTH</b> and returns verified issues with evidence quotes, labelled hypotheses, missing files, unverified raw claims and corrections where the raw fold was wrong about a file (<code>REFINER_PROMPT</code>, lines 29&ndash;80).</p>
+<p>Contract the refiner reads, quoted from <code>gradient.py</code>: <code>COVERAGE_FOOTER_CAP = 400</code>, and the fold appends the footer only when something is genuinely left unassessed (the note records why: an unbounded footer once dominated the raw gradient and the refiner echoed it as the whole gradient, 2026-10-07).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="d12">Diagram 12 &mdash; the crash rung decides before any LLM runs</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 940 250" role="img" aria-label="crash rung decision tree">
+  <defs>
+    <marker id="d12a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>crash_rung(uuid_a, ledger_a, uuid_b, ledger_b): None means the channel decides</title>
+    <rect x="350" y="20" width="240" height="50" rx="26" fill="rgba(125,249,199,0.14)" stroke="#7DF9C7" stroke-width="2"/>
+    <text class="box-label" x="470" y="50" text-anchor="middle">crash_rung</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>One side crashed: the clean side wins, decisive</title>
+    <rect x="20" y="130" width="200" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="120" y="154" text-anchor="middle">one side crashed</text>
+    <text class="box-sub" x="120" y="172" text-anchor="middle">clean side wins</text>
+    <text class="box-sub" x="120" y="186" text-anchor="middle">decisive</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>Identical error signature and class: an environment regression, not a quality difference</title>
+    <rect x="240" y="130" width="200" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#8FB8C9"/>
+    <text class="box-label" x="340" y="154" text-anchor="middle">both crashed, same signature</text>
+    <text class="box-sub" x="340" y="172" text-anchor="middle">tie is rule-correct</text>
+    <text class="box-sub" x="340" y="186" text-anchor="middle">chem clintox lesson</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>Different signatures: partial evidence decides, equal evidence ties</title>
+    <rect x="460" y="130" width="200" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="560" y="154" text-anchor="middle">different signatures</text>
+    <text class="box-sub" x="560" y="172" text-anchor="middle">partial evidence</text>
+    <text class="box-sub" x="560" y="186" text-anchor="middle">else tie</text>
+  </a>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>A bootstrap ledger has no fresh execution facts: unknown, not crashed</title>
+    <rect x="680" y="130" width="240" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="800" y="154" text-anchor="middle">bootstrap ledger</text>
+    <text class="box-sub" x="800" y="172" text-anchor="middle">returns None</text>
+    <text class="box-sub" x="800" y="186" text-anchor="middle">the channel decides</text>
+  </a>
+  <path class="edge" d="M400,70 V100 H120 V130" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d12a)"/>
+  <path class="edge" d="M440,70 V130" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d12a)"/>
+  <path class="edge" d="M500,70 V100 H560 V130" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d12a)"/>
+  <path class="edge" d="M540,70 V100 H800 V130" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#d12a)"/>
+  <text class="box-sub" x="20" y="232">the rung runs first on both channels, so a crashed generation can never win a pair through fluent feedback text</text>
+</svg>
+</div>
+<p class="figcap">Diagram 12 &mdash; <code>verdicts.py::crash_rung</code>. <span class="chip warn">crashes decide first</span> The rung returns <code>None</code> when both sides are clean, which is the signal for the pair ladder in <a href="#ladder">diagram 3</a> to continue.</p>
+
+<details><summary>the crash-rung rules, quoted from <code class="path">verdicts.py</code></summary><div class="dbody">
+<blockquote>Rules (plan &#167;4 8 / &#167;4b ladder position):
+
+- one side crashed, the other clean -&gt; the clean side wins (decisive);
+- both crashed with IDENTICAL error signature AND crash class -&gt; tie
+  (rule-correct: an environment regression is not a quality
+  difference - chem clintox lesson);
+- both crashed with clearly different signatures/classes -&gt; decided
+  by partial evidence (fresh artifact counts); equal evidence -&gt; tie.
+
+P2.4: when either ledger is a BOOTSTRAP (digest rebuilt from a
+snapshot, no fresh execution facts) this rung returns ``None`` -
+"unknown", not "crashed" - and the comparison channel decides.</blockquote>
+<p>Path: <code class="path">sources/evaluators/policy_bt_verifier/verdicts.py::crash_rung</code>, docstring (lines 128&ndash;145).</p>
+<p>Deciding keys this rung can use: <code>exec.error_signature</code>, the crash class and <code>produced_this_run</code> counts. Its verdicts carry <code>channel: "crash_rung"</code>, so the pair table shows which rung decided every pair.</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="cards">File cards</h2>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">sources/evaluators/policy_bt_verifier/evaluator.py</a></h4>
+<p class="role">Runs the whole pipeline for one generation: re-execution, digest, recon, policy, the pair loop, reward, gradient and the artifacts on disk.</p>
+<p class="meta">1 664 lines &#183; class: PolicyBTVerifierEvaluator &#183; entry: <code>WorkflowEvaluator</code> when <code>verifier_kind=policy_bt</code></p>
+<details><summary>signatures (abbreviated: defaults kept, annotations trimmed) and config fields</summary><div class="dbody">
+<pre>PolicyBTVerifierEvaluator.__init__(config, workspace_dir=None)
+PolicyBTVerifierEvaluator.evaluate(uuid: str) -&gt; dict
+PolicyBTVerifierEvaluator._pair_verdict(uuid, goal, digest_now, ledger,
+    current_ws, runner, pred, policy_src, policy_sha, visual,
+    allow_visual, registry, log) -&gt; dict
+PolicyBTVerifierEvaluator._write_artifacts(uuid, scores, pair_records,
+    raw_gradient, gradient_text) -&gt; None
+find_run_snapshot(uuid: str) -&gt; Path | None</pre>
+<p>Module constants: <code>WEAK_EVIDENCE_REWARD_CAP = 0.75</code>, <code>_RECON_MAX_DIGESTS = 12</code>.</p>
+<p>Config fields read: the twelve <code>policy_bt_*</code> knobs (<code>evaluator.py:216-251</code>), <code>vision_judge_model</code>, <code>judge_model</code> (via <code>BaseEvaluator.llm_config</code>, temperature forced to 0.0), <code>reasoning_effort</code>, <code>workflow_dir</code>.</p>
+<p><code>evaluate(uuid)</code> in order (line numbers from the shipped file):</p>
+<pre>1  _load_workflow_data(uuid); a run with no state_result or no code
+   short-circuits to a fixed gradient (493)
+2  StageLogger + TaskRegistry.load(root, goal) + task_key (503-510)
+3  ReexecRunner.run(workspace, uuid) -&gt; ledger; write_ledger_file (513-522)
+4  build_digest(uuid, copy, ledger, goal); registry.record_generation (566-573)
+5  predecessors: registered digest, else a /tmp snapshot (bootstrap),
+   else EXCLUDED with a WARN (584-625)
+6  recon: registry hit, else ONE judge call (684-712)
+7  metric ledger: resolve_primary_values for the current and every
+   predecessor on a version change (720-778)
+8  policy: cache hit re-smoked; else write -&gt; screen -&gt; smoke -&gt; repair
+   (780-935)
+9  channel selection: is_figure_dominant over the pooled deliverables (937-942)
+10 pair loop: _pair_verdict per predecessor, both channels (944-1066)
+11 schema-error recon refresh + rewrite + re-evaluate (1078-1166)
+12 reward: win_rate (or BT), weak-evidence guard, then registry.save (1178-1231)
+13 gradient: fold_gradient, then the optional refiner (1234-1307)
+14 scores dict + _write_artifacts + _save_results (1309-1372)</pre>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/reexec.py">sources/evaluators/policy_bt_verifier/reexec.py</a></h4>
+<p class="role">Copies a workspace into the verifier sandbox, provisions a local venv, runs the main script and returns the execution ledger.</p>
+<p class="meta">879 lines &#183; classes: ReexecRunner &#183; never mutates the original workspace</p>
+<details><summary>signatures (abbreviated) and keys</summary><div class="dbody">
+<pre>ReexecRunner.__init__(task_sandbox, timeout_s=900, venv_reuse=True,
+    install_timeout_s=900, python_exe=None, log=None)
+ReexecRunner.run(workspace: Path, uuid: str) -&gt; dict
+ReexecRunner.run_copy_path(uuid: str) -&gt; Path
+contract_commands(root: Path) -&gt; tuple[str, list[tuple[str, list[str]]]]
+select_main_script(root: Path) -&gt; Path | None
+frozen_manifest(d: Path) -&gt; dict[str, list]
+write_ledger_file(ledger, out_path) -&gt; None</pre>
+<p>Ledger keys include <code>exit_code</code>, <code>wall_time_s</code>, <code>timed_out</code>, <code>error_signature</code>, <code>fresh_artifacts</code>, <code>source_manifest_intact</code>, <code>launch_error</code>, <code>venv_created</code>, <code>packages_installed</code>.</p>
+<p>Imports <code>PINNED_CONSTRAINTS</code> from <code class="path">sources/benchmark_evaluation/execution_sandbox.py</code> for the era pins.</p>
+<p><code>run(workspace, uuid)</code> in order: freeze the source manifest &rarr; <code>clone_tree</code> into <code>runs/&lt;uuid&gt;/</code> &rarr; <code>contract_commands</code> (README or <code>run.sh</code>, the largest-<code>.py</code> heuristic is fallback) &rarr; <code>_ensure_venv</code> + <code>_install_requirements</code> &rarr; execute with <code>timeout_s</code> and a process-group kill &rarr; collect the log tail and the fresh-artifact set &rarr; compare the source manifest again and set <code>source_manifest_intact</code>. A clone, venv or entry-point failure lands in <code>launch_error</code> instead of raising.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/digest.py">sources/evaluators/policy_bt_verifier/digest.py</a></h4>
+<p class="role">Turns one workspace into a fixed-shape JSON: exec facts, deliverables, parsed tables, arrays, figures, metric lines and JSON leaves.</p>
+<p class="meta">630 lines &#183; no gold, no labels, no timestamps &#183; sorted iteration, fixed caps</p>
+<details><summary>signatures (abbreviated) and caps</summary><div class="dbody">
+<pre>build_digest(uuid: str, ws: Path, ledger: dict | None, goal: str = "") -&gt; dict
+digest_summary(digest: dict) -&gt; dict
+is_figure_dominant(digest: dict, share: float = 0.5) -&gt; bool
+parse_table(p, ws) / parse_array(p, ws) / parse_figure(p, ws)
+flatten_json(obj, prefix="") / flatten_flags(obj, prefix="")
+metric_lines(txt: str, source: str) -&gt; list[dict]
+contract_files(goal: str, ws: Path) -&gt; list[dict]</pre>
+<p>Caps: <code>MAX_NUM_COLS = 12</code>, <code>MAX_JSON_KEYS = 80</code>, <code>MAX_METRIC_LINES = 40</code>, <code>MAX_TRAIN_COLS = 10</code>, <code>MAX_JSON_SCAN = 8 MiB</code>.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/policy.py">sources/evaluators/policy_bt_verifier/policy.py</a></h4>
+<p class="role">Asks the judge model for a pairwise comparison script, screens it, smoke-tests it on real digests and repairs it until both orders agree.</p>
+<p class="meta">569 lines &#183; runs in a subprocess with a timeout, cwd = temp dir</p>
+<details><summary>signatures (abbreviated) and safeguards</summary><div class="dbody">
+<pre>ensure_policy(goal, task_config, smoke_digests, llm_json,
+    repair_rounds=3, smoke_timeout_s=30, log=None)
+run_policy(policy_src, dA, dB, timeout=60) -&gt; dict
+static_screen(src: str) -&gt; list[str]
+smoke_test(policy_src, digests, timeout=30, run_fn=None, max_pairs=0)
+mirrored(v_ab, v_ba) -&gt; bool
+write_prompt(goal, task_config, repair=None) -&gt; str</pre>
+<p>Constants: <code>ALLOWED_IMPORTS</code>, <code>BANNED_NAMES</code>, <code>MAX_TOKENS_FIRST = 12000</code>, <code>MAX_TOKENS_ESCALATED = 32768</code>, <code>SMOKE_MAX_DIGESTS = 6</code>, <code>SMOKE_TIMEOUT_S = 30</code>, <code>SMOKE_MAX_PAIRS_CACHE_HIT = 3</code>, <code>POLICY_SHA</code> (sha256 of the writer prompt), <code>MAIN_STANZA</code>.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/gradient.py">sources/evaluators/policy_bt_verifier/gradient.py</a></h4>
+<p class="role">Folds the pair feedbacks into one gradient, losses first; optionally refines it against file previews of the same workspace.</p>
+<p class="meta">480 lines &#183; the fold adds measured METRICS from the ledger, never from regex</p>
+<details><summary>signatures (abbreviated)</summary><div class="dbody">
+<pre>fold_gradient(uuid, pair_records, coverage_footer="", ledger=None)
+    -&gt; tuple[str, dict]
+build_preview(ws: Path, digest, ledger, limit=6000) -&gt; str
+refine_gradient(llm_json, uuid, raw_gradient, preview) -&gt; dict | None
+refined_text(raw_gradient, refinement) -&gt; str
+refiner_stats(refinement) -&gt; dict[str, int]</pre>
+<p>Constant: <code>COVERAGE_FOOTER_CAP = 400</code> characters on the single humility line.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/metrics.py">sources/evaluators/policy_bt_verifier/metrics.py</a></h4>
+<p class="role">Resolves each recon primary metric to one value per digest; reports ambiguous instead of guessing when candidates differ.</p>
+<p class="meta">365 lines &#183; the single source of truth for metric values</p>
+<details><summary>signatures (abbreviated) and statuses</summary><div class="dbody">
+<pre>resolve_primary_values(digest, primary_metrics, llm_extract=None) -&gt; dict
+extract_text_metrics_llm(text_lines, metric_keys, llm_json=None)</pre>
+<p>Statuses: <code>resolved</code>, <code>ambiguous</code>, <code>missing</code>. Resolution order: exact alias hits (fresh file first, then non-verification file, then alias order), strict lexical fallback, ambiguous, missing.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/recon.py">sources/evaluators/policy_bt_verifier/recon.py</a></h4>
+<p class="role">Builds the per-task TASK CONFIG with one judge call: deliverables, comparable metrics with aliases, sanity rules, tie policy and pitfalls.</p>
+<p class="meta">364 lines &#183; cached in the registry, keyed by goal hash and prompt version</p>
+<details><summary>signatures (abbreviated)</summary><div class="dbody">
+<pre>RECON_PROMPT_VERSION = "recon-v2-ledger-&lt;sha12&gt;"
+build_prompt(goal: str, digests: list[dict]) -&gt; str
+ensure_shape(parsed) -&gt; dict
+coverage_footer(config) -&gt; str
+is_infra_name(token) -&gt; bool
+strip_infra_mentions(text) -&gt; str</pre>
+<p>Gold, labels, rewards and grader code never enter the prompt (the gold firewall the module docstring names).</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/verdicts.py">sources/evaluators/policy_bt_verifier/verdicts.py</a></h4>
+<p class="role">Decides a pair from execution facts, runs the policy in both orders, and turns the outcomes into a win-rate or a Bradley-Terry reward.</p>
+<p class="meta">362 lines &#183; the crash rung runs before any LLM call</p>
+<details><summary>signatures (abbreviated) and rules</summary><div class="dbody">
+<pre>crash_rung(uuid_a, ledger_a, uuid_b, ledger_b) -&gt; dict | None
+code_pair_verdict(run_fn, policy_src, uuid_a, dA, uuid_b, dB, log=None)
+win_rate_reward(outcomes: list[str]) -&gt; dict
+bradley_terry_reward(uuids: list[str], pair_records: list[dict]) -&gt; dict
+bt_fit_weighted(w_idx, l_idx, wgt, n, iters=25, tol=1e-10)</pre>
+<p>Crash rules: one side crashed -&gt; the clean side wins; identical error signatures -&gt; tie; different signatures -&gt; partial evidence; a bootstrap ledger returns <code>None</code> (unknown, not crashed). <code>RIDGE = 1.0</code>.</p>
+<p><code>code_pair_verdict</code> runs <code>compare(dA, dB)</code> and <code>compare(dB, dA)</code>, then requires a mirrored winner (<code>A/B</code>, <code>B/A</code> or <code>tie/tie</code>). A disagreement or an execution error on either order becomes <code>tie</code> with <code>channel: "code_policy"</code> plus an <code>antisymmetry: "disagreement"</code> marker; the evaluator never caches an errored verdict.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/visual.py">sources/evaluators/policy_bt_verifier/visual.py</a></h4>
+<p class="role">Sends the figures of both sides to the vision model per pair, in both orders, and returns the same verdict shape as the code policy.</p>
+<p class="meta">318 lines &#183; image comparison only, never text judgments</p>
+<details><summary>signatures (abbreviated) and caps</summary><div class="dbody">
+<pre>VisualChannel.judge_pair(goal, uuid_a, figs_a, uuid_b, figs_b)
+VisualChannel.one_order(...)
+select_figures(digest, root: Path) -&gt; list[Path]
+figure_rung(uuid_a, n_figs_a, uuid_b, n_figs_b) -&gt; dict | None
+images_digest(paths) -&gt; str</pre>
+<p>Caps: <code>MAX_FIGS_PER_SIDE = 2</code> (largest pred PNGs), <code>MAX_IMAGE_BYTES = 6 MiB</code> each, base64 data URLs. <code>VISUAL_PROMPT_VERSION = "vis-v1-&lt;sha12&gt;"</code> keys the cache.</p>
+<p><code>one_order</code> asks for <code>max_tokens = 600</code>, retries once at <code>800</code> with a different role suffix when the reply does not parse, then caches either the verdict or the marker <code>{"parse_fail": True}</code>. The cache key joins the prompt version, both uuids, the order and the image digests, which is what makes a re-run of the same pair free.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/registry.py">sources/evaluators/policy_bt_verifier/registry.py</a></h4>
+<p class="role">Stores everything a later generation needs to compare: digests, ledgers, verdict caches, the recon config and the accepted policy.</p>
+<p class="meta">258 lines &#183; one JSON file per task, keyed by the goal hash</p>
+<details><summary>signatures (abbreviated) and keys</summary><div class="dbody">
+<pre>TaskRegistry.load(root: Path, goal: str, logger=None) -&gt; TaskRegistry
+TaskRegistry.record_generation(uuid, digest, ledger, reward=None, stats=None, session=None)
+TaskRegistry.previous_generations(uuid) / predecessors_with_digest(uuid) / rewards()
+TaskRegistry.get_verdict(key) / set_verdict(key, verdict)
+TaskRegistry.set_recon(cfg, version, recon_version=...) / get_recon(version)
+TaskRegistry.set_policy(record) / get_policy(policy_sha)
+code_verdict_key(policy_sha, uuid_a, uuid_b) -&gt; str</pre>
+<p><code>REGISTRY_VERSION = "policy_bt-v1-e48-20261005"</code>. A version mismatch warns and keeps the loaded state.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/logging_utils.py">sources/evaluators/policy_bt_verifier/logging_utils.py</a></h4>
+<p class="role">Writes one stdout line per stage and one JSON record per line to the run's log sink; carries per-stage and cumulative LLM spend.</p>
+<p class="meta">186 lines &#183; every stage string is prefixed <code>[policy_bt]</code></p>
+<details><summary>signatures (abbreviated)</summary><div class="dbody">
+<pre>StageLogger.__init__(uuid: str, sink: Path | None = None, verbose=False)
+StageLogger.stage(stage: str, message: str = "", **fields) -&gt; None
+StageLogger.payload(stage, message="", data=None, error=None) -&gt; None
+StageLogger.detail(text) / warn(text) / add_cost(cost_usd)
+StageLogger.spend_line() -&gt; str
+
+PREFIX = "policy_bt"
+STAGES = ("REEXEC", "DIGEST", "RECON", "POLICY", "VISUAL", "PAIRS",
+          "REWARD", "GRADIENT", "DONE")</pre>
+<p>The fixed <code>STAGES</code> order is asserted by the tests. The logger also emits payload records whose tag is not in <code>STAGES</code> &mdash; <code>METRICS</code>, <code>DIGESTS</code>, <code>PAIR</code>, <code>GRADIENT_RAW</code>, <code>GRADIENT_REFINED</code> &mdash; so <code>STAGES</code> is the stage order, not the complete tag list.</p>
+</div></details>
+</div>
+
+<div class="card l2">
+<h4><a href="../../sources/evaluators/policy_bt_verifier/__init__.py">sources/evaluators/policy_bt_verifier/__init__.py</a></h4>
+<p class="role">Public surface of the package: re-exports the evaluator, the policy helpers, the digest, the verdicts and the visual channel.</p>
+<p class="meta">56 lines &#183; no logic</p>
+<details><summary>exports</summary><div class="dbody">
+<pre>MAIN_STANZA, POLICY_SHA, RECON_PROMPT_VERSION, STAGES,
+PolicyBTVerifierEvaluator, ReexecRunner, StageLogger, TaskRegistry,
+VisualChannel, bradley_terry_reward, bt_fit_weighted, build_digest,
+build_recon_prompt, digest_summary, ensure_policy, find_run_snapshot,
+fold_gradient, is_figure_dominant, refine_gradient, run_policy, smoke_test,
+static_screen, task_key, win_rate_reward</pre>
+<p>From <code>__all__</code> in <code class="path">sources/evaluators/policy_bt_verifier/__init__.py</code> (lines 18&ndash;40). The logger <i>is</i> re-exported &mdash; <code>STAGES</code> and <code>StageLogger</code> come from <code>logging_utils.py</code>; only <code>metrics.py</code> has no exported name.</p>
+</div></details>
+</div>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="knobs">Channel selector and its 12 knobs (defaults from <code>config.py</code>, overridable from JSON or CLI)</h2>
+<table>
+<thead><tr><th>Field</th><th class="size">Default</th><th>What it changes</th><th>CLI flag</th></tr></thead>
+<tbody>
+<tr><td class="sym">verifier_kind</td><td class="size">"hybrid"</td><td>Picks the channel: hybrid, legacy, gold, policy_bt.</td><td class="sym">--verifier_kind</td></tr>
+<tr><td class="sym">policy_bt_reward</td><td class="size">"win_rate"</td><td>Reward aggregation; <code>bradley_terry</code> fits ratings instead.</td><td class="sym">--policy_bt_reward</td></tr>
+<tr><td class="sym">policy_bt_scorer_timeout_s</td><td class="size">60</td><td>Wall clock for one policy comparison.</td><td class="sym">--policy_bt_scorer_timeout_s</td></tr>
+<tr><td class="sym">policy_bt_visual_channel</td><td class="size">true</td><td>Enables the kimi per-pair figure channel.</td><td class="sym">--policy_bt_visual_channel</td></tr>
+<tr><td class="sym">policy_bt_refiner</td><td class="size">true</td><td>Runs the E47 evidence-checked gradient refiner.</td><td class="sym">--policy_bt_refiner</td></tr>
+<tr><td class="sym">policy_bt_repair_rounds</td><td class="size">3</td><td>Policy repair attempts before the pair degrades to ties.</td><td class="sym">-</td></tr>
+<tr><td class="sym">policy_bt_max_pairs</td><td class="size">0</td><td>Cap on predecessors compared; 0 = all of them.</td><td class="sym">-</td></tr>
+<tr><td class="sym">policy_bt_reexec_timeout_s</td><td class="size">900</td><td>Wall clock for one fresh re-execution.</td><td class="sym">--policy_bt_reexec_timeout_s</td></tr>
+<tr><td class="sym">policy_bt_venv_reuse</td><td class="size">true</td><td>Reuses the task venv across generations.</td><td class="sym">-</td></tr>
+<tr><td class="sym">policy_bt_visual_tiebreak_code</td><td class="size">false</td><td>A kimi tie defers to the code policy.</td><td class="sym">--policy_bt_visual_tiebreak_code</td></tr>
+<tr><td class="sym">policy_bt_visual_max_pairs_per_gen</td><td class="size">0</td><td>Cap on fresh kimi pairs per generation; 0 = no cap.</td><td class="sym">-</td></tr>
+<tr><td class="sym">policy_bt_verbose</td><td class="size">false</td><td>Adds per-pair and per-repair stdout lines.</td><td class="sym">--policy_bt_verbose</td></tr>
+<tr><td class="sym">policy_bt_recon_refresh_gap</td><td class="size">2</td><td>Minimum generations between schema-triggered recon refreshes.</td><td class="sym">-</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: five of the twelve <code>policy_bt_*</code> knobs have no CLI flag (<code>main.py</code> forwards only the seven listed above); set those five in the JSON config.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="writes">What one generation writes</h2>
+<table>
+<thead><tr><th>Path</th><th>Written by</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/state_result.json</td><td class="sym">BaseEvaluator._save_results</td><td>Key <code>evaluation.verifier</code>: the whole scores dict.</td></tr>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/evaluation.txt</td><td class="sym">PolicyBTVerifierEvaluator._write_artifacts</td><td>Reward, pair verdicts, raw gradient fold.</td></tr>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/textual_gradient.txt</td><td class="sym">PolicyBTVerifierEvaluator._write_artifacts</td><td>The final gradient: refined when the refiner ran.</td></tr>
+<tr><td class="sym">sources/workflows/&lt;uuid&gt;/verifier_policy_bt.log</td><td class="sym">StageLogger</td><td>One JSON record per stage and payload.</td></tr>
+<tr><td class="sym">sources/workflows/_verifier_tmp/policy_bt_registry_&lt;task_key&gt;.json</td><td class="sym">TaskRegistry.save</td><td>Generations, ledgers, verdict caches, recon, policy.</td></tr>
+<tr><td class="sym">sources/workflows/_verifier_tmp/policy_bt/&lt;task_key&gt;/runs/&lt;uuid&gt;/</td><td class="sym">ReexecRunner</td><td>The sandbox copy that was executed.</td></tr>
+<tr><td class="sym">sources/workflows/_verifier_tmp/policy_bt/&lt;task_key&gt;/policy_bt_ledger_&lt;uuid&gt;.json</td><td class="sym">reexec.write_ledger_file</td><td>The execution ledger of this generation.</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: <code>evaluator.py</code> builds the scratch root as <code>getattr(config, "temp_dir", None) or self.workflow_dir / "_verifier_tmp"</code>. A fresh <code>config.Config()</code> has no <code>temp_dir</code> attribute (checked in the project venv on 2026-10-10); <code>Config</code> declares <code>runner_temp_dir</code> (<code>tmp/</code>) instead. The hybrid and gold verifiers use the same expression, so the fallback is the shared convention &mdash; the paths above follow the fallback.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="contract">Contract with the evolution engine</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 220" role="img" aria-label="verifier to engine contract">
+  <defs>
+    <marker id="caw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="cawc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../sources/evaluators/policy_bt_verifier/evaluator.py">
+    <title>evaluate(uuid) returns the scores dict</title>
+    <rect x="20" y="60" width="200" height="100" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="120" y="86" text-anchor="middle">scores dict</text>
+    <text class="box-sub" x="120" y="106" text-anchor="middle">overall_score = reward</text>
+    <text class="box-sub" x="120" y="124" text-anchor="middle">pair_outcomes</text>
+    <text class="box-sub" x="120" y="142" text-anchor="middle">metric_summary</text>
+  </a>
+  <a class="box" href="mod_core_evolution_engine.html">
+    <title>EvolutionEngine reads the scores and mutates the next genotype</title>
+    <rect x="340" y="20" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="440" y="46" text-anchor="middle">EvolutionEngine</text>
+    <text class="box-sub" x="440" y="64" text-anchor="middle">reward + gradient</text>
+    <text class="box-sub" x="440" y="80" text-anchor="middle">next mutation</text>
+  </a>
+  <a class="box" href="../../sources/core/stopping.py">
+    <title>StopController.observe(uuid, iteration, reward, pair_outcomes, failed)</title>
+    <rect x="340" y="140" width="200" height="70" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="440" y="166" text-anchor="middle">StopController</text>
+    <text class="box-sub" x="440" y="184" text-anchor="middle">champion plateau stop</text>
+    <text class="box-sub" x="440" y="200" text-anchor="middle">reads pair_outcomes</text>
+  </a>
+  <a class="box" href="mod_core_variation.html">
+    <title>The variation engine reads the metric ledger summary</title>
+    <rect x="640" y="60" width="240" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="760" y="86" text-anchor="middle">variation engine</text>
+    <text class="box-sub" x="760" y="106" text-anchor="middle">frontier probe reads</text>
+    <text class="box-sub" x="760" y="124" text-anchor="middle">metric_summary</text>
+    <text class="box-sub" x="760" y="142" text-anchor="middle">asked for bolder changes</text>
+  </a>
+  <path class="edge" d="M220,90 H340 V70" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#caw)"/>
+  <path class="edge" d="M220,120 H300 V175 H340" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#caw)"/>
+  <path class="edge dashed-edge" d="M540,90 H640" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#cawc)"/>
+</svg>
+</div>
+<p class="figcap">Contract &mdash; the verifier exposes normalised outcomes, never raw verdicts. <code>sources/core/evolution_engine.py</code> reads <code>pair_outcomes</code> and <code>metric_summary</code> (lines 91&ndash;131, 918) and feeds <code>pair_outcomes</code> to <code>StopController.observe</code>; <code>sources/core/stopping.py::RELATIVE_VERIFIER_KINDS</code> includes <code>policy_bt</code>, so the stop rule defaults to the champion plateau instead of an absolute threshold.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2 id="notes">Notes and gotchas</h2>
+<p class="note">Amber: two code-level mismatches are recorded on this page &mdash; <code>__init__.py</code> cites a <code>PLAN.md</code> the package does not ship, and the <code>failure_fingerprint</code> in the scores dict is a constant zero stub, so the engine's failure-novelty layer gets no signal from this channel.</p>
+<p class="note say">Why it matters: the reward is relative to the predecessors seen so far, so <code>overall_score = 1.0</code> means "beat everything so far", not "good".</p>
+<details><summary>Design rules carried over from the offline harness (E44&ndash;E48)</summary><div class="dbody">
+<ul>
+<li>Re-execution is a rung, not a judge: the crash rung decides only crashes; a bootstrap ledger (no fresh facts) returns unknown.</li>
+<li>Both orders, always: a mirrored disagreement becomes a tie with a WARNING instead of a coin flip.</li>
+<li>The policy is code and must pass an AST screen plus a runtime smoke on real digests before it is used; a cached policy re-smokes when a new digest shape arrives.</li>
+<li>Weak-evidence guard: when every decisive pair rests on self-reported metrics outside the recon primary metrics, the reward is capped at <code>WEAK_EVIDENCE_REWARD_CAP = 0.75</code>.</li>
+<li>Gold firewall: digests, recon prompts, policy prompts and verdicts never see gold files, labels or grader code.</li>
+<li>A predecessor with no registered digest and no <code>/tmp</code> snapshot is excluded from the pairs and logged; it is never fabricated.</li>
+</ul>
+</div></details>
+</div>
+
+<footer>
+<p>Sources read: <code class="path">sources/evaluators/policy_bt_verifier/</code> (all 12 files, line counts from <code>wc -l</code> on 2026-10-10), <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/core/stopping.py</code>, <code class="path">sources/core/evolution_engine.py</code> (lines 91&ndash;131, 918), <code class="path">config.py</code> and <code class="path">config_default.json</code> (policy_bt fields), <code class="path">main.py</code> (CLI flags), <code class="path">sources/evaluators/base.py</code> (<code>_save_results</code>), and one <code>uv run python</code> check of <code>config.Config()</code> attributes.</p>
+<p class="skips">Skipped: no separate page per module (12 file cards here instead); the offline harness scripts <code class="path">experiments_verifiers/harness/e44_digest.py</code>, <code>e44_bt.py</code>, <code>e45_spartan.py</code> are cited by the module docstrings but not read for this page; experiment panels E44&ndash;E48 live in <a href="data_experiments.html">data_experiments.html</a>.</p>
+<p>Built at commit <code>7da1f5e</code> + working tree, 2026-10-10. The package is uncommitted at build time (untracked in <code>git status</code>), so this page is a dated snapshot of the working tree.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

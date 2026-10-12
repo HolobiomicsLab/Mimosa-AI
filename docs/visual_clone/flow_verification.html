@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Hybrid verification flow - Mimosa-AI visual clone</title>
+<title>Verification flows: hybrid and policy_bt - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview &gt; evaluators &gt; verification flow" data-built="ca72107+wt" data-built-date="2026-09-28">
+<body data-crumb="Overview &gt; evaluators &gt; verification flow" data-built="7da1f5e+wt" data-built-date="2026-10-10">
 <div class="wrap">
 
-<h1 class="hud">Hybrid verification flow</h1>
-<p class="intro">The hybrid verifier grades one workflow workspace per generation. It spends one LLM call on 8&#8211;12 stage-tagged claims, then one LLM call per claim to write a deterministic Python scorer, and runs each scorer as a host subprocess. The reward is a pairwise win-rate over the task's previous generations, decided at the earliest ladder stage where the two differ.</p>
+<h1 class="hud">Verification flows: hybrid (default) and policy_bt</h1>
+<p class="intro">This page is the hub of both verification channels: the hybrid verifier (the default) and the opt-in policy_bt verifier. The hybrid grades one workspace per generation through 8&#8211;12 stage-tagged claims and LLM-written scorers, and rewards it at the earliest ladder rung where it differs from a previous generation. policy_bt re-executes each generation in its own sandbox, digests it, and rewards it through a tournament of LLM-written pairwise policies; both channels return a reward 0&#8211;1 and one textual gradient that steers the next mutation.</p>
 
 <div id="legend" data-auto></div>
 
@@ -132,7 +132,7 @@
   </defs>
 
   <a class="box" id="l1" href="area_evaluators.html">
-    <title>Facade that picks the verifier kind (hybrid, legacy or gold); in gold mode GoldFeedbackEvaluator sits between it and the hybrid lane</title>
+    <title>Facade that picks the verifier kind (hybrid, legacy, gold or policy_bt); in gold mode GoldFeedbackEvaluator sits between it and the hybrid lane</title>
     <rect x="20" y="20" width="160" height="46" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="100" y="40" text-anchor="middle">WorkflowEvaluator</text>
     <text class="box-sub" x="100" y="56" text-anchor="middle">picks verifier kind</text>
@@ -231,7 +231,7 @@
   </defs>
 
   <a class="box" id="g_cfg" href="area_entry_config.html">
-    <title>config.verifier_kind, default "hybrid" (config.py:106); CLI --verifier_kind hybrid|legacy|gold (main.py:76-83)</title>
+    <title>config.verifier_kind, default "hybrid" (config.py:106); CLI --verifier_kind hybrid|legacy|gold|policy_bt (main.py:76-84)</title>
     <rect x="20" y="150" width="170" height="64" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="105" y="176" text-anchor="middle">verifier_kind</text>
     <text class="box-sub" x="105" y="194" text-anchor="middle">config / --verifier_kind</text>
@@ -341,6 +341,214 @@ honest runs             WorkflowSelector skips folders where is_oracle_generatio
 </div></details>
 </div>
 
+<div class="panel" id="policy-bt"><span class="br"></span>
+<h2>The second channel: policy_bt - re-execute, digest, policy tournament</h2>
+<p><code>config.verifier_kind = "policy_bt"</code> selects this channel (<code>sources/evaluators/evaluator.py:108-116</code>); its own page is <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> and its step-by-step flow page is <a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a>.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1160 320" role="img" aria-label="policy_bt pipeline stages for one generation">
+  <defs>
+    <marker id="arwP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="arwP2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <filter id="glowP" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" id="p_reexec" href="../../sources/evaluators/policy_bt_verifier/reexec.py">
+    <title>ReexecRunner.run copies the live workspace into the task sandbox, builds or reuses one venv, runs the deliverable contract and writes the ledger</title>
+    <rect x="20" y="50" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="120" y="74" text-anchor="middle">REEXEC</text>
+    <text class="box-sub" x="120" y="92" text-anchor="middle">reexec.py::ReexecRunner.run</text>
+    <text class="box-sub" x="120" y="108" text-anchor="middle">copy, venv, run</text>
+  </a>
+
+  <a class="box" id="p_digest" href="../../sources/evaluators/policy_bt_verifier/digest.py">
+    <title>build_digest turns the sandbox copy into one deterministic JSON: tables, arrays, figures, metrics, deliverables, contract files</title>
+    <rect x="250" y="50" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="350" y="74" text-anchor="middle">DIGEST</text>
+    <text class="box-sub" x="350" y="92" text-anchor="middle">digest.py::build_digest</text>
+    <text class="box-sub" x="350" y="108" text-anchor="middle">no LLM, deterministic</text>
+  </a>
+
+  <a class="box" id="p_recon" href="../../sources/evaluators/policy_bt_verifier/recon.py">
+    <title>One judge call per task builds the TASK CONFIG: primary metrics, pitfalls, tie policy; cached in the registry under RECON_PROMPT_VERSION</title>
+    <rect x="480" y="50" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="580" y="74" text-anchor="middle">RECON</text>
+    <text class="box-sub" x="580" y="92" text-anchor="middle">recon.py::build_prompt</text>
+    <text class="box-sub" x="580" y="108" text-anchor="middle">one LLM call, cached</text>
+  </a>
+
+  <a class="box" id="p_policy" href="../../sources/evaluators/policy_bt_verifier/policy.py">
+    <title>ensure_policy: the LLM writes a compare(A,B) policy, static_screen bans unsafe names, smoke_test runs it on digests, repair rounds fix it</title>
+    <rect x="710" y="50" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="810" y="74" text-anchor="middle">POLICY</text>
+    <text class="box-sub" x="810" y="92" text-anchor="middle">policy.py::ensure_policy</text>
+    <text class="box-sub" x="810" y="108" text-anchor="middle">screen, smoke, repair</text>
+  </a>
+
+  <a class="box" id="p_pairs" href="#policy-bt">
+    <title>One verdict per predecessor: crash rung, figure rung, kimi pair call, code policy (diagram 5)</title>
+    <rect x="20" y="200" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="120" y="224" text-anchor="middle">PAIRS</text>
+    <text class="box-sub" x="120" y="242" text-anchor="middle">one verdict per predecessor</text>
+    <text class="box-sub" x="120" y="258" text-anchor="middle">kimi VISUAL runs per pair</text>
+  </a>
+
+  <a class="box" id="p_reward" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>win_rate_reward: wins plus half the ties over the number of predecessors, at arrival moment</title>
+    <rect x="250" y="200" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="350" y="224" text-anchor="middle">REWARD</text>
+    <text class="box-sub" x="350" y="242" text-anchor="middle">verdicts.py::win_rate_reward</text>
+    <text class="box-sub" x="350" y="258" text-anchor="middle">arrival moment, never rewritten</text>
+  </a>
+
+  <a class="box" id="p_grad" href="../../sources/evaluators/policy_bt_verifier/gradient.py">
+    <title>fold_gradient: elimination-first fold of the pair feedbacks into the textual gradient; the E47 refiner is optional</title>
+    <rect x="480" y="200" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="580" y="224" text-anchor="middle">GRADIENT</text>
+    <text class="box-sub" x="580" y="242" text-anchor="middle">gradient.py::fold_gradient</text>
+    <text class="box-sub" x="580" y="258" text-anchor="middle">refiner optional</text>
+  </a>
+
+  <a class="box" id="p_engine" href="flow_evolution_loop.html">
+    <title>The engine reads overall_score, pair_outcomes and the gradient; StopController turns pair_outcomes into the champion plateau</title>
+    <rect x="710" y="200" width="220" height="70" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="820" y="224" text-anchor="middle">EvolutionEngine</text>
+    <text class="box-sub" x="820" y="242" text-anchor="middle">reward, gradient, pair_outcomes</text>
+    <text class="box-sub" x="820" y="258" text-anchor="middle">stopping.py::StopController</text>
+  </a>
+
+  <path class="edge" data-from="p_reexec" data-to="p_digest" d="M220,85 H250" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwP)"/>
+  <path class="edge" data-from="p_digest" data-to="p_recon" d="M450,85 H480" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwP)"/>
+  <text class="edge-label" x="465" y="77" text-anchor="middle">digests</text>
+  <path class="edge" data-from="p_recon" data-to="p_policy" d="M680,85 H710" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwP)"/>
+  <text class="edge-label" x="695" y="77" text-anchor="middle">task config</text>
+  <path class="edge" data-from="p_policy" data-to="p_pairs" d="M810,120 V160 H120 V200" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwP)"/>
+  <text class="edge-label" x="465" y="154" text-anchor="middle">policy source</text>
+  <path class="edge" data-from="p_pairs" data-to="p_reward" d="M220,235 H250" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwP)"/>
+  <text class="edge-label" x="235" y="227" text-anchor="middle">outcomes</text>
+  <path class="edge" data-from="p_reward" data-to="p_grad" d="M450,235 H480" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwP)"/>
+  <path class="edge" data-from="p_grad" data-to="p_engine" d="M680,235 H710" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arwP2)"/>
+  <text class="edge-label" x="695" y="227" text-anchor="middle">gradient</text>
+  <text class="box-sub" x="20" y="300">stage tags come from logging_utils.py::STAGES; METRICS is an extra log line between RECON and POLICY, not a stage tag</text>
+</svg>
+</div>
+<p class="figcap">Diagram 4 - the policy_bt pipeline for one generation: <code>sources/evaluators/policy_bt_verifier/evaluator.py::PolicyBTVerifierEvaluator.evaluate</code>. Solid arrows are calls; the reward and the gradient leave the verifier for the engine (<code class="path">sources/core/evolution_engine.py:1218-1234</code>).</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1160 250" role="img" aria-label="policy_bt pair ladder: crash rung, figure rung, kimi channel, code policy, honest tie">
+  <defs>
+    <marker id="arwQ" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="arwQ2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <filter id="glowQ" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="q_in">
+    <title>One pair: the current generation's digest and ledger against one predecessor's</title>
+    <rect x="20" y="90" width="170" height="70" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="105" y="114" text-anchor="middle">one pair</text>
+    <text class="box-sub" x="105" y="132" text-anchor="middle">two digests, two ledgers</text>
+    <text class="box-sub" x="105" y="148" text-anchor="middle">current vs predecessor</text>
+  </g>
+
+  <a class="box" id="q_crash" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>crash_rung: one side crashed and the other is clean decides; identical signatures tie</title>
+    <rect x="230" y="30" width="180" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="320" y="54" text-anchor="middle">1 crash rung</text>
+    <text class="box-sub" x="320" y="72" text-anchor="middle">verdicts.py::crash_rung</text>
+    <text class="box-sub" x="320" y="88" text-anchor="middle">exec ledger decides</text>
+  </a>
+
+  <a class="box" id="q_fig" href="../../sources/evaluators/policy_bt_verifier/visual.py">
+    <title>figure_rung: figure-dominant tasks; one side produced no figure deliverable loses</title>
+    <rect x="230" y="150" width="180" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="320" y="174" text-anchor="middle">2 figure rung</text>
+    <text class="box-sub" x="320" y="192" text-anchor="middle">visual.py::figure_rung</text>
+    <text class="box-sub" x="320" y="208" text-anchor="middle">digest figure count</text>
+  </a>
+
+  <a class="box" id="q_vis" href="../../sources/evaluators/policy_bt_verifier/visual.py">
+    <title>VisualChannel.judge_pair shows the figures of both sides to kimi in both orders and only a mirror-consistent verdict counts</title>
+    <rect x="450" y="150" width="190" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="545" y="174" text-anchor="middle">3 kimi channel</text>
+    <text class="box-sub" x="545" y="192" text-anchor="middle">visual.py::judge_pair</text>
+    <text class="box-sub" x="545" y="208" text-anchor="middle">both orders</text>
+  </a>
+
+  <a class="box" id="q_pol" href="../../sources/evaluators/policy_bt_verifier/verdicts.py">
+    <title>code_pair_verdict runs the policy on (A,B) and (B,A); disagreement is instrument noise, recorded as a tie</title>
+    <rect x="680" y="150" width="200" height="70" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="780" y="174" text-anchor="middle">4 code policy</text>
+    <text class="box-sub" x="780" y="192" text-anchor="middle">verdicts.py::code_pair_verdict</text>
+    <text class="box-sub" x="780" y="208" text-anchor="middle">both orders, antisymmetry asserted</text>
+  </a>
+
+  <a class="box" id="q_tie" href="#policy-bt">
+    <title>Honest tie: no policy, an errored pair or an unmirrored verdict never decides a pair</title>
+    <rect x="920" y="150" width="200" height="70" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="1020" y="174" text-anchor="middle">5 honest tie</text>
+    <text class="box-sub" x="1020" y="192" text-anchor="middle">no policy, error, or no mirror</text>
+    <text class="box-sub" x="1020" y="208" text-anchor="middle">never a coin flip</text>
+  </a>
+
+  <path class="edge" data-from="q_in" data-to="q_crash" d="M190,110 H210 V65 H230" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwQ)"/>
+  <text class="edge-label" x="205" y="100" text-anchor="middle">ledgers</text>
+  <path class="edge" data-from="q_in" data-to="q_fig" d="M190,135 H210 V185 H230" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwQ)"/>
+  <text class="edge-label" x="205" y="170" text-anchor="middle">both clean</text>
+  <path class="edge" data-from="q_fig" data-to="q_vis" d="M410,185 H450" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwQ)"/>
+  <text class="edge-label" x="430" y="177" text-anchor="middle">both have figures</text>
+  <path class="edge" data-from="q_vis" data-to="q_pol" d="M640,185 H680" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arwQ)"/>
+  <text class="edge-label" x="660" y="177" text-anchor="middle">no verdict</text>
+  <path class="edge dashed-edge" data-from="q_pol" data-to="q_tie" d="M880,185 H920" fill="none" stroke="#FFB547" stroke-width="1.5" marker-end="url(#arwQ2)"/>
+  <text class="edge-label" x="900" y="177" text-anchor="middle">error, tie</text>
+  <text class="box-sub" x="20" y="240">each rung returns None when it cannot decide; the next rung runs; a crash needs a real ledger, a bootstrap digest skips the crash rung</text>
+</svg>
+</div>
+<p class="figcap">Diagram 5 - the pair ladder of <code>sources/evaluators/policy_bt_verifier/evaluator.py::PolicyBTVerifierEvaluator._pair_verdict</code>: deterministic crash rung, figure rung, kimi per-pair channel, code policy in both orders, honest tie. The VISUAL log stage reports how many kimi pairs were fresh, cached or mirrored.</p>
+<table>
+<thead><tr><th>Aspect</th><th>hybrid channel</th><th>policy_bt channel</th></tr></thead>
+<tbody>
+<tr><td>Reward</td><td>Win-rate of rung-wise pair decisions; ties count 0.5.</td><td>Win-rate of whole-pair verdicts; ties count 0.5; BT optional.</td></tr>
+<tr><td>What decides a pair</td><td>Earliest differing rung: script, log or result.</td><td>Crash rung, figure rung, kimi figures, code policy, tie.</td></tr>
+<tr><td>Evidence behind a rung</td><td>8&#8211;12 stage-tagged claims graded by LLM-written scorers.</td><td>One deterministic digest per generation; the policy compares fields.</td></tr>
+<tr><td>Workspace handling</td><td>Reads the delivered workspace; an execution gate re-runs it.</td><td>Copies and re-executes every generation in a task sandbox.</td></tr>
+<tr><td>LLM calls per generation</td><td>One claims call, one digest call per task, one call per claim.</td><td>Per task: one recon, one policy; one call per figure pair.</td></tr>
+<tr><td>Artifacts per generation</td><td><code class="path">evaluation.txt</code>, <code class="path">textual_gradient.txt</code> under <code class="path">sources/workflows/&lt;uuid&gt;/</code>.</td><td>Same two files plus <code class="path">verifier_policy_bt.log</code> (JSON lines).</td></tr>
+<tr><td>Engine contract</td><td>Writes <code>pair_outcomes</code>; the champion plateau reads it.</td><td>Writes <code>pair_outcomes</code> and <code>metric_summary</code>; the plateau and probe read them.</td></tr>
+</tbody>
+</table>
+<p>The two channels are alternatives, not stages of one pipeline: <code>WorkflowEvaluator.__init__</code> builds exactly one of them, and every <code>evaluate()</code> call goes to that object. policy_bt is opt-in and still new: <code>config.verifier_kind</code> defaults to <code>"hybrid"</code> (<code class="path">config.py:106</code>), and only the CLI choice list adds <code>policy_bt</code> (<code class="path">main.py:80</code>).</p>
+<details><summary>policy_bt artifacts, side files and config knobs</summary><div class="dbody">
+<pre>evaluation.txt            reward line, pair verdicts, raw gradient fold     # evaluator.py::_write_artifacts
+textual_gradient.txt      the refined fold (raw fold inside the same file's history)
+verifier_policy_bt.log    one JSON line per stage/payload              # logging_utils.py::StageLogger
+registry                  &lt;runner temp root&gt;/policy_bt_registry_&lt;task_key&gt;.json
+                          goal-hash keyed; digests, verdicts, visual cache, recon, policy
+sandbox                   &lt;runner temp root&gt;/policy_bt/&lt;task_key&gt;/runs/&lt;uuid&gt;/ + local venv/
+ledger                    &lt;sandbox&gt;/policy_bt_ledger_&lt;uuid&gt;.json
+runner temp root          config.temp_dir, else workflow_dir/_verifier_tmp      # evaluator.py:260-263
+scores dict keys          overall_score, win_rate, pair_outcomes, metric_summary, reexec, policy_sha,
+                          refiner_*, llm_calls, llm_spend_usd, abstracted_textual_gradient
+knobs (config.py:149-180) policy_bt_reward, policy_bt_scorer_timeout_s, policy_bt_visual_channel,
+                          policy_bt_refiner, policy_bt_repair_rounds, policy_bt_max_pairs,
+                          policy_bt_reexec_timeout_s, policy_bt_venv_reuse,
+                          policy_bt_visual_tiebreak_code, policy_bt_visual_max_pairs_per_gen,
+                          policy_bt_verbose, policy_bt_recon_refresh_gap</pre>
+<p>Stage order: <code class="path">sources/evaluators/policy_bt_verifier/logging_utils.py::STAGES</code> = REEXEC, DIGEST, RECON, POLICY, VISUAL, PAIRS, REWARD, GRADIENT, DONE. <code>METRICS</code> and <code>PAIR</code> are extra log lines, not stage tags.</p>
+</div></details>
+</div>
+
 <div class="panel"><span class="br"></span>
 <h2>Package files</h2>
 <table>
@@ -357,8 +565,9 @@ honest runs             WorkflowSelector skips folders where is_oracle_generatio
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/inventory.py">hybrid_verifier/inventory.py</a></td><td>Workspace inventory with CSV and PNG content signals.</td><td class="sym">scan_workspace</td><td class="size">282</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/digest.py">hybrid_verifier/digest.py</a></td><td>One format-digest call per task, cached for the scorer prompts.</td><td class="sym">ensure_digests</td><td class="size">175</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a></td><td>Shared judge LLM, workflow loading and result persistence.</td><td class="sym">BaseEvaluator._save_results</td><td class="size">380</td></tr>
-<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>Facade that selects hybrid, legacy or gold.</td><td class="sym">WorkflowEvaluator.evaluate</td><td class="size">205</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>Facade that selects hybrid, legacy, gold or policy_bt.</td><td class="sym">WorkflowEvaluator.evaluate</td><td class="size">216</td></tr>
 <tr><td class="sym"><a href="mod_evaluators_gold_feedback.html">sources/evaluators/gold_feedback/</a></td><td>ORACLE wrapper: inner hybrid plus grader gradient.</td><td class="sym">GoldFeedbackEvaluator.evaluate</td><td class="size">1 075</td></tr>
+<tr><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">sources/evaluators/policy_bt_verifier/</a></td><td>Second channel: fresh re-execution, deterministic digest, policy tournament.</td><td class="sym">PolicyBTVerifierEvaluator.evaluate</td><td class="size">6 131</td></tr>
 </tbody>
 </table>
 
@@ -410,13 +619,17 @@ build_evaluation_report(...) -&gt; str</pre>
 <tr><td class="sym">hybrid_verifier_digest_max_files</td><td class="size">8</td><td>Files sampled by the one format-digest call.</td></tr>
 <tr><td class="sym">hybrid_verifier_visual_rung</td><td class="size">True</td><td>Figure tasks get a <code>visual</code> rung first.</td></tr>
 <tr><td class="sym">hybrid_verifier_execution_gate</td><td class="size">True</td><td>Re-run cap: crash 0.0, divergent 0.5.</td></tr>
-<tr><td class="sym">verifier_kind</td><td class="size">hybrid</td><td><code>legacy</code>: deprecated verifier; <code>gold</code>: oracle wrapper.</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="size">hybrid</td><td>Four values: <code>hybrid</code>, <code>legacy</code>, <code>gold</code>, <code>policy_bt</code>.</td></tr>
 <tr><td class="sym">gold_feedback_reward</td><td class="size">False</td><td>Gold only: reward from <code>oracle_reward</code>.</td></tr>
 <tr><td class="sym">gold_feedback_timeout_s</td><td class="size">1800</td><td>Gold only: grading cap; <code>0</code> disables it.</td></tr>
+<tr><td class="sym">policy_bt_reward</td><td class="size">win_rate</td><td><code>win_rate</code> or <code>bradley_terry</code> over pair verdicts.</td></tr>
+<tr><td class="sym">policy_bt_reexec_timeout_s</td><td class="size">900</td><td>policy_bt only: cap on the fresh re-execution, in seconds.</td></tr>
+<tr><td class="sym">policy_bt_refiner</td><td class="size">True</td><td>policy_bt only: E47 evidence-checked gradient refiner.</td></tr>
+<tr><td class="sym">policy_bt_visual_channel</td><td class="size">True</td><td>policy_bt only: kimi per-pair figures for figure tasks.</td></tr>
 </tbody>
 </table>
 
-<p class="note">Amber: the Default column is <code>config.py</code>; <code class="path">config_default.json</code> lines 18-23 set <code>hybrid_verifier_num_claims</code> 16 (extraction 14&#8211;18), <code>hybrid_verifier_scorer_timeout_s</code> 120 and <code>hybrid_verifier_digest_max_files</code> 16.</p>
+<p class="note">Amber: the Default column is <code>config.py</code>. The local <code class="path">config_default.json</code> (78 keys, untracked) agrees with every row here; a JSON file passed with <code>--config</code> wins over <code>config.py</code>.</p>
 
 <details><summary>pairwise modes and reward maths</summary><div class="dbody">
 <pre>PAIRWISE_MODES      temporal (default), temporal_strict, mean_diff, sign_sum, escalation
@@ -441,9 +654,10 @@ workflow_dir/_verifier_tmp/hybrid_registry_&lt;key&gt;.json   claims, cached sco
 </div>
 
 <footer>
-<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>; all ten files of <code class="path">sources/evaluators/hybrid_verifier/</code> (grep and <code>wc -l</code> for this build); all six files of <code class="path">sources/evaluators/gold_feedback/</code>; <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>; <code class="path">sources/evaluators/base.py</code>; <code class="path">sources/evaluators/evaluator.py</code>; <code class="path">sources/core/evolution_engine.py</code> (lines 903-938); <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/workflow_selection.py</code> (grep); <code class="path">sources/core/workflow_runner.py</code> (grep + slices); <code>config.py</code>, <code>config_default.json</code>, <code>main.py</code> (grep); <code>AGENTS.md</code>.</p>
-<p class="skips">Skipped: <code>sources/evaluators/legacy_verifier/verifier*.py</code>, <code>generic/bs_detection.py</code>, <code>generic/generic.py</code>, <code>scenario/scenario.py</code>, <code>grounding.py</code> - deprecated or unrelated verifier channels, covered by <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>; <code>gold_feedback/format.py</code> message rules - covered by <a href="file_gold_format.html">file_gold_format.html</a>; <code class="path">experiments_verifiers/harness/e19b_extract.py</code> and friends - experiment harness the package only ports from, not on the runtime path; <code>.venv/</code>, <code>tmp/</code>, <code>datasets/</code>, <code>webui/</code> - out of scope for this page.</p>
+<p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>; all ten files of <code class="path">sources/evaluators/hybrid_verifier/</code> (grep and <code>wc -l</code> for this build); all twelve files of <code class="path">sources/evaluators/policy_bt_verifier/</code> (grep, <code>wc -l</code> and the pipeline slices of <code class="path">evaluator.py</code>); all six files of <code class="path">sources/evaluators/gold_feedback/</code>; <code class="path">sources/benchmark_evaluation/snapshot_grading.py</code>; <code class="path">sources/evaluators/base.py</code>; <code class="path">sources/evaluators/evaluator.py</code>; <code class="path">sources/core/evolution_engine.py</code> (lines 85-215, 693-715, 905-940, 1205-1240); <code class="path">sources/core/stopping.py</code>; <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/workflow_selection.py</code> (grep); <code class="path">sources/core/workflow_runner.py</code> (grep + slices); <code>config.py</code>, <code>config_default.json</code>, <code>main.py</code> (grep); <code>AGENTS.md</code>.</p>
+<p class="skips">Skipped: <code>sources/evaluators/legacy_verifier/verifier*.py</code>, <code>generic_verifier/bs_detection.py</code>, <code>generic_verifier/generic.py</code>, <code>scenario/scenario.py</code>, <code>grounding.py</code> - deprecated or unrelated verifier channels, covered by <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>; <code>gold_feedback/format.py</code> message rules - covered by <a href="file_gold_format.html">file_gold_format.html</a>; the policy_bt package internals and file cards - covered by <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> and <a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a>; <code class="path">experiments_verifiers/harness/e19b_extract.py</code> and friends - experiment harness the packages only port from, not on the runtime path; <code>.venv/</code>, <code>tmp/</code>, <code>datasets/</code>, <code>webui/</code> - out of scope for this page.</p>
 <p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. The <code>gold</code> branch and <code class="path">sources/evaluators/gold_feedback/</code> are not in <code>4020790</code> (committed later as <code>ca72107</code>); the hybrid package lines come from commit <code>4020790</code>.</p>
+<p>Updated at <code>7da1f5e</code> + working tree, 2026-10-10: page retitled as the hub of both flows, new policy_bt section (stage ladder, pair ladder, the hybrid / policy_bt comparison table, artifacts and knobs), package and config tables extended, the stale <code class="path">config_default.json</code> note replaced (the file now agrees with <code>config.py</code>).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

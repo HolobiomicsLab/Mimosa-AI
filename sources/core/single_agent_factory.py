@@ -171,10 +171,18 @@ elif engine_name == "litellm":
                 "require_parameters": True,
             }}
         }}
+    # OpenAI deprecated `max_tokens` for `max_completion_tokens`;
+    # newer OpenAI models hard-reject `max_tokens` with a 400.
+    # LiteLLMModel forwards extra kwargs verbatim to litellm.
+    _budget_kwarg = (
+        "max_completion_tokens"
+        if str(model_id).startswith("openai/")
+        else "max_tokens"
+    )
     engine = LiteLLMModel(
         model_id=model_id,
         temperature=1.0,
-        max_tokens=max_tokens,
+        **{{_budget_kwarg: max_tokens}},
         **_litellm_extra,
     )
 elif engine_name == "openai":

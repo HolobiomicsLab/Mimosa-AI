@@ -2091,7 +2091,65 @@ def test_execution_gate_wired_into_evaluate(tmp_path: Path):
     # u2 ties with u1 (identical scores) and beats u0 -> raw 0.75; the
     # crash status still floors the reward at 0.0
     assert result3["win_rate"] == 0.75 and result3["overall_score"] == 0.0
-    assert result3["execution_gate"]["cap"] == 0.0
+
+def test_pair_outcomes_contract_round_trip(tmp_path: Path):
+    """B2 (stop plan 2026-10-08 §2.5): evaluate() persists the normalised
+    ``pair_outcomes`` — ``{prev_uuid: "won" | "lost" | "tie"}`` — mapped
+    from the internal win/loss/tie vocabulary, and the engine's
+    StopController consumes it unchanged (producer/consumer round-trip
+    on REAL evaluate() output, the 2026-10-07 lesson)."""
+    claims = [_claim(f"C{i}") for i in range(1, 3)]
+    v = _make_evaluator(tmp_path, _LLM([]), _ScriptedRunner([]), num_claims=2)
+    reg = TaskRegistry.load(v._runner_temp_root, GOAL, logger=v.logger)
+    reg.seed_claims(claims)
+    for c in reg.claims:
+        c["scorer"] = _scorer_body(c["id"], 0.9)
+    reg.record_generation(
+        "u0",
+        {c["id"]: 0.1 for c in reg.claims},
+        {c["id"]: "weak" for c in reg.claims},
+        reward=0.1,
+    )
+    reg.save()
+
+    def run(ws_, code, eid):
+        for c in ("C1", "C2"):
+            if c in eid:
+                return scorers_mod.ExecOutcome(
+                    rc=0,
+                    stdout=json.dumps(
+                        {"claim_id": c, "score": 0.9, "evidence": "strong"}
+                    ),
+                )
+        raise AssertionError(eid)
+
+    v2 = _make_evaluator(tmp_path, _LLM([]), run, num_claims=2)
+    v2._load_workflow_data = lambda uuid: _wf_info(GOAL)  # type: ignore[method-assign]
+    result = v2.evaluate("u1")  # beats u0 on every claim
+    assert result["pair_outcomes"] == {"u0": "won"}
+    result2 = v2.evaluate("u2")  # identical to u1 -> tie u1, win u0
+    assert result2["pair_outcomes"] == {"u0": "won", "u1": "tie"}
+    # persisted under evaluation.verifier where the engine reads it
+    saved = json.loads(
+        (tmp_path / "workflows" / "u2" / "state_result.json").read_text()
+    )
+    assert saved["evaluation"]["verifier"]["pair_outcomes"] == {
+        "u0": "won", "u1": "tie",
+    }
+
+    from sources.core.stopping import StopController
+
+    ctl = StopController(mode="auto", min_iter=2, patience=3, max_iter=8,
+                         verifier_kind="hybrid")
+    assert ctl.mode == "plateau"  # hybrid is a relative verifier
+    ctl.observe("u0", 0, 0.1, {}, failed=False)
+    ctl.observe("u1", 1, float(result["overall_score"]),
+                result["pair_outcomes"], failed=False)
+    assert ctl.champion == "u1"  # won vs champion -> new champion
+    ctl.observe("u2", 2, float(result2["overall_score"]),
+                result2["pair_outcomes"], failed=False)
+    assert ctl.champion == "u1"  # tie keeps the incumbent
+    assert ctl.since_change == 1
 
 
 

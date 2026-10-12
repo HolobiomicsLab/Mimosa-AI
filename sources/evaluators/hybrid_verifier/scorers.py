@@ -169,7 +169,7 @@ exactly (no useless `_pred` suffix added) wins; more complete results (one row p
 input row) win.
 
 # Task goal (context only)
-{goal[:2500]}
+{goal[:8000]}
 
 # Claim to implement exactly (JSON)
 {json.dumps(claim, indent=1)}
@@ -394,7 +394,7 @@ def parse_scorer_output(stdout: str) -> dict[str, Any] | None:
         return {
             "claim_id": str(d.get("claim_id", ""))[:60],
             "score": min(1.0, max(0.0, s)),
-            "evidence": str(d.get("evidence", ""))[:300],
+            "evidence": str(d.get("evidence", ""))[:2000],
         }
     return None
 

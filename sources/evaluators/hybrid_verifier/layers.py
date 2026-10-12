@@ -857,7 +857,7 @@ class VisualEvidenceLayer:
                     score = max(0.0, min(1.0, float(item["score"])))
                 except (TypeError, ValueError):
                     score = None
-            ev = str((item or {}).get("evidence", ""))[:240] if item else ""
+            ev = str((item or {}).get("evidence", ""))[:2000] if item else ""
             if score is None:
                 ev = ev or f"visual scorer returned no score for {c['id']}"
             out.append(

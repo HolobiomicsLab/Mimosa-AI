@@ -13,7 +13,7 @@ if __name__ == "__main__":
     )
 
 from .base import BaseEvaluator, EvaluatorError, WorkflowDataError  # noqa: F401
-from .generic import (  # noqa: F401
+from .generic_verifier import (  # noqa: F401
     GenericEvaluator,
     LLMEvaluationError,
     ScoreExtractionError,
@@ -44,9 +44,11 @@ class WorkflowEvaluator:
     Facade over GenericEvaluator, ScenarioEvaluator and the verifier
     channel. The verifier defaults to the hybrid E19/E19b evaluator
     (``HybridVerifierEvaluator``); ``config.verifier_kind = "legacy"``
-    selects the deprecated multi-source ``VerifierEvaluator`` instead, and
+    selects the deprecated multi-source ``VerifierEvaluator`` instead,
     ``"gold"`` the benchmark-leaking oracle control
-    (``GoldFeedbackEvaluator``, research only). Unknown values fall back to
+    (``GoldFeedbackEvaluator``, research only), and ``"policy_bt"`` the
+    E44-E48 policy/BT verifier (fresh re-execution + deterministic
+    digest + LLM policy tournament). Unknown values fall back to
     the hybrid verifier.
     """
 
@@ -101,6 +103,15 @@ class WorkflowEvaluator:
                 from .gold_feedback import GoldFeedbackEvaluator
 
                 self.verifier_evaluator = GoldFeedbackEvaluator(
+                    config, workspace_dir=verifier_workspace_dir
+                )
+            elif verifier_kind == "policy_bt":
+                # E44-E48 architecture: fresh re-execution + deterministic
+                # digest + LLM policy tournament (opt-in; default hybrid).
+                # Imported lazily so the default path never loads it.
+                from .policy_bt_verifier import PolicyBTVerifierEvaluator
+
+                self.verifier_evaluator = PolicyBTVerifierEvaluator(
                     config, workspace_dir=verifier_workspace_dir
                 )
             else:

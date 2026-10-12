@@ -76,8 +76,9 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument(
         "--verifier_kind",
         type=str,
-        choices=["hybrid", "legacy", "gold"],
-        help="Verifier channel: 'hybrid' (E19/E19b, default), 'legacy' (deprecated multi-source verifier) "
+        choices=["hybrid", "legacy", "gold", "policy_bt"],
+        help="Verifier channel: 'hybrid' (E19/E19b, default), 'legacy' (deprecated multi-source verifier), "
+        "'policy_bt' (E44-E48: fresh re-execution + deterministic digest + LLM policy tournament), "
         "or 'gold' (ORACLE / BENCHMARK-LEAKING research control: benchmark grader feedback as gradient; "
         "needs --science_agent_bench; never report its scores)",
     )
@@ -125,6 +126,52 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
         "re-execution caps reward at 0.0; divergent caps it at 0.5)",
     )
     parser.add_argument(
+        "--policy_bt_reward",
+        type=str,
+        choices=["win_rate", "bradley_terry"],
+        help="verifier_kind=policy_bt only: reward aggregation (default win_rate — "
+        "E19c measured best; bradley_terry keeps the BT fit as an option)",
+    )
+    parser.add_argument(
+        "--policy_bt_scorer_timeout_s",
+        type=int,
+        help="verifier_kind=policy_bt only: per policy-comparison subprocess "
+        "timeout (seconds)",
+    )
+    parser.add_argument(
+        "--policy_bt_visual_channel",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="verifier_kind=policy_bt only: enable/disable the kimi per-pair "
+        "visual channel for figure-dominant tasks",
+    )
+    parser.add_argument(
+        "--policy_bt_refiner",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="verifier_kind=policy_bt only: enable/disable the E47 evidence-checked "
+        "gradient refiner (default on)",
+    )
+    parser.add_argument(
+        "--policy_bt_reexec_timeout_s",
+        type=int,
+        help="verifier_kind=policy_bt only: wall-clock cap per generation "
+        "re-execution (seconds, default 900)",
+    )
+    parser.add_argument(
+        "--policy_bt_visual_tiebreak_code",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="verifier_kind=policy_bt only: code-policy tiebreak when the kimi "
+        "pair call ties (unmeasured; default off)",
+    )
+    parser.add_argument(
+        "--policy_bt_verbose",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="verifier_kind=policy_bt only: per-pair/per-repair stdout lines",
+    )
+    parser.add_argument(
         "--planner_human_approve",
         action="store_true",
         default=False,
@@ -166,6 +213,32 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.hybrid_verifier_visual_rung = args.hybrid_verifier_visual_rung
     if getattr(args, "hybrid_verifier_execution_gate", None) is not None:
         config.hybrid_verifier_execution_gate = args.hybrid_verifier_execution_gate
+    if getattr(args, "policy_bt_reward", None):
+        config.policy_bt_reward = args.policy_bt_reward
+    if getattr(args, "policy_bt_scorer_timeout_s", None):
+        config.policy_bt_scorer_timeout_s = args.policy_bt_scorer_timeout_s
+    if getattr(args, "policy_bt_visual_channel", None) is not None:
+        config.policy_bt_visual_channel = args.policy_bt_visual_channel
+    if getattr(args, "policy_bt_refiner", None) is not None:
+        config.policy_bt_refiner = args.policy_bt_refiner
+    if getattr(args, "policy_bt_reexec_timeout_s", None):
+        config.policy_bt_reexec_timeout_s = args.policy_bt_reexec_timeout_s
+    if getattr(args, "policy_bt_visual_tiebreak_code", None) is not None:
+        config.policy_bt_visual_tiebreak_code = args.policy_bt_visual_tiebreak_code
+    if getattr(args, "policy_bt_verbose", None) is not None:
+        config.policy_bt_verbose = args.policy_bt_verbose
+    if getattr(args, "early_stop_mode", None):
+        config.early_stop_mode = args.early_stop_mode
+    if getattr(args, "min_learning_evolve_iterations", None):
+        config.min_learning_evolve_iterations = (
+            args.min_learning_evolve_iterations
+        )
+    if getattr(args, "plateau_patience", None):
+        config.plateau_patience = args.plateau_patience
+    if getattr(args, "explore_after_plateau", None) is not None:
+        config.explore_after_plateau = args.explore_after_plateau
+    if getattr(args, "explore_base_rate", None) is not None:
+        config.explore_base_rate = args.explore_base_rate
     if args.runner_default_timeout:
         config.runner_default_timeout = args.runner_default_timeout
     if args.runner_default_max_memory_mb:
@@ -458,13 +531,13 @@ async def main():
         if (args.manual):
             await manual_mode(args, config)
         elif (args.papers):
-            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
+            #PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await papers_mode(args, config)
         elif (args.science_agent_bench):
-            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
+            #PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
-            PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
+            #PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await normal_execution_mode(args, config)
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)

@@ -130,8 +130,42 @@ def test_quantization_404_without_filter_raises_immediately():
     assert completion.call_count == 1
 
 
+def test_openai_provider_uses_max_completion_tokens():
+    """OpenAI's newer models hard-reject `max_tokens` with a 400 (e.g.
+    gpt-6.1-sol: "Unsupported parameter: 'max_tokens'... Use
+    'max_completion_tokens' instead"), so the openai provider must send
+    `max_completion_tokens` on the wire."""
+    provider = LLMProvider(
+        agent_name="test",
+        config=LLMConfig(model="gpt-6.1-sol", provider="openai"),
+    )
+
+    with patch("litellm.completion", return_value=_FakeResponse()) as completion:
+        result = provider("hello", use_cache=False)
+
+    assert result == "ok"
+    kwargs = completion.call_args.kwargs
+    assert kwargs["model"] == "openai/gpt-6.1-sol"
+    assert kwargs["max_completion_tokens"] == provider.config.max_tokens
+    assert "max_tokens" not in kwargs
+
+
+def test_non_openai_provider_keeps_max_tokens():
+    """Providers other than openai keep the legacy `max_tokens` param."""
+    provider = _make_openrouter_provider()
+
+    with patch("litellm.completion", return_value=_FakeResponse()) as completion:
+        provider("hello", use_cache=False)
+
+    kwargs = completion.call_args.kwargs
+    assert kwargs["max_tokens"] == provider.config.max_tokens
+    assert "max_completion_tokens" not in kwargs
+
+
 if __name__ == "__main__":
     test_retry_loop_raises_after_max_retries()
     test_timeout_retry_is_bounded()
     test_non_retryable_error_raises_immediately()
+    test_openai_provider_uses_max_completion_tokens()
+    test_non_openai_provider_keeps_max_tokens()
     print("llm_provider retry tests passed")

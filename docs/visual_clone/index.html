@@ -6,11 +6,11 @@
 <title>Mimosa-AI visual clone - menu</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview &gt; menu" data-built="ca72107+wt" data-built-date="2026-09-28">
+<body data-crumb="Overview &gt; menu" data-built="7da1f5e+wt" data-built-date="2026-10-12">
 <div class="wrap">
 
 <h1 class="hud">Mimosa-AI visual clone</h1>
-<p class="intro">This is the map of the Mimosa-AI code and architecture: 174 offline HTML pages, from the whole system down to a single file or experiment script. Each page starts with a diagram; text only labels it. Every claim comes from the code at commit <code>7e8463b</code>.</p>
+<p class="intro">This is the map of the Mimosa-AI code and architecture: 187 offline HTML pages, from the whole system down to a single file or experiment script. Each page starts with a diagram; text only labels it. Every claim comes from the code at commit <code>7da1f5e</code> plus the working tree on the page's build date.</p>
 
 <div id="legend" data-auto></div>
 
@@ -58,10 +58,10 @@
     <text class="box-label" x="180" y="286" text-anchor="middle">L3 WorkflowRunner</text>
     <text class="box-sub" x="180" y="306" text-anchor="middle">sandboxed run</text>
   </a>
-  <a class="box" id="a6" href="area_evaluators.html"><title>Layer 4 verifier; config.verifier_kind picks hybrid (default), legacy (deprecated) or gold (oracle)</title>
+  <a class="box" id="a6" href="area_evaluators.html"><title>Layer 4 verifier; config.verifier_kind picks hybrid (default), legacy (deprecated), gold (oracle) or policy_bt (opt-in pairwise)</title>
     <rect x="30" y="356" width="300" height="60" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="180" y="380" text-anchor="middle">L4 Verifier (hybrid default)</text>
-    <text class="box-sub" x="180" y="398" text-anchor="middle">verifier_kind: hybrid/legacy/gold</text>
+    <text class="box-sub" x="180" y="398" text-anchor="middle">hybrid / legacy / gold / policy_bt</text>
   </a>
 
   <path class="edge" data-from="a4" data-to="a5" d="M180,206 V260" fill="none" stroke="url(#hud)" stroke-width="2" marker-end="url(#arwG)"/>
@@ -118,10 +118,11 @@
 <h3>System level</h3>
 <p data-name="reference style legend skeleton"><a href="_reference.html">_reference.html</a> <span class="chip ok">fresh</span> <span class="sub">style reference - the page skeleton, legend and shapes</span></p>
 <p data-name="overview l0 whole system"><a href="overview.html">overview.html</a> <span class="chip ok">fresh</span> <span class="sub">L0 - five layers, verifier_kind choice, external services, runtime folders</span></p>
-<p data-name="flow task run single task"><a href="flow_task_run.html">flow_task_run.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - one task, CLI to first score (hybrid / legacy / gold)</span></p>
-<p data-name="flow evolution loop qd archive"><a href="flow_evolution_loop.html">flow_evolution_loop.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - generation N to N+1</span></p>
-<p data-name="flow verification claims scorers ladder reward"><a href="flow_verification.html">flow_verification.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - hybrid verifier, claim by claim</span></p>
-<p data-name="flow sab batch csv benchmark"><a href="flow_sab_batch.html">flow_sab_batch.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - CSV batch mode and grading</span></p>
+<p data-name="flow task run single task"><a href="flow_task_run.html">flow_task_run.html</a> <span class="chip warn">stale</span> <span class="sub">flow - one task, CLI to first score (hybrid / legacy / gold / policy_bt)</span></p>
+<p data-name="flow evolution loop qd archive"><a href="flow_evolution_loop.html">flow_evolution_loop.html</a> <span class="chip warn">stale</span> <span class="sub">flow - generation N to N+1</span></p>
+<p data-name="flow verification claims scorers ladder reward"><a href="flow_verification.html">flow_verification.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - verification hub: hybrid claim ladder and the policy_bt channel</span></p>
+<p data-name="flow policy bt verification reexec digest recon policy tournament win rate opt-in"><a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a> <span class="chip ok">fresh</span> <span class="sub">flow - BT policy verifier, stage by stage (new 2026-10-10)</span></p>
+<p data-name="flow sab batch csv benchmark"><a href="flow_sab_batch.html">flow_sab_batch.html</a> <span class="chip warn">stale</span> <span class="sub">flow - CSV batch mode and grading</span></p>
 </section>
 
 <section class="treesection">
@@ -129,20 +130,21 @@
 <p data-name="area entry config main py"><a href="area_entry_config.html">area_entry_config.html</a> <span class="chip ok">fresh</span> <span class="sub">main.py, config.py, config_default.json, helper scripts</span></p>
 <p data-name="area sources core map"><a href="area_sources_core.html">area_sources_core.html</a> <span class="chip ok">fresh</span> <span class="sub">L1 - map of sources/core</span></p>
 <details><summary>sources/core - L2 pages</summary><div class="dbody">
-<p data-name="mod core evolution engine"><a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a> <span class="chip ok">fresh</span> <span class="sub">evolution_engine.py, code_features.py, failure_fingerprint.py, orchestrator.py</span></p>
+<p data-name="mod core evolution engine"><a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a> <span class="chip warn">stale</span> <span class="sub">evolution_engine.py, code_features.py, failure_fingerprint.py, orchestrator.py</span></p>
 <p data-name="mod core selection archive novelty qd"><a href="mod_core_selection.html">mod_core_selection.html</a> <span class="chip ok">fresh</span> <span class="sub">selection.py, workflow_selection.py</span></p>
-<p data-name="mod core variation mutation crossover embedding"><a href="mod_core_variation.html">mod_core_variation.html</a> <span class="chip ok">fresh</span> <span class="sub">variation_engine.py, genotype_embedding.py, code_features.py</span></p>
-<p data-name="mod core lineage workflow info schema"><a href="mod_core_lineage.html">mod_core_lineage.html</a> <span class="chip ok">fresh</span> <span class="sub">lineage.py, workflow_info.py, schema.py</span></p>
-<p data-name="mod core runner sandbox factory"><a href="mod_core_runner.html">mod_core_runner.html</a> <span class="chip ok">fresh</span> <span class="sub">workflow_runner.py and the factories</span></p>
+<p data-name="mod core variation mutation crossover embedding"><a href="mod_core_variation.html">mod_core_variation.html</a> <span class="chip warn">stale</span> <span class="sub">variation_engine.py, genotype_embedding.py, code_features.py</span></p>
+<p data-name="mod core lineage workflow info schema"><a href="mod_core_lineage.html">mod_core_lineage.html</a> <span class="chip warn">stale</span> <span class="sub">lineage.py, workflow_info.py, schema.py</span></p>
+<p data-name="mod core runner sandbox factory"><a href="mod_core_runner.html">mod_core_runner.html</a> <span class="chip warn">stale</span> <span class="sub">workflow_runner.py and the factories</span></p>
 <p data-name="mod core planner goal mode"><a href="mod_core_planner.html">mod_core_planner.html</a> <span class="chip ok">fresh</span> <span class="sub">planner.py</span></p>
-<p data-name="mod core tools llm mcp provider"><a href="mod_core_tools_llm.html">mod_core_tools_llm.html</a> <span class="chip ok">fresh</span> <span class="sub">tools_manager.py, llm_provider.py</span></p>
+<p data-name="mod core tools llm mcp provider"><a href="mod_core_tools_llm.html">mod_core_tools_llm.html</a> <span class="chip warn">stale</span> <span class="sub">tools_manager.py, llm_provider.py</span></p>
 </div></details>
 </section>
 
 <section class="treesection">
 <h3>Evaluators and benchmarks</h3>
 <p data-name="area evaluators map verifier"><a href="area_evaluators.html">area_evaluators.html</a> <span class="chip ok">fresh</span> <span class="sub">L1 - which evaluator is used when</span></p>
-<p data-name="mod evaluators hybrid verifier default"><a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> <span class="chip ok">fresh</span> <span class="sub">the default verifier package, file by file</span></p>
+<p data-name="mod evaluators hybrid verifier default"><a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> <span class="chip warn">stale</span> <span class="sub">the default verifier package, file by file</span></p>
+<p data-name="mod evaluators policy bt verifier reexec policy tournament opt-in pairwise"><a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> <span class="chip ok">fresh</span> <span class="sub">the opt-in BT policy verifier: 13 diagrams, 12 file cards, code quoted (new 2026-10-10)</span></p>
 <p data-name="mod evaluators gold feedback oracle grader verifier kind gold"><a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> <span class="chip ok">fresh</span> <span class="chip warn">oracle - leaks gold</span> <span class="sub"><code>--verifier_kind gold</code>: grader feedback replaces the gradient</span></p>
 <p data-name="area evaluators legacy deprecated claims"><a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a> <span class="chip warn">deprecated</span> <span class="sub">legacy claims verifier and the other evaluators</span></p>
 <p data-name="area benchmark evaluation csv sandbox grader"><a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a> <span class="chip ok">fresh</span> <span class="sub">batch mode, execution sandboxes, graders</span></p>
@@ -158,12 +160,12 @@
 </section>
 
 <section class="treesection">
-<h3>File digests (96 files, one page each)</h3>
+<h3>File digests (97 files, one page each)</h3>
 <p data-name="file index hub digest"><a href="file_index.html">file_index.html</a> <span class="chip ok">fresh</span> <span class="sub">hub - one digest page per file, scope and index</span></p>
-<details><summary>sources/core (19 files)</summary><div class="dbody">
+<details><summary>sources/core (20 files)</summary><div class="dbody">
 <p data-name="file core init __init__.py file digest"><a href="file_core_init.html">file_core_init.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/__init__.py - 77 lines</span></p>
 <p data-name="file core code features code_features.py file digest"><a href="file_core_code_features.html">file_core_code_features.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/code_features.py - 37 lines</span></p>
-<p data-name="file core evolution engine evolution_engine.py file digest"><a href="file_core_evolution_engine.html">file_core_evolution_engine.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/evolution_engine.py - 1236 lines</span></p>
+<p data-name="file core evolution engine evolution_engine.py file digest"><a href="file_core_evolution_engine.html">file_core_evolution_engine.html</a> <span class="chip warn">stale</span> <span class="sub">sources/core/evolution_engine.py - 1236 lines</span></p>
 <p data-name="file core factory factory.py file digest"><a href="file_core_factory.html">file_core_factory.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/factory.py - 207 lines</span></p>
 <p data-name="file core failure fingerprint failure_fingerprint.py file digest"><a href="file_core_failure_fingerprint.html">file_core_failure_fingerprint.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/failure_fingerprint.py - 195 lines</span></p>
 <p data-name="file core genotype embedding genotype_embedding.py file digest"><a href="file_core_genotype_embedding.html">file_core_genotype_embedding.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/genotype_embedding.py - 329 lines</span></p>
@@ -174,10 +176,11 @@
 <p data-name="file core schema schema.py file digest"><a href="file_core_schema.html">file_core_schema.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/schema.py - 169 lines</span></p>
 <p data-name="file core selection selection.py file digest"><a href="file_core_selection.html">file_core_selection.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/selection.py - 842 lines</span></p>
 <p data-name="file core single agent factory single_agent_factory.py file digest"><a href="file_core_single_agent_factory.html">file_core_single_agent_factory.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/single_agent_factory.py - 315 lines</span></p>
+<p data-name="file core stopping stopping.py file digest"><a href="file_core_stopping.html">file_core_stopping.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/stopping.py - 238 lines (new 2026-10-10)</span></p>
 <p data-name="file core tools manager tools_manager.py file digest"><a href="file_core_tools_manager.html">file_core_tools_manager.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/tools_manager.py - 679 lines</span></p>
-<p data-name="file core variation engine variation_engine.py file digest"><a href="file_core_variation_engine.html">file_core_variation_engine.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/variation_engine.py - 609 lines</span></p>
+<p data-name="file core variation engine variation_engine.py file digest"><a href="file_core_variation_engine.html">file_core_variation_engine.html</a> <span class="chip warn">stale</span> <span class="sub">sources/core/variation_engine.py - 609 lines</span></p>
 <p data-name="file core workflow factory workflow_factory.py file digest"><a href="file_core_workflow_factory.html">file_core_workflow_factory.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/workflow_factory.py - 514 lines</span></p>
-<p data-name="file core workflow info workflow_info.py file digest"><a href="file_core_workflow_info.html">file_core_workflow_info.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/workflow_info.py - 340 lines</span></p>
+<p data-name="file core workflow info workflow_info.py file digest"><a href="file_core_workflow_info.html">file_core_workflow_info.html</a> <span class="chip warn">stale</span> <span class="sub">sources/core/workflow_info.py - 340 lines</span></p>
 <p data-name="file core workflow runner workflow_runner.py file digest"><a href="file_core_workflow_runner.html">file_core_workflow_runner.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/workflow_runner.py - 650 lines</span></p>
 <p data-name="file core workflow selection workflow_selection.py file digest"><a href="file_core_workflow_selection.html">file_core_workflow_selection.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/core/workflow_selection.py - 416 lines</span></p>
 </div></details>
@@ -242,13 +245,13 @@
 <p data-name="file hybrid init __init__.py file digest"><a href="file_hybrid_init.html">file_hybrid_init.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/__init__.py - 136 lines</span></p>
 <p data-name="file hybrid aggregation aggregation.py file digest"><a href="file_hybrid_aggregation.html">file_hybrid_aggregation.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/aggregation.py - 454 lines</span></p>
 <p data-name="file hybrid claims claims.py file digest"><a href="file_hybrid_claims.html">file_hybrid_claims.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/claims.py - 701 lines</span></p>
-<p data-name="file hybrid digest digest.py file digest"><a href="file_hybrid_digest.html">file_hybrid_digest.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/digest.py - 175 lines</span></p>
-<p data-name="file hybrid evaluator evaluator.py file digest"><a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/evaluator.py - 784 lines</span></p>
-<p data-name="file hybrid gradient gradient.py file digest"><a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/gradient.py - 388 lines</span></p>
+<p data-name="file hybrid digest digest.py file digest"><a href="file_hybrid_digest.html">file_hybrid_digest.html</a> <span class="chip warn">stale</span> <span class="sub">sources/evaluators/hybrid_verifier/digest.py - 175 lines</span></p>
+<p data-name="file hybrid evaluator evaluator.py file digest"><a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a> <span class="chip warn">stale</span> <span class="sub">sources/evaluators/hybrid_verifier/evaluator.py - 784 lines</span></p>
+<p data-name="file hybrid gradient gradient.py file digest"><a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a> <span class="chip warn">stale</span> <span class="sub">sources/evaluators/hybrid_verifier/gradient.py - 388 lines</span></p>
 <p data-name="file hybrid inventory inventory.py file digest"><a href="file_hybrid_inventory.html">file_hybrid_inventory.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/inventory.py - 282 lines</span></p>
-<p data-name="file hybrid layers layers.py file digest"><a href="file_hybrid_layers.html">file_hybrid_layers.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/layers.py - 1049 lines</span></p>
+<p data-name="file hybrid layers layers.py file digest"><a href="file_hybrid_layers.html">file_hybrid_layers.html</a> <span class="chip warn">stale</span> <span class="sub">sources/evaluators/hybrid_verifier/layers.py - 1049 lines</span></p>
 <p data-name="file hybrid registry registry.py file digest"><a href="file_hybrid_registry.html">file_hybrid_registry.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/registry.py - 355 lines</span></p>
-<p data-name="file hybrid scorers scorers.py file digest"><a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/hybrid_verifier/scorers.py - 411 lines</span></p>
+<p data-name="file hybrid scorers scorers.py file digest"><a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a> <span class="chip warn">stale</span> <span class="sub">sources/evaluators/hybrid_verifier/scorers.py - 411 lines</span></p>
 <p data-name="file gold init __init__.py gold_feedback oracle file digest"><a href="file_gold_init.html">file_gold_init.html</a> <span class="chip ok">fresh</span> <span class="chip warn">oracle</span> <span class="sub">sources/evaluators/gold_feedback/__init__.py - 29 lines</span></p>
 <p data-name="file gold evaluator evaluator.py gold_feedback oracle file digest"><a href="file_gold_evaluator.html">file_gold_evaluator.html</a> <span class="chip ok">fresh</span> <span class="chip warn">oracle</span> <span class="sub">sources/evaluators/gold_feedback/evaluator.py - 470 lines</span></p>
 <p data-name="file gold grader grader.py gold_feedback oracle file digest"><a href="file_gold_grader.html">file_gold_grader.html</a> <span class="chip ok">fresh</span> <span class="chip warn">oracle</span> <span class="sub">sources/evaluators/gold_feedback/grader.py - 253 lines</span></p>
@@ -256,9 +259,9 @@
 <p data-name="file gold reward reward.py gold_feedback oracle file digest"><a href="file_gold_reward.html">file_gold_reward.html</a> <span class="chip ok">fresh</span> <span class="chip warn">oracle</span> <span class="sub">sources/evaluators/gold_feedback/reward.py - 26 lines</span></p>
 <p data-name="file gold leak leak.py gold_feedback oracle file digest"><a href="file_gold_leak.html">file_gold_leak.html</a> <span class="chip ok">fresh</span> <span class="chip warn">oracle</span> <span class="sub">sources/evaluators/gold_feedback/leak.py - 29 lines</span></p>
 <p data-name="file eval base base.py file digest"><a href="file_eval_base.html">file_eval_base.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/base.py - 380 lines</span></p>
-<p data-name="file eval bs detection bs_detection.py file digest"><a href="file_eval_bs_detection.html">file_eval_bs_detection.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/generic/bs_detection.py - 801 lines</span></p>
-<p data-name="file eval evaluator evaluator.py file digest"><a href="file_eval_evaluator.html">file_eval_evaluator.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/evaluator.py - 205 lines</span></p>
-<p data-name="file eval generic generic.py file digest"><a href="file_eval_generic.html">file_eval_generic.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/generic/generic.py - 471 lines</span></p>
+<p data-name="file eval bs detection bs_detection.py file digest"><a href="file_eval_bs_detection.html">file_eval_bs_detection.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/generic_verifier/bs_detection.py - 801 lines</span></p>
+<p data-name="file eval evaluator evaluator.py file digest"><a href="file_eval_evaluator.html">file_eval_evaluator.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/evaluator.py - 216 lines</span></p>
+<p data-name="file eval generic generic.py file digest"><a href="file_eval_generic.html">file_eval_generic.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/generic_verifier/generic.py - 471 lines</span></p>
 <p data-name="file eval grounding grounding.py file digest"><a href="file_eval_grounding.html">file_eval_grounding.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/grounding.py - 55 lines</span></p>
 <p data-name="file eval scenario scenario.py file digest"><a href="file_eval_scenario.html">file_eval_scenario.html</a> <span class="chip ok">fresh</span> <span class="sub">sources/evaluators/scenario/scenario.py - 653 lines</span></p>
 </div></details>
@@ -327,7 +330,7 @@
 </section>
 <section class="treesection">
 <h3>Data and experiment folders (pattern summaries)</h3>
-<p data-name="data modules prompts templates injected"><a href="data_modules_prompts.html">data_modules_prompts.html</a> <span class="chip ok">fresh</span> <span class="sub">templates injected into generated workflows</span></p>
+<p data-name="data modules prompts templates injected"><a href="data_modules_prompts.html">data_modules_prompts.html</a> <span class="chip warn">stale</span> <span class="sub">templates injected into generated workflows</span></p>
 <p data-name="data runs run notes capsule workflows logs"><a href="data_runs.html">data_runs.html</a> <span class="chip ok">fresh</span> <span class="sub">run_notes, runs_capsule, sources/workflows, logs</span></p>
 <p data-name="data audits reports"><a href="data_audits.html">data_audits.html</a> <span class="chip ok">fresh</span> <span class="sub">audits - which report answers what</span></p>
 <p data-name="data experiments verifiers diversity"><a href="data_experiments.html">data_experiments.html</a> <span class="chip ok">fresh</span> <span class="sub">experiments_verifiers, diversity_experiments</span></p>
@@ -351,6 +354,35 @@
 </div>
 
 <div class="panel"><span class="br"></span>
+<h2>Stale pages (freshness check, 2026-10-10)</h2>
+<p class="intro">The check in UPDATE_VISUAL_CLONE.md section 8 compares each page's build commit with the changed files its <code>covers</code> list names. These 18 pages were not re-synced in the 2026-10-10 wave and their covered code changed; their menu chip reads <span class="chip warn">stale</span>.</p>
+<table>
+<thead><tr><th>Page</th><th>Changed files it covers</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="data_modules_prompts.html">data_modules_prompts.html</a></td><td class="sym">sources/modules/state_schema.py, sources/prompts/workflow_v15.md</td></tr>
+<tr><td class="sym"><a href="file_core_evolution_engine.html">file_core_evolution_engine.html</a></td><td class="sym">sources/core/evolution_engine.py</td></tr>
+<tr><td class="sym"><a href="file_core_variation_engine.html">file_core_variation_engine.html</a></td><td class="sym">sources/core/variation_engine.py</td></tr>
+<tr><td class="sym"><a href="file_core_workflow_info.html">file_core_workflow_info.html</a></td><td class="sym">sources/core/workflow_info.py</td></tr>
+<tr><td class="sym"><a href="file_hybrid_digest.html">file_hybrid_digest.html</a></td><td class="sym">sources/evaluators/hybrid_verifier/digest.py</td></tr>
+<tr><td class="sym"><a href="file_hybrid_evaluator.html">file_hybrid_evaluator.html</a></td><td class="sym">sources/evaluators/hybrid_verifier/evaluator.py</td></tr>
+<tr><td class="sym"><a href="file_hybrid_gradient.html">file_hybrid_gradient.html</a></td><td class="sym">sources/evaluators/hybrid_verifier/gradient.py</td></tr>
+<tr><td class="sym"><a href="file_hybrid_layers.html">file_hybrid_layers.html</a></td><td class="sym">sources/evaluators/hybrid_verifier/layers.py</td></tr>
+<tr><td class="sym"><a href="file_hybrid_scorers.html">file_hybrid_scorers.html</a></td><td class="sym">sources/evaluators/hybrid_verifier/scorers.py</td></tr>
+<tr><td class="sym"><a href="flow_evolution_loop.html">flow_evolution_loop.html</a></td><td class="sym">config.py, sources/core/evolution_engine.py, sources/core/variation_engine.py, sources/core/workflow_info.py, sources/evaluators/evaluator.py, sources/evaluators/hybrid_verifier/gradient.py</td></tr>
+<tr><td class="sym"><a href="flow_sab_batch.html">flow_sab_batch.html</a></td><td class="sym">main.py</td></tr>
+<tr><td class="sym"><a href="flow_task_run.html">flow_task_run.html</a></td><td class="sym">config.py, main.py, sources/core/evolution_engine.py, sources/core/variation_engine.py, sources/core/workflow_info.py, sources/evaluators/evaluator.py</td></tr>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a></td><td class="sym">sources/core/evolution_engine.py</td></tr>
+<tr><td class="sym"><a href="mod_core_lineage.html">mod_core_lineage.html</a></td><td class="sym">sources/core/workflow_info.py, sources/modules/state_schema.py</td></tr>
+<tr><td class="sym"><a href="mod_core_runner.html">mod_core_runner.html</a></td><td class="sym">sources/modules/state_schema.py</td></tr>
+<tr><td class="sym"><a href="mod_core_tools_llm.html">mod_core_tools_llm.html</a></td><td class="sym">sources/core/llm_provider.py</td></tr>
+<tr><td class="sym"><a href="mod_core_variation.html">mod_core_variation.html</a></td><td class="sym">sources/core/variation_engine.py</td></tr>
+<tr><td class="sym"><a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a></td><td class="sym">sources/evaluators/hybrid_verifier/digest.py, sources/evaluators/hybrid_verifier/evaluator.py, sources/evaluators/hybrid_verifier/gradient.py, sources/evaluators/hybrid_verifier/layers.py, sources/evaluators/hybrid_verifier/scorers.py</td></tr>
+</tbody>
+</table>
+<p class="note">Amber: a stale page is not wrong, it is dated. The 2026-10-10 wave re-synced only the pages the BT policy verifier touched; the core and hybrid_verifier pages above keep their 2026-09-28 content with earlier line counts.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
 <h2>Changelog</h2>
 <table>
 <thead><tr><th>Date</th><th>Commit</th><th>Pages</th><th>Note</th></tr></thead>
@@ -358,9 +390,27 @@
 <tr><td class="sym">2026-10-02</td><td class="sym">7e8463b</td><td>all 174</td><td>First build of the visual clone.</td></tr>
 <tr><td class="sym">2026-09-26</td><td class="sym">336fe19</td><td>36</td><td><b>Evaluators split + E35.</b> Full note below.</td></tr>
 <tr><td class="sym">2026-09-28</td><td class="sym">ca72107 + wt</td><td>46</td><td><b>Gold feedback oracle mode.</b> Full note below.</td></tr>
-<tr><td class="sym">-</td><td class="sym">-</td><td>-</td><td><b>Known gap:</b> 14 harness experiments (E26-E34, E36, E38-E41) have no page.</td></tr>
+<tr><td class="sym">2026-09-30</td><td class="sym">7da1f5e</td><td>1</td><td><b>Experiments E1-E42.</b> <code>data_experiments.html</code> refreshed: cycles 1-5, <code>improve_experiment.md</code>, E41 CAGE label-noise (ceiling 0.854) and E42 autopsy.</td></tr>
+<tr><td class="sym">2026-10-02</td><td class="sym">7da1f5e + wt</td><td>1</td><td><b>E44 KUMITE.</b> <code>data_experiments.html</code>: new panel (pipeline diagram, gates G1 FAIL 0.7041 / G2 8/19 / G3 FAIL / G4 PASS, pointers to results pair + HTML report).</td></tr>
+<tr><td class="sym">2026-10-02</td><td class="sym">7da1f5e + wt</td><td>1</td><td><b>E44 two-arm update.</b> <code>data_experiments.html</code>: E44 panel updated to the v1 &rarr; v2 result (G3 relevance 0.188 &rarr; 0.504, G1/G2/G4 both arms, cost $0.79).</td></tr>
+<tr><td class="sym">2026-10-02</td><td class="sym">7da1f5e + wt</td><td>1</td><td><b>E45 SPARTAN.</b> <code>data_experiments.html</code>: compact panel after E44 (placebo probe &rarr; v2b assessment instrument, placebo 0.000; quarantined 7-task holdout; substance-only v3 + no-recon generic control). Gates: G-INST PASS, G3-A FAIL +0.033 (substance ~0.2, structural F6), G1-MACRO v3 0.702 &gt; v2 0.654 &gt; generic 0.519 &gt; recorded 0.437, TRANSFER FAIL &minus;0.135, G4 antisym 1.000/1289. E44 verdict re-labeled its v2 relevance claim a naming artifact (adv_circularity.json). Cost chip $0.33 / program-run $1.12.</td></tr>
+<tr><td class="sym">2026-10-03</td><td class="sym">7da1f5e + wt</td><td>1</td><td><b>E46 hybrid visual BT.</b> <code>data_experiments.html</code>: compact panel after E45 (kimi-k3 per-workspace figure scoring for the 6 visual-judge tasks behind the exec-crash rung; E45 v3 policy reused for the rest). Gates: G-VIS-DECISIVE PASS 0.75 decisive (129/172) vs ~0 before, G1-VIS 0.833 (5/6 = E26 anchor on a different set, directional), G1-NONVIS guard 0.7305, G2 9/19, G-COST $0.56. Companion: non-visual recompute shows v3 best arm 0.731 and E45 G3-A passes non-visually (+0.088). Verdict: best E4x configuration &mdash; script policy + kimi visual + shared crash rung.</td></tr>
+<tr><td class="sym">2026-10-03</td><td class="sym">7da1f5e + wt</td><td>1</td><td><b>E47 REFINER.</b> <code>data_experiments.html</code>: compact panel after E46 &mdash; E46 inherited frozen + LLM gradient refinement (raw gradient = ground truth + file previews &rarr; verified issues/evidence quotes, hypothesis-only explanations, missing files, corrections; no solutions/thresholds/gold). Gates: G-REFINE-REL FAIL honest negative (0.331 vs 0.336, &Delta;&minus;0.005, n=57 &mdash; relevance-neutral under v2b; raw mean rose thanks to E46's kimi visual feedback), G-FAITH weak (0.053 vs 0.018), G-RANK-GUARD by construction, G-COST $0.15. Qualitative: 253 verified issues / 57 missing-file flags / 60 corrections per the data of record (re-derived from results/_e47/refined/, 57 files; supersedes the interim 214/37/9); pilot caught raw claiming a script missing while 435 lines present and pinned the true <code>dc.metrics.loss_score</code> crash @ line 265. PromptAudit: 2/7 audited failures are harness bugs; 5-fix E48 list recorded. Verdict: refined gradients better-grounded but v2b cannot see it &mdash; mutation-outcome test is the real validator.</td></tr>
+<tr><td class="sym">2026-10-03</td><td class="sym">7da1f5e + wt</td><td>1</td><td><b>E48 FIXES.</b> <code>data_experiments.html</code>: compact panel after E47 &mdash; the 5 PromptAudit fixes applied and re-run (real repair plumbing, runtime smoke, both-crash rung, kimi retry+self-heal, exact-token clause) plus one self-inflicted regression caught in-session (6000-token cap truncated 11 policies mid-string; now 12000 + truncated-fallback rejection in <code>e44_llm.py</code>/<code>e45_spartan.py</code>). Coverage 17/19 &rarr; 19/19 (aquatic + polyverse pass screen AND runtime smoke), non-visual pooled 0.7305 &rarr; 0.7482 (+0.018, under noise), visual contrast pairs 5/6 &rarr; 6/6 (prot-prot healed 0.5 &rarr; 1.0), visual decisive 0.75 / antisymmetry 1.000 / picks 9/19 hold; both-crash rung correctly ties chem clintox (all 10 gens share the identical deepchem signature). Verdict: the two harness bugs were real and load-bearing; baselines snapshotted at results/_e45/pre48/ and results/_e46/pre48/.</td></tr>
+<tr><td class="sym">2026-10-10</td><td class="sym">7da1f5e + wt</td><td>20</td><td><b>BT policy verifier (E44-E48).</b> Full note below.</td></tr>
+<tr><td class="sym">2026-10-12</td><td class="sym">7da1f5e + wt</td><td>3</td><td><b>Config judge-model fix.</b> <code>Config.from_json</code> now reads <code>judge_model</code> / <code>vision_judge_model</code> (<code>config.py:591-594</code>); the red note on <a href="area_entry_config.html">area_entry_config.html</a> became a FIXED note, the resolved docs-vs-code row left <a href="overview.html">overview.html</a>, and the <code>config_roundtrip_test.py</code> row in <a href="area_tests.html">area_tests.html</a> was re-counted (261 lines, 6 test funcs).</td></tr>
+<tr><td class="sym">-</td><td class="sym">-</td><td>-</td><td><b>Known gap:</b> 15 harness experiments (E26-E34, E36, E38-E42) have no page.</td></tr>
+
 </tbody>
 </table>
+<details><summary>The 2026-10-10 note in full</summary><div class="dbody">
+<p><b>BT policy verifier (E44-E48 architecture).</b> New package <code class="path">sources/evaluators/policy_bt_verifier/</code> (12 files, 6 131 lines, untracked at build time), selected by <code>--verifier_kind policy_bt</code>; the built-in default stays <code>hybrid</code>. New pages: <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> (module graph, 9-stage pipeline, pair ladder, 12 file cards, the 13 knobs, the engine contract), <a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a> (one generation stage by stage) and <a href="file_core_stopping.html">file_core_stopping.html</a> (<code class="path">sources/core/stopping.py</code>, the champion-plateau stop that reads the verifier's <code>pair_outcomes</code>).</p>
+<p><b>Review fixes (same day).</b> An independent read-only pass over all 187 pages returned 12 findings; all are fixed: the clone is now <b>link-clean</b> (the 14 gone report targets in <code class="path">data_experiments.html</code> and the 2 in <code class="path">data_audits.html</code> are plain text again, with a note naming what is missing and where the surviving reports live), the last three-channel strings (<code class="path">flow_task_run.html</code>, <code class="path">mod_core_evolution_engine.html</code>, one tooltip on <code class="path">flow_verification.html</code>) now name all four channels, <code>experiment_pages</code> is 56, and the verifier page corrected one export claim, its knob count, the <code>main_script_source</code> value set, five line references and its abbreviated signatures. One new code finding was added there: the <code>pending_recon</code> hold-then-commit path is dead code. The review record is in <code class="path">docs/visual_clone/_manifest.json</code>.</p>
+<p>Later the same day <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> was deepened on request: 13 diagrams (re-execution sandbox and ledger, digest schema, policy build loop, recon TASK CONFIG, metric resolution ladder, registry caches, reward guard, gradient fold, crash rung), verbatim code quotes with file and line numbers, step lists inside four file cards, and a diagram index. 104 quoted identifiers were re-checked against the code; 6 line references were corrected.</p>
+<p>Re-synced (17 pages): the channel list and the selector (area_evaluators, overview, flow_verification, file_eval_evaluator, area_entry_config); the folder rename <code class="path">sources/evaluators/generic/</code> &rarr; <code class="path">generic_verifier/</code> (area_evaluators_legacy, file_eval_generic, file_eval_bs_detection, file_eval_base, file_eval_grounding, file_core_llm_provider, area_cli, file_index, data_experiments; two dead links repaired and the emptied folder noted); the tests matrix (area_tests, 50 files / 15 863 lines / 613 test functions); the core file table and the file-digest hub (<code>stopping.py</code> added; <code>sources/core</code> re-measured at 20 files / 9 777 lines, four stale line counts refreshed); and index.html. The clone now holds 187 pages.</p>
+<p>Facts derived from the code and flagged on the pages: <code>config.temp_dir</code> is not a <code>Config</code> field, so the verifier scratch root falls back to <code class="path">sources/workflows/_verifier_tmp/</code> (<code>config.py</code> declares <code>runner_temp_dir</code> instead); <code>policy_bt_verifier/__init__.py</code> tells the reader to see a <code>PLAN.md</code> that is not in the package; <code>sources/evaluators/__init__.py:29</code> still aliases <code>GenericEvaluator</code> to the emptied <code>generic/</code> folder; the <code>failure_fingerprint</code> in the scores dict is a constant stub; <code>main.py</code> reads five config names (<code>early_stop_mode</code>, <code>min_learning_evolve_iterations</code>, <code>plateau_patience</code>, <code>explore_after_plateau</code>, <code>explore_base_rate</code>) that no parser declares; <code class="path">docs/reference/cli.md</code> names 38 of the 48 flags and its <code>--verifier_kind</code> row omits <code>policy_bt</code> (docs, not updated here). The local <code>config_default.json</code> is ignored by git (it was a live operator config during this wave): it selected <code>hybrid</code> early in the day and <code>policy_bt</code> when the pages were built, so the overview table shows <code>config.py hybrid</code> next to <code>config_default.json policy_bt</code>.</p>
+<p><b>Known gaps, unchanged by this pass:</b> 14 links in <code class="path">data_experiments.html</code> and 2 in <code class="path">data_audits.html</code> point at report files that were renamed into <code class="path">experiments_verifiers/html_report_human_only/</code> or removed (pre-existing since the 2026-10-03 refresh); the experiment panels stop at E48 and no campaign after it was added; <code class="path">data_runs.html</code> was not re-counted. E26-E34, E36 and E38-E42 still have no harness page.</p>
+</div></details>
 <details><summary>The 2026-09-28 note in full</summary><div class="dbody">
 <p><b>Gold feedback oracle mode.</b> New package <code class="path">sources/evaluators/gold_feedback/</code> (6 files, 1 075 lines), selected by <code>--verifier_kind gold</code>. New pages: <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> and six <code>file_gold_*.html</code> digests. Re-synced: facade and verifier-kind choice (area_evaluators, file_eval_evaluator, flow_verification, overview, flow_task_run), <code>snapshot_grading.py::grade_directory</code> shared by the ablation loop and the gold grader (area_benchmark_evaluation, flow_sab_batch), core oracle and fallback rules (evolution_engine, workflow_info, workflow_selection parent-pool skip, variation_engine without the 2048-char gradient cut, schema), config and CLI (area_entry_config), tests matrix, the 11 hybrid_verifier pages (4020790 changes), data_runs, data_audits, data_experiments and exp_index (E36-E41; E41 still running), data_modules_prompts. The orphan <a href="exp_e37_audit_run1.html">exp_e37_audit_run1.html</a> is now in the menu and the manifest. The workers re-derived every line count and line reference they touched from the current files. Workers found these gaps in the code, and the pages flag them: <code>csv_mode.py</code> picks the ablation "capsule" row by plain max reward, not by <code>_select_best_run</code>; the ablation grade can overwrite <code>pred_results/</code> in the /tmp snapshot; <code>config.py</code> still says legacy is <code>sources/evaluators/verifier.py</code>.</p>
 </div></details>
@@ -374,6 +424,7 @@
 <p>Sources: UPDATE_VISUAL_CLONE.md (build rules), AGENTS.md, config_default.json, sources/core/, sources/evaluators/hybrid_verifier/, sources/utils/paths.py.</p>
 <p class="skips">Skipped: see "What the clone does not cover" above.</p>
 <p>Built at commit <code>336fe19</code>, 2026-09-26 (30 pages re-synced; all other pages were built at <code>7e8463b</code>, recorded as 2026-10-02 by the previous build session).</p>
+<p>Updated at commit <code>7da1f5e</code> + working tree, 2026-10-10: 20 pages touched for the BT policy verifier wave (3 new, 17 re-synced); the clone now holds 187 pages. See the 2026-10-10 note above.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

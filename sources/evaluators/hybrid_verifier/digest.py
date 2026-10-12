@@ -101,7 +101,7 @@ def parse_digests(raw: str) -> dict[str, str]:
         p = str(d.get("path") or "").strip()
         text = str(d.get("digest") or "").strip()
         if p and text:
-            out[p] = text[:400]
+            out[p] = text[:4000]
     return out
 
 

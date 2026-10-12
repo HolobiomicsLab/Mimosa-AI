@@ -6,11 +6,11 @@
 <title>sources/core map - Mimosa-AI</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview &gt; sources &gt; core" data-built="ca72107+wt" data-built-date="2026-09-28">
+<body data-crumb="Overview &gt; sources &gt; core" data-built="7da1f5e+wt" data-built-date="2026-10-10">
 <div class="wrap">
 
 <h1 class="hud">sources/core</h1>
-<p class="intro">Nineteen files hold the engine that synthesizes, selects and runs workflows. This page maps them; the seven <code>mod_core_*.html</code> pages hold the file cards. Every arrow below is a real import.</p>
+<p class="intro">Twenty files hold the engine that synthesizes, selects and runs workflows, and decides when to stop. This page maps them; the seven <code>mod_core_*.html</code> pages hold the file cards. Every arrow below is a real import.</p>
 
 <div id="legend" data-auto></div>
 
@@ -36,8 +36,16 @@
     <title>The engine hub</title>
     <rect x="20" y="150" width="190" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="115" y="176" text-anchor="middle">evolution_engine.py</text>
-    <text class="box-sub" x="115" y="194" text-anchor="middle">1 236 lines, the hub</text>
+    <text class="box-sub" x="115" y="194" text-anchor="middle">1 548 lines, the hub</text>
     <text class="box-sub" x="115" y="212" text-anchor="middle">start_workflow_evolution</text>
+  </a>
+
+  <a class="box" id="g-stop" href="file_core_stopping.html">
+    <title>Champion-plateau stop control, created by the engine</title>
+    <rect x="20" y="280" width="190" height="64" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="115" y="302" text-anchor="middle">stopping.py</text>
+    <text class="box-sub" x="115" y="320" text-anchor="middle">238 lines, StopController</text>
+    <text class="box-sub" x="115" y="336" text-anchor="middle">champion-plateau stop</text>
   </a>
 
   <a class="box" id="g-sel" href="mod_core_selection.html">
@@ -117,6 +125,8 @@
   <path class="edge dotted-edge" data-from="g-engine" data-to="g-out" d="M210,150 H620 V140 H680" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arwS)"/>
   <text class="edge-label" x="430" y="132">imports 11 modules</text>
 
+  <path class="edge dotted-edge" data-from="g-engine" data-to="g-stop" d="M115,230 V280" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="125" y="258" text-anchor="start">imports StopController</text>
   <path class="edge" data-from="g-sel" data-to="g-var" d="M465,92 V110" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
   <text class="edge-label" x="472" y="106">genotype_embedding_descriptor</text>
   <path class="edge" data-from="g-exec" data-to="g-out" d="M600,236 H680" fill="none" stroke="#8FB8C9" stroke-width="1.25" marker-end="url(#arwS)"/>
@@ -125,27 +135,28 @@
   <text class="edge-label" x="620" y="470">writes</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - eleven import edges out of the 19-file folder, grouped. Import lines: <code class="path">evolution_engine.py:37-43</code>, <code class="path">orchestrator.py:18-20</code>, <code class="path">planner.py:31-34</code>, <code class="path">selection.py:22</code>, <code class="path">code_features.py:7</code>, <code class="path">workflow_factory.py:12-16</code>, <code class="path">workflow_selection.py:9-11</code>, <code class="path">factory.py:13</code>, <code class="path">single_agent_factory.py:11-12</code>, <code class="path">variation_engine.py:12-14</code>.</p>
+<p class="figcap">Diagram 1 - twelve grouped edges: eleven leaving the 20-file folder, plus the engine's internal import of <code>stopping.py</code>. Import lines: <code class="path">evolution_engine.py:38-45</code> (line 42 imports <code>StopController</code>), <code class="path">orchestrator.py:18-20</code>, <code class="path">planner.py:31-34</code>, <code class="path">selection.py:22</code>, <code class="path">code_features.py:7</code>, <code class="path">workflow_factory.py:12-16</code>, <code class="path">workflow_selection.py:9-11</code>, <code class="path">factory.py:13</code>, <code class="path">single_agent_factory.py:11-12</code>, <code class="path">variation_engine.py:12-14</code>.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
-<h2>All nineteen files</h2>
+<h2>All twenty files</h2>
 <table>
 <thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a></td><td>Runs the per-task generation loop.</td><td class="size">1 236</td><td class="sym">EvolutionEngine.start_workflow_evolution, evolve_generation, _select_best_run</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py</a></td><td>Runs the per-task generation loop.</td><td class="size">1 548</td><td class="sym">EvolutionEngine.start_workflow_evolution, evolve_generation, _select_best_run</td></tr>
 <tr><td class="sym"><a href="../../sources/core/selection.py">selection.py</a></td><td>Scores candidates and picks parents.</td><td class="size">842</td><td class="sym">SelectionPressure, SelectionStrategy, select_parent</td></tr>
 <tr><td class="sym"><a href="../../sources/core/planner.py">planner.py</a></td><td>Turns a goal into an ordered task list.</td><td class="size">1 053</td><td class="sym">Planner, Plan, PlanStep</td></tr>
 <tr><td class="sym"><a href="../../sources/core/tools_manager.py">tools_manager.py</a></td><td>Finds MCP servers and their tools.</td><td class="size">679</td><td class="sym">ToolManager, MCP, Tool, normalize_mcp_endpoint</td></tr>
 <tr><td class="sym"><a href="../../sources/core/workflow_runner.py">workflow_runner.py</a></td><td>Runs one workflow as a subprocess.</td><td class="size">650</td><td class="sym">WorkflowRunner, ExecutionResult, RuntimeConfig</td></tr>
-<tr><td class="sym"><a href="../../sources/core/llm_provider.py">llm_provider.py</a></td><td>Wraps litellm calls, retries and cost.</td><td class="size">643</td><td class="sym">LLMProvider, LLMConfig</td></tr>
-<tr><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a></td><td>Mutates or crosses genotypes with the LLM.</td><td class="size">609</td><td class="sym">VariationEngine, seed_genome_prompt</td></tr>
+<tr><td class="sym"><a href="../../sources/core/llm_provider.py">llm_provider.py</a></td><td>Wraps litellm calls, retries and cost.</td><td class="size">740</td><td class="sym">LLMProvider, LLMConfig</td></tr>
+<tr><td class="sym"><a href="../../sources/core/variation_engine.py">variation_engine.py</a></td><td>Mutates or crosses genotypes with the LLM.</td><td class="size">825</td><td class="sym">VariationEngine, seed_genome_prompt</td></tr>
 <tr><td class="sym"><a href="../../sources/core/workflow_factory.py">workflow_factory.py</a></td><td>Builds the workflow source and its state graph.</td><td class="size">514</td><td class="sym">WorkflowFactory</td></tr>
 <tr><td class="sym"><a href="../../sources/core/orchestrator.py">orchestrator.py</a></td><td>Grounds, generates and runs one round.</td><td class="size">427</td><td class="sym">WorkflowOrchestrator.orchestrate_workflow</td></tr>
 <tr><td class="sym"><a href="../../sources/core/workflow_selection.py">workflow_selection.py</a></td><td>Reads past workflows and offers parents; skips oracle runs.</td><td class="size">416</td><td class="sym">WorkflowSelector.select_parent_workflows, discover_workflows, _rehydrate_workflow_info</td></tr>
+<tr><td class="sym"><a href="../../sources/core/workflow_info.py">workflow_info.py</a></td><td>Carries one workflow's identity and score.</td><td class="size">343</td><td class="sym">WorkflowInfo, FALLBACK_REWARD_KINDS, is_oracle_generation</td></tr>
 <tr><td class="sym"><a href="../../sources/core/genotype_embedding.py">genotype_embedding.py</a></td><td>Embeds workflow code for novelty.</td><td class="size">329</td><td class="sym">GenotypeEmbedder, embed_genotype, load_sentence_transformer</td></tr>
 <tr><td class="sym"><a href="../../sources/core/single_agent_factory.py">single_agent_factory.py</a></td><td>Builds the one-agent baseline.</td><td class="size">315</td><td class="sym">SingleAgentFactory</td></tr>
-<tr><td class="sym"><a href="../../sources/core/workflow_info.py">workflow_info.py</a></td><td>Carries one workflow's identity and score.</td><td class="size">340</td><td class="sym">WorkflowInfo, FALLBACK_REWARD_KINDS, is_oracle_generation</td></tr>
+<tr><td class="sym"><a href="../../sources/core/stopping.py">stopping.py</a></td><td>Decides when the loop stops: champion plateau, threshold, or none.</td><td class="size">238</td><td class="sym">StopController, RELATIVE_VERIFIER_KINDS, VALID_STOP_MODES</td></tr>
 <tr><td class="sym"><a href="../../sources/core/factory.py">factory.py</a></td><td>Shared base: prompts, files, tools.</td><td class="size">207</td><td class="sym">Factory</td></tr>
 <tr><td class="sym"><a href="../../sources/core/failure_fingerprint.py">failure_fingerprint.py</a></td><td>Deprecated. Builds a failure vector from results.</td><td class="size">195</td><td class="sym">compute_failure_fingerprint</td></tr>
 <tr><td class="sym"><a href="../../sources/core/lineage.py">lineage.py</a></td><td>Writes and reads parent records.</td><td class="size">173</td><td class="sym">record_lineage, load_lineage, scan_all</td></tr>
@@ -154,7 +165,7 @@
 <tr><td class="sym"><a href="../../sources/core/code_features.py">code_features.py</a></td><td>One descriptor vector per genotype.</td><td class="size">37</td><td class="sym">genotype_embedding_descriptor</td></tr>
 </tbody>
 </table>
-<p class="note say">Nineteen modules, <code>__init__.py</code> included, 8 911 lines in total (my computation, <code>wc -l</code>); <code>__pycache__/</code> is not counted. <code>failure_fingerprint.py</code> says deprecated in its own docstring, but the deprecated <a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py:32</a> still imports it.</p>
+<p class="note say">Twenty modules, <code>__init__.py</code> included, 9 777 lines in total (my computation, <code>wc -l</code>, 2026-10-10); <code>__pycache__/</code> is not counted. <code>failure_fingerprint.py</code> says deprecated in its own docstring, but the deprecated <a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py:32</a> still imports it.</p>
 <p class="note">Inbound edge: the gold verifier (ORACLE, <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>) imports <code>WorkflowInfo</code> and <code>is_oracle_generation</code> from <code class="path">sources/core/workflow_info.py</code> (<code class="path">sources/evaluators/gold_feedback/evaluator.py:30</code>).</p>
 </div>
 
@@ -170,6 +181,7 @@
 <tr><td class="sym"><a href="mod_core_runner.html">mod_core_runner.html</a></td><td>workflow_runner.py, workflow_factory.py, factory.py, single_agent_factory.py, orchestrator.py</td></tr>
 <tr><td class="sym"><a href="mod_core_planner.html">mod_core_planner.html</a></td><td>planner.py</td></tr>
 <tr><td class="sym"><a href="mod_core_tools_llm.html">mod_core_tools_llm.html</a></td><td>tools_manager.py, llm_provider.py</td></tr>
+<tr><td class="sym"><a href="file_core_stopping.html">file_core_stopping.html</a></td><td>stopping.py: the champion-plateau stop decision</td></tr>
 <tr><td class="sym"><a href="flow_task_run.html">flow_task_run.html</a></td><td>the calls in time order</td></tr>
 <tr><td class="sym"><a href="flow_evolution_loop.html">flow_evolution_loop.html</a></td><td>the loop across generations</td></tr>
 </tbody>
@@ -178,8 +190,9 @@
 
 <footer>
 <p>Sources: <code class="path">sources/core/*.py</code> (import lines, <code>wc -l</code>, top-level <code>class</code>/<code>def</code>), <code class="path">sources/evaluators/legacy_verifier/verifier.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (import line only).</p>
-<p class="skips">Skipped: <code class="path">sources/core/__pycache__/</code> (bytecode); method bodies (owned by the seven L2 pages); the <code>__main__</code> smoke blocks. First write of this page failed inside the coordinator's worker, so the coordinator wrote it directly from the same evidence.</p>
-<p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. Line counts re-derived with <code>wc -l sources/core/*.py</code>: changed since <code>336fe19</code> are <code>evolution_engine.py</code>, <code>workflow_info.py</code>, <code>workflow_selection.py</code>, <code>schema.py</code> and <code>variation_engine.py</code> (one-line change, same count). The duplicate <code>workflow_selection.py</code> row and the "twenty files" count were removed: the folder has 19 files.</p>
+<p class="skips">Skipped: <code class="path">sources/core/__pycache__/</code> (bytecode); method bodies (owned by the seven L2 pages, plus the <a href="file_core_stopping.html">stopping.py</a> file page); the <code>__main__</code> smoke blocks. First write of this page failed inside the coordinator's worker, so the coordinator wrote it directly from the same evidence.</p>
+<p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. Line counts re-derived with <code>wc -l sources/core/*.py</code>: changed since <code>336fe19</code> are <code>evolution_engine.py</code>, <code>workflow_info.py</code>, <code>workflow_selection.py</code>, <code>schema.py</code> and <code>variation_engine.py</code> (one-line change, same count). The duplicate <code>workflow_selection.py</code> row and the "twenty files" count were removed: the folder had 19 files at that commit.</p>
+<p>Updated at commit <code>7da1f5e</code> + working tree, 2026-10-10: added <code>sources/core/stopping.py</code> (untracked in the working tree) to the table and the diagram, and re-derived every line count from the folder: 20 files, 9 777 lines with <code>wc -l sources/core/*.py</code>. The earlier total (8 911 over 19 files) is stale. <code>stopping.py</code> has its own page, <a href="file_core_stopping.html">file_core_stopping.html</a>.</p>
 <p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
 </footer>
 </div>

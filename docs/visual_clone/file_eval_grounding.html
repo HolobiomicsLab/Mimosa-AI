@@ -6,7 +6,7 @@
 <title>grounding.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="File digests &gt; sources/evaluators &gt; grounding.py" data-built="336fe19" data-built-date="2026-09-26">
+<body data-crumb="File digests &gt; sources/evaluators &gt; grounding.py" data-built="7da1f5e+wt" data-built-date="2026-10-10">
 <div class="wrap">
 
 <h1 class="hud">grounding.py</h1>
@@ -108,10 +108,10 @@
     </filter>
   </defs>
 
-  <a class="box" id="d1" href="../../sources/evaluators/generic/generic.py">
-    <title>generic/generic.py imports the function at L29 and calls it at L353</title>
+  <a class="box" id="d1" href="../../sources/evaluators/generic_verifier/generic.py">
+    <title>generic_verifier/generic.py imports the function at L29 and calls it at L353</title>
     <rect x="20" y="30" width="200" height="66" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
-    <text class="box-label" x="120" y="56" text-anchor="middle">generic/generic.py</text>
+    <text class="box-label" x="120" y="56" text-anchor="middle">generic_verifier/generic.py</text>
     <text class="box-sub" x="120" y="74" text-anchor="middle">call &#183; L353</text>
   </a>
 
@@ -281,7 +281,7 @@
 <table>
 <thead><tr><th>Who</th><th>How</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../sources/evaluators/generic/generic.py">sources/evaluators/generic/generic.py</a></td><td><code>from sources.evaluators.grounding import get_perspicacite_grounding</code>; called when the run succeeded</td><td class="sym">L29 L353</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/generic_verifier/generic.py">sources/evaluators/generic_verifier/generic.py</a></td><td><code>from sources.evaluators.grounding import get_perspicacite_grounding</code>; called when the run succeeded</td><td class="sym">L29 L353</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier.py">sources/evaluators/legacy_verifier/verifier.py</a></td><td>called inside <code>_get_grounding</code>, one call per uuid, cached, gated by <code>use_grounding</code></td><td class="sym">L41 L258</td></tr>
 <tr><td class="sym"><a href="../../sources/core/orchestrator.py">sources/core/orchestrator.py</a></td><td>does NOT import this file; it has its own Perspicacite path</td><td class="sym">L157 L327</td></tr>
 </tbody>
@@ -291,7 +291,7 @@
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/grounding.py</code> (55 lines, whole file), <code class="path">sources/evaluators/generic/generic.py</code> (import and call sites), <code class="path">sources/evaluators/legacy_verifier/verifier.py</code> (import, call, marker lines), <code class="path">sources/utils/perspicacite_client.py</code> (env var, POST path, cache path &mdash; header and named lines only), <code class="path">sources/core/orchestrator.py</code> (L141&#8211;L167, L327), <code class="path">config.py</code> (L103), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
+<p>Sources read: <code class="path">sources/evaluators/grounding.py</code> (55 lines, whole file), <code class="path">sources/evaluators/generic_verifier/generic.py</code> (import and call sites), <code class="path">sources/evaluators/legacy_verifier/verifier.py</code> (import, call, marker lines), <code class="path">sources/utils/perspicacite_client.py</code> (env var, POST path, cache path &mdash; header and named lines only), <code class="path">sources/core/orchestrator.py</code> (L141&#8211;L167, L327), <code class="path">config.py</code> (L103), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/mod_evaluators_hybrid_verifier.html</code> (house style), repo-wide grep for importers and for <code class="path">tests/</code> coverage.</p>
 <p class="skips">Skipped, with reason: <code class="path">.env</code> and <code class="path">experiments_verifiers/.env</code> (never opened, secrets); the body of <code class="path">sources/utils/perspicacite_client.py</code> after L305 (streaming and non-streaming HTTP detail; the page needs only the env var, the URL and the cache path); <code class="path">sources/memory/perspicacite_requests/</code> contents (runtime cache, not needed to describe the code); every other evaluator file (grep shows no importer); no pytest run and no script executed, as instructed.</p>
 <p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (the flat evaluator modules are deleted and <code>evaluator.py</code> is modified).</p>
 </footer>

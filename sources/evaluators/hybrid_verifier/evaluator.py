@@ -97,6 +97,12 @@ _SHORT_CIRCUIT_GRADIENT = (
     "workflow code failed to generate or execute; ensure code is properly "
     "formatted and that the workflow runs without crashing"
 )
+#: Normalised pair-outcome spelling for the engine contract (stop plan
+# 2026-10-08 §2.5): both verifiers persist ``pair_outcomes`` under
+# ``evaluation.verifier`` as ``{prev_uuid: "won" | "lost" | "tie"}`` —
+# the engine's StopController reads only that key. The hybrid's
+# internal vocabulary (aggregation.py) is win/loss/tie.
+_PAIR_OUTCOME_SPELLING = {"win": "won", "loss": "lost", "tie": "tie"}
 
 
 def _run_coro_sync(
@@ -601,6 +607,15 @@ class HybridVerifierEvaluator(BaseEvaluator):
             "n_wins": reward_data["wins"],
             "n_losses": reward_data["losses"],
             "n_ties": reward_data["ties"],
+            # Engine contract §2.5: head-to-head outcomes of THIS
+            # generation vs each predecessor, in the normalised
+            # won/lost/tie spelling the engine consumes.
+            "pair_outcomes": {
+                rec["prev_uuid"]: _PAIR_OUTCOME_SPELLING.get(
+                    rec["outcome"], "tie"
+                )
+                for rec in pair_records
+            },
             "pairwise_mode": self.pairwise_mode,
             "reward_mode": reward_mode,
             "figure_task": figure_task,
@@ -622,7 +637,7 @@ class HybridVerifierEvaluator(BaseEvaluator):
                     "statement": s.statement[:512],
                     "score": s.score,
                     "surviving": s.claim_id in surviving,
-                    "evidence": (s.evidence or "")[:512],
+                    "evidence": (s.evidence or "")[:4000],
                 }
                 for s in collected
             ],
@@ -750,6 +765,8 @@ class HybridVerifierEvaluator(BaseEvaluator):
             "n_wins": 0,
             "n_losses": 0,
             "n_ties": 0,
+            # Engine contract §2.5: short-circuit ran no pairs.
+            "pair_outcomes": {},
             "pairwise_mode": self.pairwise_mode,
             "reward_fallback": "short_circuit",
             "n_claims": 1,

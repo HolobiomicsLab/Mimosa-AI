@@ -41,13 +41,16 @@ KNOWN_GAPS = {
 
 def _init_assigned_fields() -> list[str]:
     """Public ``self.<name>`` assignments in ``Config.__init__``, in order."""
-    tree = ast.parse(open(config_module.__file__).read())
+    with open(config_module.__file__) as fh:
+        tree = ast.parse(fh.read())
     cls = next(
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, ast.ClassDef) and node.name == "Config"
     )
     init = next(
-        node for node in cls.body
+        node
+        for node in cls.body
         if isinstance(node, ast.FunctionDef) and node.name == "__init__"
     )
 
@@ -74,7 +77,9 @@ def test_every_init_field_is_persisted_by_jsonify():
     print("\n🧪 Testing jsonify covers every __init__ field...")
 
     fields = _init_assigned_fields()
-    assert len(fields) > 40, f"AST scan found only {len(fields)} fields — scan is broken"
+    assert len(fields) > 40, (
+        f"AST scan found only {len(fields)} fields — scan is broken"
+    )
 
     persisted = set(Config().jsonify().keys())
     missing = set(fields) - persisted - NOT_PERSISTED
@@ -85,6 +90,81 @@ def test_every_init_field_is_persisted_by_jsonify():
         "or to NOT_PERSISTED if they are secrets or runtime-derived."
     )
     print(f"✅ {len(persisted)} fields persisted; no new round-trip gaps")
+
+
+def test_every_jsonify_key_is_read_by_from_json():
+    """Guard the load direction: a key dumped by jsonify but never read by
+    from_json is silently reverted to the __init__ default on every load.
+
+    This is how judge_model/vision_judge_model were lost: written into every
+    persisted config (including by the onboarding wizard) and ignored on
+    read-back, with no CLI flag as an escape hatch.
+    """
+    print("\n🧪 Testing from_json consumes every jsonify key...")
+
+    with open(config_module.__file__) as fh:
+        tree = ast.parse(fh.read())
+    functions = {
+        node.name: node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.FunctionDef) and node.name in ("jsonify", "from_json")
+    }
+
+    # Only the keys of the dict literal jsonify RETURNS are config keys —
+    # walking all string constants would pick up the nested portable()
+    # docstring and the discovery_addresses AddressMCP sub-dict keys.
+    ret = next(
+        node
+        for node in functions["jsonify"].body
+        if isinstance(node, ast.Return) and isinstance(node.value, ast.Dict)
+    )
+    dumped = {
+        key.value
+        for key in ret.value.keys
+        if isinstance(key, ast.Constant) and isinstance(key.value, str)
+    }
+    loaded = {
+        call.args[0].value
+        for call in ast.walk(functions["from_json"])
+        if isinstance(call, ast.Call)
+        and isinstance(call.func, ast.Attribute)
+        and call.func.attr == "get"
+        and call.args
+        and isinstance(call.args[0], ast.Constant)
+    }
+
+    missing = dumped - loaded
+    assert not missing, (
+        f"jsonify dumps keys that from_json never reads: {sorted(missing)}. "
+        "Add a data.get(...) line for each in Config.from_json."
+    )
+    print(f"✅ All {len(dumped)} dumped keys are read back by from_json")
+
+
+def test_judge_models_survive_a_round_trip():
+    """judge_model and vision_judge_model must survive dump/load.
+
+    judge_model drives every evaluator; vision_judge_model gates the visual
+    channel (None disables it). An explicit null must disable, not reset.
+    """
+    print("\n🧪 Testing judge model round-trip...")
+
+    original = Config()
+    original.judge_model = "openai/gpt-6.1-sol"
+    original.vision_judge_model = "openrouter/moonshotai/kimi-k3"
+
+    restored = Config()
+    restored.from_json(original.jsonify())
+    assert restored.judge_model == "openai/gpt-6.1-sol", restored.judge_model
+    assert restored.vision_judge_model == "openrouter/moonshotai/kimi-k3", (
+        restored.vision_judge_model
+    )
+
+    disabled = Config()
+    disabled.from_json({"vision_judge_model": None})
+    assert disabled.vision_judge_model is None, disabled.vision_judge_model
+
+    print("✅ judge_model and vision_judge_model survive jsonify -> from_json")
 
 
 def test_prompt_and_routing_fields_survive_a_round_trip():
@@ -138,9 +218,13 @@ def test_present_discovery_addresses_replaces_the_default():
     print("\n🧪 Testing discovery_addresses override...")
 
     config = Config()
-    config.from_json({
-        "discovery_addresses": [{"ip": "127.0.0.1", "port_min": 5001, "port_max": 5200}]
-    })
+    config.from_json(
+        {
+            "discovery_addresses": [
+                {"ip": "127.0.0.1", "port_min": 5001, "port_max": 5200}
+            ]
+        }
+    )
 
     assert config.discovery_addresses == [AddressMCP("127.0.0.1", 5001, 5200)], (
         f"explicit addresses not loaded: {config.discovery_addresses}"
@@ -157,6 +241,9 @@ def run_all_tests():
         test_prompt_and_routing_fields_survive_a_round_trip()
         test_absent_discovery_addresses_keeps_the_default()
         test_present_discovery_addresses_replaces_the_default()
+
+        test_every_jsonify_key_is_read_by_from_json()
+        test_judge_models_survive_a_round_trip()
 
         print("\n🎉 All config round-trip tests passed successfully!")
         return True

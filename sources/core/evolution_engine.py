@@ -6,11 +6,12 @@ import asyncio
 import json
 import logging
 import os
+import random
 import time
 from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
 from sources.cli.pretty_print import (
@@ -38,9 +39,13 @@ from .lineage import record_lineage
 from .orchestrator import WorkflowOrchestrator
 from .schema import IndividualRun, SelectionLog
 from .selection import SelectionPressure
-from .variation_engine import VariationEngine
+from .stopping import StopController
+from .variation_engine import VariationEngine, exploration_state
 from .workflow_info import FALLBACK_REWARD_KINDS, WorkflowInfo
 from .workflow_selection import WorkflowSelector
+
+if TYPE_CHECKING:
+    from config import Config
 
 
 def _scalar(value: Any) -> float | None:
@@ -67,6 +72,151 @@ def _verifier_block(run: "IndividualRun") -> dict:
     evaluation = (run.state_result or {}).get("evaluation") or {}
     block = evaluation.get("verifier")
     return block if isinstance(block, dict) else {}
+
+
+#: Frontier probe (review 2026-10-09 §4.3): how many recent generations
+#: must report identical measured metrics for the all-tie trigger.
+_EXPLORE_TIE_WINDOW = 2
+
+#: Seed for the base-rate RNG. Fixed (not run-dependent) so identical
+#: configs replay identically; the base rate defaults to 0 anyway.
+_EXPLORE_RNG_SEED = 20261009
+
+
+def _objective_tie_window(
+    runs: list["IndividualRun"], window: int,
+) -> dict | None:
+    """Detect identical measured metrics across the last ``window`` runs.
+
+    Reads each run's ``evaluation.verifier.metric_summary`` — the compact
+    ledger summary the verifier persists (id → status/value). The window
+    counts only runs that carry a verifier block, so cold-start entries
+    never dilute it.
+
+    Args:
+        runs: Completed runs, oldest first (last element = latest).
+        window: Number of recent generations that must agree.
+
+    Returns:
+        ``{"n_pairs": int, "metrics": [{"id", "value"}, ...]}`` when the
+        latest generation compared at least one pair AND every metric of
+        its summary is resolved with the same value in every generation
+        of the window; ``None`` otherwise (never guesses).
+    """
+    if window < 1:
+        return None
+    blocks: list[dict] = []
+    for run in reversed(runs):
+        block = _verifier_block(run)
+        if block.get("metric_summary") or block.get("pair_outcomes"):
+            blocks.append(block)
+            if len(blocks) >= window:
+                break
+    if len(blocks) < window:
+        return None
+    latest = blocks[0]
+    pairs = latest.get("pair_outcomes") or {}
+    if not pairs:
+        return None  # no comparison happened (defect C9: gen 1 has 0 pairs)
+    summary = latest.get("metric_summary") or {}
+    metrics: list[dict] = []
+    for mid, entry in summary.items():
+        entry = entry if isinstance(entry, dict) else {}
+        if str(entry.get("status") or "") != "resolved":
+            return None
+        value = entry.get("value")
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            return None
+        for other in blocks[1:]:
+            prev = other.get("metric_summary") or {}
+            prev_entry = prev.get(mid)
+            prev_entry = prev_entry if isinstance(prev_entry, dict) else {}
+            if (
+                str(prev_entry.get("status") or "") != "resolved"
+                or prev_entry.get("value") != value
+            ):
+                return None
+        metrics.append({"id": mid, "value": value})
+    if not metrics:
+        return None
+    return {"n_pairs": len(pairs), "metrics": metrics}
+
+
+def evaluate_exploration_probe(
+    controller: StopController,
+    runs: list["IndividualRun"],
+    *,
+    explore_after: int | None = None,
+    base_rate: float = 0.0,
+    rng: random.Random | None = None,
+    tie_window: int = _EXPLORE_TIE_WINDOW,
+) -> dict:
+    """Evaluate the frontier-probe trigger (review 2026-10-09 §4.3).
+
+    Deterministic, state-based, verifier-agnostic:
+
+    - **plateau**: the champion is unchanged for ``>= explore_after``
+      generations (default ``patience - 1``, guaranteeing at least one
+      probe before the plateau stop);
+    - **all-tie**: the last ``tie_window`` generations report identical
+      resolved values for every measured metric (read from
+      ``metric_summary``) — the verifier measured but cannot rank;
+    - **base-rate** (optional): ``base_rate`` probability per generation,
+      drawn from the engine's seeded RNG so runs replay identically.
+
+    The probe is a search-policy request only: rewards, verdicts and the
+    textual gradient are untouched, and the produced dict is what the
+    variation engine renders as the labelled ``<exploration>`` block.
+
+    Args:
+        controller: Session stop controller (champion/since_change).
+        runs: Completed runs, oldest first.
+        explore_after: Plateau threshold; ``None`` = ``patience - 1``.
+        base_rate: Extra per-generation trigger probability in [0, 1].
+        rng: Seeded RNG for the base rate; ``None`` skips that trigger.
+        tie_window: Generations that must tie for the all-tie trigger.
+
+    Returns:
+        ``{"triggered": bool, "reason": str, "champion": str | None,
+        "since_change": int, "n_pairs": int | None,
+        "generations_compared": int | None, "metrics": [...]}``.
+    """
+    patience = max(1, int(getattr(controller, "patience", 3)))
+    after = patience - 1 if explore_after is None else max(0, int(explore_after))
+    base_rate = float(base_rate or 0.0)
+    champion = controller.champion
+    since_change = controller.since_change
+    probe: dict[str, Any] = {
+        "triggered": False,
+        "reason": "",
+        "champion": champion,
+        "since_change": since_change,
+        "n_pairs": None,
+        "generations_compared": None,
+        "metrics": [],
+    }
+    tie = _objective_tie_window(runs, tie_window)
+    if tie is not None:
+        probe["n_pairs"] = tie["n_pairs"]
+        probe["generations_compared"] = tie_window
+        probe["metrics"] = tie["metrics"]
+    if champion is not None and since_change >= after:
+        probe["triggered"] = True
+        probe["reason"] = (
+            f"plateau: champion {StopController._tag(champion)} "
+            f"unchanged for {since_change} generations"
+        )
+    elif tie is not None:
+        listed = ", ".join(f"{m['id']}={m['value']}" for m in tie["metrics"])
+        probe["triggered"] = True
+        probe["reason"] = (
+            f"all-tie: last {tie_window} generations report identical "
+            f"values for every measured metric ({listed})"
+        )
+    elif base_rate > 0.0 and rng is not None and rng.random() < base_rate:
+        probe["triggered"] = True
+        probe["reason"] = f"base-rate: scheduled exploration (p={base_rate:.2f})"
+    return probe
 
 
 def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRun"]) -> bool:
@@ -218,6 +368,11 @@ class EvolutionEngine:
             length_penalty_lambda=getattr(config, "length_penalty_lambda", 0.05),
         )
         self.initial_population = getattr(config, "initial_population", 2) # number of initial random workflows before enabling mutation
+        # Frontier probe (review 2026-10-09 §4.3): last trigger state and
+        # the seeded base-rate RNG, evaluated per generation in
+        # evolve_generation once a stop controller exists.
+        self._exploration_probe: dict | None = None
+        self._exploration_rng: random.Random | None = None
     
     def get_workspace_manager_session_id(self) -> str | None:
         """Session id of the current WorkspaceManager session (None if none started).
@@ -226,6 +381,33 @@ class EvolutionEngine:
         workspace snapshots in /tmp (mimosa_run_<session_id>_<run_uuid>).
         """
         return self.workspace_mgr.session_id
+
+    def _explore_rng(self) -> random.Random:
+        """The engine-owned, seeded base-rate RNG (created once)."""
+        rng = getattr(self, "_exploration_rng", None)
+        if rng is None:
+            rng = random.Random(_EXPLORE_RNG_SEED)
+            self._exploration_rng = rng
+        return rng
+
+    def _evaluate_exploration_probe(
+        self, controller: StopController, runs: list[IndividualRun],
+    ) -> dict:
+        """Evaluate the frontier-probe trigger with the config knobs.
+
+        Thin wrapper over :func:`evaluate_exploration_probe`: resolves
+        ``explore_after_plateau`` (None → patience − 1) and
+        ``explore_base_rate`` from config and supplies the seeded RNG.
+        """
+        return evaluate_exploration_probe(
+            controller,
+            runs,
+            explore_after=getattr(self.config, "explore_after_plateau", None),
+            base_rate=float(
+                getattr(self.config, "explore_base_rate", 0.0) or 0.0
+            ),
+            rng=self._explore_rng(),
+        )
 
     async def mockup(self, wf: WorkflowInfo | None, goal: str) -> list[IndividualRun]:
         """Use existing workflow data instead of orchestrating a fresh run.
@@ -353,7 +535,7 @@ class EvolutionEngine:
             return ""
 
         agents_answers = (
-            "\n".join(f"agent {n}: {str(x)[:256]}..." for (n, x) in zip(wf_state["step_name"], wf_state["answers"], strict=True))
+            "\n".join(f"agent {n}: {str(x)[:16384]}..." for (n, x) in zip(wf_state["step_name"], wf_state["answers"], strict=True))
             if isinstance(wf_state["answers"], list)
             else wf_state["answers"]
         )
@@ -511,6 +693,25 @@ class EvolutionEngine:
         assertion_history = []  # Track [passed, total] per iteration
         self.viz_utils.create_rewards_curve_plot(goal)
 
+        # ── Stop control (stop-condition plan 2026-10-08) ─────────────
+        # Resolved once per session: relative-reward verifiers (hybrid,
+        # policy_bt) must not stop on an absolute score threshold — their
+        # overall_score is a pairwise win-rate/BT rating, so 0.9 means
+        # "first clean sweep" or "never". They get the champion-plateau
+        # rule instead (sources/core/stopping.py).
+        stop_controller = StopController(
+            mode=self.config.early_stop_mode,
+            min_iter=self.config.min_learning_evolve_iterations,
+            patience=self.config.plateau_patience,
+            threshold=self.config.learned_score_threshold,
+            max_iter=max_iteration,
+            verifier_kind=getattr(self.judge, "verifier_kind", None),
+        )
+        print_info(
+            f"[STOP] mode={stop_controller.mode} "
+            f"({stop_controller.resolution_note()})"
+        )
+
         # First run lineage: template-mutation if a parent was loaded, else seed.
         run0_kind = "mutation" if wf is not None else "seed"
         run0_parents = [wf.uuid] if wf is not None else []
@@ -534,14 +735,44 @@ class EvolutionEngine:
             enable_evolution=enable_evolution,
             single_agent_mode=single_agent_mode,
             workspace_mgr=self.workspace_mgr,
+            stop_controller=stop_controller,
         )
 
         # ── Restore workspace to the best run's saved state ──────────────────
         try:
+            capsule_rule = "argmax arrival-moment reward (_select_best_run)"
             best_run = _select_best_run(runs)
+            if (
+                stop_controller.selects_champion
+                and stop_controller.champion
+            ):
+                # Relative modes ship the FINAL CHAMPION: the argmax over
+                # arrival-moment rewards is meaningless across generations
+                # (a 1.0 vs 1 predecessor ranks equal to a 1.0 vs 10, and
+                # earlier generations can never be re-ranked).
+                champion_run = next(
+                    (
+                        r
+                        for r in runs
+                        if r.current_uuid == stop_controller.champion
+                    ),
+                    None,
+                )
+                if champion_run is not None:
+                    best_run = champion_run
+                    capsule_rule = (
+                        f"final champion {stop_controller.champion} "
+                        "(head-to-head)"
+                    )
+                else:
+                    print_warn(
+                        "[STOP] champion "
+                        f"{stop_controller.champion} has no run in this "
+                        f"session; falling back to {capsule_rule}"
+                    )
             if best_run and best_run.current_uuid:
                 print_info(
-                    f"Best run: {best_run.current_uuid} "
+                    f"Best run [{capsule_rule}]: {best_run.current_uuid} "
                     f"(score={f'{best_run.reward:.3f}' if best_run.reward is not None else 'N/A'})"
                 )
                 self.workspace_mgr.restore_best(best_run.current_uuid)
@@ -552,7 +783,7 @@ class EvolutionEngine:
                     pass
             else:
                 print_warn("No successful run found; workspace restored to initial state.")
-                self.workspace_mgr.restore_best("")  # triggers fallback 
+                self.workspace_mgr.restore_best("")  # triggers fallback
         except Exception:
             print_err("Unknown error in workspace restauration defaulting to latest workspace state.")
             pass
@@ -567,6 +798,7 @@ class EvolutionEngine:
         enable_evolution: bool = False,
         single_agent_mode: bool = False,
         workspace_mgr: WorkspaceManager | None = None,
+        stop_controller: StopController | None = None,
     ) -> list[IndividualRun]:
         """Run one iteration of the evolution loop and recurse if needed.
 
@@ -581,6 +813,9 @@ class EvolutionEngine:
             single_agent_mode: Force single-agent orchestration.
             workspace_mgr: Workspace lifecycle manager; ``None`` skips
                 snapshot/restore plumbing.
+            stop_controller: Session stop controller (created in
+                :meth:`start_workflow_evolution`); fed one observation
+                per generation and consulted for the early-stop decision.
 
         Returns:
             The (mutated) runs list, with the final attempt populated and
@@ -632,6 +867,11 @@ class EvolutionEngine:
                 executed, runs[-1].judge, uuid, runs[-1].answers, runs[-1].scenario_rubric, assertion_history
             )
 
+        verifier = (wf_info.state_result or {}).get("evaluation", {}).get("verifier", {})
+        is_failure = (
+            on_error
+            or verifier.get("skipped_reason") == "workflow_generation_or_execution_failed"
+        )
         if uuid:
             # Reward wiring (N1): score, uncapped score and the fallback
             # flag are read back from the run's state_result in ONE pass,
@@ -643,11 +883,6 @@ class EvolutionEngine:
             runs[-1].reward_uncapped = wf_info.overall_score_uncapped
             runs[-1].reward_is_fallback = wf_info.reward_is_fallback
             runs[-1].code = wf_info.code
-            verifier = (wf_info.state_result or {}).get("evaluation", {}).get("verifier", {})
-            is_failure = (
-                on_error
-                or verifier.get("skipped_reason") == "workflow_generation_or_execution_failed"
-            )
             # Best-so-far *before* this offspring contributes; used by the
             # VariationEngine observer (plateau streak / success rate) for
             # the search-state block and telemetry.
@@ -668,9 +903,48 @@ class EvolutionEngine:
         runs[-1].state_result = wf_info.state_result if wf_info else {}
         agents_answers = self.extract_agents_behavior(wf_info.state_result) if wf_info else ""
         self.show_answers(agents_answers)
-
         if rewards_history is not None and wf_info is not None:
             rewards_history.append(wf_info.overall_score)
+
+        # ── Stop-controller bookkeeping (champion plateau) ────────────
+        # One observation per completed generation: the head-to-head
+        # pair outcomes vs predecessors (engine contract §2.5) drive the
+        # champion; failed generations can only advance the plateau.
+        if stop_controller is not None:
+            stop_controller.observe(
+                uuid=uuid or "",
+                iteration=runs[-1].iteration_count,
+                reward=wf_info.overall_score,
+                pair_outcomes=(
+                    verifier.get("pair_outcomes")
+                    if isinstance(verifier, dict)
+                    else None
+                ),
+                failed=is_failure or not uuid,
+            )
+
+        # ── Frontier probe (review 2026-10-09 §4.3) ──────────────────
+        # Evaluated after the stop observation and before the stop
+        # decision, so a probe is guaranteed to shape the next prompt
+        # whenever the plateau is one generation from stopping
+        # (explore_after defaults to patience − 1). The probe state is
+        # persisted through last_variation_state (run_metrics.json +
+        # variation_log.jsonl); textual_gradient.txt stays 100% verifier
+        # output.
+        exploration_probe: dict | None = None
+        if stop_controller is not None:
+            exploration_probe = self._evaluate_exploration_probe(
+                stop_controller, runs
+            )
+            self._exploration_probe = exploration_probe
+            self.variation.last_variation_state["exploration"] = (
+                exploration_state(exploration_probe)
+            )
+            if exploration_probe["triggered"]:
+                print_info(
+                    "[EXPLORE] frontier probe: "
+                    f"{exploration_probe['reason']}"
+                )
 
         # ── Survivor validation: gate + populate _archive (steady-state population)
         if uuid and not on_error:
@@ -706,6 +980,8 @@ class EvolutionEngine:
             "iteration_cost": current_iteration_cost,
             "iteration_start_time": iteration_start_time,
             "on_error": on_error,
+            "stop_controller": stop_controller,
+            "exploration_probe": exploration_probe,
         }
         self._persist_iteration_metrics(
             uuid, self._build_run_metrics_snapshot(runs[-1], wf_info, ctx)
@@ -722,23 +998,37 @@ class EvolutionEngine:
                 wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
             )
         
-        if runs[-1].iteration_count >= runs[-1].max_depth-1 and not on_error:
+        # N3 (2026-10-08 audit): HARD cap regardless of on_error — an
+        # errored generation at the cap used to fall through to parent
+        # selection and recurse past max_depth without bound.
+        if runs[-1].iteration_count >= runs[-1].max_depth-1:
             print_info("Maximum recursive depth reached.")
             return runs
-        
+
         if wf_info and enable_evolution:
-            if wf_info.overall_score >= self.config.learned_score_threshold:
-                print_ok("Evolution engine reached learning threshold.")
+            if stop_controller is not None:
+                stop, why = stop_controller.should_stop(runs[-1].iteration_count)
+            else:
+                # Defensive: a caller that bypassed start_workflow_evolution
+                # keeps the legacy inline threshold check.
+                stop = (
+                    wf_info.overall_score is not None
+                    and wf_info.overall_score >= self.config.learned_score_threshold
+                )
+                why = "threshold: legacy inline check"
+            if stop:
+                print_ok(f"Evolution engine stopping: {why}")
                 self._save_final_plots(assertion_history, rewards_history, uuid)
                 self.notifier.send_message(
                     f"Done learning task: {wf_info.goal[:256]} \n"
+                    f"Stop reason: {why}\n"
                     f"Final UUID: {uuid}\n"
                     f"Iterations: {runs[-1].iteration_count + 1}/{runs[-1].max_depth}\n",
                     title="Evolution done learning task.",
                     priority=0
                 )
                 return runs
-            # Below threshold with --learn: fall through to keep evolving.
+            # Not stopping yet: fall through to keep evolving.
         elif not on_error:
             self._save_final_plots(assertion_history, rewards_history, uuid)
             print_ok("Completed workflow execution. Evolution disabled.")
@@ -772,6 +1062,7 @@ class EvolutionEngine:
                 run_stderrs=[run_stdout] * len(parent_workflows),
                 iteration_count=runs[-1].iteration_count,
                 max_iterations=runs[-1].max_depth,
+                exploration_probe=exploration_probe,
             )
             next_kind = "crossover"
             next_parent_uuids = [pw.uuid for pw in parent_workflows if pw and pw.uuid]
@@ -783,6 +1074,7 @@ class EvolutionEngine:
             runs[-1].prompt = self.variation.mutation_prompt(
                 task_goal, primary_parent, code, run_stdout,
                 runs[-1].iteration_count, max_iterations=runs[-1].max_depth,
+                exploration_probe=exploration_probe,
             )
             next_kind = "mutation" if primary_parent else "seed"
             next_parent_uuids = [primary_parent.uuid] if primary_parent else []
@@ -822,6 +1114,7 @@ class EvolutionEngine:
             enable_evolution=enable_evolution,
             single_agent_mode=single_agent_mode,
             workspace_mgr=workspace_mgr,
+            stop_controller=stop_controller,
         )
 
         runs[-1].plot = self._save_final_plots(assertion_history, rewards_history, uuid)
@@ -1122,13 +1415,29 @@ class EvolutionEngine:
     ) -> dict:
         """Assemble the per-iteration dict written to ``run_metrics.json``.
 
+        Besides the stop state, ``variation_state.exploration`` carries
+        the frontier-probe trigger evaluated at the END of this
+        generation (it shaped the NEXT prompt): ``{"triggered": bool,
+        "reason": str, "metrics": [...]}`` (review 2026-10-09 §4.3).
+
         Args:
             run: Current ``IndividualRun`` (post-evaluation, post cumulative-cost update).
             wf_info: Workflow info exposing scores.
             ctx: Iteration locals: ``verdict``, ``iteration_cost``,
-                ``iteration_start_time``, ``on_error``.
+                ``iteration_start_time``, ``on_error``, ``stop_controller``,
+                ``exploration_probe``.
         """
         verdict = ctx.get("verdict") or {}
+        stop = ctx.get("stop_controller")
+        stop_state: dict[str, Any] = {"champion_uuid": None, "since_change": None,
+                                      "stop_reason": None}
+        if stop is not None:
+            stopping, reason = stop.should_stop(run.iteration_count)
+            stop_state = {
+                "champion_uuid": stop.champion,
+                "since_change": stop.since_change,
+                "stop_reason": reason if stopping else None,
+            }
         return {
             "uuid": run.current_uuid,
             "iteration": run.iteration_count,
@@ -1141,6 +1450,7 @@ class EvolutionEngine:
             "overall_score_uncapped": _scalar(wf_info.overall_score_uncapped),
             "reward_is_fallback": bool(run.reward_is_fallback),
             "on_error": bool(ctx["on_error"]),
+            **stop_state,
             "selection_log": _to_jsonable(run.selection_log),
             "qd_descriptor": list(verdict.get("behaviour_descriptor", [])),
             "qd_score": _scalar(verdict.get("qd_score")),

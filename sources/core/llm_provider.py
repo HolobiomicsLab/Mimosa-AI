@@ -1,13 +1,14 @@
+import glob
 import json
 import logging
 import os
+import random
 import time
 from dataclasses import dataclass, field
 from typing import Any
-import glob
-import random
 
 import litellm
+
 
 def extract_model_pattern(llm_model: str) -> tuple[str, str]:
     """Split a model identifier into provider and model components.
@@ -106,8 +107,11 @@ class LLMConfig:
                 env_var = "OPENAI_API_KEY"
             elif self.provider == "deepseek":
                 env_var = "DEEPSEEK_API_KEY"
+            elif self.provider == "z-ai":
+                env_var = "ZAI_API_KEY"
             else:
                 env_var = f"{self.provider.upper()}_API_KEY"
+            _ = env_var  # kept for the commented-out raise below
 
             #raise ValueError(
             #    f"API key not provided and {env_var} environment variable not set"
@@ -200,11 +204,19 @@ class LLMProvider:
         """Check if the current model supports reasoning tokens.
 
         Returns:
-            True if the model name contains a known reasoning-capable prefix
-            (``o1``, ``o3``, ``gpt-5``), False otherwise.
+            True if the model name contains a known reasoning-capable marker
+            (see the list below), False otherwise.
         """
         model_name = self.config.model.lower()
-        reasoning_models = ["o1", "o3", "gpt-5"]
+        reasoning_models = [
+            "o1", "o3", "gpt-5",
+            # OpenRouter reasoning-capable families that share one
+            # max_tokens budget across reasoning + content; without an
+            # explicit effort they default to full-strength thinking and
+            # can overrun the budget on long prompts (empty content).
+            "glm-5.3", "deepseek-v4", "deepseek-v3",
+            "qwen3", "kimi-k3",
+        ]
         return any(reasoning_model in model_name for reasoning_model in reasoning_models)
 
     def _is_claude_model(self) -> bool:
@@ -215,6 +227,22 @@ class LLMProvider:
             contains ``"claude"``, False otherwise.
         """
         return self.config.provider == "anthropic" or "claude" in self.config.model.lower()
+
+    def _token_budget_param(self) -> str:
+        """Name of the completion-budget parameter the endpoint expects.
+
+        OpenAI deprecated ``max_tokens`` in favour of
+        ``max_completion_tokens`` and its newer models hard-reject
+        ``max_tokens`` with a 400 (litellm only rewrites the param for
+        models it knows, so unreleased ones like ``gpt-6.1-sol`` leak the
+        legacy param through). ``max_completion_tokens`` is accepted by
+        every OpenAI chat model; all other providers keep ``max_tokens``.
+
+        Returns:
+            ``"max_completion_tokens"`` for the openai provider, else
+            ``"max_tokens"``.
+        """
+        return "max_completion_tokens" if self.config.provider == "openai" else "max_tokens"
 
     def _supports_prompt_caching(self) -> bool:
         """True for providers that honour Anthropic-style ``cache_control`` hints.
@@ -338,7 +366,7 @@ class LLMProvider:
         if len(expected) != len(cached):
             return False
 
-        for exp_msg, cached_msg in zip(expected, cached):
+        for exp_msg, cached_msg in zip(expected, cached, strict=False):
             r_a = exp_msg.get('role')
             r_b = cached_msg.get('role')
             c_a = exp_msg.get('content')
@@ -417,6 +445,36 @@ class LLMProvider:
         wait_time = base_wait + jitter
         return min(wait_time, max_wait)
 
+    @staticmethod
+    def _usage_dict(usage: Any) -> dict:
+        """Plain dict from a litellm usage object ({} when absent)."""
+        if usage is None:
+            return {}
+        if isinstance(usage, dict):
+            return dict(usage)
+        try:
+            return dict(usage.json()) if hasattr(usage, "json") else {}
+        except Exception:  # noqa: BLE001 — usage is best-effort accounting
+            return {}
+
+    @classmethod
+    def _merge_usage(cls, acc: dict | None, usage: Any) -> dict:
+        """Sum token counters across retry attempts (P5.3).
+
+        Numeric fields (tokens) add up; anything non-numeric keeps the
+        latest value. The result replaces ``usage`` in the dumped call
+        record so per-agent spend reflects the FULL cost of retries.
+        """
+        out = dict(acc or {})
+        for k, v in cls._usage_dict(usage).items():
+            if isinstance(v, bool):
+                continue
+            if isinstance(v, int | float):
+                out[k] = out.get(k, 0) + v
+            else:
+                out[k] = v
+        return out
+
     def __call__(self, prompt: str, timeout: int = 180, use_cache: bool = True) -> str:
         """Send a prompt to the configured LLM and return its text response.
 
@@ -452,14 +510,24 @@ class LLMProvider:
         max_wait = 500  # Maximum wait time in seconds
         context_window_retry_count = 0  # Track context window errors specifically
         effective_temperature = self.config.temperature
-
+        # P5.3: usage of ABANDONED (truncated) attempts, summed into the
+        # dumped usage so spend accounting reports the full call cost.
+        retried_usage: dict | None = None
         while True:  # Infinite retry loop
             try:
+                # OpenAI deprecated `max_tokens` in favour of
+                # `max_completion_tokens` and its newer models (gpt-5+,
+                # o-series, and unreleased ones litellm does not yet know,
+                # e.g. gpt-6.1-sol) hard-reject `max_tokens` with a 400.
+                # `max_completion_tokens` is accepted by every OpenAI chat
+                # model, so use it for the whole openai provider; every
+                # other provider keeps `max_tokens`.
+                budget_key = self._token_budget_param()
                 completion_params = {
                     "model": f"{self.config.provider}/{self.config.model}",
                     "messages": self._apply_cache_control(message),
                     "timeout": timeout,
-                    "max_tokens": self.config.max_tokens,
+                    budget_key: self.config.max_tokens,
                     "drop_params": True,
                 }
                 # Anthropic models reject (Opus 4.x) or ignore an explicit
@@ -467,33 +535,82 @@ class LLMProvider:
                 if not self._is_claude_model():
                     completion_params["temperature"] = effective_temperature
                 completion_params["api_key"] = self.config.key
-                # Add reasoning effort if supported (not for Claude models)
+                # Add reasoning effort if supported (not for Claude models).
+                # FIX 2026-10-07: for OpenRouter reasoning models (deepseek,
+                # GLM, etc.), the effort must go through extra_body.reasoning
+                # — a top-level reasoning_effort param is silently ignored,
+                # causing the model to burn the ENTIRE max_tokens budget on
+                # full-strength reasoning (observed: 24000 reasoning tokens,
+                # 0 content, on every policy generation attempt).
                 if self._supports_reasoning_tokens() and not self._is_claude_model():
-                    completion_params["reasoning_effort"] = self.config.reasoning_effort
-                    self.logger.info(f"Using reasoning_effort: {self.config.reasoning_effort}")
+                    if self.config.provider == "openrouter":
+                        # OpenRouter: reasoning control via extra_body
+                        extra = completion_params.get("extra_body") or {}
+                        extra["reasoning"] = {
+                            "effort": self.config.reasoning_effort,
+                        }
+                        completion_params["extra_body"] = extra
+                        self.logger.info(
+                            f"Using reasoning effort via extra_body: "
+                            f"{self.config.reasoning_effort}"
+                        )
+                    else:
+                        completion_params["reasoning_effort"] = (
+                            self.config.reasoning_effort
+                        )
+                        self.logger.info(
+                            f"Using reasoning_effort: "
+                            f"{self.config.reasoning_effort}"
+                        )
 
                 # Pin OpenRouter inference provider for reproducible benchmarks.
-                # Avoids silent routing to alternative providers that may use different
-                # quantizations or serving stacks and produce divergent outputs.
+                # Merged into extra_body (not replacing) so reasoning config
+                # from above survives.
                 if self.config.provider == "openrouter" and self.config.openrouter_provider:
                     provider_routing = {
                         "order": self.config.openrouter_provider,
                         "allow_fallbacks": False,
                         "require_parameters": True,
                     }
-                    # OpenRouter's `quantizations` field is an exclusion filter:
-                    # untagged endpoints (e.g. google-vertex, google-ai-studio)
-                    # are dropped when it's set. Omit it when precheck selected
-                    # such a provider (config records `None` in that case).
                     if self.config.openrouter_quantizations:
                         provider_routing["quantizations"] = self.config.openrouter_quantizations
-                    completion_params["extra_body"] = {"provider": provider_routing}
+                    extra = completion_params.get("extra_body") or {}
+                    extra["provider"] = provider_routing
+                    completion_params["extra_body"] = extra
 
                 response = litellm.completion(**completion_params)
 
+                # Reasoning models (GLM/deepseek class) draw reasoning tokens
+                # from the SAME max_tokens budget as content: on long prompts
+                # the reasoning can consume everything, returning finish_
+                # reason "length" with empty or single-fragment content
+                # (observed live: directives of "" / "∈"). Retry ONCE with a
+                # doubled budget before accepting the response.
+                content_now = response.choices[0].message.content or ""
+                # FIX 2026-10-06: retry on ANY length truncation, not just
+                # short content — a 500-char truncated Python file also needs
+                # a retry (the code is cut mid-function even though the JSON
+                # envelope may have completed). Only skip if we're already
+                # at the ceiling.
+                if (
+                    response.choices[0].finish_reason == "length"
+                    and completion_params[budget_key] < 32768
+                ):
+                    bumped = min(32768, completion_params[budget_key] * 2)
+                    self.logger.warning(
+                        f"⚠️  Response truncated by length (reasoning "
+                        f"overrun; content={len(content_now)} chars); "
+                        f"retrying with token budget "
+                        f"{completion_params[budget_key]} → {bumped}."
+                    )
+                    retried_usage = self._merge_usage(
+                        retried_usage, getattr(response, "usage", None)
+                    )
+                    completion_params[budget_key] = bumped
+                    response = litellm.completion(**completion_params)
+
                 # Success - break out of retry loop
                 break
-
             except TimeoutError as e:
                 # Timeout is retryable, up to the max_retries ceiling.
                 if attempt >= self.max_retries:
@@ -600,6 +717,7 @@ class LLMProvider:
             )
 
         # Check for truncation due to max_tokens limit
+        # Check for truncation due to max_tokens limit
         stop_reason = getattr(response.choices[0], 'stop_reason', None) or \
                       getattr(response.choices[0], 'finish_reason', None)
         if stop_reason == 'max_tokens' or stop_reason == 'length':
@@ -607,7 +725,6 @@ class LLMProvider:
                 f"⚠️  LLM response was truncated due to max_tokens limit ({self.config.max_tokens}). "
                 f"Consider increasing max_tokens in config for longer outputs."
             )
-
         json_res = {
             **response.json(),
             "response": res,
@@ -616,6 +733,12 @@ class LLMProvider:
             "reasoning_effort": self.config.reasoning_effort if not self._is_claude_model() else None,
             "model": f"{self.config.provider}/{self.config.model}",  # Ensure consistent model format for pricing
         }
+        if retried_usage is not None:
+            # P5.3: report the FULL cost — the abandoned truncated attempt
+            # was billed too.
+            json_res["usage"] = self._merge_usage(
+                retried_usage, getattr(response, "usage", None)
+            )
         if self.memory_path and self.agent_name:
             self.save_call(json_res)
 

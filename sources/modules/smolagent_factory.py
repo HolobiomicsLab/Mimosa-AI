@@ -219,19 +219,28 @@ class SmolAgentFactory:
                         "require_parameters": True,
                     }
                 }
+            # OpenAI deprecated `max_tokens` for `max_completion_tokens`;
+            # newer OpenAI models hard-reject `max_tokens` with a 400.
+            # LiteLLMModel forwards extra kwargs verbatim to litellm.
+            budget_kwarg = (
+                "max_completion_tokens"
+                if str(self.model_id).startswith("openai/")
+                else "max_tokens"
+            )
             return LiteLLMModel(
                 model_id=self.model_id,
                 temperature=self.temperature,
-                max_tokens=self.max_tokens,
                 timeout=self.timeout,
                 request_timeout=180,
+                **{budget_kwarg: self.max_tokens},
                 **extra_kwargs,
             )
         elif self.engine_name == "openai":
             return InferenceClientModel(
                 model_id=self.model_id,
                 provider=self.provider,
-                api_key=os.getenv("OPENAI_API_KEY")
+                api_key=os.getenv("OPENAI_API_KEY"),
+                additional_drop_params=["stop"]
             )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client and litellm.")

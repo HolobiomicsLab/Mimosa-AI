@@ -4,6 +4,8 @@ VariationEngine: prompt assembly and search-state observation for LLM-guided
 workflow evolution.
 """
 
+import logging
+
 import numpy as np
 
 from sources.cli.pretty_print import (
@@ -12,6 +14,157 @@ from sources.cli.pretty_print import (
 from sources.core.llm_provider import LLMConfig, LLMProvider
 
 from .workflow_info import WorkflowInfo
+
+
+def frontier_target(
+    value: float,
+    direction: str,
+    bounds: tuple[float, float] | list[float] | None = None,
+    integer: bool = False,
+    delta: float = 0.25,
+    min_step: float = 0.1,
+) -> float | int | None:
+    """Sign-aware exploratory target for one metric (review 2026-10-09 §4.3).
+
+    ``target = value ∓ max(|value|·delta, min_step)`` in the improving
+    direction — a signed value is NEVER multiplied (the imaginary-gradient
+    defect that pushed ``minimum_energy`` −2 "down" to −1.5). The result
+    is clipped to ``bounds`` when goal-derivable and rounded to an int
+    when the metric is integer-valued.
+
+    Args:
+        value: Current measured value of the metric.
+        direction: Improving direction, ``"higher"`` or ``"lower"``.
+        bounds: Optional ``[lo, hi]`` the metric cannot leave.
+        integer: Round the target to a whole number when True.
+        delta: Relative step size (fraction of ``|value|``).
+        min_step: Absolute floor for the step (covers ``value == 0``).
+
+    Returns:
+        A strictly better target inside ``bounds``, or ``None`` when no
+        strictly better value exists (e.g. the bound is already reached).
+    """
+    if direction not in ("higher", "lower"):
+        return None
+    v = float(value)
+    step = max(abs(v) * float(delta), float(min_step))
+    target = v + step if direction == "higher" else v - step
+    if bounds:
+        lo, hi = float(bounds[0]), float(bounds[1])
+        target = min(max(target, lo), hi)
+    if integer:
+        target = int(round(target))
+        if not (target > v if direction == "higher" else target < v):
+            target = target + 1 if direction == "higher" else target - 1
+        if bounds:
+            lo, hi = float(bounds[0]), float(bounds[1])
+            target = min(max(target, lo), hi)
+    better = target > v if direction == "higher" else target < v
+    return target if better else None
+
+
+def exploration_state(probe: dict | None) -> dict:
+    """Compact, JSON-persistable summary of one probe evaluation.
+
+    Args:
+        probe: A probe dict from
+            :func:`sources.core.evolution_engine.evaluate_exploration_probe`,
+            or ``None`` when no evaluation happened.
+
+    Returns:
+        ``{"triggered": bool, "reason": str, "metrics": [...]}`` — the
+        exact shape persisted under ``variation_state.exploration``.
+    """
+    probe = probe or {}
+    return {
+        "triggered": bool(probe.get("triggered")),
+        "reason": str(probe.get("reason") or ""),
+        "metrics": list(probe.get("metrics") or []),
+    }
+
+
+def render_exploration_block(
+    probe: dict | None,
+    metric_specs: dict[str, dict] | None = None,
+) -> str:
+    """Render the labelled ``<exploration>`` block (review §4.3).
+
+    The block is a SEARCH-POLICY request, never a measurement: it states
+    the deterministic search state (champion plateau, metric ties read
+    from the verifier's ``metric_summary``), asks for ONE bolder change,
+    and forbids changing reported numbers without a producing method.
+    It is injected ALONGSIDE the directive/diagnosis, never instead of
+    it.
+
+    Args:
+        probe: Probe dict with ``triggered``/``reason``/``champion``/
+            ``since_change``/``n_pairs``/``generations_compared``/
+            ``metrics``; an absent or untriggered probe renders "".
+        metric_specs: Optional ``{metric_id: spec}`` with ``role``,
+            ``direction``, ``bounds``, ``integer``. When a spec marks an
+            ``objective`` metric with a known direction, a sign-aware
+            arithmetic target (:func:`frontier_target`) is appended.
+            Default ``None`` = text-only (no invented numbers).
+
+    Returns:
+        The multi-line ``<exploration>…</exploration>`` block, or "".
+    """
+    if not probe or not probe.get("triggered"):
+        return ""
+    state_bits: list[str] = []
+    champion = probe.get("champion")
+    since = probe.get("since_change")
+    if champion:
+        tag = str(champion)[-8:] if len(str(champion)) > 8 else str(champion)
+        state_bits.append(f"champion {tag} unchanged for {since} generations")
+    metrics = list(probe.get("metrics") or [])
+    if metrics:
+        values = "; ".join(f"{m['id']} = {m['value']} everywhere" for m in metrics)
+        n_pairs = probe.get("n_pairs")
+        compared = f", {n_pairs} pairs compared" if n_pairs else ""
+        gens = probe.get("generations_compared")
+        window = f"last {gens} generations" if gens else "recent generations"
+        state_bits.append(
+            f"every measured metric is identical across the {window} "
+            f"({values}{compared})"
+        )
+    state = "; ".join(state_bits) or "no measured state available"
+    names = "/".join(str(m["id"]) for m in metrics) if metrics else "the current values"
+    head = f"{metrics[0]['value']}" if metrics else ""
+    cannot = (
+        f"The verifier cannot tell whether {head} is optimal."
+        if metrics
+        else "The verifier cannot tell whether the current values are optimal."
+    )
+    lines = [
+        "<exploration>",
+        "EXPLORATION PROBE — search policy, NOT a measured loss.",
+        f"State: {state}.",
+        f"{cannot} Propose ONE bolder change that would either improve "
+        f"{names} or independently confirm the bound (e.g. a different "
+        "algorithm, a proof/bound argument, or a stronger independent "
+        "validation).",
+    ]
+    for metric in metrics:
+        spec = (metric_specs or {}).get(str(metric["id"]))
+        if not spec or str(spec.get("role") or "objective") != "objective":
+            continue  # invariants/reports are never pushed (defect C5)
+        target = frontier_target(
+            metric["value"],
+            str(spec.get("direction") or ""),
+            spec.get("bounds"),
+            bool(spec.get("integer")),
+        )
+        if target is not None:
+            lines.append(
+                f"Optional arithmetic target (derived, not measured): "
+                f"{metric['id']} = {target}."
+            )
+    lines.append(
+        "Do not change reported numbers without a method that produces them."
+    )
+    lines.append("</exploration>")
+    return "\n".join(lines)
 
 
 class VariationEngine:
@@ -33,6 +186,7 @@ class VariationEngine:
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
         self.last_variation_state: dict = {}
+        self.logger = logging.getLogger(__name__)
         self.config = config
         self.llm_config = None
         self.setup_llm(config)
@@ -271,7 +425,7 @@ class VariationEngine:
         answers = wf_state["answers"]
         if isinstance(answers, list):
             return "\n".join(
-                f"agent {name}: {str(answer)[:2048]}..."
+                f"agent {name}: {str(answer)[:16384]}..."
                 for name, answer in zip(wf_state["step_name"], answers, strict=True)
             )
         return str(answers)
@@ -293,13 +447,13 @@ class VariationEngine:
             f"Goal to assemble a workflow for:\n{goal}\n"
             f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
-
     def llm_think_mutation_directive(
         self,
         agent_answers: str,
         textual_gradient_block: str,
         search_state: str,
         goal: str,
+        exploration_block: str = "",
     ) -> str:
         """Ask a dedicated LLM for the next mutation directive.
 
@@ -315,6 +469,9 @@ class VariationEngine:
             search_state: Read-only ``<search_state>`` payload built by
                 ``_search_state_block`` (scores only, no rubric text).
             goal: Task description.
+            exploration_block: Rendered ``<exploration>`` block (review
+                §4.3), passed ALONGSIDE the diagnosis when the frontier
+                probe triggered; empty string when it did not.
 
         Returns:
             The directive text (≤ 3 sentences, one named issue).
@@ -326,6 +483,7 @@ Focus on identifying what worked, what didn't, and why. Suggest specific changes
 You will be given the previous workflow's agent answers (agents_answers) and a textual gradient block (diagnosis) that summarizes the failure.
 The diagnosis is a summary of  deterministic ground truth verification using rubric-based scoring, and may include hints about what went wrong.
 The diagnosis is trusted and should be used to inform your directive.
+An <exploration> block, when present, is a search-policy request, not a measured fact; the <diagnosis> remains the only measured evidence.
 The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the diagnosis.
 You will also be given a read-only <search_state> block with deterministic search statistics: parent score, iteration progress, iterations since the last improvement, recent success rate, and the recent score trajectory.
 You decide yourself how bold the next change should be, justified by the search state: recent improvements and a rising score trajectory call for small incremental tweaks; a long plateau, a 0% success rate, or repeated identical failures call for bolder restructuring (such as adding agents, rewriting prompt, changing prompt persona, etc...).
@@ -344,6 +502,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             "",
             textual_gradient_block,
             "</diagnosis>",
+            *([exploration_block] if exploration_block else []),
             "The diagnosis contains fail/pass assertions with details, never report passing claims, never leak the exact claim being checked. only  diagnosis the failure and suggest pragmatic switch in approach for fix."
             "<search_state>",
             search_state,
@@ -360,8 +519,32 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             system_msg=sys_msg,
             config=self.llm_config,
         )
-        return provider(prompt)
-
+        directive = provider(prompt)
+        # Guard against truncated/degenerate directive output (reasoning
+        # overrun can return empty or single-token content, e.g. "∈"):
+        # retry once with an output-only nudge, then fall back to a
+        # deterministic directive — never embed a fragment verbatim.
+        if not directive or len(directive.strip()) < 20:
+            self.logger.warning(
+                "Directive LLM returned empty/degenerate output "
+                f"({directive!r:.60}); retrying with output-only nudge."
+            )
+            directive = provider(
+                prompt + "\n\nOutput ONLY the directive text now — no "
+                "analysis, no preamble, max 3 sentences.",
+                use_cache=False,
+            )
+        if not directive or len(directive.strip()) < 20:
+            self.logger.warning(
+                "Directive still degenerate after retry; using deterministic "
+                "fallback directive."
+            )
+            directive = (
+                "Make one small incremental improvement to the weakest step "
+                "flagged in the diagnosis; keep the rest of the workflow "
+                "unchanged."
+            )
+        return directive
 
     def mutation_prompt(
         self,
@@ -371,12 +554,18 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         run_stderr: str,
         iteration_count: int,
         max_iterations: int = 10,
+        exploration_probe: dict | None = None,
     ) -> str:
         """Build a prompt for one mutation step in the evolutionary search.
 
         The prompt has three layers:
           1. Voice framing   — sets the LLM's reasoning tone for this iteration.
           2. Execution grounding — previous code, agent answers, and judge eval.
+          3. Optional frontier probe — a labelled ``<exploration>`` block
+             (review 2026-10-09 §4.3) injected AFTER the directive and
+             BEFORE the mutation instructions when the engine's plateau/
+             tie trigger fired. It augments; it never replaces the
+             directive or the verifier's diagnosis.
 
         Args:
             goal: Task description for the mutated workflow.
@@ -388,6 +577,9 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
                 semantic diagnosis is available.
             iteration_count: Zero-based index of the current attempt.
             max_iterations: Total planned attempts (used for prompt context).
+            exploration_probe: Frontier-probe state from the engine
+                (:func:`render_exploration_block` decides whether a block
+                is rendered); ``None`` injects nothing.
 
         Returns:
             The fully assembled mutation prompt string.
@@ -422,6 +614,15 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         agent_budget = self._sample_mutation_agent_budget(parent_agents)
         self.last_variation_state["agent_budget"] = int(agent_budget)
 
+        # Frontier probe (review §4.3): labelled search-policy request,
+        # rendered from the engine's trigger state. Passed to the
+        # directive LLM alongside the diagnosis AND injected verbatim
+        # into this prompt — never instead of the diagnosis.
+        exploration_block = render_exploration_block(exploration_probe)
+        self.last_variation_state["exploration"] = exploration_state(
+            exploration_probe
+        )
+
         if genotype is None:
             directive = "Previous attempt failed completly. Fix syntax errors."
         else:
@@ -430,6 +631,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
                 textual_gradient_block=textual_gradient_block,
                 search_state=search_state,
                 goal=goal,
+                exploration_block=exploration_block,
             )
         return "\n".join([
             f"Attempt {iteration_count + 1} of workflow generation.",
@@ -444,6 +646,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             "<directive>",
             directive,
             "</directive>",
+            *([exploration_block] if exploration_block else []),
             "## MUTATION INSTRUCTIONS:",
             "- Follow exactly the directive as guideline regarding what to change in the workflow code.",
             f"- Do not add or remove more than 1 agent at a time, and use at most {agent_budget} agents in total.",
@@ -461,6 +664,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         run_stderrs: list[str],
         iteration_count: int,
         max_iterations: int = 10,
+        exploration_probe: dict | None = None,
     ) -> str:
         """Build a prompt for a crossover step: recombine N parent workflows into one offspring.
 
@@ -473,10 +677,21 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             run_stderrs: Parent stderr tails used as fallback gradients.
             iteration_count: Zero-based index of the current attempt.
             max_iterations: Total planned attempts (used for prompt context).
+            exploration_probe: Frontier-probe state from the engine; the
+                labelled ``<exploration>`` block (review 2026-10-09 §4.3)
+                is injected after the parent diagnoses and before the
+                recombination instructions when triggered.
 
         Returns:
             The fully assembled crossover prompt string.
         """
+        # Frontier probe state is persisted through the same
+        # last_variation_state path as the mutation prompt.
+        exploration_block = render_exploration_block(exploration_probe)
+        self.last_variation_state["exploration"] = exploration_state(
+            exploration_probe
+        )
+
         # ── Assemble parent records ──────────────────────────────────────────
         parents = []
         for i, (wf_info, genotype, stderr) in enumerate(
@@ -518,6 +733,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             "## PARENT WORKFLOWS:",
             "\n\n".join(parents_block),
             "",
+            *([exploration_block] if exploration_block else []),
             "## YOUR TASK:",
             "Do not pick one parent and patch it. Genuinely recombine.",
             "Do not create a workflow with more agents than the workflow with the highest agent count among the parents. Hard cap to prevent runaway complexity.",

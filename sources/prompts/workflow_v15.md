@@ -65,7 +65,7 @@ A minimal custom router. Route names are yours to choose, but your mapping dict 
 
 ```python
 def my_router(state: WorkflowState) -> str:
-    last_answer = Answer.validate(state["answers"][-1])
+    last_answer = Answer.from_raw(state["answers"][-1])
 
     if "SUCCESS" in last_answer.status:
         return "next_node"
@@ -177,7 +177,7 @@ Return a JSON object with fields:
 - status: one of SUCCESS, RETRY, FALLBACK, FAILURE
 - message: short summary of what was done
 - retry_advice: what to fix if retrying
-- error: error details if any
+- error: brief error message string if something went wrong; otherwise use an empty string — NEVER use null/None
 """.strip()
 
 
@@ -315,6 +315,21 @@ workflow.add_conditional_edges(
 )
 
 
+```
+
+# Note
+
+Never write workflow.add_node on multiple lines:
+```python
+workflow.add_node(
+    "metab_annotate_agent",
+    WorkflowNodeFactory.create_agent_node(metab_annotate_agent),
+)
+```
+
+Always on one line such as:
+```python
+workflow.add_node("metab_annotate_agent", WorkflowNodeFactory.create_agent_node(metab_annotate_agent))
 ```
 
 # Compilation

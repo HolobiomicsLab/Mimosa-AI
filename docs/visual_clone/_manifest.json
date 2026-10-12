@@ -1,7 +1,7 @@
 {
-  "built_commit": "ca72107",
-  "built_date": "2026-09-28",
-  "build_note": "Update build (gold feedback oracle mode). The manifest was at 336fe19. HEAD was 4020790 at the start. Commit ca72107 (2026-09-28 17:50, \"feat: gold based gradient for study\") landed while the wave ran and committed the gold_feedback work. The build INCLUDES WORKING-TREE STATE. For code, the tree equals ca72107, except for the uncommitted, in-flight edits to sources/evaluators/hybrid_verifier/gradient.py and tests/hybrid_verifier_test.py (mtime 17:59; the hybrid pages read them at 18:06-18:15), plus datasets/ and .gitignore (Tier D). 45 pages were re-synced or written (7 new: mod_evaluators_gold_feedback.html and file_gold_{init,evaluator,grader,format,reward,leak}.html), plus index.html, _clone.js and this manifest. Pages with working_tree=true were built from that tree. Stamp \"ca72107+wt\" in the top bar. E41 CAGE was still running at 2026-09-28 17:37. Its rows are a dated snapshot.",
+  "built_commit": "7da1f5e",
+  "built_date": "2026-10-10",
+  "build_note": "Update build (BT policy verifier, E44-E48). The manifest was at ca72107 (previous build 2026-09-28, plus two data_experiments refreshes on 2026-10-02/03). HEAD is 7da1f5e; the wave is built from the WORKING TREE, because sources/evaluators/policy_bt_verifier/, sources/evaluators/generic_verifier/ and sources/core/stopping.py are untracked and several core and evaluator files are modified. Stamp in the top bar: \"7da1f5e+wt\". 20 pages touched (3 new). The other pages keep their earlier stamps; pages whose covered code changed in this period but were not re-synced are: data_runs.html (run_notes grew), file_core_evolution_engine.html, mod_core_variation.html, file_core_llm_provider.html (line counts only), area_security_transparency.html. E26-E34, E36, E38-E42 harness experiments still have no page.",
   "pages": {
     "area_benchmark_evaluation.html": {
       "covers": [
@@ -17,14 +17,16 @@
     },
     "area_cli.html": {
       "covers": [
-        "sources/cli/*.py"
+        "sources/cli/*.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [
         "sources/cli/__pycache__: build artifacts",
         "webui/backend/mimosa_bridge.py: web UI out of scope (Tier D)"
-      ]
+      ],
+      "working_tree": true
     },
     "area_entry_config.html": {
       "covers": [
@@ -33,10 +35,12 @@
         "config_default.json",
         "auto-install.sh",
         "cleanup.sh",
-        "workflow_evolution_anim.py"
+        "workflow_evolution_anim.py",
+        "sources/evaluators/policy_bt_verifier/*.py",
+        "sources/core/stopping.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-12",
       "skipped": [
         "sources/utils/*, sources/cli/*: read only for call targets, owned by area_utils.html / area_cli.html",
         "Tier D: docs/*, webui/, datasets/, run_notes/, runs_capsule/, sources/workflows/, sources/memory/, logs/, audits/, CLA/"
@@ -50,23 +54,27 @@
         "sources/evaluators/scenario/*.py",
         "sources/evaluators/legacy_verifier/*.py",
         "sources/evaluators/hybrid_verifier/*.py",
-        "sources/evaluators/gold_feedback/*.py"
+        "sources/evaluators/gold_feedback/*.py",
+        "sources/evaluators/policy_bt_verifier/*.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [],
       "working_tree": true
     },
     "area_evaluators_legacy.html": {
       "covers": [
-        "sources/evaluators/legacy_verifier/*.py"
+        "sources/evaluators/legacy_verifier/*.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [
         "per-file cards for verifier*.py: one diagram + one table only",
         "recovery/visual/package-install branch bodies (entry points only)"
-      ]
+      ],
+      "working_tree": true
     },
     "area_extensibility.html": {
       "covers": [
@@ -94,19 +102,22 @@
     },
     "area_sources_core.html": {
       "covers": [
-        "sources/core/*.py"
+        "sources/core/*.py",
+        "sources/core/stopping.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [],
       "working_tree": true
     },
     "area_tests.html": {
       "covers": [
-        "tests/*.py"
+        "tests/*.py",
+        "sources/core/stopping.py",
+        "sources/evaluators/policy_bt_verifier/*.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-12",
       "skipped": [
         "tests/__pycache__/*.pyc: generated output, not source",
         "test bodies: page is a coverage matrix, not per-test text",
@@ -129,8 +140,8 @@
         "audits/*",
         "audits/**/*"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [
         "bodies of the large HTML reports: read title, first heading and TL;DR only (Tier C method)",
         "audits/reward_signal_analysis/*.pdf: binary, no text read",
@@ -146,8 +157,8 @@
         "experiments_verifiers/results/*",
         "diversity_experiments/*"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [
         "experiments_verifiers/.env: never opened (secrets rule)",
         "results/_e24_venv/: virtualenv, size counted only",
@@ -254,8 +265,8 @@
         "sources/evaluators/gold_feedback/grader.py",
         "sources/benchmark_evaluation/snapshot_grading.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [
         "sources/core/planner.py, single_agent_factory.py: --goal and --single_agent paths, outside this flow",
         "sources/evaluators/{verifier,verifier_*,generic,scenario,bs_detection}.py: not on the default verifier path",
@@ -269,10 +280,11 @@
         "sources/evaluators/base.py",
         "sources/evaluators/evaluator.py",
         "sources/evaluators/gold_feedback/evaluator.py",
-        "sources/benchmark_evaluation/snapshot_grading.py"
+        "sources/benchmark_evaluation/snapshot_grading.py",
+        "sources/evaluators/policy_bt_verifier/*.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [
         "sources/evaluators/verifier*.py etc: covered by area_evaluators_legacy.html"
       ],
@@ -282,8 +294,8 @@
       "covers": [
         "docs/visual_clone/*.html"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [],
       "working_tree": true
     },
@@ -294,8 +306,8 @@
         "sources/core/failure_fingerprint.py",
         "sources/core/orchestrator.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [
         "sources/utils/* one-line roles only, no cards",
         "sources/core/genotype_embedding.py: only its entry point embed_genotype is shown"
@@ -403,10 +415,11 @@
         "sources/evaluators/hybrid_verifier/*.py",
         "sources/utils/paths.py",
         "sources/evaluators/evaluator.py",
-        "sources/evaluators/gold_feedback/*.py"
+        "sources/evaluators/gold_feedback/*.py",
+        "sources/core/stopping.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-12",
       "skipped": [],
       "working_tree": true
     },
@@ -1436,11 +1449,13 @@
     },
     "file_core_llm_provider.html": {
       "covers": [
-        "sources/core/llm_provider.py"
+        "sources/core/llm_provider.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
+      "skipped": [],
+      "working_tree": true
     },
     "file_core_orchestrator.html": {
       "covers": [
@@ -1960,44 +1975,54 @@
     },
     "file_eval_base.html": {
       "covers": [
-        "sources/evaluators/base.py"
+        "sources/evaluators/base.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
+      "skipped": [],
+      "working_tree": true
     },
     "file_eval_bs_detection.html": {
       "covers": [
-        "sources/evaluators/generic/bs_detection.py"
+        "sources/evaluators/generic/bs_detection.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
+      "skipped": [],
+      "working_tree": true
     },
     "file_eval_evaluator.html": {
       "covers": [
-        "sources/evaluators/evaluator.py"
+        "sources/evaluators/evaluator.py",
+        "sources/evaluators/policy_bt_verifier/*.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [],
       "working_tree": true
     },
     "file_eval_generic.html": {
       "covers": [
-        "sources/evaluators/generic/generic.py"
+        "sources/evaluators/generic/generic.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
+      "skipped": [],
+      "working_tree": true
     },
     "file_eval_grounding.html": {
       "covers": [
-        "sources/evaluators/grounding.py"
+        "sources/evaluators/grounding.py",
+        "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "336fe19",
-      "date": "2026-09-26",
-      "skipped": []
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
+      "skipped": [],
+      "working_tree": true
     },
     "file_eval_scenario.html": {
       "covers": [
@@ -2102,10 +2127,11 @@
         "sources/core/*.py",
         "sources/evaluators/**/*.py",
         "sources/evaluators/*.py",
-        "experiments_verifiers/harness/*.py"
+        "experiments_verifiers/harness/*.py",
+        "docs/visual_clone/*.html"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "skipped": [
         "sources/evaluators/verifier*.py (deprecated)"
       ],
@@ -2234,6 +2260,64 @@
       "skipped": [],
       "commit": "ca72107",
       "date": "2026-09-28",
+      "working_tree": true
+    },
+    "mod_evaluators_policy_bt_verifier.html": {
+      "covers": [
+        "sources/evaluators/policy_bt_verifier/*.py",
+        "sources/evaluators/evaluator.py",
+        "sources/evaluators/base.py",
+        "sources/core/stopping.py",
+        "sources/core/evolution_engine.py",
+        "config.py",
+        "config_default.json",
+        "main.py"
+      ],
+      "skipped": [
+        "sources/evaluators/policy_bt_verifier/REVIEW_metric_tie_and_imaginary_2026-10-09.md: design review note, cited for the metric-ledger rationale only",
+        "experiments_verifiers/harness/e44_digest.py, e44_bt.py, e45_spartan.py: cited by the package docstrings, not read",
+        "one digest page per module: the 12 files get cards on this page instead (Tier B rule)"
+      ],
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
+      "working_tree": true
+    },
+    "flow_policy_bt_verification.html": {
+      "covers": [
+        "sources/evaluators/policy_bt_verifier/*.py",
+        "sources/evaluators/evaluator.py",
+        "sources/core/stopping.py",
+        "sources/core/evolution_engine.py",
+        "sources/workflows/<uuid>/evaluation.txt"
+      ],
+      "skipped": [
+        "policy_bt_verifier/REVIEW_metric_tie_and_imaginary_2026-10-09.md: not runtime code",
+        "sources/evaluators/policy_bt_verifier/__init__.py: re-export list only",
+        "CSV batch grading path (VER/SR/CBS, CapsuleEvaluator): not on this flow"
+      ],
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
+      "working_tree": true
+    },
+    "file_core_stopping.html": {
+      "covers": [
+        "sources/core/stopping.py",
+        "sources/core/evolution_engine.py",
+        "config.py",
+        "config_default.json",
+        "main.py",
+        "sources/evaluators/evaluator.py",
+        "tests/evolution_engine_stop_test.py",
+        "tests/exploration_probe_test.py",
+        "tests/hybrid_verifier_test.py",
+        "tests/policy_bt_verifier_test.py"
+      ],
+      "skipped": [
+        "the four test file bodies: only their StopController touchpoints are cited",
+        "evaluate_exploration_probe and VariationEngine internals: the frontier probe has no page yet"
+      ],
+      "commit": "7da1f5e",
+      "date": "2026-10-10",
       "working_tree": true
     }
   },
@@ -2475,6 +2559,120 @@
         "_manifest.json"
       ],
       "note": "Gold feedback oracle mode (--verifier_kind gold). New L2 page and 6 file digests for sources/evaluators/gold_feedback/. snapshot_grading.grade_directory is drawn as shared by the csv_mode ablation loop and the gold grader (CapsuleEvaluator -> ExecutionSandbox). Verifier-kind branch hybrid/legacy/gold on overview, flow_task_run, flow_evolution_loop, flow_verification and area_evaluators. Oracle rules in core: the FALLBACK_REWARD_KINDS/is_oracle_generation skip is in the PARENT POOL (WorkflowSelector.discover_workflows), not in _select_best_run. Also: 2048-char gradient cut removed, reward_source benchmark_grader. Config and CLI flags, tests matrix (gold_feedback_test.py, 49 passed). 11 hybrid_verifier pages re-synced to the 4020790 changes. data_runs, data_audits, data_experiments, exp_index (E36-E41, E41 in flight), data_modules_prompts (workflow_v15.md changed in 4020790). Orphan exp_e37_audit_run1.html added to the menu and the manifest. _clone.js: the top bar reads per-page data-built. All 184 pages got a stamp from this manifest. Workers re-derived every line count and line ref they touched. Code gaps are flagged on pages: csv_mode ablation best-run uses plain max (not _select_best_run); ablation grading may overwrite pred_results/ in the /tmp snapshot; config.py comment names sources/evaluators/verifier.py for legacy. Review (vc-review, read-only): it checked 190 claims and found 4 minor errors, all fixed: the censored-reward wording, the hybrid_verifier total 4 735, gradient.py 388 lines on 3 pages, and \"removed in working tree\" -> \"removed in ca72107\". One blocker, fixed: the first stamp pass broke <body> on 96 pages whose data-crumb had a literal \">\". The crumb is now escaped as &gt; and all 96 crumbs match HEAD. Open: 24 table cells over 12 words on 13 pages; area_tests shows hybrid_verifier_test.py at its HEAD size, 2514 lines (2556 in the working tree, in flight)."
+    },
+    {
+      "date": "2026-09-30",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "data_experiments.html",
+        "index.html"
+      ],
+      "note": "Experiments program E1-E42 (cycles 1-5). data_experiments.html refreshed: E1-E42 span, improve_experiment.md action plan, cycle-5 findings (HANDOFF.md sec 3.4), E41 CAGE label-noise finding (SR flip 0.108, fresh-regrade ceiling 0.854), key facts with source citations (best ranker e30_online 0.759, gold gradient ceiling 0.695 relevance, production verifier sources/evaluators/hybrid_verifier/), a 6-box lifecycle diagram (arena -> channels -> instrument -> audits), and E42 gradient-autopsy rows. index.html changelog entry added. experiments_verifiers/ is untracked, so HEAD is 7da1f5e (hybrid verifier edit)."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "data_experiments.html",
+        "index.html"
+      ],
+      "note": "E44 'KUMITE' (2026-10-02) added to data_experiments.html: intro span extended to E1-E44, new panel with a 7-box pipeline diagram (e44_reexec -> digest -> policy -> BT -> results/_e44 -> HTML report), gate table (G1 FAIL 0.7041 vs legacy 0.5578 CI spans 0, G2 8/19, G3 FAIL relevance 0.188, G4 PASS antisymmetry 1.000), cost $0.346/$10, 11 fresh-fail divergences, pointers to results/E44_kumite_2026-10-02.{md,json}, harness/e44_gradient_anatomy.md, e44_scout_failure_modes.md and html_report_human_only/REPORT_E44_kumite_2026-10-02.html. index.html changelog row added. experiments_verifiers/ untracked; HEAD still 7da1f5e."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "data_experiments.html",
+        "index.html"
+      ],
+      "note": "E44 KUMITE panel updated to the two-arm result (v1 -> v2, second arm content-v2): title now 'policy-script BT-tree; content-v2 confirmed'; gate table G1 v2 pooled 0.687 / cluster 0.676 (v1 0.704), G2 9/19 (v1 8/19), G3 v1 0.188 -> v2 0.504 relevance (zero-rel 29->0, away 11->6, hall 0.175->0.158, projection 0.4-0.55 hit), G4 antisymmetry 1.000 both arms; cost chip $0.79/$10; verdict line rewritten (ranking unmoved within noise, feedback content and ranking separable, v2 feedback layer a candidate gradient module); link added to results/_e44/v1/. index.html changelog row added."
+    },
+    {
+      "date": "2026-10-02",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "data_experiments.html",
+        "index.html"
+      ],
+      "note": "E45 'SPARTAN' (2026-10-02) added to data_experiments.html as a compact panel after E44: intro span extended to E1-E45; 6-box diagram (E44 v2 gradients -> placebo probe results/_e44/measure/adv_circularity.json -> v2b judge harness/e45_spartan.py; quarantined 7-task holdout results/_e45/ -> v3 + generic arms -> gates results/E45_spartan_2026-10-02.md); gate table G-INST PASS (placebo 0.000, n=10), G3-A FAIL (v3 0.217 vs v2 0.183, +0.033 < 0.05, n=18; assessed substance ~0.2 in every arm, structural F6), G1-MACRO guard PASS/marginal (v3 0.702 > v2 0.654 > generic 0.519 > recorded 0.437; value-determinant rung bulk_modulus 0.615 -> 0.808), TRANSFER FAIL (generic no-recon 0.519, gap 0.135 > 0.10), G4 PARTIAL (antisymmetry 1.000 over 1289 pairs; decisive floor tripped on chem clintox 9->0 and chem papyrus 17->1, rose on 5 tasks mat 40->90); cost chip E45+adv $0.33 / program-run $1.12 of $10; v3 exclusions aquatic + polyverse noted. E44 panel verdict line gained the E45 correction: its v2 relevance claim (0.188 -> 0.504) re-labeled a naming artifact, citing results/_e44/measure/adv_circularity.json. Links to report sections REPORT_E44_kumite#e45 and REPORT_all_experiments#e45. index.html changelog row added. experiments_verifiers/ untracked; HEAD still 7da1f5e."
+    },
+    {
+      "date": "2026-10-03",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "data_experiments.html",
+        "index.html"
+      ],
+      "note": "E46 hybrid visual BT (2026-10-03) added to data_experiments.html as a compact panel after E45: intro span extended to E1-E46; 6-box diagram (kimi-k3 per-workspace visual scorer harness/e46_hybrid.py -> hybrid ladder exec-crash rung then kimi compare -> gates results/E46_hybrid_visual_2026-10-03.md; evidence tree results/_e46/, E45 v3 tournaments reused unchanged, companion recompute results/_e44/measure/nonvisual.json); gate table G-VIS-DECISIVE PASS (0.75 decisive, 129/172 visual pairs vs ~0 for v1/v3), G1-VIS REPORT ONLY 0.833 (5/6; equals E26 BUMBLEBEE anchor on a different pair set, directional, n=6), G1-NONVIS guard PASS 0.7305 macro (v3 by construction), G2 9/19, G-COST PASS $0.5561 (44 kimi calls, 2 parse fails); verdict best E4x configuration - script policy non-visual + kimi visual + shared exec-crash rung; companion non-visual recompute: v3 best arm 0.731 pooled / 0.727 macro (141 pairs, 6 tasks; v2 0.695/0.709, recorded 0.543) and E45 G3-A passes non-visually (+0.088, n=12). index.html changelog row added. experiments_verifiers/ untracked; HEAD still 7da1f5e."
+    },
+    {
+      "date": "2026-10-03",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "data_experiments.html",
+        "index.html"
+      ],
+      "note": "E47 'REFINER' (2026-10-03) added to data_experiments.html as a compact panel after E46: intro span extended to E1-E47; 6-box diagram (harness/e47_refiner.py: raw gradient as ground truth + file previews -> refined gradient with evidence-quoted issues -> gates results/E47_refiner_2026-10-03.md; evidence tree results/_e47/ with refined/ 57 row JSONs + measure.json, E46 hybrid BT inherited frozen supplying the raw baseline, PromptAudit box -> E48 5-fix list recorded in the results JSON e48_fix_list); gate table G-REFINE-REL FAIL honest negative (refined 0.331 vs raw 0.336, paired delta -0.005, n=57, relevance-neutral under v2b; raw mean rose because E46 merged gradients carry kimi visual feedback), G-FAITH weak PASS (hall 0.053 vs 0.018, bar <= max(raw, 0.15)), G-RANK-GUARD PASS by construction (E46 tournaments unchanged), G-COST PASS $0.1452 (57 refine + 114 judge calls); qualitative chips 253 verified issues / 57 missing-file flags / 60 corrections - counts re-derived from all 57 files in results/_e47/refined/ and matching the data of record E47_refiner_2026-10-03.{md,json} (an earlier interim summary said 214/37/9; superseded); pilot example in the figcap (raw fold claimed clintox_nn.py missing while the 435-line file exists; true crash dc.metrics.loss_score AttributeError at line 265; pred_results/clintox_test_pred.csv flagged missing); PromptAudit note 2 of 7 audited E44-E46 failures are harness bugs (E45 repair loop identical cache key; kimi empty responses cached with no retry); verdict refined gradients better-grounded but v2b cannot see it, mutation-outcome test is the real validator; cost chip program-run $1.83 / $10. index.html changelog row added. experiments_verifiers/ untracked; HEAD still 7da1f5e."
+    },
+    {
+      "date": "2026-10-03",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "data_experiments.html",
+        "index.html"
+      ],
+      "note": "E48 'FIXES' (2026-10-03) added to data_experiments.html as a compact panel after E47: intro span extended to E1-E48; 6-box diagram (harness fix sites: e45_spartan.py fixes 1+2+3+5 [repair loop passes screen errors with cache-busting role, runtime smoke on 2 real digest pairs, both-crash error-family rung clause, exact-token contract; write_policy rejects truncated fallbacks], e44_llm.py cap 6000->12000 via min(12000, max_tokens*2), e46_hybrid.py fix 4 kimi retry-once + cache self-heal -> re-run results results/E48_fixes_2026-10-03.md + .json; pre-fix baselines results/_e45/pre48/ [policies_v3, tour_v3, verdicts_v3] and results/_e46/pre48/ [kimi_cache.jsonl, tour, tour_merged, verdicts]); result chips: coverage 17/19->19/19 (aquatic + polyverse pass screen AND runtime smoke; polyverse despite consensus-constants history), non-visual pooled 0.7305->0.7482 (+0.018 under noise floor, positive; macro 0.7479), visual contrast pairs 5/6->6/6 (healed kimi score flips prot-prot 0.5->1.0), visual decisive 0.75 / antisymmetry 1.000 (705 pairs) / picks 9/19 hold, both-crash rung correctly did NOT fire on chem clintox (all 10 gens share the identical deepchem signature, tie rule-correct, env regression stays a tie task); self-inflicted regression caught in-session: longer prompt exceeded the 6000-token cap, llm() returned raw truncated JSON which write_policy accepted as policy source -> SyntaxError unterminated string literal on 11/19 tasks, fixed by the 12000 cap + screen-failing sentinel on non-dict fallback; verdict: the two audited harness bugs (no-op repair loop, permanent kimi fail-cache) were real and load-bearing; cost ~$0.35 regeneration, program-run total ~$2.18 of the $10 cap; index.html changelog row added. Fix sites verified in code before writing: e45_spartan.py:206,224-265, e46_hybrid.py:118,130, e44_llm.py:92."
+    },
+    {
+      "date": "2026-10-10",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "index.html",
+        "file_index.html",
+        "overview.html",
+        "flow_verification.html",
+        "flow_policy_bt_verification.html",
+        "mod_evaluators_policy_bt_verifier.html",
+        "file_core_stopping.html",
+        "area_evaluators.html",
+        "area_evaluators_legacy.html",
+        "file_eval_evaluator.html",
+        "file_eval_generic.html",
+        "file_eval_bs_detection.html",
+        "file_eval_base.html",
+        "file_eval_grounding.html",
+        "file_core_llm_provider.html",
+        "area_sources_core.html",
+        "area_entry_config.html",
+        "area_tests.html",
+        "area_cli.html",
+        "data_experiments.html",
+        "flow_task_run.html",
+        "mod_core_evolution_engine.html",
+        "data_audits.html"
+      ],
+      "note": "BT policy verifier (E44-E48) wave. New pages: mod_evaluators_policy_bt_verifier.html, flow_policy_bt_verification.html, file_core_stopping.html. The untracked package sources/evaluators/policy_bt_verifier/ (12 files, 6 131 lines) is selectable with --verifier_kind policy_bt (built-in default stays hybrid). Also re-synced: the channel list (area_evaluators, overview, flow_verification, file_eval_evaluator, area_entry_config), the folder rename sources/evaluators/generic/ -> generic_verifier/ (area_evaluators_legacy, file_eval_generic, file_eval_bs_detection, file_eval_base, file_eval_grounding, file_core_llm_provider, area_cli, file_index, data_experiments; 2 dead links repaired), the tests matrix (area_tests), the core file table and the file-digest hub (stopping.py added; sources/core 20 files / 9 777 lines), index.html. 187 pages total. Findings flagged on the pages: config.temp_dir is not a Config field (scratch root falls back to sources/workflows/_verifier_tmp/, config.py declares runner_temp_dir); policy_bt_verifier/__init__.py cites a missing PLAN.md; sources/evaluators/__init__.py:29 still aliases GenericEvaluator to the emptied generic/ folder; the scores failure_fingerprint is a constant stub; main.py reads five config names no parser declares; docs/reference/cli.md omits policy_bt and 11 flags. Known gaps left as they were: 14 report links in data_experiments.html and 2 in data_audits.html (pre-existing), experiment panels stop at E48, data_runs not re-counted. The untracked config_default.json is a live operator file: it said hybrid earlier in the day and policy_bt at build time. EXPANSION later the same day: mod_evaluators_policy_bt_verifier.html was deepened on request -- 13 diagrams (sandbox + ledger, digest schema, policy build loop, recon TASK CONFIG, metric resolution ladder, registry caches, reward guard, gradient fold, crash rung), verbatim code quotes with file and line numbers in collapsed blocks, step-by-step collapsed lists inside the evaluator, reexec, verdicts and visual file cards, and a diagram index. 104 quoted identifiers were re-checked against the code and 6 line references were corrected (gradient fold 132-216, REFINER_KEYS 73-80, static_screen line 239, reexec constants 76-78, reexec run from 489, bt_fit_weighted line 39, main_script_source values). LATE FIXES after the independent review: the clone is now link-clean (0 broken links over 187 pages) -- 14 gone report targets and 2 gone audit targets in data_experiments.html and data_audits.html became plain text with a note naming what is missing and where the surviving reports live; data_experiments.html got the 7da1f5e+wt stamp; experiment_pages corrected to 56; the three-channel strings in flow_task_run.html and mod_core_evolution_engine.html and the flow_verification.html tooltip now name all four channels; the verifier page corrected its export claim (STAGES and StageLogger DO come from logging_utils.py), its knob count (12, not 13), the main_script_source values (adds shell_run_sh), 5 line references, and its file-card signatures are now labelled abbreviated; file_core_stopping.html fixed two line refs (stopping.py L123/L128, evolution_engine.py restore_best L778). New finding recorded on the verifier page: the N6 hold-then-commit path around pending_recon is dead code (assigned once to null) and the schema-error refresh persists the new recon before the policy rewrite, so a failed rewrite keeps the new recon and the old policy."
+    },
+    {
+      "date": "2026-10-12",
+      "commit": "7da1f5e",
+      "working_tree": true,
+      "pages": [
+        "area_entry_config.html",
+        "overview.html",
+        "area_tests.html",
+        "index.html",
+        "_manifest.json"
+      ],
+      "note": "Config fix: Config.from_json now reads judge_model and vision_judge_model (config.py:591-594, data.get next to capsule_namer_model); previously loading any JSON config silently kept the constructor defaults for both fields. area_entry_config.html: red note became a FIXED note with the regression-test names, plumbing note corrected (loading the local config now does switch the judge), test description refreshed. overview.html: removed the resolved docs-vs-code row. area_tests.html: config_roundtrip_test.py row re-counted (174->261 lines, 4->6 test funcs: test_every_jsonify_key_is_read_by_from_json, test_judge_models_survive_a_round_trip). Page dates bumped to 2026-10-12, stamp 7da1f5e+wt (fix is uncommitted working tree)."
     }
   ],
   "review": {
@@ -2492,7 +2690,9 @@
       "fd-rev-harness-b",
       "reviewer-2026-09-26",
       "polish-2026-09-26",
-      "vc-review-2026-09-28"
+      "vc-review-2026-09-28",
+      "vc-review-2026-10-10",
+      "vc-review-1010"
     ],
     "numbers_re_derived": 1625,
     "checks": [
@@ -2506,14 +2706,90 @@
       "footer skips",
       "no secrets"
     ],
-    "last": "2026-09-28: 190 claims sampled, 4 minor wrong (fixed), 1 blocker (body stamp, fixed); links/external/box/banned/secrets pass"
+    "last": "2026-10-10: independent read-only review by vc-review-1010 over the whole clone (187 pages, 325 symbols, 68 facts): checks 1-5, 8, 10 PASS (links, offline rule, box budget, text budget/banned words, symbol existence, menu/manifest agreement, secrets). 12 findings, all fixed the same day: 1 wrong export claim, 1 wrong knob count, 1 wrong main_script_source value set, 1 claim contradicted by dead code (pending_recon), 5 line-number offsets, 3 stale three-channel strings, 1 stamp, 1 count (experiment_pages 57->56) and a set of file-card signatures that are now labelled as abbreviated. After the fixes: 0 broken links in the whole clone, 0 external URLs, 0 diagrams over 12 boxes, 0 banned words, 0 secret patterns. Unchecked by the reviewer: JS behaviour (no browser), runtime behaviour (no execution), the dated runtime observations of file_core_stopping.html (their /tmp folders are gone), and the 16 formerly linked report targets (absent from the checkout)."
   },
   "counts": {
-    "pages": 184,
-    "html_files": 184,
-    "file_digest_pages": 96,
+    "pages": 187,
+    "html_files": 187,
+    "file_digest_pages": 97,
     "experiment_pages": 56,
     "note": "digest/experiment counts exclude the hubs file_index.html and exp_index.html"
   },
-  "working_tree": true
+  "working_tree": true,
+  "stale": {
+    "checked": "2026-10-10",
+    "basis": "per-page covers intersected with the paths changed since the page's build commit (tracked diff ca72107..HEAD + working tree, Tier D excluded); pages re-synced in this wave are excluded",
+    "pages": {
+      "data_modules_prompts.html": [
+        "sources/modules/state_schema.py",
+        "sources/prompts/workflow_v15.md"
+      ],
+      "file_core_evolution_engine.html": [
+        "sources/core/evolution_engine.py"
+      ],
+      "file_core_variation_engine.html": [
+        "sources/core/variation_engine.py"
+      ],
+      "file_core_workflow_info.html": [
+        "sources/core/workflow_info.py"
+      ],
+      "file_hybrid_digest.html": [
+        "sources/evaluators/hybrid_verifier/digest.py"
+      ],
+      "file_hybrid_evaluator.html": [
+        "sources/evaluators/hybrid_verifier/evaluator.py"
+      ],
+      "file_hybrid_gradient.html": [
+        "sources/evaluators/hybrid_verifier/gradient.py"
+      ],
+      "file_hybrid_layers.html": [
+        "sources/evaluators/hybrid_verifier/layers.py"
+      ],
+      "file_hybrid_scorers.html": [
+        "sources/evaluators/hybrid_verifier/scorers.py"
+      ],
+      "flow_evolution_loop.html": [
+        "config.py",
+        "sources/core/evolution_engine.py",
+        "sources/core/variation_engine.py",
+        "sources/core/workflow_info.py",
+        "sources/evaluators/evaluator.py",
+        "sources/evaluators/hybrid_verifier/gradient.py"
+      ],
+      "flow_sab_batch.html": [
+        "main.py"
+      ],
+      "flow_task_run.html": [
+        "config.py",
+        "main.py",
+        "sources/core/evolution_engine.py",
+        "sources/core/variation_engine.py",
+        "sources/core/workflow_info.py",
+        "sources/evaluators/evaluator.py"
+      ],
+      "mod_core_evolution_engine.html": [
+        "sources/core/evolution_engine.py"
+      ],
+      "mod_core_lineage.html": [
+        "sources/core/workflow_info.py",
+        "sources/modules/state_schema.py"
+      ],
+      "mod_core_runner.html": [
+        "sources/modules/state_schema.py"
+      ],
+      "mod_core_tools_llm.html": [
+        "sources/core/llm_provider.py"
+      ],
+      "mod_core_variation.html": [
+        "sources/core/variation_engine.py"
+      ],
+      "mod_evaluators_hybrid_verifier.html": [
+        "sources/evaluators/hybrid_verifier/digest.py",
+        "sources/evaluators/hybrid_verifier/evaluator.py",
+        "sources/evaluators/hybrid_verifier/gradient.py",
+        "sources/evaluators/hybrid_verifier/layers.py",
+        "sources/evaluators/hybrid_verifier/scorers.py"
+      ]
+    }
+  }
 }

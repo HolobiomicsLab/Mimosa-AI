@@ -712,9 +712,9 @@ class _VerifierPerClaimMixin:
         output is shown separately and explicitly marked UNTRUSTED.
         """
         grounding_block = (
-            grounding.strip()[:1500] if grounding else "(no literature grounding)"
+            grounding.strip()[:4000] if grounding else "(no literature grounding)"
         )
-        goal_block = (goal or "").strip()[:2500] or "(no goal text available)"
+        goal_block = (goal or "").strip()[:8000] or "(no goal text available)"
         agent_block = (execution_text or "").strip()[-2500:] or "(no agent output)"
         images_block = (
             "\n".join(f"- {label}" for label in (image_labels or []))
@@ -858,7 +858,7 @@ Return STRICT JSON only, no markdown, no prose outside the JSON:
         goal: str = "",
     ) -> str:
         """Build the per-claim file-selection prompt sent to the judge."""
-        goal_block = (goal or "").strip()[:3000] or "(none provided)"
+        goal_block = (goal or "").strip()[:8000] or "(none provided)"
         return f"""You are picking which workspace files a deterministic verifier should open to check ONE atomic claim about a multi-agent workflow.
 
 TASK GOAL (the user's specification — names the deliverables and their exact paths):
