@@ -6,7 +6,7 @@
 <title>Policy-BT verification flow - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview &gt; evaluators &gt; policy_bt verification flow" data-built="7da1f5e+wt" data-built-date="2026-10-10">
+<body data-crumb="Overview &gt; evaluators &gt; policy_bt verification flow" data-built="c508f11+wt" data-built-date="2026-10-13">
 <div class="wrap">
 
 <h1 class="hud">Policy-BT verification flow</h1>
@@ -17,7 +17,7 @@
 <div class="panel"><span class="br"></span>
 <h2>One generation through the verifier</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1340 700" role="img" aria-label="Sequence diagram of one policy-BT verification">
+<svg class="diagram" viewBox="0 0 1340 718" role="img" aria-label="Sequence diagram of one policy-BT verification">
   <defs>
     <marker id="arwV" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
@@ -173,11 +173,13 @@
   <text x="88" y="583.5" text-anchor="end" style="font-family:var(--mono);font-size:9.5px;fill:#00E5FF">DONE</text>
   <text class="box-sub" x="20" y="620" style="font-size:9.5px">re-execution never mutates the source workspace: a size + head-hash manifest is compared before and after the copy (reexec.py::frozen_manifest)</text>
   <text class="box-sub" x="20" y="638" style="font-size:9.5px">step 11 runs once per predecessor and only for figure-dominant tasks; the code policy decides every other pair (diagram 2)</text>
-  <text class="box-sub" x="20" y="656" style="font-size:9.5px">METRICS is not one of the 9 STAGES tags - the logger also emits DIGESTS, METRICS, PAIR, GRADIENT_RAW and GRADIENT_REFINED payload records</text>
-  <text class="box-sub" x="20" y="674" style="font-size:9.5px">step 15 hands the assembled scores dict back to WorkflowEvaluator; the EvolutionEngine loop reads reward, pair_outcomes and metric_summary from it</text>
+  <text class="box-sub" x="20" y="656" style="font-size:9.5px">METRICS is not one of the 9 STAGES tags - the logger also emits DIGESTS, METRICS, PAIR, FILES, PREVIEW, TABLE, GRADIENT_RAW and GRADIENT_REFINED records</text>
+  <text class="box-sub" x="20" y="674" style="font-size:9.5px">step 16 hands the assembled scores dict back to WorkflowEvaluator; the EvolutionEngine loop reads reward, pair_outcomes and metric_summary from it</text>
+  <text class="box-sub" x="20" y="692" style="font-size:9.5px">between PAIRS and REWARD (conditional): pairs flagged schema_error by BOTH orders trigger a recon refresh, policy rewrite and re-evaluation (evaluator.py::_schema_error_refresh)</text>
+  <text class="box-sub" x="20" y="710" style="font-size:9.5px">operator log (2026-10-12): a bounded PREVIEW of each fresh policy source, a FILES artifact-name diff per fresh pair, and a Bradley-Terry standings TABLE right after REWARD (colors only on a TTY)</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - one <code>PolicyBTVerifierEvaluator.evaluate(uuid)</code> call, steps 1-15 top to bottom. The left rail is the order of the nine <code>STAGES</code> tags (<code class="path">logging_utils.py:25</code>) and their tag lines: <code>REEXEC</code> 534, <code>DIGEST</code> 575, <code>RECON</code> 712, <code>POLICY</code> 814/875, <code>VISUAL</code> 1069, <code>PAIRS</code> 1169, <code>REWARD</code> 1209, <code>GRADIENT</code> 1286, <code>DONE</code> 1377, all in <code class="path">sources/evaluators/policy_bt_verifier/evaluator.py</code>. Every stage line also goes to the JSON-lines sink <code class="path">&lt;workflow_dir&gt;/&lt;uuid&gt;/verifier_policy_bt.log</code>.</p>
+<p class="figcap">Diagram 1 - one <code>PolicyBTVerifierEvaluator.evaluate(uuid)</code> call, steps 1-16 top to bottom. The left rail is the order of the nine <code>STAGES</code> tags (<code class="path">logging_utils.py:43</code>) and their tag lines: <code>REEXEC</code> 722, <code>DIGEST</code> 768, <code>RECON</code> 908 (a second <code>RECON</code> line at 1459 fires only on the schema-error refresh), <code>POLICY</code> 1042&ndash;1166, <code>VISUAL</code> 1389, <code>PAIRS</code> 1635, <code>REWARD</code> 1674, <code>GRADIENT</code> 1839, <code>DONE</code> 1956, all in <code class="path">sources/evaluators/policy_bt_verifier/evaluator.py</code>. Every stage line also goes to the JSON-lines sink <code class="path">&lt;workflow_dir&gt;/&lt;uuid&gt;/verifier_policy_bt.log</code>.</p>
 
 <p class="note say">The verifier never mutates the workspace it grades: the run happens on a sandbox copy and a size + head-hash manifest is compared before and after (<code>reexec.py::frozen_manifest</code>), so a mismatch is logged and counts as the crash class <code>manifest_mutated</code>.</p>
 
@@ -189,20 +191,21 @@
 <tr><td class="sym">3 &#183; REEXEC</td><td>Ledger and copy path feed the digest stage.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/reexec.py">reexec.py::write_ledger_file</a></td><td>policy_bt_ledger_&lt;uuid&gt;.json in the sandbox</td></tr>
 <tr><td class="sym">4 &#183; DIGEST</td><td>Reads tables, arrays, figures, metrics and deliverables from the copy.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/digest.py">digest.py::build_digest</a></td><td>digest; digest_summary stage line</td></tr>
 <tr><td class="sym">5 &#183; RECON</td><td>One judge call when the cached recon is missing.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::_llm_json (role recon)</a></td><td>task config: primary_metrics, coverage</td></tr>
-<tr><td class="sym">6 &#183; RECON</td><td>Primary metric ids feed the metric ledger for current and predecessors.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::PolicyBTVerifierEvaluator.evaluate</a></td><td>digest primary_values + version</td></tr>
+<tr><td class="sym">6 &#183; RECON</td><td>Primary metric ids feed the metric ledger for current and predecessors.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::_resolve_metric_ledger</a></td><td>digest primary_values + version</td></tr>
 <tr><td class="sym">7 &#183; METRICS</td><td>LLM reads raw output when json aliases miss a metric.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/metrics.py">metrics.py::extract_text_metrics_llm</a></td><td>{key: value or null}; extra stage tag</td></tr>
-<tr><td class="sym">8 &#183; POLICY</td><td>Writer prompt carries goal and task config; first write 12000 tokens.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/policy.py">policy.py::ensure_policy</a></td><td>policy source, or None after repairs</td></tr>
+<tr><td class="sym">8 &#183; POLICY</td><td>Writer prompt carries goal and task config; first write 12000 tokens.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/policy.py">policy.py::ensure_policy</a></td><td>policy source (<code>PREVIEW</code> logged on a fresh or rewritten write), or None after repairs</td></tr>
 <tr><td class="sym">9 &#183; POLICY</td><td>AST screen, then smoke test on real digests in both orders.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/policy.py">policy.py::static_screen / smoke_test</a></td><td>screen errors; smoke pass or fail</td></tr>
 <tr><td class="sym">10 &#183; POLICY</td><td>Repair loop; a cached policy is re-smoked before reuse.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/policy.py">policy.py::ensure_policy</a></td><td>meta: attempts, repairs, escalations, smoke</td></tr>
 <tr><td class="sym">11 &#183; VISUAL</td><td>Figure-dominant tasks get the figure rung and kimi pair calls.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/visual.py">visual.py::figure_rung / judge_pair</a></td><td>kimi verdict; cache key with image hashes</td></tr>
-<tr><td class="sym">12 &#183; PAIRS</td><td>Ladder decides each pair against every predecessor.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::_pair_verdict</a></td><td>outcomes: win, loss or tie</td></tr>
-<tr><td class="sym">13 &#183; REWARD</td><td>Win-rate over the outcomes; ties count half.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/verdicts.py">verdicts.py::win_rate_reward</a></td><td>reward, wins, losses, ties</td></tr>
-<tr><td class="sym">14 &#183; GRADIENT</td><td>Elimination-first fold; the refiner rewrites it when enabled.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/gradient.py">gradient.py::fold_gradient / refine_gradient</a></td><td>textual_gradient.txt</td></tr>
-<tr><td class="sym">15 &#183; DONE</td><td>Scores persisted; the engine loop receives the dict.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::_write_artifacts</a></td><td>evaluation.txt, log, evaluation.verifier</td></tr>
+<tr><td class="sym">12 &#183; PAIRS</td><td>Ladder decides each pair; each fresh pair logs a <code>FILES</code> artifact diff.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::_pair_verdict + _log_artifact_diff</a></td><td>outcomes: win, loss or tie; A-only / B-only / common names</td></tr>
+<tr><td class="sym">13 &#183; RECON</td><td>Conditional: both-orders SchemaError pairs get a recon refresh, policy rewrite and re-evaluation (fixed 2026-10-12).</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::_schema_error_refresh</a></td><td>replaced pair records; <code>schema_refresh_reeval</code> PAIR log</td></tr>
+<tr><td class="sym">14 &#183; REWARD</td><td>Win-rate over the outcomes; ties count half; a Bradley-Terry standings <code>TABLE</code> follows (display-only in win-rate mode).</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/verdicts.py">verdicts.py::win_rate_reward</a> + <a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::_log_tournament</a></td><td>reward, wins, losses, ties; standings table</td></tr>
+<tr><td class="sym">15 &#183; GRADIENT</td><td>Elimination-first fold; the refiner rewrites it when enabled.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/gradient.py">gradient.py::fold_gradient / refine_gradient</a></td><td>textual_gradient.txt</td></tr>
+<tr><td class="sym">16 &#183; DONE</td><td>Scores persisted; the engine loop receives the dict.</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">evaluator.py::_write_artifacts</a></td><td>evaluation.txt, log, evaluation.verifier</td></tr>
 </tbody>
 </table>
 
-<p>The channel is picked once, at start-up: <code>config.verifier_kind</code> defaults to <code>"hybrid"</code> (<code class="path">config.py:106</code>), the CLI flag is <code>--verifier_kind {hybrid,legacy,gold,policy_bt}</code> (<code class="path">main.py:79</code>), and the facade loads <code>PolicyBTVerifierEvaluator</code> lazily for <code>"policy_bt"</code> (<code class="path">sources/evaluators/evaluator.py:108</code>). Related pages: <a href="mod_evaluators_policy_bt_verifier.html">the package page</a>, <a href="flow_verification.html">the hybrid channel flow</a>, <a href="area_evaluators.html">the evaluators area</a>, <a href="file_eval_evaluator.html">the facade</a>, <a href="area_entry_config.html">config and CLI</a>.</p>
+<p>The channel is picked once, at start-up: <code>config_default.json:16</code> ships <code>"policy_bt"</code> (untracked operator file, read 2026-10-13), so runs made with the default config use this verifier; <code>config.py:106</code> keeps <code>"hybrid"</code> as the built-in fallback, the CLI flag is <code>--verifier_kind {hybrid,legacy,gold,policy_bt}</code> (<code class="path">main.py:78-84</code>), and the facade loads <code>PolicyBTVerifierEvaluator</code> lazily for <code>"policy_bt"</code> (<code class="path">sources/evaluators/evaluator.py:108-116</code>). Related pages: <a href="mod_evaluators_policy_bt_verifier.html">the package page</a>, the previous hybrid channel on <a href="flow_verification.html">flow_verification.html</a> and <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -277,12 +280,12 @@
   <text class="box-sub" x="60" y="386" style="font-size:9.5px">the ladder is walked once per predecessor; the first rung that returns a verdict closes the pair (evaluator.py::PolicyBTVerifierEvaluator._pair_verdict)</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - the rung ladder of <code>_pair_verdict</code> (<code class="path">sources/evaluators/policy_bt_verifier/evaluator.py:1432</code>), walked once per predecessor. A rung returns a verdict and the pair closes; <code>None</code> passes to the next rung.</p>
+<p class="figcap">Diagram 2 - the rung ladder of <code>_pair_verdict</code> (<code class="path">sources/evaluators/policy_bt_verifier/evaluator.py:2013</code>), walked once per predecessor. A rung returns a verdict and the pair closes; <code>None</code> passes to the next rung.</p>
 
 <blockquote>Ladder: deterministic crash rung -&gt; (figure tasks) figure rung -&gt;
 kimi per-pair channel (both orders) -&gt; code policy (both orders,
 antisymmetry asserted) -&gt; honest tie.
-<br>&#8212; <code class="path">sources/evaluators/policy_bt_verifier/evaluator.py:1450-1452</code> (docstring of <code>PolicyBTVerifierEvaluator._pair_verdict</code>)</blockquote>
+<br>&#8212; <code class="path">sources/evaluators/policy_bt_verifier/evaluator.py:2029-2034</code> (docstring of <code>PolicyBTVerifierEvaluator._pair_verdict</code>)</blockquote>
 
 <table>
 <thead><tr><th>Channel</th><th>Decides when</th><th>Deciding keys</th></tr></thead>
@@ -295,7 +298,7 @@ antisymmetry asserted) -&gt; honest tie.
 </tbody>
 </table>
 
-<p>Predecessors come from the registry in arrival order (<code>TaskRegistry.previous_generations</code>); a predecessor with no stored digest is rebuilt from its <code class="path">/tmp/mimosa_run_*_&lt;uuid&gt;</code> snapshot when one exists, and is otherwise excluded from the comparison and never fabricated (<code class="path">evaluator.py:587-625</code>). A pair verdict that carries an <code>error</code> field is not cached, so a policy that errors once can still decide the same pair later (<code class="path">evaluator.py:1564</code>).</p>
+<p>Predecessors come from the registry in arrival order (<code>TaskRegistry.previous_generations</code>); a predecessor with no stored digest is rebuilt from its <code class="path">/tmp/mimosa_run_*_&lt;uuid&gt;</code> snapshot when one exists, and is otherwise excluded from the comparison and never fabricated (<code class="path">evaluator.py::_bootstrap_or_exclude</code>). A pair verdict that carries an <code>error</code> field is not cached, so a policy that errors once can still decide the same pair later (<code class="path">evaluator.py::_code_policy_verdict</code>, lines 2176-2181).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -359,10 +362,10 @@ antisymmetry asserted) -&gt; honest tie.
   </g>
   <path class="edge" data-from="reg" data-to="pol" d="M270,151 C400,151 430,262 558,262" fill="none" stroke="#5E8CA3" stroke-width="1.2" stroke-dasharray="5 4" marker-end="url(#arwS)"/>
   <text class="edge-label" x="300" y="142" style="font-size:9.5px">stores</text>
-  <text class="box-sub" x="20" y="300" style="font-size:9.5px">all five caches live in one JSON file per task goal; the verifier saves it right after the reward (evaluator.py:1231)</text>
+  <text class="box-sub" x="20" y="300" style="font-size:9.5px">all five caches live in one JSON file per task goal; the verifier saves it right after the reward (evaluator.py::_persist_generation, line 1752)</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - the per-task registry at <code class="path">&lt;verifier scratch root&gt;/policy_bt_registry_&lt;task_key&gt;.json</code> (<code class="path">registry.py:88</code>) - the scratch root is <code>config.temp_dir</code> when set, else <code>&lt;workflow_dir&gt;/_verifier_tmp</code> (<code class="path">evaluator.py:260-263</code>; a fresh <code>Config</code> has no <code>temp_dir</code> attribute) holds every cache the verifier reads again on the next generation.</p>
+<p class="figcap">Diagram 3 - the per-task registry at <code class="path">&lt;verifier scratch root&gt;/policy_bt_registry_&lt;task_key&gt;.json</code> (<code class="path">registry.py:88</code>) - the scratch root is <code>config.temp_dir</code> when set, else <code>&lt;workflow_dir&gt;/_verifier_tmp</code> (<code class="path">evaluator.py:398</code>; a fresh <code>Config</code> has no <code>temp_dir</code> attribute) holds every cache the verifier reads again on the next generation.</p>
 
 <details><summary>cache keys and the fine print behind them</summary><div class="dbody">
 <table>
@@ -376,24 +379,26 @@ antisymmetry asserted) -&gt; honest tie.
 <tr><td class="sym">local venv</td><td class="sym">sha256(PINNED_CONSTRAINTS + python version), first 16 chars</td><td>the pip installs</td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/reexec.py">reexec.py::ReexecRunner.venv_fingerprint</a></td></tr>
 </tbody>
 </table>
-<pre>effective_policy_sha = POLICY_SHA + "_" + recon_version[:8]        # evaluator.py:785
+<pre>effective_policy_sha = POLICY_SHA + "_" + recon_version[:8]        # evaluator.py::PolicyBTVerifierEvaluator._policy_sha
 verdict key          code_verdict_key(sha, a, b)  -&gt;  "&lt;sha&gt;|&lt;a&gt;|&lt;b&gt;"
 visual key           visual_key(v, a, b, "AB", h) -&gt;  "&lt;v&gt;|&lt;a&gt;|&lt;b&gt;|AB|&lt;hash_a&gt;_&lt;hash_b&gt;"
 image hash           sha256(figure name + size), 12 hex chars      # visual.py::images_digest
 task key             sha256(goal + REGISTRY_VERSION), 16 hex chars # registry.py::task_key
 smoke caps           SMOKE_MAX_DIGESTS 6, SMOKE_TIMEOUT_S 30, cache-hit pairs 3
 registry save        tmp file + os.replace (atomic)                # registry.py::TaskRegistry.save
-never cached         a pair verdict that carries an "error" field  # evaluator.py:1564</pre>
-<p>A cache hit still re-runs the smoke on the newest digest shapes, so a policy written for generation 1 that breaks on generation 2's shape is rewritten (<code class="path">evaluator.py:796-837</code>). The <code class="path">visual_key</code> shape is built inline by <code>VisualChannel.one_order</code> (<code class="path">visual.py:200-208</code>) and is the same key the registry helper documents. The <code>visual</code> list is append-only and scanned for a usable entry, because a cached parse failure never satisfies a hit (<code class="path">evaluator.py:1411-1418</code>).</p>
+never cached         a pair verdict that carries an "error" field  # evaluator.py::_code_policy_verdict</pre>
+<p>A cache hit still re-runs the smoke on the newest digest shapes, so a policy written for generation 1 that breaks on generation 2's shape is rewritten (<code class="path">evaluator.py::_try_cached_policy</code>). The <code class="path">visual_key</code> shape is built inline by <code>VisualChannel.one_order</code> (<code class="path">visual.py:200-208</code>) and is the same key the registry helper documents. The <code>visual</code> list is append-only and scanned for a usable entry, because a cached parse failure never satisfies a hit (<code class="path">evaluator.py:1988-1999</code>).</p>
 </div></details>
 
-<p class="note">Amber: the registry is keyed by the <b>goal text</b>, not by the campaign, so a second campaign on the same goal compares against the first campaign's generations and logs a cross-session warning (<code class="path">evaluator.py:640-651</code>); <code class="path">cleanup.sh</code> or a fresh temp root avoids it.</p>
+<p class="note">Amber: the registry is keyed by the <b>goal text</b>, not by the campaign, so a second campaign on the same goal compares against the first campaign's generations and logs a cross-session warning (<code class="path">evaluator.py::_warn_foreign_sessions</code>); <code class="path">cleanup.sh</code> or a fresh temp root avoids it.</p>
 </div>
 
 <footer>
 <p>Sources read: <code>UPDATE_VISUAL_CLONE.md</code>; <code class="path">docs/visual_clone/_reference.html</code>, <code>_clone.css</code>, <code>_clone.js</code>, <code class="path">docs/visual_clone/flow_verification.html</code>; all twelve files of <code class="path">sources/evaluators/policy_bt_verifier/</code> (<code>evaluator.py</code>, <code>reexec.py</code>, <code>digest.py</code>, <code>recon.py</code>, <code>metrics.py</code>, <code>policy.py</code>, <code>visual.py</code>, <code>verdicts.py</code>, <code>gradient.py</code>, <code>registry.py</code>, <code>logging_utils.py</code>, <code>__init__.py</code>); <code class="path">sources/evaluators/evaluator.py</code>; <code class="path">sources/evaluators/base.py</code>; <code class="path">sources/core/stopping.py</code>; <code class="path">sources/core/evolution_engine.py</code> (lines 86-142, 909-924); <code>config.py</code>, <code>config_default.json</code>, <code>main.py</code> (grep).</p>
 <p class="skips">Skipped: <code class="path">sources/evaluators/policy_bt_verifier/REVIEW_metric_tie_and_imaginary_2026-10-09.md</code> - design review note (30 kB, 30 340 bytes, my measurement), it documents why a decision was taken, not how the flow runs; <code>__init__.py</code> - re-export list only, no logic; the benchmark grading path (VER / SR / CBS, <code>CapsuleEvaluator</code>) - not on this flow, see <a href="area_benchmark_evaluation.html">area_benchmark_evaluation.html</a>; the hybrid ladder - see <a href="flow_verification.html">flow_verification.html</a>; <code class="path">sources/evaluators/generic/</code> (now <code class="path">generic_verifier/</code>) - a different channel, not on this flow; Tier D paths (<code class="path">.venv/</code>, <code>tmp/</code>, <code>docs/</code>, <code>datasets/</code>, <code>webui/</code>, <code>sources/workflows/</code>) - out of scope for this page.</p>
-<p>Built at commit <code>7da1f5e</code> + working tree, 2026-10-10. <code class="path">sources/evaluators/policy_bt_verifier/</code> and <code class="path">sources/evaluators/generic_verifier/</code> are untracked in this working tree; the facts above come from the working-tree files, not from commit <code>7da1f5e</code>.</p>
+<p>Built at commit <code>c508f11</code> + working tree, 2026-10-12. <code>evaluator.py</code> was refactored on 2026-10-12 (evaluate decomposed into ~35 stage methods over <code>_EvalState</code>/<code>_PairCtx</code>; no behaviour change), so every <code>evaluator.py</code> line reference on this page was re-synced against the working-tree file. Updated later the same day: the schema-error refresh bug chain was fixed (flag propagation in <code>verdicts.py::code_pair_verdict</code>, outcome vocabulary + tallies + <code>schema_refresh_reeval</code> logging in the re-evaluation), so step 13 is now shown and every line reference was re-synced again (<a href="../../audits/policy_bt_schema_refresh_reward_bugs.md">audits/policy_bt_schema_refresh_reward_bugs.md</a>).</p>
+<p>Updated again on 2026-10-12 (same commit + working tree): operator-logging upgrade in the verifier &mdash; <code>PREVIEW</code> of the policy source after each fresh/rewrite and schema-refresh write (steps 8 and 13), a <code>FILES</code> artifact-name diff per fresh pair (step 12) and a Bradley-Terry standings <code>TABLE</code> right after the reward (step 14; <code>_log_tournament</code>, display-only in the default <code>win_rate</code> mode); <code>StageLogger</code> paints stage tags with ANSI colors on a TTY only (<code>NO_COLOR</code> wins), so the <code>[policy_bt][&lt;uuid8&gt;] TAG message</code> shape stays grep-safe under pytest. <code>evaluator.py</code> 2 167 &rarr; 2 278 lines; every stage-tag line reference re-synced.</p>
+<p>Updated 2026-10-13 (same commit + working tree): the channel-choice paragraph now names the run default &mdash; <code>config_default.json:16</code> ships <code>"policy_bt"</code> (read 2026-10-13) &mdash; so the page describes the verifier runs actually use, not an opt-in; links to the previous hybrid channel pages added.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

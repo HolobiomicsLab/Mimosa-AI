@@ -23,10 +23,12 @@ No gold, no labels, no rewards ever enter the digest (gold firewall).
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import math
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +36,10 @@ import numpy as np
 import pandas as pd
 from PIL import Image
 
-from .recon import is_infra_name
+try:
+    from .recon import is_infra_name
+except ImportError:  # direct script execution (uv run digest.py <folder>)
+    from recon import is_infra_name
 
 MAX_NUM_COLS = 12
 MAX_JSON_KEYS = 80
@@ -96,7 +101,10 @@ def _col_stats(s: pd.Series) -> dict[str, Any]:
     """Numeric summary of one DataFrame column."""
     num = pd.to_numeric(s, errors="coerce")
     ok = num.notna()
-    st: dict[str, Any] = {"n_nan": int((~ok).sum()), "n_unique": int(s.nunique(dropna=True))}
+    st: dict[str, Any] = {
+        "n_nan": int((~ok).sum()),
+        "n_unique": int(s.nunique(dropna=True)),
+    }
     if ok.sum():
         v = num[ok]
         st.update(
@@ -185,9 +193,9 @@ def parse_table(p: Path, ws: Path) -> dict[str, Any] | None:
         "n_rows": int(len(df)),
         "columns": list(df.columns)[:24],
     }
-    num_cols = [
-        c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])
-    ][:MAX_NUM_COLS]
+    num_cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])][
+        :MAX_NUM_COLS
+    ]
     t["num_stats"] = {c: _col_stats(df[c]) for c in num_cols}
     first = df.columns[0]
     t["first_col_head"] = [str(v)[:60] for v in df[first].head(3).tolist()]
@@ -390,9 +398,7 @@ def contract_files(goal: str, ws: Path) -> list[dict[str, Any]]:
             if p.is_file():
                 rec["present"] = True
                 rec["bytes"] = p.stat().st_size
-                rec["sha256"] = hashlib.sha256(
-                    p.read_bytes()
-                ).hexdigest()[:16]
+                rec["sha256"] = hashlib.sha256(p.read_bytes()).hexdigest()[:16]
                 rec["head"] = p.read_text(errors="replace")[:400]
         except OSError:
             pass  # presence stays False; unreadable files are not evidence
@@ -503,9 +509,7 @@ def build_digest(
         for lf in log_files[:8]:
             if lf.exists():
                 logs.extend(
-                    metric_lines(
-                        lf.read_text(errors="replace")[:400_000], lf.name
-                    )
+                    metric_lines(lf.read_text(errors="replace")[:400_000], lf.name)
                 )
     d["log_metrics"] = logs[:MAX_METRIC_LINES]
 
@@ -517,9 +521,7 @@ def build_digest(
         # pred_results files can share a name), and keep top-level
         # scalars of oversized files instead of dropping them entirely.
         jcands: list[tuple[Path, int]] = []
-        for jp in sorted(ws.glob("*.json")) + sorted(
-            ws.glob("pred_results/*.json")
-        ):
+        for jp in sorted(ws.glob("*.json")) + sorted(ws.glob("pred_results/*.json")):
             if is_infra_name(jp.name):
                 continue
             try:
@@ -556,9 +558,9 @@ def build_digest(
             df = _read_csv_safe(p)
             if df is None or df.empty:
                 continue
-            cols = [
-                c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])
-            ][:MAX_TRAIN_COLS]
+            cols = [c for c in df.columns if pd.api.types.is_numeric_dtype(df[c])][
+                :MAX_TRAIN_COLS
+            ]
             inputs["train_csvs"][p.relative_to(ws).as_posix()] = {
                 "n_rows": int(len(df)),
                 **{c: _col_stats(df[c]) for c in cols},
@@ -628,3 +630,76 @@ def is_figure_dominant(digest: dict[str, Any], share: float = 0.5) -> bool:
     pool = in_results or deliverables
     images = sum(1 for dv in pool if dv.get("kind") == "png")
     return images / len(pool) >= share
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint: digest one workspace folder and print the JSON.
+
+    Prints the full digest to stdout and a one-line DIGEST summary to
+    stderr. Run from this package directory::
+
+        uv run digest.py <workspace> [--uuid FAKE] [--ledger ledger.json]
+            [--goal TEXT | --goal-file PATH] [--out digest.json]
+
+    or as a module from the repository root::
+
+        uv run python -m sources.evaluators.policy_bt_verifier.digest ...
+
+    Args:
+        argv: CLI arguments (defaults to ``sys.argv[1:]``).
+
+    Returns:
+        Process exit code (0 on success).
+    """
+    ap = argparse.ArgumentParser(
+        description=(
+            "Build the deterministic policy_bt digest of one workspace folder."
+        ),
+    )
+    ap.add_argument("folder", type=Path, help="workspace folder to digest")
+    ap.add_argument(
+        "--uuid",
+        default="cli-digest-00000000",
+        help="fake generation uuid recorded in the digest (default: %(default)s)",
+    )
+    ap.add_argument(
+        "--ledger",
+        type=Path,
+        default=None,
+        help="optional re-execution ledger JSON (as written by the reexec CLI)",
+    )
+    ap.add_argument(
+        "--goal", default="", help="verbatim goal text; enables contract_files"
+    )
+    ap.add_argument(
+        "--goal-file", type=Path, default=None, help="read the goal text from a file"
+    )
+    ap.add_argument(
+        "--out", type=Path, default=None, help="also write the digest JSON here"
+    )
+    args = ap.parse_args(argv)
+
+    ws = args.folder.resolve()
+    if not ws.is_dir():
+        ap.error(f"not a directory: {ws}")
+    goal = args.goal
+    if args.goal_file is not None:
+        goal = args.goal_file.read_text(encoding="utf-8", errors="replace")
+    ledger = None
+    if args.ledger is not None:
+        ledger = json.loads(args.ledger.read_text(encoding="utf-8"))
+
+    digest = build_digest(args.uuid, ws, ledger, goal=goal)
+    text = json.dumps(digest, indent=1, sort_keys=True)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text + "\n", encoding="utf-8")
+    print(text)
+    print(
+        "DIGEST " + json.dumps(digest_summary(digest), sort_keys=True), file=sys.stderr
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

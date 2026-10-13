@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">audits/ &mdash; which report answers what</h1>
-<p class="intro">Eleven files and three subfolders sit in <code>audits/</code> (36 files, 8.5 MB), written between 2026-09-06 and 2026-09-28. Each answers a different question about the verifier-driven evolution loop, the ScienceAgentBench chemistry runs, or the new gold-feedback oracle mode. This page maps the families, the sizes, and the evidence each report reads.</p>
+<p class="intro">Fifteen files and three subfolders sit in <code>audits/</code> (40 files, 10 MB), written between 2026-09-06 and 2026-10-12. Each answers a different question about the verifier-driven evolution loop, the ScienceAgentBench chemistry runs, the gold-feedback oracle mode, or the policy_bt verifier fixes. This page maps the families, the sizes, and the evidence each report reads.</p>
 
 <div id="legend" data-auto></div>
 <div class="panel"><span class="br"></span>
@@ -205,11 +205,15 @@
 <tr><td class="sym"><code class="path">chemistry_gradient_detailled_steering_transitions/</code></td><td class="size">1.7 MB &#183; 11 files</td><td>Between two generations, what did the loop do?</td><td><a href="../../audits/chemistry_gradient_detailled_steering_transitions/index.html">open</a></td></tr>
 <tr><td class="sym"><code class="path">explainers_per_task/</code></td><td class="size">236 KB &#183; 6 files</td><td>Why did this one task pass or fail SR?</td><td><a href="../../audits/explainers_per_task/compound_filter_iterative_sr_explainer.html">open</a></td></tr>
 <tr><td class="sym"><code class="path">reward_signal_analysis/</code></td><td class="size">1.0 MB &#183; 8 files</td><td>Does reward track the ground-truth ablation metrics?</td><td><a href="../../audits/reward_signal_analysis/reward_vs_groundtruth_publication.png">open</a></td></tr>
+<tr><td class="sym"><code class="path">e41_run1_postfix_steering_2026-09-29.html</code></td><td class="size">1.8 MB</td><td>E41: how did run_1 steer after the verifier fixes?</td><td><a href="../../audits/e41_run1_postfix_steering_2026-09-29.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">e42_gradient_evolution_2026-09-29.html</code></td><td class="size">44 KB</td><td>E42: did run_1 gradients evolve toward the gold?</td><td><a href="../../audits/e42_gradient_evolution_2026-09-29.html">open</a></td></tr>
+<tr><td class="sym"><code class="path">policy_bt_schema_refresh_reward_bugs.md</code></td><td class="size">16 KB</td><td>Which three bugs broke the policy_bt schema-error refresh, and what fixed them?</td><td><a href="../../audits/policy_bt_schema_refresh_reward_bugs.md">open</a> &middot; <a href="mod_evaluators_policy_bt_verifier.html">code</a></td></tr>
+<tr><td class="sym"><code class="path">policy_bt_schema_refresh_repro.py</code></td><td class="size">13 KB</td><td>End-to-end executable proof that the refresh path now works (no monkeypatch).</td><td><a href="../../audits/policy_bt_schema_refresh_repro.py">open</a></td></tr>
 </tbody>
 </table>
 <p class="sub">AGENTS.md: audit reports are single-file offline HTML in <code>audits/</code>. Checked on 2026-09-28: no report has an <code>src=</code> or <code>href=</code> to an external asset; two reports quote an external URL as plain text only. The new design report is Markdown, not HTML.</p>
 <p class="sub">Related clone pages: <a href="data_runs.html">data_runs.html</a> (the runtime folders these reports quote), <a href="flow_verification.html">flow_verification.html</a> (how the verifier runs) and <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> (the oracle-mode code the design report led to).</p>
-<p class="sub">36 files (plus one <code>.DS_Store</code>), 8.5 MB total, dates 2026-09-06 to 2026-09-28 (my computation from <code>find</code>, <code>ls -l</code> and <code>du -sh</code>). <code>audits/</code> is git-ignored (<code>.gitignore</code> line 2), so <code>git</code> does not track these files.</p>
+<p class="sub">40 files (plus one <code>.DS_Store</code>), 10 MB total, dates 2026-09-06 to 2026-10-12 (my computation from <code>find</code>, <code>ls -l</code> and <code>du -sh</code>). <code>audits/</code> is git-ignored (<code>.gitignore</code> line 2), so <code>git</code> does not track these files.</p>
 
 <p class="note say"><code>audits/</code> is read-only evidence: AGENTS.md says never modify, move, or delete anything inside an audit folder.</p>
 <p class="note">Amber note: the gold-feedback design report cites line numbers of the tree it read; the working tree has changed since (for example the 2048-char gradient clip it lists as a trap is gone from <code>sources/core/variation_engine.py</code>).</p>
@@ -269,6 +273,7 @@ scout_assignment 102 entries</pre>
 <p class="skips">Skipped: report bodies of the big HTML files (only title, heading, TL;DR read - Tier C method) &#183; body of the gold-feedback design report beyond headings, TL;DR and header (its code is mapped on <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>) &#183; <code>evolution_index_vs_metrics.pdf</code> and <code>reward_vs_groundtruth_publication.pdf</code> (binary, no text read; PNG twins listed instead) &#183; <code class="path">audits/.DS_Store</code> (macOS system file) &#183; per-task transition HTML bodies (same five-block template, described once) &#183; chemical-correctness verdicts (out of scope; reports say the same).</p>
 <p>Built at ca72107 + working tree, 2026-09-28. <code>audits/</code> is git-ignored, so its content is not tied to a commit; counts are a snapshot taken on 2026-09-28.</p>
 <p class="note">Amber (link repair, 2026-10-10): <code class="path">audits/verifier_system_report.md</code> is not in the repository, so the two links to it are now plain text. The reports that do exist are the HTML files listed in the table above.</p>
+<p>Updated at <code>c508f11</code> + working tree, 2026-10-12: four reports added since the 2026-09-28 snapshot &mdash; E41 (2026-09-29), E42 (2026-09-29) and the two policy_bt schema-refresh files (2026-10-12, the bug-fix provenance linked from <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>). Counts refreshed; the older rows are unchanged.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

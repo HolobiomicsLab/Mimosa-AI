@@ -87,9 +87,9 @@ class Config:
         ##############
         self.planner_llm_model: str = "openrouter/z-ai/glm-5.3"
         self.workflow_llm_model: str = "openrouter/z-ai/glm-5.3"
-        self.smolagent_model_id: str = "openrouter/deepseek/deepseek-v4-flash-0731"
-        self.judge_model = "openrouter/deepseek/deepseek-v4.1-flash"
-        self.capsule_namer_model = "openrouter/deepseek/deepseek-v4.1-flash"
+        self.smolagent_model_id: str = "openrouter/z-ai/glm-5.3-flash"
+        self.judge_model = "openrouter/z-ai/glm-5.3-flash"
+        self.capsule_namer_model = "openrouter/z-ai/glm-5.3-flash"
         # Vision model for Source G (visual figure inspection).
         self.vision_judge_model: str | None = "openrouter/moonshotai/kimi-k3"
 
@@ -146,6 +146,42 @@ class Config:
         # clean recovery leaves the reward uncapped (E24: 29% of
         # workspaces fail clean re-execution).
         self.hybrid_verifier_execution_gate: bool = True
+        # --- policy_bt verifier (verifier_kind="policy_bt"; E44-E48
+        # architecture, defaults from the offline measurements) ---
+        # Reward aggregation over pairwise outcomes: "win_rate" (default —
+        # raw arrival-moment majority vs predecessors; E19c measured BEST:
+        # 0.742 vs BT 0.643) or "bradley_terry".
+        self.policy_bt_reward: str = "win_rate"
+        # Per policy-comparison subprocess timeout (seconds).
+        self.policy_bt_scorer_timeout_s: int = 60
+        # Kimi per-PAIR visual channel for figure-dominant tasks (E26
+        # channel-selection rule; >=50% image share).
+        self.policy_bt_visual_channel: bool = True
+        # E47 evidence-checked gradient refiner (relevance-neutral,
+        # better-grounded at ~$0.003/gradient).
+        self.policy_bt_refiner: bool = True
+        # Max policy-generation repair rounds (E48 repair plumbing).
+        self.policy_bt_repair_rounds: int = 3
+        # 0 = compare all predecessors; else cap comparisons to the N most
+        # recent (budget guard).
+        self.policy_bt_max_pairs: int = 0
+        # Wall-clock cap per generation re-execution.
+        self.policy_bt_reexec_timeout_s: int = 900
+        # One local ./venv per task sandbox, incremental installs across
+        # the task's generations.
+        self.policy_bt_venv_reuse: bool = True
+        # Code-policy tiebreak when the kimi PAIR call ties (unmeasured;
+        # default OFF).
+        self.policy_bt_visual_tiebreak_code: bool = False
+        # 0 = unlimited; cap on fresh kimi pair-calls per generation
+        # (budget guard; overflow pairs fall to the code policy).
+        self.policy_bt_visual_max_pairs_per_gen: int = 0
+        # Verbose per-pair / per-repair stdout lines (plan §6b).
+        self.policy_bt_verbose: bool = False
+        # Incremental recon refresh: at these generation counts, rebuild the
+        # recon config with ALL accumulated digests; if the config changed,
+        # the policy is rewritten (same ladder, updated schema knowledge).
+        self.policy_bt_recon_refresh_gap: int = 2
         #############
         # Orchestrator Workflow generation options
         #############
@@ -184,6 +220,29 @@ class Config:
         self.selection_strategy = "qd"
         # learning parameters
         self.learned_score_threshold = 0.9
+        # Early-stop policy (stop-condition plan 2026-10-08). Relative-
+        # reward verifiers (hybrid, policy_bt) must NOT stop on an
+        # absolute threshold: their overall_score is a pairwise win-rate
+        # or BT rating, so 0.9 means "first clean sweep" (win-rate) or
+        # "never stop" (BT). "auto" resolves per verifier kind.
+        self.early_stop_mode: str = "auto"
+        # No early stop (any mode) before this many completed
+        # generations; clamped to max_learning_evolve_iterations.
+        self.min_learning_evolve_iterations: int = 6
+        # Champion-plateau patience: stop after this many consecutive
+        # generations without a new head-to-head champion.
+        self.plateau_patience: int = 3
+        # Frontier probe (metric-tie review 2026-10-09 §4.3): trigger an
+        # honest, labelled <exploration> block in the next variation
+        # prompt once the champion is unchanged for this many
+        # generations. None = plateau_patience - 1, which guarantees at
+        # least one probe before the plateau stop. Verifier-agnostic.
+        self.explore_after_plateau: int | None = None
+        # Frontier probe: extra per-generation trigger probability on top
+        # of the state triggers (0.0 = state-triggered only; the probe
+        # never fires during improving streaks unless this is set).
+        # Drawn from a seeded RNG so identical runs replay identically.
+        self.explore_base_rate: float = 0.0
         self.max_learning_evolve_iterations = 16
         # KNN settings for novelty
         self.novelty_comparison: str = "archive_knn"
@@ -447,6 +506,20 @@ class Config:
             "hybrid_verifier_visual_rung": self.hybrid_verifier_visual_rung,
             "hybrid_verifier_execution_gate": self.hybrid_verifier_execution_gate,
             "engine_name": self.engine_name,
+            "policy_bt_reward": self.policy_bt_reward,
+            "policy_bt_scorer_timeout_s": self.policy_bt_scorer_timeout_s,
+            "policy_bt_visual_channel": self.policy_bt_visual_channel,
+            "policy_bt_refiner": self.policy_bt_refiner,
+            "policy_bt_repair_rounds": self.policy_bt_repair_rounds,
+            "policy_bt_max_pairs": self.policy_bt_max_pairs,
+            "policy_bt_reexec_timeout_s": self.policy_bt_reexec_timeout_s,
+            "policy_bt_venv_reuse": self.policy_bt_venv_reuse,
+            "policy_bt_visual_tiebreak_code": self.policy_bt_visual_tiebreak_code,
+            "policy_bt_visual_max_pairs_per_gen": (
+                self.policy_bt_visual_max_pairs_per_gen
+            ),
+            "policy_bt_verbose": self.policy_bt_verbose,
+            "policy_bt_recon_refresh_gap": self.policy_bt_recon_refresh_gap,
             "openrouter_provider": self.openrouter_provider,
             "default_openrouter_quantizations": self.default_openrouter_quantizations,
             "save_logprobs": self.save_logprobs,
@@ -456,6 +529,11 @@ class Config:
             "reasoning_effort": self.reasoning_effort,
             "max_tokens": self.max_tokens,
             "learned_score_threshold": self.learned_score_threshold,
+            "early_stop_mode": self.early_stop_mode,
+            "min_learning_evolve_iterations": self.min_learning_evolve_iterations,
+            "explore_after_plateau": self.explore_after_plateau,
+            "explore_base_rate": self.explore_base_rate,
+            "plateau_patience": self.plateau_patience,
             "selection_strategy": self.selection_strategy,
             "max_learning_evolve_iterations": self.max_learning_evolve_iterations,
             "max_concurrent_eval_tasks": self.max_concurrent_eval_tasks,
@@ -510,6 +588,10 @@ class Config:
         self.smolagent_model_id = data.get(
             "smolagent_model_id", self.smolagent_model_id
         )
+        self.judge_model = data.get("judge_model", self.judge_model)
+        self.vision_judge_model = data.get(
+            "vision_judge_model", self.vision_judge_model
+        )
         self.capsule_namer_model = data.get(
             "capsule_namer_model", self.capsule_namer_model
         )
@@ -558,6 +640,47 @@ class Config:
                 self.hybrid_verifier_execution_gate,
             )
         )
+        self.policy_bt_reward = str(
+            data.get("policy_bt_reward", self.policy_bt_reward)
+        ).lower()
+        self.policy_bt_scorer_timeout_s = int(
+            data.get("policy_bt_scorer_timeout_s", self.policy_bt_scorer_timeout_s)
+        )
+        self.policy_bt_visual_channel = _json_bool(
+            data.get("policy_bt_visual_channel"),
+            self.policy_bt_visual_channel,
+        )
+        self.policy_bt_refiner = _json_bool(
+            data.get("policy_bt_refiner"), self.policy_bt_refiner
+        )
+        self.policy_bt_repair_rounds = int(
+            data.get("policy_bt_repair_rounds", self.policy_bt_repair_rounds)
+        )
+        self.policy_bt_max_pairs = int(
+            data.get("policy_bt_max_pairs", self.policy_bt_max_pairs)
+        )
+        self.policy_bt_reexec_timeout_s = int(
+            data.get("policy_bt_reexec_timeout_s", self.policy_bt_reexec_timeout_s)
+        )
+        self.policy_bt_venv_reuse = _json_bool(
+            data.get("policy_bt_venv_reuse"), self.policy_bt_venv_reuse
+        )
+        self.policy_bt_visual_tiebreak_code = _json_bool(
+            data.get("policy_bt_visual_tiebreak_code"),
+            self.policy_bt_visual_tiebreak_code,
+        )
+        self.policy_bt_visual_max_pairs_per_gen = int(
+            data.get(
+                "policy_bt_visual_max_pairs_per_gen",
+                self.policy_bt_visual_max_pairs_per_gen,
+            )
+        )
+        self.policy_bt_verbose = _json_bool(
+            data.get("policy_bt_verbose"), self.policy_bt_verbose
+        )
+        self.policy_bt_recon_refresh_gap = max(
+            1, int(data.get("policy_bt_recon_refresh_gap", 2))
+        )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get(
             "openrouter_provider", self.openrouter_provider
@@ -576,6 +699,48 @@ class Config:
         self.learned_score_threshold = data.get(
             "learned_score_threshold", self.learned_score_threshold
         )
+        early_stop_mode = (
+            str(data.get("early_stop_mode", self.early_stop_mode)).strip().lower()
+        )
+        if early_stop_mode not in ("auto", "threshold", "plateau", "none"):
+            raise ValueError(
+                "early_stop_mode must be one of auto, threshold, plateau, "
+                f"none; got {early_stop_mode!r}"
+            )
+        min_learning_evolve_iterations = int(
+            data.get(
+                "min_learning_evolve_iterations",
+                self.min_learning_evolve_iterations,
+            )
+        )
+        if min_learning_evolve_iterations < 1:
+            raise ValueError(
+                "min_learning_evolve_iterations must be >= 1, got "
+                f"{min_learning_evolve_iterations}"
+            )
+        plateau_patience = int(data.get("plateau_patience", self.plateau_patience))
+        if plateau_patience < 1:
+            raise ValueError(f"plateau_patience must be >= 1, got {plateau_patience}")
+        explore_after_plateau = data.get(
+            "explore_after_plateau", self.explore_after_plateau
+        )
+        if explore_after_plateau is not None:
+            explore_after_plateau = int(explore_after_plateau)
+            if explore_after_plateau < 0:
+                raise ValueError(
+                    "explore_after_plateau must be >= 0 or null, got "
+                    f"{explore_after_plateau}"
+                )
+        explore_base_rate = float(data.get("explore_base_rate", self.explore_base_rate))
+        if not 0.0 <= explore_base_rate <= 1.0:
+            raise ValueError(
+                f"explore_base_rate must be within [0.0, 1.0], got {explore_base_rate}"
+            )
+        self.early_stop_mode = early_stop_mode
+        self.min_learning_evolve_iterations = min_learning_evolve_iterations
+        self.plateau_patience = plateau_patience
+        self.explore_after_plateau = explore_after_plateau
+        self.explore_base_rate = explore_base_rate
         self.selection_strategy = data.get(
             "selection_strategy", self.selection_strategy
         )
@@ -727,6 +892,13 @@ class Config:
         lines.append(f"  reasoning_effort={self.reasoning_effort}")
         lines.append(f"  max_tokens={self.max_tokens}")
         lines.append(f"  learned_score_threshold={self.learned_score_threshold}")
+        lines.append(f"  early_stop_mode={self.early_stop_mode}")
+        lines.append(
+            f"  min_learning_evolve_iterations={self.min_learning_evolve_iterations}"
+        )
+        lines.append(f"  plateau_patience={self.plateau_patience}")
+        lines.append(f"  explore_after_plateau={self.explore_after_plateau}")
+        lines.append(f"  explore_base_rate={self.explore_base_rate}")
         lines.append(f"  selection_strategy={self.selection_strategy}")
         lines.append(
             f"  max_learning_evolve_iterations={self.max_learning_evolve_iterations}"

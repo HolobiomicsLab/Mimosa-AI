@@ -239,8 +239,7 @@ class SmolAgentFactory:
             return InferenceClientModel(
                 model_id=self.model_id,
                 provider=self.provider,
-                api_key=os.getenv("OPENAI_API_KEY"),
-                additional_drop_params=["stop"]
+                api_key=os.getenv("OPENAI_API_KEY")
             )
         else:
             raise ValueError(f"Unknown engine name: {self.engine_name}. Supported engines are: mlx, hf_api, inference_client and litellm.")

@@ -29,9 +29,20 @@ Resolution order per metric (review §4.1):
 
 from __future__ import annotations
 
+import argparse
+import json
 import math
 import re
+import sys
+from pathlib import Path
 from typing import Any
+
+try:
+    from .digest import build_digest
+    from .recon import ensure_shape
+except ImportError:  # direct script execution (uv run metrics.py <folder>)
+    from digest import build_digest
+    from recon import ensure_shape
 
 #: Verifier-written echo FILES: they restate solver metrics (possibly
 #: stale or recomputed under a different convention), so they lose every
@@ -51,8 +62,25 @@ _VERIF_KEY_RE = re.compile(
 #: but not stopwords, and the every-token-required rule tolerates them.
 _STOPWORDS = frozenset(
     {
-        "the", "a", "an", "of", "for", "in", "to", "and", "or", "is",
-        "are", "on", "at", "by", "with", "this", "that", "from", "as",
+        "the",
+        "a",
+        "an",
+        "of",
+        "for",
+        "in",
+        "to",
+        "and",
+        "or",
+        "is",
+        "are",
+        "on",
+        "at",
+        "by",
+        "with",
+        "this",
+        "that",
+        "from",
+        "as",
     }
 )
 
@@ -122,9 +150,7 @@ def _freshness_map(digest: dict[str, Any]) -> dict[str, bool | None]:
     for dv in digest.get("deliverables") or []:
         if isinstance(dv, dict) and dv.get("path"):
             fresh = dv.get("produced_this_run")
-            out[str(dv["path"])] = (
-                bool(fresh) if isinstance(fresh, bool) else None
-            )
+            out[str(dv["path"])] = bool(fresh) if isinstance(fresh, bool) else None
     return out
 
 
@@ -157,12 +183,6 @@ def _result(
     }
 
 
-
-
-
-
-
-
 def extract_text_metrics_llm(
     text_lines: list[str],
     metric_keys: list[str],
@@ -186,7 +206,7 @@ def extract_text_metrics_llm(
     if not llm_json or not text_lines or not metric_keys:
         return {k: None for k in metric_keys}
 
-    text = "\n".join(text_lines[:100])  # cap at 100 lines
+    text = "\n".join(text_lines[:1024])  # cap at 1024 lines
     keys_str = ", ".join(f'"{k}"' for k in metric_keys)
     prompt = (
         "You are a precise data extraction instrument. Given the raw output"
@@ -195,14 +215,16 @@ def extract_text_metrics_llm(
         " output text — never compute, estimate, or recall from memory.\n\n"
         f"# Metrics to extract: [{keys_str}]\n\n"
         f"# Program output:\n{text}\n\n"
-        "Return STRICT JSON: {\"<metric_name>\": <number or null>, ...}"
+        'Return STRICT JSON: {"<metric_name>": <number or null>, ...}'
         " — one key per metric, null when not found in the output."
     )
-    parsed = llm_json(prompt, 2000, "metric_text_extract")
+    parsed = llm_json(prompt, 32000, "metric_text_extract")
     if isinstance(parsed, dict):
         return {
-            k: float(parsed[k]) if isinstance(parsed.get(k), int | float)
-            and not isinstance(parsed.get(k), bool) else None
+            k: float(parsed[k])
+            if isinstance(parsed.get(k), int | float)
+            and not isinstance(parsed.get(k), bool)
+            else None
             for k in metric_keys
         }
     return {k: None for k in metric_keys}
@@ -246,8 +268,13 @@ def _resolve_one(
             for h in hits[:_MAX_CANDIDATES]
         ]
         if len(same_rank_vals) == 1:
-            return _result("resolved", best_value, f"{best_file}:"
-                           f"{_alias_key(metric, hits[0][1])}", best_fresh, cands)
+            return _result(
+                "resolved",
+                best_value,
+                f"{best_file}:{_alias_key(metric, hits[0][1])}",
+                best_fresh,
+                cands,
+            )
         # Equal-preference aliases disagree → never guess.
         return _result("ambiguous", candidates=cands)
 
@@ -256,8 +283,11 @@ def _resolve_one(
     # output and extract the metric values. Generic, no patterns.
     if text_lines and llm_extract:
         mid_key = str(metric.get("id") or metric.get("key") or "").strip()
-        alias_keys = [str(a.get("key") or "") for a in
-                      (metric.get("aliases") or []) if isinstance(a, dict)]
+        alias_keys = [
+            str(a.get("key") or "")
+            for a in (metric.get("aliases") or [])
+            if isinstance(a, dict)
+        ]
         search_keys = [k for k in [mid_key] + alias_keys if k]
         if search_keys:
             extracted = llm_extract(text_lines, search_keys)
@@ -281,9 +311,7 @@ def _resolve_one(
                 key_tokens_cache[key] = _tokens(key)
             ktok = key_tokens_cache[key]
             if all(any(_tok_match(q, c) for c in ktok) for q in query):
-                cands.append(
-                    {"source": f"{fname}:{key}", "value": float(value)}
-                )
+                cands.append({"source": f"{fname}:{key}", "value": float(value)})
     for entry in log_metrics:
         if not isinstance(entry, dict):
             continue
@@ -302,8 +330,11 @@ def _resolve_one(
         first = cands[0]
         fname = first["source"].split(":", 1)[0]
         return _result(
-            "resolved", first["value"], first["source"],
-            freshness.get(fname), cands[:_MAX_CANDIDATES],
+            "resolved",
+            first["value"],
+            first["source"],
+            freshness.get(fname),
+            cands[:_MAX_CANDIDATES],
         )
     return _result("ambiguous", candidates=cands[:_MAX_CANDIDATES])
 
@@ -331,9 +362,7 @@ def resolve_primary_values(
         str(f): (m if isinstance(m, dict) else {})
         for f, m in (digest.get("json_metrics") or {}).items()
     }
-    log_metrics = [
-        e for e in (digest.get("log_metrics") or []) if isinstance(e, dict)
-    ]
+    log_metrics = [e for e in (digest.get("log_metrics") or []) if isinstance(e, dict)]
     # Raw text from the re-execution output + deliverable file contents
     # (HP-folding fix: "Minimum energy found: -9" lives HERE, not in json)
     exec_tail = (digest.get("exec") or {}).get("log_tail") or []
@@ -359,7 +388,146 @@ def resolve_primary_values(
         if mid in out:
             mid = f"{mid}_{i}"
         out[mid] = _resolve_one(
-            metric, json_metrics, log_metrics, freshness,
-            text_lines=text_lines, llm_extract=llm_extract,
+            metric,
+            json_metrics,
+            log_metrics,
+            freshness,
+            text_lines=text_lines,
+            llm_extract=llm_extract,
         )
     return out
+
+
+#: Cap on the auto-derived demo metric list (CLI smoke, not production).
+DEMO_METRIC_CAP = 12
+
+
+def _demo_metrics(digest: dict[str, Any]) -> list[dict[str, Any]]:
+    """Demo primary metrics derived from one digest's own observed keys.
+
+    Offline stand-in for the recon (``--config`` not given): every
+    distinct ``json_metrics`` key becomes ONE metric whose aliases are
+    all its (file, key) occurrences — exercising the fresh/non-
+    verification alias ranking — and every distinct ``log_metrics`` name
+    becomes an alias-free metric — exercising the lexical and log
+    fallbacks. Deterministic order, capped at :data:`DEMO_METRIC_CAP`.
+
+    Args:
+        digest: One generation's digest (as built by ``digest.py``).
+
+    Returns:
+        A recon-shaped metric list for :func:`resolve_primary_values`.
+    """
+    by_key: dict[str, list[dict[str, str]]] = {}
+    json_metrics = digest.get("json_metrics") or {}
+    for fname in sorted(json_metrics):
+        for key in sorted(json_metrics[fname]):
+            by_key.setdefault(key, []).append({"file": fname, "key": key})
+    out: list[dict[str, Any]] = []
+    for key in sorted(by_key):
+        mid = "_".join(_tokens(key.rsplit(".", 1)[-1]))[:40] or key
+        out.append(
+            {
+                "id": mid,
+                "key": key,
+                "direction": "higher",
+                "role": "report",
+                "aliases": by_key[key],
+            }
+        )
+    for entry in digest.get("log_metrics") or []:
+        name = str(entry.get("metric") or "")
+        if name and all(m["key"] != name for m in out):
+            out.append({"id": name, "key": name, "aliases": []})
+    return out[:DEMO_METRIC_CAP]
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint: resolve primary metrics against one folder's digest.
+
+    Builds the folder's digest, resolves the primary metrics against it
+    (deterministic ladder, ``llm_extract`` disabled) and prints the
+    ledger JSON to stdout plus one line per metric to stderr. Run from
+    this package directory::
+
+        uv run metrics.py <workspace> [--uuid FAKE] [--ledger ledger.json]
+            [--config recon.json] [--out resolved.json]
+
+    or as a module from the repository root::
+
+        uv run python -m sources.evaluators.policy_bt_verifier.metrics ...
+
+    Without ``--config`` the metric list is auto-derived from the
+    digest's own keys (:func:`_demo_metrics`); with it, ``primary_metrics``
+    is read from a recon config JSON (normalized via
+    :func:`recon.ensure_shape`).
+
+    Args:
+        argv: CLI arguments (defaults to ``sys.argv[1:]``).
+
+    Returns:
+        Process exit code (0 on success).
+    """
+    ap = argparse.ArgumentParser(
+        description=("Resolve policy_bt primary metrics against one workspace digest."),
+    )
+    ap.add_argument(
+        "folder", type=Path, help="workspace folder to digest and resolve against"
+    )
+    ap.add_argument(
+        "--uuid",
+        default="cli-metrics-00000000",
+        help="fake generation uuid for the digest (default: %(default)s)",
+    )
+    ap.add_argument(
+        "--ledger",
+        type=Path,
+        default=None,
+        help="optional re-execution ledger JSON (as written by the reexec CLI)",
+    )
+    ap.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="recon config JSON whose primary_metrics to resolve "
+        "(default: derive demo metrics from the digest keys)",
+    )
+    ap.add_argument(
+        "--out", type=Path, default=None, help="also write the resolved ledger here"
+    )
+    args = ap.parse_args(argv)
+
+    ws = args.folder.resolve()
+    if not ws.is_dir():
+        ap.error(f"not a directory: {ws}")
+    ledger = None
+    if args.ledger is not None:
+        ledger = json.loads(args.ledger.read_text(encoding="utf-8"))
+
+    digest = build_digest(args.uuid, ws, ledger)
+    if args.config is not None:
+        cfg = ensure_shape(json.loads(args.config.read_text(encoding="utf-8")))
+        metrics = cfg.get("primary_metrics") or []
+        source = f"config {args.config.name}"
+    else:
+        metrics = _demo_metrics(digest)
+        source = "digest keys (demo)"
+    resolved = resolve_primary_values(digest, metrics, llm_extract=None)
+    text = json.dumps(resolved, indent=1, sort_keys=True)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text + "\n", encoding="utf-8")
+    print(text)
+    print(f"# {len(metrics)} metrics from {source}", file=sys.stderr)
+    for mid, entry in resolved.items():
+        line = f"# {mid}: {entry['status']}"
+        if entry["value"] is not None:
+            line += f" = {entry['value']!r}"
+        if entry["source"]:
+            line += f"  [{entry['source']}]"
+        print(line, file=sys.stderr)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

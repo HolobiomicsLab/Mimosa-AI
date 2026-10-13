@@ -14,17 +14,22 @@ firewall — audited PASS in E45).
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import re
+import sys
+import tempfile
+from pathlib import Path
 from typing import Any
 
 #: Bump to invalidate every recon cache cleanly (operator decision 3).
 #: v2 (2026-10-09): primary_metrics gained the metric-ledger schema
 #: (id/role/aliases/bounds/integer/convention — review §4.1).
-RECON_PROMPT_VERSION = ("recon-v2-ledger-" + hashlib.sha256(
-    b"policy_bt_recon_v2_metric_ledger"
-).hexdigest()[:12])
+RECON_PROMPT_VERSION = (
+    "recon-v2-ledger-"
+    + hashlib.sha256(b"policy_bt_recon_v2_metric_ledger").hexdigest()[:12]
+)
 
 RECON_PROMPT = """You are the reconnaissance analyst for a pairwise workspace verifier.
 Below: (1) the verbatim goal of a scientific-computing task, and (2) one DIGEST
@@ -154,9 +159,24 @@ def _metric_id(key: str, taken: set[str]) -> str:
     from before the schema extension (or degenerate payloads).
     """
     toks = re.split(r"[^a-z0-9]+", key.lower())
-    keep = [t for t in toks if len(t) > 1 and t not in (
-        "the", "a", "an", "of", "for", "in", "to", "and", "or", "is",
-    )]
+    keep = [
+        t
+        for t in toks
+        if len(t) > 1
+        and t
+        not in (
+            "the",
+            "a",
+            "an",
+            "of",
+            "for",
+            "in",
+            "to",
+            "and",
+            "or",
+            "is",
+        )
+    ]
     mid = "_".join(keep)[:40] or "metric"
     base, n = mid, 2
     while mid in taken:
@@ -222,6 +242,7 @@ def _normalize_primary_metrics(entries: Any) -> list[dict[str, Any]]:
             }
         )
     return out
+
 
 def ensure_shape(parsed: Any) -> dict[str, Any]:
     """Coerce a parsed recon payload into a usable TASK CONFIG.
@@ -359,6 +380,196 @@ def coverage_footer(config: dict[str, Any] | None) -> str:
     digests never see, so demanding their assessment only manufactures
     "NOT ASSESSED" noise in every gradient.
     """
-    return strip_infra_mentions(
-        str((config or {}).get("coverage_footer") or "")
+    return strip_infra_mentions(str((config or {}).get("coverage_footer") or ""))
+
+
+def _run_recon_judge(
+    prompt: str, mimosa_config: Path | None, max_tokens: int
+) -> dict[str, Any]:
+    """Perform the real recon judge call (the evaluator's own plumbing).
+
+    Same call contract as ``evaluator.py::_ensure_recon``: judge model
+    from the Mimosa config, temperature 0, ``reasoning_effort="low"``,
+    strict-JSON response normalized by :func:`ensure_shape`. Requires
+    an API key (repo ``.env`` is loaded like ``main.py`` does). The raw
+    provider dump lands in ``<tmp>/policy_bt_recon_cli/``.
+
+    Args:
+        prompt: Assembled recon prompt (goal + digests).
+        mimosa_config: Optional Mimosa config JSON path (``judge_model``
+            override); ``None`` keeps the built-in defaults.
+        max_tokens: Token cap for the judge response.
+
+    Returns:
+        The normalized TASK CONFIG (empty dict when unparseable).
+    """
+    try:
+        from sources.evaluators.policy_bt_verifier.evaluator import _SYSTEM_PROMPT
+    except ImportError:  # direct script execution (uv run recon.py --run)
+        sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+        from sources.evaluators.policy_bt_verifier.evaluator import _SYSTEM_PROMPT
+    import dotenv
+
+    from config import Config
+    from sources.core.llm_provider import LLMConfig, LLMProvider
+    from sources.evaluators.base import extract_json_payload
+    from sources.utils import paths as paths_mod
+
+    dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
+    dotenv.load_dotenv(paths_mod.user_env_file())
+    mimosa = Config()
+    if mimosa_config is not None:
+        mimosa.load(str(mimosa_config))
+    provider_name, model = (
+        mimosa.judge_model.split("/", 1)
+        if "/" in mimosa.judge_model
+        else ("openai", mimosa.judge_model)
     )
+    cfg = LLMConfig().from_dict(
+        {
+            "model": model,
+            "provider": provider_name,
+            "temperature": 0.0,
+            "reasoning_effort": "low",
+            "max_tokens": max(0, int(max_tokens)),
+            "openrouter_provider": mimosa.openrouter_provider_for(mimosa.judge_model),
+            "openrouter_quantizations": mimosa.openrouter_quantizations_for(
+                mimosa.judge_model
+            ),
+        }
+    )
+    memory_path = Path(tempfile.gettempdir()) / "policy_bt_recon_cli"
+    memory_path.mkdir(parents=True, exist_ok=True)
+    provider = LLMProvider(
+        agent_name="policy_bt_recon_cli",
+        memory_path=memory_path,
+        system_msg=_SYSTEM_PROMPT,
+        config=cfg,
+    )
+    raw = provider(prompt)
+    payload = extract_json_payload(raw or "")
+    parsed = None
+    if payload:
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError:
+            parsed = None
+    if parsed is None:
+        print(
+            f"recon judge response unparseable; raw dump: "
+            f"{memory_path / 'policy_bt_recon_cli.json'}",
+            file=sys.stderr,
+        )
+    return ensure_shape(parsed)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint: assemble the recon prompt for one workspace folder.
+
+    Builds the folder's digest (no LLM call) and prints the exact prompt
+    the judge model would receive, so the recon input can be inspected
+    offline. Run from this package directory::
+
+        uv run recon.py <workspace> [--uuid FAKE]
+            [--goal TEXT | --goal-file PATH] [--out prompt.txt]
+
+    With ``--run`` it instead performs the REAL recon judge call (same
+    plumbing as ``evaluator.py::_ensure_recon``: judge model from the
+    Mimosa config, temperature 0, effort low; an API key must be in the
+    environment) and prints the normalized TASK CONFIG::
+
+        uv run recon.py <workspace> --run [--goal ...]
+            [--mimosa-config my_config.json] [--max-tokens 4000]
+
+    or as a module from the repository root::
+
+        uv run python -m sources.evaluators.policy_bt_verifier.recon ...
+
+    Args:
+        argv: CLI arguments (defaults to ``sys.argv[1:]``).
+
+    Returns:
+        Process exit code (0 on success).
+    """
+    # Local import: digest.py imports this module (is_infra_name), so a
+    # module-level import here would be circular under ``python -m``.
+    try:
+        from .digest import build_digest
+    except ImportError:  # direct script execution (uv run recon.py <folder>)
+        from digest import build_digest
+
+    ap = argparse.ArgumentParser(
+        description=("Assemble the policy_bt recon prompt for one workspace folder."),
+    )
+    ap.add_argument("folder", type=Path, help="workspace folder to digest")
+    ap.add_argument(
+        "--uuid",
+        default="cli-recon-00000000",
+        help="fake generation uuid for the digest slot (default: %(default)s)",
+    )
+    ap.add_argument(
+        "--goal", default="", help="verbatim task goal text (prompt section 1)"
+    )
+    ap.add_argument(
+        "--goal-file", type=Path, default=None, help="read the goal text from a file"
+    )
+    ap.add_argument("--out", type=Path, default=None, help="also write the output here")
+    ap.add_argument(
+        "--run",
+        action="store_true",
+        help="perform the real recon judge call (needs an API key in the "
+        "environment) and print the normalized TASK CONFIG instead of the prompt",
+    )
+    ap.add_argument(
+        "--mimosa-config",
+        type=Path,
+        default=None,
+        help="Mimosa config JSON choosing the judge model "
+        "(default: built-in config defaults)",
+    )
+    ap.add_argument(
+        "--max-tokens",
+        type=int,
+        default=4000,
+        help="judge response token cap (default: %(default)s, the evaluator's "
+        "recon cap)",
+    )
+    args = ap.parse_args(argv)
+
+    ws = args.folder.resolve()
+    if not ws.is_dir():
+        ap.error(f"not a directory: {ws}")
+    goal = args.goal
+    if args.goal_file is not None:
+        goal = args.goal_file.read_text(encoding="utf-8", errors="replace")
+
+    digest = build_digest(args.uuid, ws, None, goal=goal)
+    prompt = build_prompt(goal, [digest])
+    if args.run:
+        task_cfg = _run_recon_judge(prompt, args.mimosa_config, args.max_tokens)
+        text = json.dumps(task_cfg, indent=1, sort_keys=True)
+        if args.out is not None:
+            args.out.parent.mkdir(parents=True, exist_ok=True)
+            args.out.write_text(text + "\n", encoding="utf-8")
+        print(text)
+        print(
+            f"recon TASK CONFIG: {len(task_cfg.get('primary_metrics') or [])} "
+            f"primary metrics, {len(task_cfg)} top-level keys "
+            f"(prompt {len(prompt)} chars)",
+            file=sys.stderr,
+        )
+        return 0
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(prompt + "\n", encoding="utf-8")
+    print(prompt)
+    print(
+        f"recon prompt: {len(prompt)} chars "
+        f"(goal {len(goal)} chars, 1 digest slot, uuid {args.uuid})",
+        file=sys.stderr,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

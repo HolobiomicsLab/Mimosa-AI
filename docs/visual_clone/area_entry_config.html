@@ -6,11 +6,11 @@
 <title>Entry point and configuration - Mimosa-AI</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview &gt; entry &amp; config &gt; main.py + config.py" data-built="7da1f5e+wt" data-built-date="2026-10-12">
+<body data-crumb="Overview &gt; entry &amp; config &gt; main.py + config.py" data-built="c508f11+wt" data-built-date="2026-10-13">
 <div class="wrap">
 
 <h1 class="hud">Entry point and configuration</h1>
-<p class="intro">The shell calls <code>main.py::cli_main</code>, which parses 48 flags and dispatches to one of eight modes. <code>config.py::Config</code> holds every default, then reads a JSON file and applies CLI overrides. This page covers the six files of the entry and config area, plus the <code>verifier_kind</code> choice (hybrid, legacy, gold, policy_bt).</p>
+<p class="intro">The shell calls <code>main.py::cli_main</code>, which parses 48 flags and dispatches to one of eight modes. <code>config.py::Config</code> holds every default, then reads a JSON file and applies CLI overrides. This page covers the six files of the entry and config area, plus the <code>verifier_kind</code> choice (policy_bt run default, hybrid previous, legacy, gold).</p>
 
 <div id="legend" data-auto></div>
 
@@ -302,7 +302,7 @@
     <title>argparse choices: hybrid, legacy, gold, policy_bt</title>
     <rect x="20" y="30" width="220" height="50" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="130" y="51" text-anchor="middle">--verifier_kind</text>
-    <text class="box-sub" x="130" y="68" text-anchor="middle">4 choices, default hybrid</text>
+    <text class="box-sub" x="130" y="68" text-anchor="middle">4 choices, no default here</text>
   </a>
   <a class="box" id="v2" href="#config-default">
     <title>Config.from_json copies the JSON value as a string, with no choice check</title>
@@ -311,10 +311,10 @@
     <text class="box-sub" x="130" y="158" text-anchor="middle">any string, no check</text>
   </a>
   <a class="box" id="v3" href="#c-config">
-    <title>Config field, default hybrid</title>
+    <title>Config field, built-in default hybrid; the JSON file overrides it</title>
     <rect x="290" y="75" width="220" height="50" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="400" y="96" text-anchor="middle">Config.verifier_kind</text>
-    <text class="box-sub" x="400" y="113" text-anchor="middle">default "hybrid"</text>
+    <text class="box-sub" x="400" y="113" text-anchor="middle">hybrid; file ships policy_bt</text>
   </a>
   <a class="box" id="v4" href="file_eval_evaluator.html">
     <title>Facade built once in EvolutionEngine.__init__; lower-cases the value</title>
@@ -323,7 +323,7 @@
     <text class="box-sub" x="400" y="228" text-anchor="middle">sources/evaluators/evaluator.py</text>
   </a>
   <a class="box" id="v5" href="mod_evaluators_hybrid_verifier.html">
-    <title>Default; also built for any unknown value</title>
+    <title>Previous channel; also built for any unknown value</title>
     <rect x="570" y="16" width="240" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="690" y="37" text-anchor="middle">HybridVerifierEvaluator</text>
     <text class="box-sub" x="690" y="54" text-anchor="middle">hybrid, or unknown value</text>
@@ -341,10 +341,10 @@
     <text class="box-sub" x="690" y="190" text-anchor="middle">gold - ORACLE</text>
   </a>
   <a class="box" id="v12" href="mod_evaluators_policy_bt_verifier.html">
-    <title>E44-E48 policy tournament: fresh re-execution, deterministic digest, LLM policy; imported lazily</title>
+    <title>E44-E48 policy tournament: fresh re-execution, deterministic digest, LLM policy; imported lazily; the run default via config_default.json:16</title>
     <rect x="860" y="84" width="240" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="980" y="105" text-anchor="middle">PolicyBTVerifierEvaluator</text>
-    <text class="box-sub" x="980" y="122" text-anchor="middle">policy_bt - opt-in</text>
+    <text class="box-sub" x="980" y="122" text-anchor="middle">policy_bt - run default</text>
   </a>
   <a class="box" id="v8" href="#c-config">
     <title>True = full oracle: the reward also comes from the grader</title>
@@ -394,7 +394,7 @@
   <text class="edge-label" x="246" y="338">sets</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> picks the verifier. <code>legacy</code>, <code>gold</code> and <code>policy_bt</code> are imported lazily, so the default path never loads them. <span class="chip warn">oracle - leaks gold</span> <code>gold</code> reads the benchmark grader's verdict; <code>main.py::warn_gold_feedback_mode</code> prints <code>LEAK_WARNING</code>, and without <code>--science_agent_bench</code> every generation falls back to the hybrid gradient. <code>policy_bt</code> is the E44-E48 channel; its package page is <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>.</p>
+<p class="figcap">Diagram 3 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> picks the verifier. <code>legacy</code>, <code>gold</code> and <code>policy_bt</code> are imported lazily, so a non-matching path never loads them. <span class="chip warn">oracle - leaks gold</span> <code>gold</code> reads the benchmark grader's verdict; <code>main.py::warn_gold_feedback_mode</code> prints <code>LEAK_WARNING</code>, and without <code>--science_agent_bench</code> every generation falls back to the hybrid gradient. <code>policy_bt</code> is the E44-E48 channel and the run default (<code>config_default.json:16</code> = <code>"policy_bt"</code>, read 2026-10-13); its package page is <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>.</p>
 <details><summary>verifier flags: flag | type | default | effect</summary><div class="dbody">
 <table>
 <thead><tr><th>Flag</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
@@ -491,7 +491,7 @@ Config.load(filepath) -&gt; None</pre>
 <tr><td class="sym">judge_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">sources/evaluators/base.py</td></tr>
 <tr><td class="sym">capsule_namer_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">sources/utils/transfer_toolomics.py</td></tr>
 <tr><td class="sym">vision_judge_model</td><td class="sym">openrouter/moonshotai/kimi-k3</td><td class="sym">sources/evaluators/hybrid_verifier/evaluator.py &#183; legacy: legacy_verifier/verifier.py</td></tr>
-<tr><td class="sym">verifier_kind</td><td class="sym">hybrid (also legacy, gold, policy_bt)</td><td class="sym">sources/evaluators/evaluator.py</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="sym">hybrid (config.py:106); file ships policy_bt</td><td class="sym">sources/evaluators/evaluator.py</td></tr>
 <tr><td class="sym">gold_feedback_reward</td><td class="sym">false</td><td class="sym">gold_feedback/evaluator.py, csv_mode.py, main.py</td></tr>
 <tr><td class="sym">gold_feedback_timeout_s</td><td class="sym">1800 s</td><td class="sym">gold_feedback/evaluator.py</td></tr>
 <tr><td class="sym">gold_feedback_task_row / gold_feedback_sab_loader</td><td class="sym">None, runtime only</td><td class="sym">gold_feedback/grader.py, set by csv_mode.py</td></tr>
@@ -592,6 +592,7 @@ App.run() ; App.record(path, fps, hold_seconds)</pre>
 <p>Updated at ca72107 + working tree, 2026-09-28: gold-feedback flags and <code>warn_gold_feedback_mode</code> (Diagram 1, Diagram 3), new <code>config.py</code> fields and <code>_json_bool</code>, the visual-rung and execution-gate flags from <code>4020790</code>, all line and key counts recomputed. <code>config_default.json</code> is a local, untracked file, so its key counts can differ on another checkout.</p>
 <p>Updated at <code>7da1f5e</code> + working tree, 2026-10-10: <code>--verifier_kind</code> gained the fourth choice <code>policy_bt</code> and the seven <code>--policy_bt_*</code> flags; <code>config.py</code>, <code>main.py</code> and <code>config_default.json</code> counts recomputed (973 / 559 / 134 lines, 48 flags, 78 keys); the 12 <code>policy_bt_*</code> fields and the 5 early-stop knobs added to the field table; Diagram 3 extended with the <code>PolicyBTVerifierEvaluator</code> branch and relaid out (12 boxes).</p>
 <p>Updated 2026-10-12 (working tree, commit <code>7da1f5e</code>): <code>Config.from_json</code> now reads <code>judge_model</code> and <code>vision_judge_model</code> (config.py:591-594). The red note about the unread judge keys became a FIXED note, the plumbing note updated, and the round-trip test description refreshed (261 lines, 6 test funcs).</p>
+<p>Updated 2026-10-13 (<code>c508f11</code> + working tree): diagram 3 re-framed for the default switch &mdash; <code>config_default.json:16</code> ships <code>"policy_bt"</code> (read 2026-10-13), so <code>PolicyBTVerifierEvaluator</code> is the run default, the hybrid box is the previous channel and the <code>Config.verifier_kind</code> box notes the built-in/file split. No flag, count or loader behaviour changed.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

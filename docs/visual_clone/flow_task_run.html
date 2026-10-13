@@ -6,7 +6,7 @@
 <title>Task run flow - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview &gt; flows &gt; task run" data-built="7da1f5e+wt" data-built-date="2026-10-10">
+<body data-crumb="Overview &gt; flows &gt; task run" data-built="c508f11+wt" data-built-date="2026-10-13">
 <div class="wrap">
 
 <h1 class="hud">Task run flow</h1>
@@ -128,7 +128,7 @@
     <text class="edge-label" x="730.0" y="534" text-anchor="middle">11 uuid</text>
   </g>
   <g>
-    <title>hybrid: HybridVerifierEvaluator._write_artifacts; gold: GoldFeedbackEvaluator._persist</title>
+    <title>policy_bt / hybrid: _write_artifacts; gold: GoldFeedbackEvaluator._persist</title>
     <path class="edge dashed-edge" data-from="l7" data-to="l6" d="M 1050,584 H 890" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
     <text class="edge-label" x="970.0" y="578" text-anchor="middle">12 evaluation.txt, gradient</text>
   </g>
@@ -203,7 +203,8 @@ WorkflowFactory.craft_workflow(goal, craft_instructions, save_workflow=True, ori
     -&gt; (complete_code, genotype_code, uuid)
 WorkflowRunner.execute(code, execution_id=None, progress_callback=None) -&gt; ExecutionResult
 WorkflowEvaluator.evaluate(uuid, agent_answers=None, evaluator_type="verifier", scenario_rubric=None) -&gt; dict
-HybridVerifierEvaluator.evaluate(uuid) -&gt; dict
+HybridVerifierEvaluator.evaluate(uuid) -&gt; dict      # previous channel
+PolicyBTVerifierEvaluator.evaluate(uuid) -&gt; dict    # run default
 GoldFeedbackEvaluator.evaluate(uuid) -&gt; dict
 WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / restore_best(uuid)</pre>
 <p>Config fields read on this path: <code>workflow_dir</code>, <code>memory_dir</code>, <code>runner_temp_dir</code>, <code>runner_default_python_version</code> (<code>3.12</code>), <code>runner_default_timeout</code> (<code>10800 s</code>), <code>agent_execution_timeout</code> (<code>18000 s</code>), <code>runner_requirements</code>, <code>workspace_dir</code>, <code>workflow_llm_model</code>, <code>smolagent_model_id</code>, <code>judge_model</code>, <code>literrature_grounding</code>, <code>verifier_kind</code> (<code>hybrid</code>; also <code>legacy</code>, <code>gold</code>), <code>gold_feedback_reward</code> (<code>False</code>), <code>gold_feedback_timeout_s</code> (<code>1800 s</code>), <code>gold_feedback_task_row</code> / <code>gold_feedback_sab_loader</code> (<code>None</code> on this path), <code>hybrid_verifier_num_claims</code> (<code>10</code>), <code>hybrid_verifier_scorer_timeout_s</code> (<code>60</code>), <code>hybrid_verifier_pairwise_mode</code> (<code>temporal</code>), <code>learned_score_threshold</code> (<code>0.9</code>), <code>max_learning_evolve_iterations</code> (<code>16</code>), <code>initial_population</code> (<code>2</code>), <code>selection_strategy</code> (<code>qd</code>), <code>export_astra</code> (<code>False</code>).</p>
@@ -215,7 +216,7 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
 <div class="panel" id="verifier-choice"><span class="br"></span>
 <h2>Step 19 - which verifier runs</h2>
 <div class="canvas">
-<svg class="diagram" viewBox="0 0 1160 350" role="img" aria-label="EvolutionEngine calls WorkflowEvaluator, which calls the hybrid, legacy, gold or policy_bt verifier; gold also grades a private copy with the benchmark grader">
+<svg class="diagram" viewBox="0 0 1160 350" role="img" aria-label="EvolutionEngine calls WorkflowEvaluator, which calls the policy_bt, hybrid, legacy or gold verifier; gold also grades a private copy with the benchmark grader">
   <defs>
     <marker id="arw5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
@@ -240,11 +241,11 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
     <text class="box-label" x="395" y="51" text-anchor="middle">WorkflowEvaluator.evaluate</text>
     <text class="box-sub" x="395" y="68" text-anchor="middle">evaluator_type="verifier"</text>
   </a>
-  <a class="box" id="e3" href="file_hybrid_evaluator.html">
-    <title>Default; also built for unknown verifier_kind values</title>
+  <a class="box" id="e3" href="mod_evaluators_policy_bt_verifier.html">
+    <title>Run default since 2026-10-10 (config_default.json:16); re-execution + policy tournament</title>
     <rect x="580" y="18" width="220" height="48" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="690" y="38" text-anchor="middle">HybridVerifierEvaluator</text>
-    <text class="box-sub" x="690" y="55" text-anchor="middle">hybrid (default)</text>
+    <text class="box-label" x="690" y="38" text-anchor="middle">PolicyBTVerifierEvaluator</text>
+    <text class="box-sub" x="690" y="55" text-anchor="middle">policy_bt (run default)</text>
   </a>
   <a class="box" id="e4" href="area_evaluators_legacy.html">
     <title>Deprecated per-claim verifier</title>
@@ -318,7 +319,7 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
   <text class="edge-label" x="300" y="200">3 writes grader gradient</text>
 </svg>
 </div>
-<p class="figcap">Diagram 2 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> builds one verifier from <code>config.verifier_kind</code>. <span class="chip warn">oracle - leaks gold</span> For <code>gold</code>, <code>GoldFeedbackEvaluator.evaluate</code> first copies the workspace (<code>make_private_copy</code>), runs the inner hybrid, grades the copy, then writes the grader's VER/SR text as <code>textual_gradient.txt</code>.</p>
+<p class="figcap">Diagram 2 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> builds one verifier from <code>config.verifier_kind</code>; the run default is <code>policy_bt</code> (<code>config_default.json:16</code>, read 2026-10-13), <code>config.py:106</code> falls back to <code>hybrid</code> and any unknown value also builds the hybrid verifier (previous channel, not drawn; see <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>). <span class="chip warn">oracle - leaks gold</span> For <code>gold</code>, <code>GoldFeedbackEvaluator.evaluate</code> first copies the workspace (<code>make_private_copy</code>), runs the inner hybrid, grades the copy, then writes the grader's VER/SR text as <code>textual_gradient.txt</code>.</p>
 <p class="note">Amber note: on a plain <code>--task</code> run, <code>gold_feedback_task_row</code> is unset, so <code>resolve_task_context</code> returns no context, nothing is graded, and the gradient stays the hybrid one; only <code>--science_agent_bench</code> sets the row (<code>CsvEvaluationMode._set_gold_feedback_task</code>).</p>
 <details><summary>gold reward and gradient rules</summary><div class="dbody">
 <table><thead><tr><th>Grade status</th><th>Gradient</th><th>Reward (default)</th><th>Reward with <code>gold_feedback_reward</code></th></tr></thead><tbody>
@@ -441,7 +442,7 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
 </svg>
 </div>
 <p class="figcap">Diagram 3 - paths come from <code>sources/utils/paths.py::default_workflow_dir</code>, <code>::default_memory_dir</code>, <code>::default_runs_capsule_dir</code> and <code>::default_tmp_dir</code>; a repo checkout keeps them in-tree, an installed wheel moves them to XDG dirs. <code>run_&lt;x&gt;/</code>, <code>runs_capsule/run_&lt;x&gt;/</code> and <code>run_notes/run_&lt;x&gt;/</code> are set by <a href="../../sources/cli/evaluation_cli.py">sources/cli/evaluation_cli.py</a>::<code>EvaluationCLI</code> (lines 1051-1078).</p>
-<details><summary>10 files inside one &lt;uuid&gt;/ folder</summary><div class="dbody">
+<details><summary>11 files inside one &lt;uuid&gt;/ folder (policy_bt default; hybrid writes 10)</summary><div class="dbody">
 <table><thead><tr><th>File under <code>&lt;uuid&gt;/</code></th><th>Written by</th><th>Holds</th></tr></thead><tbody>
 <tr><td class="sym"><code>workflow_genotype_&lt;uuid&gt;.py</code></td><td class="sym">Factory.save_workflow_files</td><td>genotype, the mutant</td></tr>
 <tr><td class="sym"><code>system_prompt_&lt;uuid&gt;.md</code></td><td class="sym">Factory.save_workflow_files</td><td>workflow creator prompt</td></tr>
@@ -451,11 +452,12 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
 <tr><td class="sym"><code>lineage_&lt;uuid&gt;.json</code></td><td class="sym">record_lineage</td><td>parents, kind, iteration</td></tr>
 <tr><td class="sym"><code>run_metrics.json</code></td><td class="sym">EvolutionEngine._persist_iteration_metrics</td><td>scores, cost, qd verdict</td></tr>
 <tr><td class="sym"><code>state_result.json</code></td><td class="sym">generated script, then BaseEvaluator._save_results</td><td>answers + evaluation.verifier</td></tr>
-<tr><td class="sym"><code>evaluation.txt</code></td><td class="sym">HybridVerifierEvaluator._write_artifacts</td><td>claim verdicts</td></tr>
-<tr><td class="sym"><code>textual_gradient.txt</code></td><td class="sym">HybridVerifierEvaluator._write_artifacts</td><td>gradient for next mutation</td></tr>
+<tr><td class="sym"><code>evaluation.txt</code></td><td class="sym">PolicyBTVerifierEvaluator._write_artifacts (default); HybridVerifierEvaluator._write_artifacts (previous)</td><td>reward, pair verdicts / claim verdicts</td></tr>
+<tr><td class="sym"><code>textual_gradient.txt</code></td><td class="sym">PolicyBTVerifierEvaluator._write_artifacts (default); HybridVerifierEvaluator._write_artifacts (previous)</td><td>gradient for next mutation</td></tr>
+<tr><td class="sym"><code>verifier_policy_bt.log</code></td><td class="sym">policy_bt StageLogger</td><td>JSON lines, policy_bt only</td></tr>
 </tbody></table>
 <p>With <code>verifier_kind = "gold"</code>, <code>GoldFeedbackEvaluator._persist</code> also writes <code>textual_gradient_hybrid.txt</code> and <code>gold_feedback.json</code>, puts a leak banner on top of <code>evaluation.txt</code>, and adds an <code>evaluation.gold_oracle</code> block to <code>state_result.json</code>. The inner hybrid registry goes to <code>_verifier_tmp_gold/</code> under <code>workflow_dir</code>, because <code>Config</code> sets no <code>temp_dir</code> (<code>gold_hybrid_config</code>).</p>
-<p>Also under <code>workflow_dir</code> itself: <code>qd_archive.jsonl</code> (<code>EvolutionEngine._persist_qd_archive</code>), <code>variation_log.jsonl</code> (<code>::_persist_variation_log</code>), and <code>_verifier_tmp/hybrid_registry_&lt;key&gt;.json</code> plus <code>_verifier_tmp/&lt;uuid&gt;/verify_*.py</code> (<a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a>::<code>TaskRegistry.save</code>).</p>
+<p>Also under <code>workflow_dir</code> itself: <code>qd_archive.jsonl</code> (<code>EvolutionEngine._persist_qd_archive</code>), <code>variation_log.jsonl</code> (<code>::_persist_variation_log</code>), <code>_verifier_tmp/hybrid_registry_&lt;key&gt;.json</code> plus <code>_verifier_tmp/&lt;uuid&gt;/verify_*.py</code> (<a href="../../sources/evaluators/hybrid_verifier/registry.py">hybrid_verifier/registry.py</a>::<code>TaskRegistry.save</code>), and, for the policy_bt default, <code>_verifier_tmp/policy_bt_registry_&lt;task_key&gt;.json</code> plus the re-execution sandbox <code>_verifier_tmp/policy_bt/&lt;task_key&gt;/runs/&lt;uuid&gt;/</code> with its local <code>venv/</code> (<a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">policy_bt_verifier/evaluator.py</a>:692-709).</p>
 </div></details>
 </div>
 
@@ -550,6 +552,7 @@ WorkspaceManager.begin_session() / reset_for_run() / save_run_snapshot(uuid) / r
 <p>Unconfirmed: the exact artifacts of the OS-level Python 3.12 install in <a href="../../sources/utils/ensure_env.py">ensure_env.py</a> (package-manager commands run outside the repo) - <code>unknown</code>.</p>
 <p>Built at commit <code>7e8463b</code>, 2026-10-02. The working tree had uncommitted changes at build time (<code>git status --porcelain</code> lists modified files, among them <code>main.py</code>, <code>config.py</code> and <code class="path">sources/evaluators/evaluator.py</code>), so line numbers may shift.</p>
 <p>Updated at ca72107 + working tree, 2026-09-28: steps 2-4 put in code order (<code>PreCheck.run</code> runs after the path checks), step 1 adds <code>warn_gold_feedback_mode</code>, step 5 names the facade build, step 19 routes through <code>WorkflowEvaluator.evaluate</code>, step 24 names <code>_select_best_run</code>, new Diagram 2 (verifier choice). Every step symbol was re-checked with an AST scan of the current files.</p>
+<p>Updated 2026-10-13 (<code>c508f11</code> + working tree): step 19 and the artifact table re-framed for the default switch &mdash; <code>config_default.json:16</code> ships <code>"policy_bt"</code> (read 2026-10-13), so the verifier box, the evaluation.txt / textual_gradient.txt writers and the &lt;uuid&gt;/ folder listing (now 11 files with <code>verifier_policy_bt.log</code>) name <code>PolicyBTVerifierEvaluator</code> first; hybrid kept as the previous channel.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

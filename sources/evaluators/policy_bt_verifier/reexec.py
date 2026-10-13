@@ -26,6 +26,7 @@ installs are cheap).
 
 from __future__ import annotations
 
+import argparse
 import ast
 import contextlib
 import hashlib
@@ -37,21 +38,32 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from sources.benchmark_evaluation.execution_sandbox import (
-    DROP_PACKAGES,
-    EXTRA_DEPS,
-    IMPORT_NAME_REMAP,
-    PINNED_CONSTRAINTS,
-)
+try:
+    from sources.benchmark_evaluation.execution_sandbox import (
+        DROP_PACKAGES,
+        EXTRA_DEPS,
+        IMPORT_NAME_REMAP,
+        PINNED_CONSTRAINTS,
+    )
 
-from .recon import is_infra_name
-
-if TYPE_CHECKING:
     from .logging_utils import StageLogger
+    from .recon import is_infra_name
+except ImportError:  # direct script execution (uv run reexec.py <folder>)
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from logging_utils import StageLogger
+    from recon import is_infra_name
+
+    from sources.benchmark_evaluation.execution_sandbox import (
+        DROP_PACKAGES,
+        EXTRA_DEPS,
+        IMPORT_NAME_REMAP,
+        PINNED_CONSTRAINTS,
+    )
 
 ERROR_PAT = re.compile(
     r"(Traceback \(most recent call last\)|^\w*(Error|Exception)\b|CUDA out of memory"
@@ -257,6 +269,7 @@ def _python_command(tokens: list[str]) -> tuple[str, list[str]] | None:
     script = " ".join([*pre, target]) if pre else target
     return script, _args_from(i + 1)
 
+
 def contract_commands(root: Path) -> tuple[str, list[tuple[str, list[str]]]]:
     """Python invocations demanded by ``run.sh`` (then ``README*``).
 
@@ -318,7 +331,9 @@ def scan_imports(script: Path) -> list[str]:
             roots.add(node.module.split(".")[0])
     local = {p.stem for p in script.parent.glob("*.py")}
     local |= {
-        d.name for d in script.parent.iterdir() if d.is_dir() and not d.name.startswith(".")
+        d.name
+        for d in script.parent.iterdir()
+        if d.is_dir() and not d.name.startswith(".")
     }
     pkgs: set[str] = set()
     for name in sorted(roots):
@@ -377,6 +392,7 @@ def _is_pip_requirements(path: Path) -> bool:
     )
     matching = sum(1 for ln in content if spec_re.match(ln))
     return matching >= len(content) * 0.5
+
 
 def _find_requirements_file(copy_dir: Path) -> Path | None:
     """The workspace's pip requirements file (P1.2), content-validated.
@@ -439,9 +455,7 @@ class ReexecRunner:
         self.venv_reuse = bool(venv_reuse)
         self.install_timeout_s = max(60, int(install_timeout_s))
         self.python_exe = (
-            python_exe
-            or os.environ.get("MIMOSA_POLICY_BT_PYTHON")
-            or sys.executable
+            python_exe or os.environ.get("MIMOSA_POLICY_BT_PYTHON") or sys.executable
         )
         self.log = log
         self._constraints_file = self.task_sandbox / "constraints.txt"
@@ -454,8 +468,7 @@ class ReexecRunner:
         if self._py_version is None:
             try:
                 r = subprocess.run(
-                    [self.python_exe, "-c",
-                     "import sys; print(sys.version_info[:3])"],
+                    [self.python_exe, "-c", "import sys; print(sys.version_info[:3])"],
                     capture_output=True,
                     text=True,
                     timeout=60,
@@ -522,9 +535,7 @@ class ReexecRunner:
             main = select_main_script(dst)
             if main is None:
                 ledger["launch_error"] = "no_main_script"
-                ledger["source_manifest_intact"] = (
-                    pre_man == frozen_manifest(workspace)
-                )
+                ledger["source_manifest_intact"] = pre_man == frozen_manifest(workspace)
                 return ledger
             ledger["main_script_source"] = "fallback"
             commands = [(main.name, [])]
@@ -600,9 +611,7 @@ class ReexecRunner:
             timeout=600,
         )
         if r.returncode != 0 or not python_bin.exists():
-            raise RuntimeError(
-                f"venv creation failed: {(r.stderr or r.stdout)[-500:]}"
-            )
+            raise RuntimeError(f"venv creation failed: {(r.stderr or r.stdout)[-500:]}")
         fp_file.write_text(fp + "\n", encoding="utf-8")
         return True
 
@@ -670,13 +679,9 @@ class ReexecRunner:
                     )
                 return False
         except subprocess.TimeoutExpired:
-            self._last_pip_error = (
-                f"pip timeout after {self.install_timeout_s}s"
-            )
+            self._last_pip_error = f"pip timeout after {self.install_timeout_s}s"
             if self.log is not None:
-                self.log.warn(
-                    f"pip install timed out ({self._last_install_source})"
-                )
+                self.log.warn(f"pip install timed out ({self._last_install_source})")
             return False
         return True
 
@@ -744,18 +749,14 @@ class ReexecRunner:
         with contextlib.suppress(OSError):
             out_log.write_text(out or "", encoding="utf-8")
         lines = (out or "").splitlines()
-        err_sig = sorted(
-            {m.group(0)[:120] for m in ERROR_PAT.finditer(out or "")}
-        )[:8]
+        err_sig = sorted({m.group(0)[:120] for m in ERROR_PAT.finditer(out or "")})[:8]
         return {
             "exit_code": exit_code,
             "wall_time_s": wall,
             "timed_out": timed_out,
             "error_signature": err_sig,
             "log_tail": "\n".join(lines[-LOG_TAIL_LINES:]),
-            "output_log_sha256": (
-                sha256_file(out_log) if out_log.exists() else None
-            ),
+            "output_log_sha256": (sha256_file(out_log) if out_log.exists() else None),
             "pip_error": self.pip_error,
             "t0_wall": t0_wall,
         }
@@ -837,9 +838,7 @@ class ReexecRunner:
             "killed_pgid": killed_pgid,
             "error_signature": err_sig,
             "log_tail": "\n".join(lines[-LOG_TAIL_LINES:]),
-            "output_log_sha256": (
-                sha256_file(out_log) if out_log.exists() else None
-            ),
+            "output_log_sha256": (sha256_file(out_log) if out_log.exists() else None),
             "pip_error": self.pip_error,
             "t0_wall": t0_wall,
         }
@@ -864,9 +863,7 @@ class ReexecRunner:
             if st.st_mtime >= t0_wall - 1:
                 fresh[rel] = {
                     "bytes": st.st_size,
-                    "sha256": (
-                        sha256_file(p) if st.st_size <= FRESH_SHA_CAP else None
-                    ),
+                    "sha256": (sha256_file(p) if st.st_size <= FRESH_SHA_CAP else None),
                 }
         return fresh
 
@@ -877,3 +874,91 @@ def write_ledger_file(ledger: dict[str, Any], out_path: Path) -> None:
     clean.pop("t0_wall", None)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json_dump(clean), encoding="utf-8")
+
+
+def main(argv: list[str] | None = None) -> int:
+    """CLI entrypoint: re-execute one workspace folder in a sandbox.
+
+    The input folder is never mutated (manifest guard): execution runs
+    in a sandbox copy under ``--sandbox`` (default
+    ``<tmp>/policy_bt_reexec/<folder name>``), whose venv is provisioned
+    under the era pins — first run may take minutes on pip installs.
+    The ledger JSON goes to stdout (and ``--out``, default
+    ``<sandbox>/ledger_<uuid>.json``). Run from this package directory::
+
+        uv run reexec.py <workspace> [--uuid FAKE] [--sandbox DIR]
+            [--timeout S] [--no-venv-reuse] [--out ledger.json]
+
+    or as a module from the repository root::
+
+        uv run python -m sources.evaluators.policy_bt_verifier.reexec ...
+
+    Args:
+        argv: CLI arguments (defaults to ``sys.argv[1:]``).
+
+    Returns:
+        0 normally — a crashing workspace is evidence, not a CLI
+        failure; 1 only when the ledger records a ``launch_error`` (the
+        verifier itself could not run).
+    """
+    ap = argparse.ArgumentParser(
+        description=("Re-execute one workspace folder in a verifier-owned sandbox."),
+    )
+    ap.add_argument(
+        "folder",
+        type=Path,
+        help="generation workspace to re-execute (never mutated)",
+    )
+    ap.add_argument(
+        "--uuid",
+        default="cli-reexec-00000000",
+        help="fake generation uuid for the sandbox copy (default: %(default)s)",
+    )
+    ap.add_argument(
+        "--sandbox",
+        type=Path,
+        default=None,
+        help="task sandbox root (default: <tmp>/policy_bt_reexec/<folder name>)",
+    )
+    ap.add_argument(
+        "--timeout",
+        type=int,
+        default=900,
+        help="wall-clock cap per script execution, seconds (default: %(default)s)",
+    )
+    ap.add_argument(
+        "--no-venv-reuse",
+        action="store_true",
+        help="rebuild the sandbox venv instead of reusing it",
+    )
+    ap.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="ledger JSON path (default: <sandbox>/ledger_<uuid>.json)",
+    )
+    args = ap.parse_args(argv)
+
+    ws = args.folder.resolve()
+    if not ws.is_dir():
+        ap.error(f"not a directory: {ws}")
+    sandbox = (
+        args.sandbox or Path(tempfile.gettempdir()) / "policy_bt_reexec" / ws.name
+    ).resolve()
+    runner = ReexecRunner(
+        sandbox,
+        timeout_s=args.timeout,
+        venv_reuse=not args.no_venv_reuse,
+        log=StageLogger(args.uuid),
+    )
+    ledger = runner.run(ws, args.uuid)
+    out = args.out or sandbox / f"ledger_{args.uuid}.json"
+    write_ledger_file(ledger, out)
+    print(json_dump(ledger))
+    print(f"LEDGER {out}", file=sys.stderr)
+    print(f"SANDBOX {sandbox}", file=sys.stderr)
+    return 1 if ledger.get("launch_error") else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -25,7 +25,7 @@ from typing import Any
 #: Hard cap on the gradient-tail coverage footer: it is one humility
 #: line, not a file manifest (2026-10-07: unbounded footers dominated the
 #: raw gradient and the refiner echoed them as the whole gradient).
-COVERAGE_FOOTER_CAP = 400
+COVERAGE_FOOTER_CAP = 512
 REFINER_PROMPT = """You are a gradient refiner for an evolution loop. You \
 receive (1) the RAW GRADIENT produced by a pairwise tournament verifier for \
 generation N — treat it as GROUND TRUTH, the verified verdict record; and \

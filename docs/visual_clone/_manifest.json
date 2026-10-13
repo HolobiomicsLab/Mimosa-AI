@@ -1,7 +1,7 @@
 {
-  "built_commit": "7da1f5e",
-  "built_date": "2026-10-10",
-  "build_note": "Update build (BT policy verifier, E44-E48). The manifest was at ca72107 (previous build 2026-09-28, plus two data_experiments refreshes on 2026-10-02/03). HEAD is 7da1f5e; the wave is built from the WORKING TREE, because sources/evaluators/policy_bt_verifier/, sources/evaluators/generic_verifier/ and sources/core/stopping.py are untracked and several core and evaluator files are modified. Stamp in the top bar: \"7da1f5e+wt\". 20 pages touched (3 new). The other pages keep their earlier stamps; pages whose covered code changed in this period but were not re-synced are: data_runs.html (run_notes grew), file_core_evolution_engine.html, mod_core_variation.html, file_core_llm_provider.html (line counts only), area_security_transparency.html. E26-E34, E36, E38-E42 harness experiments still have no page.",
+  "built_commit": "c508f11",
+  "built_date": "2026-10-12",
+  "build_note": "Update build (BT policy verifier, E44-E48). The manifest was at ca72107 (previous build 2026-09-28, plus two data_experiments refreshes on 2026-10-02/03). HEAD is 7da1f5e; the wave is built from the WORKING TREE, because sources/evaluators/policy_bt_verifier/, sources/evaluators/generic_verifier/ and sources/core/stopping.py are untracked and several core and evaluator files are modified. Stamp in the top bar: \"7da1f5e+wt\". 20 pages touched (3 new). The other pages keep their earlier stamps; pages whose covered code changed in this period but were not re-synced are: data_runs.html (run_notes grew), file_core_evolution_engine.html, mod_core_variation.html, file_core_llm_provider.html (line counts only), area_security_transparency.html. E26-E34, E36, E38-E42 harness experiments still have no page. Later wave, same day (c508f11 + working tree): policy_bt schema-error refresh bug-fix sync. verdicts.py::code_pair_verdict propagates schema_error on a both-orders signal; evaluator.py re-evaluation (_reevaluate_one_pair/_replace_pair_record/_reevaluate_schema_pairs/_recount_pairs/_log_reevaluated_pair, _outcome_spellings/_OUTCOME_CANONICAL) records won/lost/tie and recomputes tallies; tests 84->86 (2 new). 7 pages touched: mod_evaluators_policy_bt_verifier, flow_policy_bt_verification, area_evaluators, area_tests, file_eval_evaluator, data_audits, index. Provenance: audits/policy_bt_schema_refresh_reward_bugs.md. Later wave, same day (c508f11 + working tree): policy_bt operator-logging sync - StageLogger color/paint/preview/table emitters (_color_output TTY gate, _STAGE_TAG_STYLES), evaluator POLICY previews + FILES artifact diff + BT standings table after REWARD, tests 86->90. 6 pages touched (mod_evaluators_policy_bt_verifier with new diagram 13, flow_policy_bt_verification, area_evaluators, area_tests, file_eval_evaluator, index).",
   "pages": {
     "area_benchmark_evaluation.html": {
       "covers": [
@@ -58,8 +58,8 @@
         "sources/evaluators/policy_bt_verifier/*.py",
         "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "c508f11",
+      "date": "2026-10-12",
       "skipped": [],
       "working_tree": true
     },
@@ -116,7 +116,7 @@
         "sources/core/stopping.py",
         "sources/evaluators/policy_bt_verifier/*.py"
       ],
-      "commit": "7da1f5e",
+      "commit": "c508f11",
       "date": "2026-10-12",
       "skipped": [
         "tests/__pycache__/*.pyc: generated output, not source",
@@ -140,8 +140,8 @@
         "audits/*",
         "audits/**/*"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "c508f11",
+      "date": "2026-10-12",
       "skipped": [
         "bodies of the large HTML reports: read title, first heading and TL;DR only (Tier C method)",
         "audits/reward_signal_analysis/*.pdf: binary, no text read",
@@ -294,8 +294,8 @@
       "covers": [
         "docs/visual_clone/*.html"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "c508f11",
+      "date": "2026-10-12",
       "skipped": [],
       "working_tree": true
     },
@@ -1999,8 +1999,8 @@
         "sources/evaluators/policy_bt_verifier/*.py",
         "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "c508f11",
+      "date": "2026-10-12",
       "skipped": [],
       "working_tree": true
     },
@@ -2278,8 +2278,8 @@
         "experiments_verifiers/harness/e44_digest.py, e44_bt.py, e45_spartan.py: cited by the package docstrings, not read",
         "one digest page per module: the 12 files get cards on this page instead (Tier B rule)"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "c508f11",
+      "date": "2026-10-12",
       "working_tree": true
     },
     "flow_policy_bt_verification.html": {
@@ -2295,8 +2295,8 @@
         "sources/evaluators/policy_bt_verifier/__init__.py: re-export list only",
         "CSV batch grading path (VER/SR/CBS, CapsuleEvaluator): not on this flow"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "c508f11",
+      "date": "2026-10-12",
       "working_tree": true
     },
     "file_core_stopping.html": {
@@ -2673,6 +2673,49 @@
         "_manifest.json"
       ],
       "note": "Config fix: Config.from_json now reads judge_model and vision_judge_model (config.py:591-594, data.get next to capsule_namer_model); previously loading any JSON config silently kept the constructor defaults for both fields. area_entry_config.html: red note became a FIXED note with the regression-test names, plumbing note corrected (loading the local config now does switch the judge), test description refreshed. overview.html: removed the resolved docs-vs-code row. area_tests.html: config_roundtrip_test.py row re-counted (174->261 lines, 4->6 test funcs: test_every_jsonify_key_is_read_by_from_json, test_judge_models_survive_a_round_trip). Page dates bumped to 2026-10-12, stamp 7da1f5e+wt (fix is uncommitted working tree)."
+    },
+    {
+      "date": "2026-10-12",
+      "commit": "c508f11",
+      "working_tree": true,
+      "pages": [
+        "mod_evaluators_policy_bt_verifier.html",
+        "flow_policy_bt_verification.html",
+        "area_evaluators.html",
+        "index.html",
+        "_manifest.json"
+      ],
+      "note": "policy_bt evaluator refactor sync: evaluator.py decomposed into ~35 stage methods over _EvalState/_PairCtx (no method > 40 LOC, file 1664 -> 2072 lines, folder 6131 -> 6539). No behaviour change; only line references, line counts, the evaluator file card and the pending_recon red note (re-checked, still dead code) were updated."
+    },
+    {
+      "date": "2026-10-12",
+      "commit": "c508f11",
+      "pages": [
+        "mod_evaluators_policy_bt_verifier.html",
+        "flow_policy_bt_verification.html",
+        "area_evaluators.html",
+        "area_tests.html",
+        "file_eval_evaluator.html",
+        "data_audits.html",
+        "index.html",
+        "_manifest.json"
+      ],
+      "note": "policy_bt schema-error refresh bug-fix sync: verdicts.py code_pair_verdict propagates schema_error on a both-orders signal (refresh was unreachable before); evaluator.py re-evaluation records won/lost/tie via _outcome_spellings/_OUTCOME_CANONICAL and _recount_pairs recomputes tallies; _log_reevaluated_pair emits schema_refresh_reeval PAIR payload; tests 84->86. Counts: evaluator.py 2072->2167, verdicts.py 362->377, package 6539->6649, tests file 2627->2889 lines / 86 funcs. data_audits gained the fix report + repro rows (and the E41/E42 reports from 2026-09-29)."
+    },
+    {
+      "date": "2026-10-12",
+      "commit": "c508f11",
+      "working_tree": true,
+      "pages": [
+        "mod_evaluators_policy_bt_verifier.html",
+        "flow_policy_bt_verification.html",
+        "area_evaluators.html",
+        "area_tests.html",
+        "file_eval_evaluator.html",
+        "index.html",
+        "_manifest.json"
+      ],
+      "note": "policy_bt operator-logging sync (working tree, same day as the schema-refresh fix): logging_utils.py 186->336 lines - StageLogger gained color= kwarg + _color_output() (TTY auto-detect, NO_COLOR wins), paint(), preview(label, text, max_lines, max_chars) (bounded numbered console block with '+N more lines' marker, FULL text in the JSON sink, stage PREVIEW) and table(label, header, rows, row_styles) (aligned console table, widths measured on plain cells, row-level ANSI, stage TABLE); stage/payload/detail/warn lines paint their tags per _STAGE_TAG_STYLES while the [policy_bt][<uuid8>] TAG message shape stays grep-safe with colors off. evaluator.py 2167->2278 lines - POLICY previews the LLM-written source after fresh/rewrite writes (_commit_new_policy) and after a schema-refresh rewrite (_apply_schema_refresh); each fresh pair emits a FILES payload (artifact-name diff A-only/B-only/common, from _artifact_names = deliverables + json_metrics + json_flags; full lists in the sink; cached pairs skip); REWARD is followed by a live bradley-terry standings table (_log_tournament/_print_standings: the reward's own fit in bradley_terry mode, display-only free fit in win_rate mode; current gen row green with a middot-this marker). tests/policy_bt_verifier_test.py 2889->2978 lines, 86->90 tests (4 new logging tests; 90/90 pass). mod page: new diagram 13 (operator log) + logging_utils/evaluator cards re-synced + counts; flow page: stage-tag line refs re-derived (REEXEC 722 ... DONE 1956), steps 8/12/14 carry PREVIEW/FILES/TABLE, notes row added; area_evaluators: package 6649->6910; area_tests: row + totals 16335/623; file_eval_evaluator: note only (cited test line refs still hold)."
     }
   ],
   "review": {

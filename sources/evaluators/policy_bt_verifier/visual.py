@@ -121,7 +121,7 @@ def build_pair_prompt(goal: str, names_a: list[str], names_b: list[str]) -> str:
         return "\n".join(f"- {n}" for n in names) or "- (no figures)"
 
     return PAIR_PROMPT.format(
-        goal=goal[:1500],
+        goal=goal[:4096],
         figs_a=_side(names_a),
         figs_b=_side(names_b),
     )

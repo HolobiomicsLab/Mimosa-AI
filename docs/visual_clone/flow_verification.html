@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Verification flows: hybrid and policy_bt - Mimosa-AI visual clone</title>
+<title>Verification flows: policy_bt and hybrid - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview &gt; evaluators &gt; verification flow" data-built="7da1f5e+wt" data-built-date="2026-10-10">
+<body data-crumb="Overview &gt; evaluators &gt; verification flow" data-built="c508f11+wt" data-built-date="2026-10-13">
 <div class="wrap">
 
-<h1 class="hud">Verification flows: hybrid (default) and policy_bt</h1>
-<p class="intro">This page is the hub of both verification channels: the hybrid verifier (the default) and the opt-in policy_bt verifier. The hybrid grades one workspace per generation through 8&#8211;12 stage-tagged claims and LLM-written scorers, and rewards it at the earliest ladder rung where it differs from a previous generation. policy_bt re-executes each generation in its own sandbox, digests it, and rewards it through a tournament of LLM-written pairwise policies; both channels return a reward 0&#8211;1 and one textual gradient that steers the next mutation.</p>
+<h1 class="hud">Verification flows: policy_bt (default) and hybrid (previous)</h1>
+<p class="intro">This page is the hub of both verification channels: the policy_bt verifier (the one runs use &mdash; <code>config_default.json:16</code> ships <code>"policy_bt"</code>, read 2026-10-13) and the hybrid verifier, the previous channel that <code>config.py:106</code> still falls back to. policy_bt re-executes each generation in its own sandbox, digests it, and rewards it through a tournament of LLM-written pairwise policies. The hybrid grades one workspace per generation through 8&#8211;12 stage-tagged claims and LLM-written scorers, and rewards it at the earliest ladder rung where it differs from a previous generation. Both channels return a reward 0&#8211;1 and one textual gradient that steers the next mutation.</p>
 
 <div id="legend" data-auto></div>
 
@@ -139,10 +139,10 @@
   </a>
 
   <a class="box" id="l2" href="mod_evaluators_hybrid_verifier.html">
-    <title>HybridVerifierEvaluator drives the pipeline</title>
+    <title>hybrid channel (previous): HybridVerifierEvaluator drives the ladder below</title>
     <rect x="200" y="20" width="170" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="285" y="40" text-anchor="middle">HybridVerifierEvaluator</text>
-    <text class="box-sub" x="285" y="56" text-anchor="middle">evaluator.py</text>
+    <text class="box-sub" x="285" y="56" text-anchor="middle">evaluator.py &#183; previous</text>
   </a>
 
   <a class="box" id="l3" href="../../sources/evaluators/hybrid_verifier/layers.py">
@@ -260,10 +260,10 @@
   </a>
 
   <a class="box" id="g_hyb" href="mod_evaluators_hybrid_verifier.html">
-    <title>The full hybrid ladder above; in gold mode built from gold_hybrid_config(config), so its registry sits under _verifier_tmp_gold</title>
+    <title>The previous-channel hybrid ladder above; in gold mode built from gold_hybrid_config(config), so its registry sits under _verifier_tmp_gold</title>
     <rect x="710" y="20" width="220" height="64" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="820" y="44" text-anchor="middle">HybridVerifierEvaluator</text>
-    <text class="box-sub" x="820" y="62" text-anchor="middle">hybrid, or inner in gold</text>
+    <text class="box-sub" x="820" y="62" text-anchor="middle">hybrid / inner in gold</text>
   </a>
 
   <a class="box" id="g_copy" href="file_gold_grader.html">
@@ -342,8 +342,8 @@ honest runs             WorkflowSelector skips folders where is_oracle_generatio
 </div>
 
 <div class="panel" id="policy-bt"><span class="br"></span>
-<h2>The second channel: policy_bt - re-execute, digest, policy tournament</h2>
-<p><code>config.verifier_kind = "policy_bt"</code> selects this channel (<code>sources/evaluators/evaluator.py:108-116</code>); its own page is <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> and its step-by-step flow page is <a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a>.</p>
+<h2>The second channel on this page: policy_bt - re-execute, digest, policy tournament</h2>
+<p><code>config.verifier_kind = "policy_bt"</code> selects this channel (<code>sources/evaluators/evaluator.py:108-116</code>) and is what <code>config_default.json:16</code> ships, so runs made with the default config use it; its own page is <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> and its step-by-step flow page is <a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a>.</p>
 <div class="canvas">
 <svg class="diagram" viewBox="0 0 1160 320" role="img" aria-label="policy_bt pipeline stages for one generation">
   <defs>
@@ -528,7 +528,7 @@ honest runs             WorkflowSelector skips folders where is_oracle_generatio
 <tr><td>Engine contract</td><td>Writes <code>pair_outcomes</code>; the champion plateau reads it.</td><td>Writes <code>pair_outcomes</code> and <code>metric_summary</code>; the plateau and probe read them.</td></tr>
 </tbody>
 </table>
-<p>The two channels are alternatives, not stages of one pipeline: <code>WorkflowEvaluator.__init__</code> builds exactly one of them, and every <code>evaluate()</code> call goes to that object. policy_bt is opt-in and still new: <code>config.verifier_kind</code> defaults to <code>"hybrid"</code> (<code class="path">config.py:106</code>), and only the CLI choice list adds <code>policy_bt</code> (<code class="path">main.py:80</code>).</p>
+<p>The two channels are alternatives, not stages of one pipeline: <code>WorkflowEvaluator.__init__</code> builds exactly one of them, and every <code>evaluate()</code> call goes to that object. policy_bt is the run default since the operator file switched (<code>config_default.json:16</code> = <code>"policy_bt"</code>, untracked, read 2026-10-13); <code>config.py:106</code> keeps <code>"hybrid"</code> as the built-in fallback and the facade builds <code>HybridVerifierEvaluator</code> for <code>"hybrid"</code> or any unknown value (<code class="path">sources/evaluators/evaluator.py:117-120</code>); the CLI choice list is <code class="path">main.py:78</code>.</p>
 <details><summary>policy_bt artifacts, side files and config knobs</summary><div class="dbody">
 <pre>evaluation.txt            reward line, pair verdicts, raw gradient fold     # evaluator.py::_write_artifacts
 textual_gradient.txt      the refined fold (raw fold inside the same file's history)
@@ -567,7 +567,7 @@ knobs (config.py:149-180) policy_bt_reward, policy_bt_scorer_timeout_s, policy_b
 <tr><td class="sym"><a href="../../sources/evaluators/base.py">sources/evaluators/base.py</a></td><td>Shared judge LLM, workflow loading and result persistence.</td><td class="sym">BaseEvaluator._save_results</td><td class="size">380</td></tr>
 <tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>Facade that selects hybrid, legacy, gold or policy_bt.</td><td class="sym">WorkflowEvaluator.evaluate</td><td class="size">216</td></tr>
 <tr><td class="sym"><a href="mod_evaluators_gold_feedback.html">sources/evaluators/gold_feedback/</a></td><td>ORACLE wrapper: inner hybrid plus grader gradient.</td><td class="sym">GoldFeedbackEvaluator.evaluate</td><td class="size">1 075</td></tr>
-<tr><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">sources/evaluators/policy_bt_verifier/</a></td><td>Second channel: fresh re-execution, deterministic digest, policy tournament.</td><td class="sym">PolicyBTVerifierEvaluator.evaluate</td><td class="size">6 131</td></tr>
+<tr><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">sources/evaluators/policy_bt_verifier/</a></td><td>Second channel: fresh re-execution, deterministic digest, policy tournament.</td><td class="sym">PolicyBTVerifierEvaluator.evaluate</td><td class="size">6 539</td></tr>
 </tbody>
 </table>
 
@@ -658,6 +658,7 @@ workflow_dir/_verifier_tmp/hybrid_registry_&lt;key&gt;.json   claims, cached sco
 <p class="skips">Skipped: <code>sources/evaluators/legacy_verifier/verifier*.py</code>, <code>generic_verifier/bs_detection.py</code>, <code>generic_verifier/generic.py</code>, <code>scenario/scenario.py</code>, <code>grounding.py</code> - deprecated or unrelated verifier channels, covered by <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>; <code>gold_feedback/format.py</code> message rules - covered by <a href="file_gold_format.html">file_gold_format.html</a>; the policy_bt package internals and file cards - covered by <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> and <a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a>; <code class="path">experiments_verifiers/harness/e19b_extract.py</code> and friends - experiment harness the packages only port from, not on the runtime path; <code>.venv/</code>, <code>tmp/</code>, <code>datasets/</code>, <code>webui/</code> - out of scope for this page.</p>
 <p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. The <code>gold</code> branch and <code class="path">sources/evaluators/gold_feedback/</code> are not in <code>4020790</code> (committed later as <code>ca72107</code>); the hybrid package lines come from commit <code>4020790</code>.</p>
 <p>Updated at <code>7da1f5e</code> + working tree, 2026-10-10: page retitled as the hub of both flows, new policy_bt section (stage ladder, pair ladder, the hybrid / policy_bt comparison table, artifacts and knobs), package and config tables extended, the stale <code class="path">config_default.json</code> note replaced (the file now agrees with <code>config.py</code>).</p>
+<p>Updated at <code>c508f11</code> + working tree, 2026-10-13: policy_bt reframed as the run default (<code>config_default.json:16</code> = <code>"policy_bt"</code>, read 2026-10-13) and hybrid as the previous channel; the channel-choice paragraph now separates run default (<code>config_default.json</code>), built-in fallback (<code>config.py:106</code>) and unknown-value behaviour (<code>evaluator.py:117-120</code>).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

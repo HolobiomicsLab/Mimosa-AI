@@ -6,11 +6,11 @@
 <title>L0 overview - Mimosa-AI</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<body data-crumb="Overview &gt; L0 whole system" data-built="7da1f5e+wt" data-built-date="2026-10-12">
+<body data-crumb="Overview &gt; L0 whole system" data-built="c508f11+wt" data-built-date="2026-10-13">
 <div class="wrap">
 
 <h1 class="hud">Mimosa-AI, whole system</h1>
-<p class="intro">For each task Mimosa synthesizes a workflow as plain Python, runs it in a sandbox, verifies the run with the verifier that <code>verifier_kind</code> selects, and evolves the workflow across generations. Four channels exist: <code>hybrid</code> (default, temporal ladder), <code>legacy</code> (deprecated), <code>gold</code> (oracle, leaks the benchmark gold) and <code>policy_bt</code> (fresh re-execution plus an LLM policy tournament, win-rate reward). Five layers carry that loop; the verifier's gradient text steers the next mutation.</p>
+<p class="intro">For each task Mimosa synthesizes a workflow as plain Python, runs it in a sandbox, verifies the run with the verifier that <code>verifier_kind</code> selects, and evolves the workflow across generations. Four channels exist: <code>policy_bt</code> (the run default: fresh re-execution plus an LLM policy tournament, win-rate reward vs predecessors), <code>hybrid</code> (previous channel, temporal ladder), <code>legacy</code> (deprecated) and <code>gold</code> (oracle, leaks the benchmark gold). Five layers carry that loop; the verifier's gradient text steers the next mutation.</p>
 
 <div id="legend" data-auto></div>
 
@@ -71,11 +71,11 @@
   </a>
 
   <a class="box" id="verifier" href="area_evaluators.html">
-    <title>Layer 4 - WorkflowEvaluator builds one verifier from config.verifier_kind: hybrid (default), legacy (deprecated), gold (oracle) or policy_bt</title>
+    <title>Layer 4 - WorkflowEvaluator builds one verifier from config.verifier_kind: policy_bt (run default), hybrid (previous), legacy (deprecated) or gold (oracle)</title>
     <rect x="60" y="470" width="270" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="195" y="488" text-anchor="middle">L4 Verifier (verifier_kind)</text>
-    <text class="box-sub" x="195" y="504" text-anchor="middle">hybrid = default | legacy DEPRECATED</text>
-    <text class="box-sub" x="195" y="518" text-anchor="middle">gold ORACLE | policy_bt tournament</text>
+    <text class="box-sub" x="195" y="504" text-anchor="middle">policy_bt = run default | hybrid PREVIOUS</text>
+    <text class="box-sub" x="195" y="518" text-anchor="middle">legacy DEPRECATED | gold ORACLE</text>
   </a>
 
   <a class="box" id="tools" href="mod_core_tools_llm.html">
@@ -179,13 +179,13 @@
 <tr><td>L2</td><td class="sym">EvolutionEngine</td><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py::EvolutionEngine</a></td><td>Workflow source, then the next generation.</td></tr>
 <tr><td>L3</td><td class="sym">WorkflowRunner</td><td class="sym"><a href="../../sources/core/workflow_runner.py">workflow_runner.py::WorkflowRunner</a></td><td>Temp workspace, run log, state result.</td></tr>
 <tr><td>L4</td><td class="sym">WorkflowEvaluator</td><td class="sym"><a href="../../sources/evaluators/evaluator.py">evaluator.py::WorkflowEvaluator</a></td><td>Builds one verifier from <code>verifier_kind</code>: four channels.</td></tr>
-<tr><td>L4 hybrid</td><td class="sym">HybridVerifierEvaluator</td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py::HybridVerifierEvaluator</a></td><td>Default. Reward 0-1 and the gradient text.</td></tr>
+<tr><td>L4 hybrid</td><td class="sym">HybridVerifierEvaluator</td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py::HybridVerifierEvaluator</a></td><td>Previous channel; also built for unknown values. Reward 0-1, gradient.</td></tr>
 <tr><td>L4 legacy</td><td class="sym">VerifierEvaluator <span class="tag dep">DEPRECATED</span></td><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier.py">legacy_verifier/verifier.py::VerifierEvaluator</a></td><td>Old per-claim verifier, only when <code>legacy</code>.</td></tr>
 <tr><td>L4 gold</td><td class="sym">GoldFeedbackEvaluator <span class="tag">ORACLE</span></td><td class="sym"><a href="../../sources/evaluators/gold_feedback/evaluator.py">gold_feedback/evaluator.py::GoldFeedbackEvaluator</a></td><td>Hybrid reward, benchmark-grader gradient; research control only.</td></tr>
-<tr><td>L4 policy_bt</td><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">PolicyBTVerifierEvaluator</a></td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">policy_bt_verifier/evaluator.py::PolicyBTVerifierEvaluator</a></td><td>Fresh re-execution, LLM policy tournament, win-rate reward.</td></tr>
+<tr><td>L4 policy_bt</td><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">PolicyBTVerifierEvaluator</a></td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">policy_bt_verifier/evaluator.py::PolicyBTVerifierEvaluator</a></td><td>Run default. Re-execution, LLM policy tournament, win-rate reward.</td></tr>
 </tbody>
 </table>
-<p class="note say">The built-in default verifier is <code>verifier_kind = "hybrid"</code> (<code class="path">config.py:106</code>); the local, untracked <code>config_default.json</code> is a live operator file and selected <code>policy_bt</code> when it was read on 2026-10-10 14:03 (it said <code>hybrid</code> earlier the same day); the CLI accepts four values, <code>hybrid</code>, <code>legacy</code>, <code>gold</code> and <code>policy_bt</code> (<code class="path">main.py:80</code>). <code>legacy</code> is deprecated since 2026-09-24 (AGENTS.md); <code>gold</code> leaks the benchmark and <code>main.py::warn_gold_feedback_mode</code> prints a warning; <code>policy_bt</code> is opt-in and coded since E44-E48.</p>
+<p class="note say">The run default is <code>verifier_kind = "policy_bt"</code>: the local, untracked <code>config_default.json</code> is a live operator file and its line 16 ships <code>"policy_bt"</code> (read 2026-10-13). <code>config.py:106</code> keeps <code>"hybrid"</code> as the built-in fallback, and the facade builds <code>HybridVerifierEvaluator</code> for <code>"hybrid"</code> or any unknown value (<code class="path">sources/evaluators/evaluator.py:117-120</code>); the CLI accepts four values, <code>hybrid</code>, <code>legacy</code>, <code>gold</code> and <code>policy_bt</code> (<code class="path">main.py:78</code>). <code>legacy</code> is deprecated since 2026-09-24 (AGENTS.md); <code>gold</code> leaks the benchmark and <code>main.py::warn_gold_feedback_mode</code> prints a warning; <code>policy_bt</code> productionizes E44-E48.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -193,8 +193,8 @@
 <div class="grid2">
 <div class="card l2"><h4><a href="flow_task_run.html">flow_task_run.html</a></h4><p class="role">One task from CLI to first score: synthesis, sandbox run, verification.</p></div>
 <div class="card l2"><h4><a href="flow_evolution_loop.html">flow_evolution_loop.html</a></h4><p class="role">Generation N to N+1: gradient, mutation, archive, novelty, early stop.</p></div>
-<div class="card l4"><h4><a href="flow_verification.html">flow_verification.html</a></h4><p class="role">Claims, policy scorers, the script-log-result ladder, pairwise win-rate.</p></div>
-<div class="card l4"><h4><a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a></h4><p class="role">The opt-in channel: re-execution, digest, policy tournament, win-rate.</p></div>
+<div class="card l4"><h4><a href="flow_verification.html">flow_verification.html</a></h4><p class="role">Verification hub: the policy_bt default and the previous hybrid channel.</p></div>
+<div class="card l4"><h4><a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a></h4><p class="role">The verifier in use: re-execution, digest, policy tournament, win-rate.</p></div>
 <div class="card l3"><h4><a href="flow_sab_batch.html">flow_sab_batch.html</a></h4><p class="role">Batch mode over a CSV: per-task runs, ablations, benchmark grades.</p></div>
 </div>
 </div>

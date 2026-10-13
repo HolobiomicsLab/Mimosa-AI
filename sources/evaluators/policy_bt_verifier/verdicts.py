@@ -233,6 +233,8 @@ def _rung_verdict(
             f"goal's deliverables"
         ),
     }
+
+
 def code_pair_verdict(
     run_fn: Callable[[str, dict, dict], dict],
     policy_src: str,
@@ -260,15 +262,17 @@ def code_pair_verdict(
         return {
             "winner": "tie",
             "channel": "code_policy",
-            "error": str(err)[:400],
+            "error": str(err)[:2048],
             "feedback_winner": "",
             "feedback_looser": "",
             "mirrored": None,
         }
     w_ab, w_ba = v_ab.get("winner"), v_ba.get("winner")
-    mirrored = (w_ab == "tie" and w_ba == "tie") or (
-        w_ab == "A" and w_ba == "B"
-    ) or (w_ab == "B" and w_ba == "A")
+    mirrored = (
+        (w_ab == "tie" and w_ba == "tie")
+        or (w_ab == "A" and w_ba == "B")
+        or (w_ab == "B" and w_ba == "A")
+    )
     if not mirrored:
         if log is not None:
             log.warn(
@@ -285,7 +289,7 @@ def code_pair_verdict(
             "mirrored": False,
         }
     winner = "tie" if w_ab == "tie" else (uuid_a if w_ab == "A" else uuid_b)
-    return {
+    verdict = {
         "winner": winner,
         "channel": "code_policy",
         "confidence": v_ab.get("confidence"),
@@ -295,6 +299,15 @@ def code_pair_verdict(
         "feedback_looser": v_ab.get("feedback_looser") or "",
         "mirrored": True,
     }
+    if v_ab.get("schema_error") and v_ba.get("schema_error"):
+        # Both orders signal unknown digest structure (E48 SchemaError
+        # contract): honest tie + the flag, so the evaluator can cache
+        # it, refresh its recon and re-evaluate this pair. A one-sided
+        # signal stays an antisymmetry tie WITHOUT the flag (the branch
+        # above) — one order reading novel keys is instrument noise,
+        # not a knowledge gap.
+        verdict["schema_error"] = v_ab.get("schema_error")
+    return verdict
 
 
 # ------------------------------------------------------------------
@@ -356,7 +369,9 @@ def bradley_terry_reward(
     ratings = expit(th - th.mean())
     best = max(range(len(uuids)), key=lambda k: (ratings[k], k))
     return {
-        "ratings": {u: round(float(r), 4) for u, r in zip(uuids, ratings, strict=False)},
+        "ratings": {
+            u: round(float(r), 4) for u, r in zip(uuids, ratings, strict=False)
+        },
         "pick": uuids[best],
         "theta": th.tolist(),
     }

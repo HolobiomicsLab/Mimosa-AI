@@ -122,9 +122,9 @@ REFINER_JSON = {
 _TIE_POLICY_BODY = (
     "import json\n"
     "def compare(dA, dB):\n"
-    "    return {\"winner\": \"tie\", \"confidence\": 0.5, \"rungs\": [],\n"
-    "            \"deciding\": [], \"feedback_winner\": \"tie - no decisive evidence\",\n"
-    "            \"feedback_looser\": \"tie - no decisive evidence\"}\n"
+    '    return {"winner": "tie", "confidence": 0.5, "rungs": [],\n'
+    '            "deciding": [], "feedback_winner": "tie - no decisive evidence",\n'
+    '            "feedback_looser": "tie - no decisive evidence"}\n'
 )
 
 _DECISIVE_POLICY_BODY = (
@@ -133,15 +133,47 @@ _DECISIVE_POLICY_BODY = (
     "    a = len(dA.get('deliverables') or [])\n"
     "    b = len(dB.get('deliverables') or [])\n"
     "    if a == b:\n"
-    "        return {\"winner\": \"tie\", \"confidence\": 0.5, \"rungs\": [],\n"
-    "                \"deciding\": [], \"feedback_winner\": \"both sides equal\",\n"
-    "                \"feedback_looser\": \"both sides equal\"}\n"
+    '        return {"winner": "tie", "confidence": 0.5, "rungs": [],\n'
+    '                "deciding": [], "feedback_winner": "both sides equal",\n'
+    '                "feedback_looser": "both sides equal"}\n'
     "    w = 'A' if a > b else 'B'\n"
     "    hi, lo = max(a, b), min(a, b)\n"
-    "    return {\"winner\": w, \"confidence\": 0.9, \"rungs\": [],\n"
+    '    return {"winner": w, "confidence": 0.9, "rungs": [],\n'
     "            \"deciding\": ['deliverables'],\n"
-    "            \"feedback_winner\": f\"{hi} deliverables vs {lo}\",\n"
-    "            \"feedback_looser\": f\"{lo} deliverables vs {hi}\"}\n"
+    '            "feedback_winner": f"{hi} deliverables vs {lo}",\n'
+    '            "feedback_looser": f"{lo} deliverables vs {hi}"}\n'
+)
+
+
+_SCHEMA_ERROR_POLICY_BODY = (
+    "import json\n"
+    "class SchemaError(Exception):\n"
+    "    pass\n"
+    "def compare(dA, dB):\n"
+    "    if dA == dB:\n"
+    '        return {"winner": "tie", "confidence": 0.5, "rungs": [],\n'
+    '                "deciding": [], "feedback_winner": "same digest",\n'
+    '                "feedback_looser": "same digest"}\n'
+    "    raise SchemaError('unrecognised key results/minimum_energy')\n"
+)
+
+_ONE_SIDED_SCHEMA_POLICY_BODY = (
+    "import json\n"
+    "class SchemaError(Exception):\n"
+    "    pass\n"
+    "def compare(dA, dB):\n"
+    "    a = len(dA.get('deliverables') or [])\n"
+    "    b = len(dB.get('deliverables') or [])\n"
+    "    if a == b:\n"
+    '        return {"winner": "tie", "confidence": 0.5, "rungs": [],\n'
+    '                "deciding": [], "feedback_winner": "equal",\n'
+    '                "feedback_looser": "equal"}\n'
+    "    if a < b:\n"
+    "        raise SchemaError('novel structure on the smaller side')\n"
+    '    return {"winner": "A", "confidence": 0.9, "rungs": [],\n'
+    "            \"deciding\": ['deliverables'],\n"
+    '            "feedback_winner": "more deliverables",\n'
+    '            "feedback_looser": "fewer deliverables"}\n'
 )
 
 
@@ -176,7 +208,9 @@ def _seed_workspace(ws: Path, n_rows: int = 3, with_figs: bool = False) -> None:
         encoding="utf-8",
     )
     (ws / "train.csv").write_text(
-        "smiles,tox\n" + "\n".join(f"{s}C,{i % 2}" for i, s in enumerate(smiles)) + "\n",
+        "smiles,tox\n"
+        + "\n".join(f"{s}C,{i % 2}" for i, s in enumerate(smiles))
+        + "\n",
         encoding="utf-8",
     )
     rows = "\n".join(f"{s},{0.2 + 0.15 * i}" for i, s in enumerate(smiles))
@@ -289,9 +323,7 @@ class _FakeReexecRunner:
         if dst.exists():
             shutil.rmtree(dst)
         shutil.copytree(workspace, dst)
-        fresh = {
-            "pred_results/predictions.csv": {"bytes": 64, "sha256": "0" * 64}
-        }
+        fresh = {"pred_results/predictions.csv": {"bytes": 64, "sha256": "0" * 64}}
         return {
             "uuid": uuid,
             "exit_code": 0,
@@ -311,9 +343,14 @@ class _FakeReexecRunner:
 class _ScriptedLLM:
     """Dispatches canned JSON by agent role; records every call."""
 
-    def __init__(self, recon=RECON_JSON, policy=_DECISIVE_POLICY_BODY,
-                 refiner=REFINER_JSON, first_policy_raw=None,
-                 text_extract=None):
+    def __init__(
+        self,
+        recon=RECON_JSON,
+        policy=_DECISIVE_POLICY_BODY,
+        refiner=REFINER_JSON,
+        first_policy_raw=None,
+        text_extract=None,
+    ):
         self.recon = recon
         self.text_extract = text_extract or {}
         self.policy = policy
@@ -339,6 +376,7 @@ class _ScriptedLLM:
             return self.text_extract
         raise AssertionError(f"unexpected llm role: {role}")
 
+
 _JSON_POLICY_BODY = (
     "import json\n"
     "def compare(dA, dB):\n"
@@ -347,40 +385,45 @@ _JSON_POLICY_BODY = (
     "    b = (dB.get('json_metrics') or {}).get('metrics.json', {})"
     ".get('auc', 0.0)\n"
     "    if a == b:\n"
-    "        return {\"winner\": \"tie\", \"confidence\": 0.5, \"rungs\": [],\n"
-    "                \"deciding\": [], \"feedback_winner\": \"equal\",\n"
-    "                \"feedback_looser\": \"equal\"}\n"
+    '        return {"winner": "tie", "confidence": 0.5, "rungs": [],\n'
+    '                "deciding": [], "feedback_winner": "equal",\n'
+    '                "feedback_looser": "equal"}\n'
     "    w = 'A' if a > b else 'B'\n"
-    "    return {\"winner\": w, \"confidence\": 0.9, \"rungs\": [],\n"
+    '    return {"winner": w, "confidence": 0.9, "rungs": [],\n'
     "            \"deciding\": ['json_metrics[metrics.json].auc'],\n"
-    "            \"feedback_winner\": f\"auc {max(a, b):.2f} vs {min(a, b):.2f}\",\n"
-    "            \"feedback_looser\": f\"auc {min(a, b):.2f} vs {max(a, b):.2f}\"}\n"
+    '            "feedback_winner": f"auc {max(a, b):.2f} vs {min(a, b):.2f}",\n'
+    '            "feedback_looser": f"auc {min(a, b):.2f} vs {max(a, b):.2f}"}\n'
 )
 
 _BRITTLE_JSON_POLICY_BODY = (
     "import json\n"
     "def compare(dA, dB):\n"
     "    if dB.get('json_metrics'):\n"
-        # KeyError whenever one side reports json metrics and the other
-        # does not — a branch-only error invisible to a self-compare
+    # KeyError whenever one side reports json metrics and the other
+    # does not — a branch-only error invisible to a self-compare
     "        return dA['json_metrics']['metrics.json']['auc']\n"
-    "    return {\"winner\": \"tie\", \"confidence\": 0.5, \"rungs\": [],\n"
-    "            \"deciding\": [], \"feedback_winner\": \"tie\",\n"
-    "            \"feedback_looser\": \"tie\"}\n"
+    '    return {"winner": "tie", "confidence": 0.5, "rungs": [],\n'
+    '            "deciding": [], "feedback_winner": "tie",\n'
+    '            "feedback_looser": "tie"}\n'
 )
 
 
 class _SeqPolicyLLM(_ScriptedLLM):
     """_ScriptedLLM returning a SEQUENCE of policy bodies (write order)."""
 
-    def __init__(self, policies, **kw):
+    def __init__(self, policies, recon_refresh=None, **kw):
         super().__init__(**kw)
         self.policies = list(policies)
+        # Distinct refreshed recon -> distinct config hash -> the
+        # schema-refresh policy rewrite lands under a NEW sha.
+        self.recon_refresh = recon_refresh
 
     def __call__(self, uuid, role, prompt, max_tokens, log):
         self.calls.append((role, max_tokens))
         if role == "recon":
             return self.recon
+        if role == "recon_refresh":
+            return self.recon_refresh or self.recon
         if role.startswith("policy_write"):
             self.policy_writes += 1
             body = self.policies.pop(0) if self.policies else self.policy
@@ -401,7 +444,9 @@ def _seed_workspace(ws: Path, n_rows: int = 3, with_figs: bool = False) -> None:
         encoding="utf-8",
     )
     (ws / "train.csv").write_text(
-        "smiles,tox\n" + "\n".join(f"{s}C,{i % 2}" for i, s in enumerate(smiles)) + "\n",
+        "smiles,tox\n"
+        + "\n".join(f"{s}C,{i % 2}" for i, s in enumerate(smiles))
+        + "\n",
         encoding="utf-8",
     )
     rows = "\n".join(f"{s},{0.2 + 0.15 * i}" for i, s in enumerate(smiles))
@@ -472,13 +517,16 @@ def test_digest_bootstrap_and_figure_dominance(tmp_path: Path):
     assert d["exec"]["exit_code"] is None
     assert d["exec"]["bootstrap"] is None
 
-    data = {"deliverables": [{"path": "pred_results/p.csv", "kind": "csv"},
-                             {"path": "pred_results/q.csv", "kind": "csv"},
-                             {"path": "pred_results/dens.npy", "kind": "npy"},
-                             {"path": "pred_results/fig.png", "kind": "png"}]}
+    data = {
+        "deliverables": [
+            {"path": "pred_results/p.csv", "kind": "csv"},
+            {"path": "pred_results/q.csv", "kind": "csv"},
+            {"path": "pred_results/dens.npy", "kind": "npy"},
+            {"path": "pred_results/fig.png", "kind": "png"},
+        ]
+    }
     assert is_figure_dominant(data) is False  # charge_density class
     assert is_figure_dominant({"deliverables": []}) is False
-
 
 
 def test_digest_booleans_are_flags_and_coordinates_are_shape_markers(
@@ -585,9 +633,7 @@ def test_reexec_timeout_kills_process_group_no_orphans(tmp_path: Path):
     # the kill logged loudly (plan §6b failure paths)
     assert any("timed out" in w and "process group" in w for w in log.warns)
     # no orphaned grandchild survived the group kill
-    probe = subprocess.run(
-        ["pgrep", "-f", marker], capture_output=True, text=True
-    )
+    probe = subprocess.run(["pgrep", "-f", marker], capture_output=True, text=True)
     assert probe.stdout.strip() == "", f"orphan survived: {probe.stdout}"
 
 
@@ -611,7 +657,7 @@ def test_contract_commands_from_run_sh(tmp_path: Path):
     (ws / "run.sh").write_text(
         "#!/usr/bin/env bash\n"
         "set -euo pipefail\n"
-        "cd \"$(dirname \"$0\")\"\n"
+        'cd "$(dirname "$0")"\n'
         "pip install -r requirement.txt\n"
         "python3 hp_exact_enumeration.py\n"
         "python helper.py --mode fast\n"
@@ -674,13 +720,10 @@ def test_reexec_shell_preserves_pipes_and_redirects(tmp_path: Path):
     ws = tmp_path / "ws"
     ws.mkdir(parents=True)
     (ws / "run.sh").write_text(
-        "python3 gen.py | tee run_output.txt\n"
-        "python3 gen.py > redirected.txt\n",
+        "python3 gen.py | tee run_output.txt\npython3 gen.py > redirected.txt\n",
         encoding="utf-8",
     )
-    (ws / "gen.py").write_text(
-        "print('Minimum energy found: -9')\n", encoding="utf-8"
-    )
+    (ws / "gen.py").write_text("print('Minimum energy found: -9')\n", encoding="utf-8")
     runner = ReexecRunner(tmp_path / "sb", timeout_s=60, venv_reuse=False)
     ledger = runner.run(ws, "g1")
     assert ledger["main_script_source"] == "shell_run_sh"
@@ -698,15 +741,17 @@ def test_metric_resolution_via_llm_text_extraction():
     from sources.evaluators.policy_bt_verifier import metrics as mm
 
     digest = {
-        "exec": {"log_tail": ["Minimum energy found: -9",
-                              "Contacts in optimal: 9"]},
+        "exec": {"log_tail": ["Minimum energy found: -9", "Contacts in optimal: 9"]},
         "json_metrics": {},
         "log_metrics": [],
         "deliverables": [],
     }
     primary = [
-        {"id": "min_energy", "key": "minimum energy",
-         "aliases": [{"file": "results.json", "key": "minimum_energy"}]},
+        {
+            "id": "min_energy",
+            "key": "minimum energy",
+            "aliases": [{"file": "results.json", "key": "minimum_energy"}],
+        },
     ]
     seen_prompts: list[str] = []
 
@@ -727,6 +772,7 @@ def test_metric_resolution_via_llm_text_extraction():
     # without llm_extract the same digest resolves nothing (no regex path)
     out2 = mm.resolve_primary_values(digest, primary)
     assert out2["min_energy"]["status"] == "missing"
+
 
 def test_scan_imports_remap_and_local_dirs(tmp_path: Path):
     """P1.3: sklearn/PIL map to their PyPI names; local dirs and stdlib
@@ -795,9 +841,7 @@ def test_static_screen_allowlist_and_banlist():
     assert static_screen("import sys\ndef compare(dA, dB): pass")
     errs = static_screen("import sys\ndef compare(dA, dB): pass")
     assert any("banned import: sys" in e for e in errs)
-    errs = static_screen(
-        "def compare(dA, dB):\n    return open('x').read()\n"
-    )
+    errs = static_screen("def compare(dA, dB):\n    return open('x').read()\n")
     assert any("banned name: open" in e for e in errs)
     errs = static_screen("x = 1\n")
     assert any("missing def compare" in e for e in errs)
@@ -891,9 +935,9 @@ def test_run_policy_and_smoke_both_orders():
     bad_policy = (
         "import json\n"
         "def compare(dA, dB):\n"
-        "    return {\"winner\": \"A\", \"confidence\": 0.9, \"rungs\": [],\n"
-        "            \"deciding\": [], \"feedback_winner\": \"x\",\n"
-        "            \"feedback_looser\": \"y\"}\n"
+        '    return {"winner": "A", "confidence": 0.9, "rungs": [],\n'
+        '            "deciding": [], "feedback_winner": "x",\n'
+        '            "feedback_looser": "y"}\n'
     ) + MAIN_STANZA
     ok, err = smoke_test(bad_policy, [dA, dB])
     assert not ok and "antisymmetry" in err
@@ -908,9 +952,9 @@ def test_smoke_covers_every_distinct_pair_branch_only_errors():
         "def compare(dA, dB):\n"
         "    if (dA.get('tables') or []) and not (dB.get('tables') or []):\n"
         "        return dA['saw_count']  # KeyError: branch-only error\n"
-        "    return {\"winner\": \"tie\", \"confidence\": 0.5, \"rungs\": [],\n"
-        "            \"deciding\": [], \"feedback_winner\": \"x\",\n"
-        "            \"feedback_looser\": \"y\"}\n"
+        '    return {"winner": "tie", "confidence": 0.5, "rungs": [],\n'
+        '            "deciding": [], "feedback_winner": "x",\n'
+        '            "feedback_looser": "y"}\n'
     ) + MAIN_STANZA
     digests = [
         {},
@@ -933,9 +977,9 @@ def test_run_policy_non_dict_output_is_error_not_crash():
         "def compare(dA, dB):\n"
         "    if dB.get('deliverables'):\n"
         "        return None\n"
-        "    return {\"winner\": \"tie\", \"confidence\": 0.5, \"rungs\": [],\n"
-        "            \"deciding\": [], \"feedback_winner\": \"\",\n"
-        "            \"feedback_looser\": \"\"}\n"
+        '    return {"winner": "tie", "confidence": 0.5, "rungs": [],\n'
+        '            "deciding": [], "feedback_winner": "",\n'
+        '            "feedback_looser": ""}\n'
     ) + MAIN_STANZA
     v = run_policy(none_policy, {}, {"deliverables": [{"path": "a"}]})
     assert "error" in v and "non-dict" in v["error"]
@@ -1012,10 +1056,18 @@ def test_code_pair_verdict_mirrored_and_disagreement():
 
 
 def test_crash_rung_rules():
-    clean = {"exit_code": 0, "timed_out": False, "error_signature": [],
-             "fresh_artifacts": {"a": 1}}
-    crash = {"exit_code": 1, "timed_out": False,
-             "error_signature": ["ModuleNotFoundError"], "fresh_artifacts": {}}
+    clean = {
+        "exit_code": 0,
+        "timed_out": False,
+        "error_signature": [],
+        "fresh_artifacts": {"a": 1},
+    }
+    crash = {
+        "exit_code": 1,
+        "timed_out": False,
+        "error_signature": ["ModuleNotFoundError"],
+        "fresh_artifacts": {},
+    }
     assert verdicts_mod.crash_rung("u1", clean, "u2", clean) is None
     v = verdicts_mod.crash_rung("u1", clean, "u2", crash)
     assert v["winner"] == "u1" and v["rung"] == "one_side_crashed"
@@ -1024,14 +1076,16 @@ def test_crash_rung_rules():
     other = dict(crash, error_signature=["AssertionError"])
     v = verdicts_mod.crash_rung("u1", crash, "u2", other)
     assert v["winner"] == "tie"  # different but equal partial evidence
-    partial = dict(crash, error_signature=["AssertionError"],
-                   fresh_artifacts={"a": 1, "b": 2})
+    partial = dict(
+        crash, error_signature=["AssertionError"], fresh_artifacts={"a": 1, "b": 2}
+    )
     v = verdicts_mod.crash_rung("u1", partial, "u2", crash)
     assert v["winner"] == "u1"
     # identical signatures dominate partial evidence (chem clintox rule)
     partial_same_sig = dict(crash, fresh_artifacts={"a": 1, "b": 2})
     v = verdicts_mod.crash_rung("u1", partial_same_sig, "u2", crash)
     assert v["winner"] == "tie"
+
 
 # ------------------------------------------------------------- (5) visual ----
 
@@ -1053,17 +1107,29 @@ def test_visual_retry_once_and_self_heal_cache(tmp_path: Path):
     fa, fb = [_png(tmp_path, "a.png"), _png(tmp_path, "b.png")]
     store: list[dict] = []
     roles: list[str] = []
-    responses = iter([
-        "",  # first order, first attempt: empty (billable-but-zero-byte)
-        json.dumps({"winner": "A", "confidence": 0.9,
+    responses = iter(
+        [
+            "",  # first order, first attempt: empty (billable-but-zero-byte)
+            json.dumps(
+                {
+                    "winner": "A",
+                    "confidence": 0.9,
                     "figure_notes": "A clearer",
                     "feedback_winner": "A shows labeled axes",
-                    "feedback_looser": "B lacks axis labels"}),
-        json.dumps({"winner": "B", "confidence": 0.9,  # mirrored order
+                    "feedback_looser": "B lacks axis labels",
+                }
+            ),
+            json.dumps(
+                {
+                    "winner": "B",
+                    "confidence": 0.9,  # mirrored order
                     "figure_notes": "A clearer",
                     "feedback_winner": "A shows labeled axes",
-                    "feedback_looser": "B lacks axis labels"}),
-    ])
+                    "feedback_looser": "B lacks axis labels",
+                }
+            ),
+        ]
+    )
 
     def vision_call(prompt, figs_a, figs_b, max_tokens, role):
         roles.append(role)
@@ -1144,9 +1210,19 @@ def test_visual_cap_falls_to_code_policy_with_warning(tmp_path):
     visual = ev._make_visual_channel("genA", GOAL, registry, log)
     pred = {"uuid": "genB", "digest": digest_b, "ledger": ledger_b}
     verdict = ev._pair_verdict(
-        "genA", GOAL, digest_a, ledger, runner.run_copy_path("genA"),
-        runner, pred, _TIE_POLICY_BODY + MAIN_STANZA, "test_sha_123",
-        visual, allow_visual=False, registry=registry, log=log,
+        "genA",
+        GOAL,
+        digest_a,
+        ledger,
+        runner.run_copy_path("genA"),
+        runner,
+        pred,
+        _TIE_POLICY_BODY + MAIN_STANZA,
+        "test_sha_123",
+        visual,
+        allow_visual=False,
+        registry=registry,
+        log=log,
     )
     assert verdict["channel"] == "code_policy"
     assert any("budget cap" in w for w in log.warns)
@@ -1173,7 +1249,10 @@ def test_gradient_fold_ordering_losses_ties_wins():
     assert "NOT ASSESSED (grading bars unknown): cover" in text
     # no coverage footers INSIDE the pairwise feedback (v2b lesson)
     for seg in ("L4", "L2", "W1", "W5"):
-        assert "not assessed" not in text[text.index(seg):text.index(seg) + len(seg) + 10]
+        assert (
+            "not assessed"
+            not in text[text.index(seg) : text.index(seg) + len(seg) + 10]
+        )
 
 
 def test_refiner_contract_keys_and_no_solutions():
@@ -1224,7 +1303,9 @@ def test_registry_persistence_and_arrival_order(tmp_path: Path):
     assert [g["uuid"] for g in reg2.generations] == ["u1", "u2"]
     assert reg2.generation("u1")["reward"] == 0.9
     # self-heal scan sees parse-fail entries but they never satisfy a hit
-    reg2.add_visual_entry(visual_key("pv", "u1", "u3", "AB", "ih"), {"parse_fail": True})
+    reg2.add_visual_entry(
+        visual_key("pv", "u1", "u3", "AB", "ih"), {"parse_fail": True}
+    )
     hits = reg2.visual_entries(visual_key("pv", "u1", "u3", "AB", "ih"))
     assert len(hits) == 1 and hits[0].get("parse_fail")
 
@@ -1243,7 +1324,9 @@ def test_short_circuit_paths(tmp_path: Path, capsys):
     uuid = "deadgen0001"
     _wf_dir(tmp_path, uuid)
     # no state_result -> short circuit (folder has state_result though; wipe it)
-    (tmp_path / "workflows" / uuid / "state_result.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "workflows" / uuid / "state_result.json").write_text(
+        "{}", encoding="utf-8"
+    )
     out = ev.evaluate(uuid)
     assert out["overall_score"] == 0.0
     assert out["abstracted_textual_gradient"]
@@ -1285,7 +1368,8 @@ def test_evaluate_accumulates_generations_and_stage_order(
     # registry persisted the predecessor (tier-1 resolution)
     reg = TaskRegistry.load(ev._runner_temp_root, GOAL)
     assert [g["uuid"] for g in reg.generations] == [
-        "aaaaaaaa-1111", "aaaaaaaa-2222",
+        "aaaaaaaa-1111",
+        "aaaaaaaa-2222",
     ]
     assert reg.policy is not None  # policy cached (composite sha)
     assert "_" in reg.policy["sha"]  # composite: POLICY_SHA_reconVersion
@@ -1297,23 +1381,42 @@ def test_evaluate_accumulates_generations_and_stage_order(
     stage_lines = [
         ln for ln in captured.splitlines() if ln.startswith(f"[policy_bt][{tag2}]")
     ]
-    stages_seen = [
-        ln.split("]", 2)[2].split()[0] for ln in stage_lines if "]" in ln
-    ]
-    for stage in ("REEXEC", "DIGEST", "RECON", "POLICY", "PAIRS", "REWARD",
-                  "GRADIENT", "DONE"):
+    stages_seen = [ln.split("]", 2)[2].split()[0] for ln in stage_lines if "]" in ln]
+    for stage in (
+        "REEXEC",
+        "DIGEST",
+        "RECON",
+        "POLICY",
+        "PAIRS",
+        "REWARD",
+        "GRADIENT",
+        "DONE",
+    ):
         assert stage in stages_seen, f"missing stage {stage}: {stages_seen}"
-    order = {s: stages_seen.index(s) for s in
-             ("REEXEC", "DIGEST", "RECON", "POLICY", "PAIRS", "REWARD",
-              "GRADIENT", "DONE")}
+    order = {
+        s: stages_seen.index(s)
+        for s in (
+            "REEXEC",
+            "DIGEST",
+            "RECON",
+            "POLICY",
+            "PAIRS",
+            "REWARD",
+            "GRADIENT",
+            "DONE",
+        )
+    }
     assert order["REEXEC"] < order["DIGEST"] < order["RECON"] < order["POLICY"]
     assert order["POLICY"] < order["PAIRS"] < order["REWARD"] < order["GRADIENT"]
     assert order["GRADIENT"] < order["DONE"]
     assert any(f"(gen {tag2} vs {tag1})" in ln for ln in stage_lines)
     # uuid — uuid[:8] is the DATE in Mimosa uuids and collides all day)
     tkey = task_key(GOAL)
-    led = ev._runner_temp_root / "policy_bt" / tkey / (
-        "policy_bt_ledger_aaaaaaaa-2222.json"
+    led = (
+        ev._runner_temp_root
+        / "policy_bt"
+        / tkey
+        / ("policy_bt_ledger_aaaaaaaa-2222.json")
     )
     assert led.exists()
     # verbose mode: per-pair detail lines present
@@ -1324,11 +1427,19 @@ def test_evaluate_accumulates_generations_and_stage_order(
     records = [json.loads(ln) for ln in lines]
     assert all("stage" in r and "uuid" in r for r in records)
     assert {r["stage"] for r in records} >= {
-        "REEXEC", "DIGEST", "RECON", "POLICY", "PAIRS", "REWARD", "DONE"
+        "REEXEC",
+        "DIGEST",
+        "RECON",
+        "POLICY",
+        "PAIRS",
+        "REWARD",
+        "DONE",
     }
     # one ledger file per generation (full-uuid names never collide)
     led1 = (
-        ev._runner_temp_root / "policy_bt" / tkey
+        ev._runner_temp_root
+        / "policy_bt"
+        / tkey
         / "policy_bt_ledger_aaaaaaaa-1111.json"
     )
     assert led1.exists() and led.exists()
@@ -1351,6 +1462,77 @@ def test_evaluate_bradley_terry_mode(tmp_path: Path, monkeypatch):
     assert out["reward_mode"] == "bradley_terry"
     assert out["bt_ratings"]["bbbbbbbb-2222"] > out["bt_ratings"]["bbbbbbbb-1111"]
     assert 0.0 <= out["overall_score"] <= 1.0
+
+
+def test_code_pair_verdict_propagates_schema_error():
+    """Fix 3 (2026-10-12): the schema_error flag must survive
+    code_pair_verdict into the verdict cache, or the recon refresh can
+    never trigger (audits/policy_bt_schema_refresh_reward_bugs.md)."""
+    dA = {"deliverables": [{"path": "a"}]}
+    dB = {"deliverables": [{"path": "a"}, {"path": "b"}]}
+    full = _SCHEMA_ERROR_POLICY_BODY + MAIN_STANZA
+    v = verdicts_mod.code_pair_verdict(run_policy, full, "uuidA", dA, "uuidB", dB)
+    assert v["winner"] == "tie" and v["mirrored"] is True
+    assert v["schema_error"] == "unrecognised key results/minimum_energy"
+
+    # One-sided signal: order-dependent noise, NOT a knowledge gap —
+    # stays an antisymmetry tie WITHOUT the flag (no refresh trigger).
+    one_sided = _ONE_SIDED_SCHEMA_POLICY_BODY + MAIN_STANZA
+    v2 = verdicts_mod.code_pair_verdict(run_policy, one_sided, "uuidA", dA, "uuidB", dB)
+    assert v2["winner"] == "tie" and v2["antisymmetry"] == "disagreement"
+    assert "schema_error" not in v2
+
+
+def test_schema_error_refresh_flow_rewards_re_evaluated_wins(
+    tmp_path: Path, monkeypatch, capsys
+):
+    """End-to-end refresh flow (fixes 1+2, 2026-10-12): SchemaError
+    pairs tie + cache the flag (fix 3) -> recon refresh rewrites the
+    policy -> re-evaluated WINS are recorded as outcome "won" (not the
+    raw winner uuid) and rewarded in the canonical vocabulary."""
+    monkeypatch.setattr(ev_mod, "ReexecRunner", _FakeReexecRunner)
+    ev = _make_evaluator(tmp_path)
+    recon_v2 = dict(RECON_JSON, tie_policy="tie only on identical deliverable sets")
+    llm = _SeqPolicyLLM(
+        [_SCHEMA_ERROR_POLICY_BODY, _DECISIVE_POLICY_BODY],
+        recon_refresh=recon_v2,
+    )
+    g1, g2, g3 = "schemagen-1111", "schemagen-2222", "schemagen-3333"
+
+    out1 = _run_generation(ev, llm, g1)
+    assert out1["n_pairs"] == 0 and out1["overall_score"] == 0.5
+
+    # gen-2 introduces a new digest shape: both orders raise SchemaError
+    # -> honest tie with the flag cached. Refresh gap (2) not yet reached.
+    (ev.workspace_dir / "pred_results" / "extra.csv").write_text(
+        "smiles,probability\nCCO,0.5\n", encoding="utf-8"
+    )
+    out2 = _run_generation(ev, llm, g2)
+    assert out2["pair_outcomes"] == {g1: "tie"}
+    assert out2["overall_score"] == 0.5
+    assert "SchemaError from policy" not in capsys.readouterr().out
+
+    # gen-3 strictly dominates both predecessors; gap reached -> the
+    # refresh fires NATURALLY and both re-evaluations WIN under the
+    # rewritten (decisive) policy.
+    (ev.workspace_dir / "pred_results" / "extra2.csv").write_text(
+        "smiles,probability\nCCO,0.6\n", encoding="utf-8"
+    )
+    out3 = _run_generation(ev, llm, g3)
+    captured = capsys.readouterr().out
+    assert "SchemaError from policy on 2 pairs" in captured
+    assert "cache=schema-refreshed" in captured
+    assert llm.policy_writes == 2  # gen-1 build + refresh rewrite
+    # Fix 1: record vocabulary ("won"), never the raw uuid.
+    assert out3["pair_outcomes"] == {g1: "won", g2: "won"}
+    # Fix 2: canonical outcomes -> the wins actually count.
+    assert out3["n_wins"] == 2 and out3["n_losses"] == 0
+    assert out3["overall_score"] == 1.0
+    assert out3["reward_weak_evidence"] is False
+    txt = (tmp_path / "workflows" / g3 / "evaluation.txt").read_text(encoding="utf-8")
+    assert f"- vs {g1}: won via code_policy" in txt
+    assert f"- vs {g2}: won via code_policy" in txt
+    assert "2W/0L/0T" in txt  # gradient fold keeps both wins
 
 
 def test_evaluate_excludes_unscoreable_predecessor_with_warning(
@@ -1403,18 +1585,14 @@ def test_errored_pair_verdict_never_cached(tmp_path: Path, monkeypatch):
     runner = _FakeReexecRunner(tmp_path / "sb")
     _seed_workspace(ev.workspace_dir)
     ledger = runner.run(ev.workspace_dir, "genA")
-    digest_a = digest_mod.build_digest(
-        "genA", runner.run_copy_path("genA"), ledger
-    )
+    digest_a = digest_mod.build_digest("genA", runner.run_copy_path("genA"), ledger)
     ws_b = tmp_path / "ws_b"
     _seed_workspace(ws_b)
     (ws_b / "pred_results" / "extra.csv").write_text(
         "smiles,probability\nCCO,0.5\n", encoding="utf-8"
     )
     ledger_b = runner.run(ws_b, "genB")
-    digest_b = digest_mod.build_digest(
-        "genB", runner.run_copy_path("genB"), ledger_b
-    )
+    digest_b = digest_mod.build_digest("genB", runner.run_copy_path("genB"), ledger_b)
     pred = {"uuid": "genB", "digest": digest_b, "ledger": ledger_b}
     real_run = ev_mod.policy_mod.run_policy
     policy = _DECISIVE_POLICY_BODY + MAIN_STANZA
@@ -1426,27 +1604,47 @@ def test_errored_pair_verdict_never_cached(tmp_path: Path, monkeypatch):
             return {"error": "KeyError: 'saw_count'", "wall_ms": 1}
         return real_run(src, dA, dB, timeout=timeout)
 
-
     monkeypatch.setattr(ev_mod.policy_mod, "run_policy", flaky)
     v1 = ev._pair_verdict(
-        "genA", GOAL, digest_a, ledger, runner.run_copy_path("genA"),
-        runner, pred, policy, "sha_x", None, False, registry, log,
+        "genA",
+        GOAL,
+        digest_a,
+        ledger,
+        runner.run_copy_path("genA"),
+        runner,
+        pred,
+        policy,
+        "sha_x",
+        None,
+        False,
+        registry,
+        log,
     )
     assert v1["winner"] == "tie" and v1.get("error")
     key = code_verdict_key("sha_x", "genA", "genB")
     assert registry.get_verdict(key) is None  # NOT cached (P0.5)
     monkeypatch.setattr(ev_mod.policy_mod, "run_policy", real_run)
     v2 = ev._pair_verdict(
-        "genA", GOAL, digest_a, ledger, runner.run_copy_path("genA"),
-        runner, pred, policy, "sha_x", None, False, registry, log,
+        "genA",
+        GOAL,
+        digest_a,
+        ledger,
+        runner.run_copy_path("genA"),
+        runner,
+        pred,
+        policy,
+        "sha_x",
+        None,
+        False,
+        registry,
+        log,
     )
     assert v2["winner"] == "genB" and "error" not in v2  # decisive on retry
 
 
 def test_weak_evidence_guard_classification():
     """P0.7 unit: which decisive verdicts count as weak evidence."""
-    primary = [{"field": "json_metrics", "key": "minimum_energy",
-                "direction": "lower"}]
+    primary = [{"field": "json_metrics", "key": "minimum_energy", "direction": "lower"}]
     # gen-4 style: self-reported metric outside the primary metrics
     weak = {
         "deciding": ["json_metrics[r.json].optimality.globally_optimal"],
@@ -1455,8 +1653,9 @@ def test_weak_evidence_guard_classification():
     assert ev_mod._decisive_weak_evidence(weak, primary) is True
     # the primary metric itself is strong evidence
     strong = {
-        "deciding": ["json_metrics[hp_min_energy_results.json]."
-                     "optimality.minimum_energy"],
+        "deciding": [
+            "json_metrics[hp_min_energy_results.json].optimality.minimum_energy"
+        ],
         "confidence": 0.9,
     }
     assert ev_mod._decisive_weak_evidence(strong, primary) is False
@@ -1471,9 +1670,7 @@ def test_weak_evidence_guard_classification():
     assert ev_mod._decisive_weak_evidence(str_conf, primary) is True
 
 
-def test_weak_evidence_reward_cap_integration(
-    tmp_path: Path, monkeypatch, capsys
-):
+def test_weak_evidence_reward_cap_integration(tmp_path: Path, monkeypatch, capsys):
     """P0.7: all-decisive-on-unverifiable-self-reported-metrics caps the
     reward at 0.75 with reward_weak_evidence=true; a primary-metric win
     still reaches 1.0."""
@@ -1501,8 +1698,9 @@ def test_weak_evidence_reward_cap_integration(
     # auc declared as a primary metric -> the same win is NOT capped
     recon_strong = dict(
         RECON_JSON,
-        primary_metrics=[{"field": "json_metrics", "key": "auc",
-                          "direction": "higher"}],
+        primary_metrics=[
+            {"field": "json_metrics", "key": "auc", "direction": "higher"}
+        ],
     )
     ev2 = _make_evaluator(tmp_path / "primary")
     llm2 = _ScriptedLLM(recon=recon_strong, policy=_JSON_POLICY_BODY)
@@ -1517,6 +1715,7 @@ def test_weak_evidence_reward_cap_integration(
     out4 = _run_generation(ev2, llm2, "ffffffff-2222")
     assert out4["overall_score"] == 1.0
     assert out4["reward_weak_evidence"] is False
+
 
 # ---------------------------------------- (8b) N1/N2 + engine contract ----
 
@@ -1545,9 +1744,7 @@ def test_n1_loss_first_pair_returns_scores(tmp_path: Path, monkeypatch):
     assert "deliverables" in out["pairs"][0]["feedback"]
     # engine contract §2.5: outcomes round-trip in the normalised spelling
     assert out["pair_outcomes"] == {"lossgen01-1111": "lost"}
-    assert out["pair_outcomes"] == {
-        p["prev_uuid"]: p["outcome"] for p in out["pairs"]
-    }
+    assert out["pair_outcomes"] == {p["prev_uuid"]: p["outcome"] for p in out["pairs"]}
 
 
 def test_n1_mixed_win_and_weak_loss_cap(tmp_path: Path, monkeypatch):
@@ -1570,8 +1767,8 @@ def test_n1_mixed_win_and_weak_loss_cap(tmp_path: Path, monkeypatch):
         ev._llm_json = llm
         return ev.evaluate(uuid)
 
-    gen("mixgen001-1111", 0.7)   # predecessor, auc 0.7
-    out2 = gen("mixgen001-2222", 0.9)   # beats gen1 (win)
+    gen("mixgen001-1111", 0.7)  # predecessor, auc 0.7
+    out2 = gen("mixgen001-2222", 0.9)  # beats gen1 (win)
     out = gen("mixgen001-3333", 0.5)  # loses to BOTH, FIRST pair is a loss
     assert out["n_wins"] == 0 and out["n_losses"] == 2
     assert out["n_ties"] == 0
@@ -1589,15 +1786,16 @@ def test_n1_mixed_win_and_weak_loss_cap(tmp_path: Path, monkeypatch):
     # never becomes champion, losses advance the plateau
     from sources.core.stopping import StopController
 
-    ctl = StopController(mode="plateau", min_iter=2, patience=1, max_iter=8,
-                         verifier_kind="policy_bt")
+    ctl = StopController(
+        mode="plateau", min_iter=2, patience=1, max_iter=8, verifier_kind="policy_bt"
+    )
     ctl.observe("mixgen001-1111", 0, 0.5, {}, failed=False)
-    ctl.observe("mixgen001-2222", 1, 1.0,
-                out2["pair_outcomes"], failed=False)
+    ctl.observe("mixgen001-2222", 1, 1.0, out2["pair_outcomes"], failed=False)
     assert ctl.champion == "mixgen001-2222"
     ctl.observe("mixgen001-3333", 2, 0.0, out["pair_outcomes"], failed=False)
     assert ctl.champion == "mixgen001-2222"  # lost -> incumbent stays
     assert ctl.since_change == 1
+
 
 def test_n2_freshness_count_decisions_are_weak():
     """N2: HP 2026-10-08 — the gen-4 sweep was decided ONLY by
@@ -1643,8 +1841,6 @@ def test_n2_prompt_forbids_freshness_count_wins():
     assert "never decisive" in r2
 
 
-
-
 def test_config_defaults_and_json_roundtrip():
     from config import Config
 
@@ -1688,12 +1884,16 @@ def test_cli_flags_apply_overrides():
     main_mod.add_config_arguments(parser, Config())
     args = parser.parse_args(
         [
-            "--verifier_kind", "policy_bt",
-            "--policy_bt_reward", "bradley_terry",
-            "--policy_bt_scorer_timeout_s", "90",
+            "--verifier_kind",
+            "policy_bt",
+            "--policy_bt_reward",
+            "bradley_terry",
+            "--policy_bt_scorer_timeout_s",
+            "90",
             "--no-policy_bt_visual_channel",
             "--no-policy_bt_refiner",
-            "--policy_bt_reexec_timeout_s", "600",
+            "--policy_bt_reexec_timeout_s",
+            "600",
             "--policy_bt_visual_tiebreak_code",
             "--policy_bt_verbose",
         ]
@@ -1755,7 +1955,10 @@ def test_stage_logger_stdout_json_and_spend(tmp_path: Path, capsys):
     assert log.spend_usd == pytest.approx(0.01)
     assert f"total_llm=${log.spend_usd:.4f}" in out
     records = [json.loads(ln) for ln in sink.read_text().splitlines()]
-    assert records[0]["stage"] == "REEXEC" and records[0]["uuid"] == "20261008_101010_abcdef01"
+    assert (
+        records[0]["stage"] == "REEXEC"
+        and records[0]["uuid"] == "20261008_101010_abcdef01"
+    )
     assert records[-1]["stage"] == "DONE"
     assert any(r["stage"] == "WARNING" for r in records)
     # P5.1: tags are uuid SUFFIXES — two same-day generations differ
@@ -1768,9 +1971,99 @@ def test_stage_logger_stdout_json_and_spend(tmp_path: Path, capsys):
     assert "DETAIL" in capsys.readouterr().out
 
 
+def test_stage_logger_preview_bounded_console_full_sink(tmp_path: Path, capsys):
+    """PREVIEW: bounded numbered console block; FULL text in the sink."""
+    sink = tmp_path / "wf" / "u2" / "verifier_policy_bt.log"
+    log = StageLogger("20261008_101010_abcdef01", sink=sink)
+    text = "\n".join(f"line {i}" for i in range(1, 31))
+    log.preview("policy source (fresh write)", text, max_lines=5, sha="abcd1234")
+    out = capsys.readouterr().out
+    assert "PREVIEW  policy source (fresh write) (30 lines, showing 5)" in out
+    assert "    1 │ line 1" in out and "    5 │ line 5" in out
+    assert "line 6" not in out  # console preview is bounded
+    assert "+25 more lines (full text in the JSON sink)" in out
+    rec = json.loads(sink.read_text().splitlines()[0])
+    assert rec["stage"] == "PREVIEW" and rec["n_lines"] == 30
+    assert rec["text"] == text  # sink keeps the payload verbatim
+    assert rec["sha"] == "abcd1234"
+
+
+def test_stage_logger_table_aligned_rows_and_styles(capsys):
+    """TABLE: aligned columns, row styles painted, rows in the sink."""
+    log = StageLogger("abcdef01", color=True)
+    from sources.cli.pretty_print import GREEN, RESET
+
+    log.table(
+        "bradley-terry standings (display-only)",
+        ["gen", "rating", "strength"],
+        [["aaaa-2222 ·this", "1.62", "████████"], ["aaaa-1111", "0.52", "██"]],
+        row_styles=[GREEN, None],
+        pick="aaaa-2222",
+    )
+    out = capsys.readouterr().out
+    assert "TABLE" in out
+    assert "bradley-terry standings (display-only)" in out
+    assert "aaaa-2222 ·this  1.62" in out and "aaaa-1111        0.52" in out
+    assert GREEN in out and out.count(RESET) >= 2  # colored current gen
+
+
+def test_stage_logger_colors_gated_by_flag(capsys):
+    """Colors off (default under capture): plain lines, no ANSI escapes."""
+    plain = StageLogger("abcdef01")
+    plain.stage("REWARD", "value=1.000")
+    assert "\033[" not in capsys.readouterr().out
+
+    colored = StageLogger("abcdef01", color=True)
+    colored.stage("REWARD", "value=1.000")
+    out = capsys.readouterr().out
+    assert out.startswith("[policy_bt][abcdef01] ")  # prefix stays searchable
+    assert "\033[" in out
+    # the stage token stays parseable even when painted
+    assert out.split("]", 2)[2].split()[0].endswith("REWARD")
+
+
+def test_evaluate_emits_previews_files_and_tournament(
+    tmp_path: Path, monkeypatch, capsys
+):
+    """The operator view: policy PREVIEW, per-pair FILES diff and the
+    bradley-terry TABLE all appear on stdout and in the JSON sink."""
+    monkeypatch.setattr(ev_mod, "ReexecRunner", _FakeReexecRunner)
+    ev = _make_evaluator(tmp_path)
+    llm = _ScriptedLLM()
+    _run_generation(ev, llm, "dddddddd-1111")
+    (ev.workspace_dir / "pred_results" / "extra.csv").write_text(
+        "smiles,probability\nCCO,0.5\n", encoding="utf-8"
+    )
+    out = _run_generation(ev, llm, "dddddddd-2222")
+    captured = capsys.readouterr().out
+    tag2 = "dddddddd-2222"[-8:]
+    lines = [ln for ln in captured.splitlines() if ln.startswith("[policy_bt]")]
+    tag1 = "dddddddd-1111"[-8:]
+    assert any(
+        ln.startswith(f"[policy_bt][{tag1}] PREVIEW") for ln in lines
+    )  # gen-1 wrote the policy; its preview carries gen-1's tag
+    assert any(
+        f"[policy_bt][{tag2}] FILES" in ln and "pred_results/extra.csv" in ln
+        for ln in lines
+    )
+    all_lines = captured.splitlines()
+    table_idx = [i for i, ln in enumerate(all_lines) if f"[{tag2}] TABLE" in ln]
+    assert table_idx, "tournament table missing"
+    header_i = table_idx[0] + 1
+    assert "gen" in all_lines[header_i] and "rating" in all_lines[header_i]
+    assert any(f"{tag2} ·this" in ln for ln in all_lines[header_i + 1 :])
+    stages = set()
+    for gen in ("dddddddd-1111", "dddddddd-2222"):
+        sink = ev.workflow_dir / gen / "verifier_policy_bt.log"
+        stages |= {json.loads(ln)["stage"] for ln in sink.read_text().splitlines()}
+    assert {"PREVIEW", "FILES", "TABLE"} <= stages
+    assert out["overall_score"] == 1.0
+
+
 # ======================================================================
 # Incremental recon refresh + policy rewrite (2026-10-06)
 # ======================================================================
+
 
 class TestReconRefresh:
     """Recon versioning, trigger points, and policy rewrite on config change."""
@@ -1780,6 +2073,7 @@ class TestReconRefresh:
         from sources.evaluators.policy_bt_verifier.evaluator import (
             PolicyBTVerifierEvaluator,
         )
+
         cfg_a = {"primary_metrics": [{"key": "auc"}], "tie_policy": "x"}
         cfg_b = {"primary_metrics": [{"key": "auc"}], "tie_policy": "x"}
         cfg_c = {"primary_metrics": [{"key": "rmse"}], "tie_policy": "x"}
@@ -1804,6 +2098,7 @@ class TestReconRefresh:
     def test_refresh_gap_default(self):
         """Default gap is 2 generations between schema-triggered refreshes."""
         from config import Config
+
         c = Config()
         assert c.policy_bt_recon_refresh_gap == 2
 
@@ -1812,6 +2107,7 @@ class TestReconRefresh:
         # verified in the evaluator code: effective_policy_sha =
         # POLICY_SHA + "_" + recon_version[:8]
         from sources.evaluators.policy_bt_verifier import policy as pol
+
         assert "_" not in pol.POLICY_SHA  # the base sha has no underscore
         # the composite is built in evaluate(), tested via integration below
 
@@ -1857,7 +2153,7 @@ def test_n4_goal_file_regex_tokens():
         "docs at https://example.com/run.sh; output pred_results/out.csv"
     )
     paths = [c["path"] for c in dm_contract(goal, ws)]
-    assert "results.json" in paths          # split, not merged with /.txt
+    assert "results.json" in paths  # split, not merged with /.txt
     assert not any("/." in p for p in paths)
     assert not any(p.endswith(".jsonl") for p in paths)  # data.jsonl -> no token
     assert not any("//" in p for p in paths)  # URL skipped
@@ -1893,18 +2189,25 @@ def test_p24_p25_crash_rung_bootstrap_and_classes():
     exit-1 are different classes (partial evidence decides, not a
     confidence-1.0 identical-signature tie)."""
     boot = {"bootstrap": "snapshot:x", "exit_code": None}
-    crash = {"exit_code": 1, "timed_out": False, "error_signature": [],
-             "fresh_artifacts": {}}
+    crash = {
+        "exit_code": 1,
+        "timed_out": False,
+        "error_signature": [],
+        "fresh_artifacts": {},
+    }
     assert verdicts_mod.crash_rung("u1", boot, "u2", crash) is None
     assert verdicts_mod.crash_rung("u1", crash, "u2", boot) is None
-    timeout = {"exit_code": None, "timed_out": True,
-               "error_signature": [], "fresh_artifacts": {}}
+    timeout = {
+        "exit_code": None,
+        "timed_out": True,
+        "error_signature": [],
+        "fresh_artifacts": {},
+    }
     v = verdicts_mod.crash_rung("u1", timeout, "u2", crash)
     assert v["winner"] == "tie"  # different classes, equal evidence
     assert v["rung"] == "both_crashed_different_signature_equal_evidence"
     # P2.8: a mutated source manifest is its own crash class
-    mutated = dict(crash, source_manifest_intact=False,
-                   fresh_artifacts={"a": 1})
+    mutated = dict(crash, source_manifest_intact=False, fresh_artifacts={"a": 1})
     v = verdicts_mod.crash_rung("u1", mutated, "u2", crash)
     assert v["winner"] == "u1"  # more partial evidence wins
 
@@ -1914,7 +2217,9 @@ def test_p29_registry_atomic_save(tmp_path: Path):
     reg = TaskRegistry.load(tmp_path, "atomic-goal")
     reg.record_generation("u1", {"uuid": "u1"}, reward=0.5, session="s1")
     reg.save()
-    assert not (tmp_path / f"policy_bt_registry_{task_key('atomic-goal')}.json.tmp").exists()
+    assert not (
+        tmp_path / f"policy_bt_registry_{task_key('atomic-goal')}.json.tmp"
+    ).exists()
     reg2 = TaskRegistry.load(tmp_path, "atomic-goal")
     assert reg2.generation("u1")["session"] == "s1"
 
@@ -1991,7 +2296,9 @@ def test_p56_json_metrics_relpath_priority_and_oversize(tmp_path: Path):
     big = {"auc": 0.5, "n_rows": 10, "config": {"seed": 1}}
     big["points"] = [{"x": i, "y": i} for i in range(500)]  # many leaves
     (ws / "big.json").write_text(json.dumps(big), encoding="utf-8")
-    (ws / "huge.json").write_text(json.dumps(dict(big, blob="x" * 70_000)), encoding="utf-8")
+    (ws / "huge.json").write_text(
+        json.dumps(dict(big, blob="x" * 70_000)), encoding="utf-8"
+    )
     d = digest_mod.build_digest("u", ws, None)
     assert d["json_metrics"]["pred_results/metrics.json"]["auc"] == 0.9
     assert d["json_metrics"]["metrics.json"]["auc"] == 0.1  # relpath, no collision
@@ -2089,10 +2396,12 @@ _DRIFT_4FC65D93 = {
 _DRIFT_METRICS_V1 = [
     _pm("min_energy", "results.json.minimum_energy", direction="lower"),
     _pm("hh_contacts", "results.json.optimal_conformation.hh_contact_count"),
-    _pm("n_optimal", "results.json.number_of_optimal_conformations",
-        role="invariant"),
-    _pm("total_saws", "results.json.total_self_avoiding_walks_enumerated",
-        role="invariant"),
+    _pm("n_optimal", "results.json.number_of_optimal_conformations", role="invariant"),
+    _pm(
+        "total_saws",
+        "results.json.total_self_avoiding_walks_enumerated",
+        role="invariant",
+    ),
 ]
 
 
@@ -2110,7 +2419,9 @@ class TestMetricLedger:
             "log_metrics": [],
         }
         with_alias = _pm(
-            "min_energy", "minimum energy", direction="lower",
+            "min_energy",
+            "minimum energy",
+            direction="lower",
             aliases=[{"file": "results.json", "key": "minimum_energy"}],
         )
         r = metrics_mod.resolve_primary_values(digest, [with_alias])
@@ -2139,7 +2450,9 @@ class TestMetricLedger:
             ],
         }
         m = _pm(
-            "min_energy", "minimum energy", direction="lower",
+            "min_energy",
+            "minimum energy",
+            direction="lower",
             aliases=[
                 {"file": "old_results.json", "key": "minimum_energy"},
                 {"file": "results.json", "key": "minimum_energy"},
@@ -2162,10 +2475,11 @@ class TestMetricLedger:
             "log_metrics": [],
         }
         m = _pm(
-            "min_energy", "minimum energy", direction="lower",
+            "min_energy",
+            "minimum energy",
+            direction="lower",
             aliases=[
-                {"file": "independent_verify_result.json",
-                 "key": "minimum_energy"},
+                {"file": "independent_verify_result.json", "key": "minimum_energy"},
                 {"file": "results.json", "key": "minimum_energy"},
             ],
         )
@@ -2198,19 +2512,17 @@ class TestMetricLedger:
             },
             "log_metrics": [],
         }
-        diff = metrics_mod.resolve_primary_values(
-            digest, [_pm("auc", "auc")]
-        )
+        diff = metrics_mod.resolve_primary_values(digest, [_pm("auc", "auc")])
         assert diff["auc"]["status"] == "ambiguous"
         assert diff["auc"]["value"] is None
         sources = {c["source"] for c in diff["auc"]["candidates"]}
         assert sources == {
-            "results.json:auc_validation", "results.json:auc_test",
-            "results.json:auc_seed_a", "results.json:auc_seed_b",
+            "results.json:auc_validation",
+            "results.json:auc_test",
+            "results.json:auc_seed_a",
+            "results.json:auc_seed_b",
         }
-        same = metrics_mod.resolve_primary_values(
-            digest, [_pm("auc_seed", "auc seed")]
-        )
+        same = metrics_mod.resolve_primary_values(digest, [_pm("auc_seed", "auc seed")])
         assert same["auc_seed"]["status"] == "resolved"
         assert same["auc_seed"]["value"] == 0.5
 
@@ -2238,8 +2550,7 @@ class TestMetricLedger:
                 ("total_saws", 376.0),
             ):
                 assert not (
-                    r[mid]["status"] == "resolved"
-                    and r[mid]["value"] == wrong
+                    r[mid]["status"] == "resolved" and r[mid]["value"] == wrong
                 ), f"{name}: {mid} resolved to the wrong quantity {wrong}"
                 assert r[mid]["value"] is None, (name, mid)
 
@@ -2251,9 +2562,10 @@ class TestMetricLedger:
         assert r1["total_saws"]["status"] == "missing"
         v2 = [
             _pm(
-                "total_saws", "total SAWs", role="invariant",
-                aliases=[{"file": "results.json",
-                          "key": "raw_saw_count.count"}],
+                "total_saws",
+                "total SAWs",
+                role="invariant",
+                aliases=[{"file": "results.json", "key": "raw_saw_count.count"}],
             ),
         ]
         r2 = metrics_mod.resolve_primary_values(digest, v2)
@@ -2266,8 +2578,13 @@ class TestMetricLedger:
         digest = {
             "json_metrics": {},
             "log_metrics": [
-                {"metric": "auc", "value": 0.83, "context": "validation",
-                 "raw_line": "AUC = 0.83", "source": "output.log"},
+                {
+                    "metric": "auc",
+                    "value": 0.83,
+                    "context": "validation",
+                    "raw_line": "AUC = 0.83",
+                    "source": "output.log",
+                },
             ],
         }
         r = metrics_mod.resolve_primary_values(digest, [_pm("auc", "auc")])
@@ -2278,17 +2595,27 @@ class TestMetricLedger:
     def test_recon_ensure_shape_normalizes_new_fields(self):
         """ensure_shape gives every primary_metrics entry the §4.1 fields
         with safe defaults (legacy cached configs keep working)."""
-        cfg = recon_mod.ensure_shape({
-            "primary_metrics": [
-                {"key": "results.json.minimum_energy", "direction": "lower"},
-                {"id": "auc", "key": "auc", "direction": "sideways",
-                 "role": "weird", "aliases": [{"key": "metrics.json:auc"},
-                                             {"file": "m.json"},
-                                             "junk"],
-                 "bounds": [0, 1], "integer": True},
-            ],
-            "tie_policy": "x",
-        })
+        cfg = recon_mod.ensure_shape(
+            {
+                "primary_metrics": [
+                    {"key": "results.json.minimum_energy", "direction": "lower"},
+                    {
+                        "id": "auc",
+                        "key": "auc",
+                        "direction": "sideways",
+                        "role": "weird",
+                        "aliases": [
+                            {"key": "metrics.json:auc"},
+                            {"file": "m.json"},
+                            "junk",
+                        ],
+                        "bounds": [0, 1],
+                        "integer": True,
+                    },
+                ],
+                "tie_policy": "x",
+            }
+        )
         [legacy, full] = cfg["primary_metrics"]
         assert legacy["id"] == "results_json_minimum_energy"
         assert legacy["direction"] == "lower"
@@ -2302,8 +2629,12 @@ class TestMetricLedger:
 
     def test_recon_prompt_strips_ledger_fields(self):
         """build_prompt never sends resolver output back to the recon LLM."""
-        digest = {"uuid": "u", "primary_values": {"auc": {"status": "ok"}},
-                  "primary_values_version": "v1", "json_metrics": {}}
+        digest = {
+            "uuid": "u",
+            "primary_values": {"auc": {"status": "ok"}},
+            "primary_values_version": "v1",
+            "json_metrics": {},
+        }
         prompt = recon_mod.build_prompt("goal", [digest])
         assert "primary_values" not in prompt
         assert "slot_1" in prompt
@@ -2318,32 +2649,46 @@ class TestFoldMetrics:
     """fold_gradient(ledger=...) renders measured ties from the data."""
 
     LEDGER_METRICS = [
-        _pm("min_energy", "minimum energy", direction="lower",
-            aliases=[{"file": "results.json", "key": "minimum_energy"}]),
-        _pm("hh_contacts", "hh contacts",
-            aliases=[{"file": "results.json", "key": "hh_contact_count"}]),
+        _pm(
+            "min_energy",
+            "minimum energy",
+            direction="lower",
+            aliases=[{"file": "results.json", "key": "minimum_energy"}],
+        ),
+        _pm(
+            "hh_contacts",
+            "hh contacts",
+            aliases=[{"file": "results.json", "key": "hh_contact_count"}],
+        ),
         _pm("total_saws", "total SAWs", role="invariant"),
     ]
 
     @staticmethod
     def _pv(status, value=None, candidates=None):
-        return {"status": status, "value": value, "source": None,
-                "fresh": None, "candidates": candidates or []}
+        return {
+            "status": status,
+            "value": value,
+            "source": None,
+            "fresh": None,
+            "candidates": candidates or [],
+        }
 
     def _ledger(self, current, preds):
-        return {"current": current, "preds": preds,
-                "metrics": self.LEDGER_METRICS}
+        return {"current": current, "preds": preds, "metrics": self.LEDGER_METRICS}
 
     def test_real_tie_string_produces_metrics_section(self):
         """Test 7 (real tie regression): the HP 10-08 tie feedback plus a
         tied ledger → METRICS section names min_energy and says tied; the
         old regex missed exactly this single-digit -2 vs -2 case."""
         recs = [
-            {"prev_uuid": "20261008_190432_32ed726e", "outcome": "tie",
-             "feedback": "minimum_energy -2 vs -2; requirement.txt fresh "
-                         "True vs True; run.sh fresh True vs True. Goal "
-                         "requires: save a requirement.txt and a run.sh to "
-                         "reproduce run."},
+            {
+                "prev_uuid": "20261008_190432_32ed726e",
+                "outcome": "tie",
+                "feedback": "minimum_energy -2 vs -2; requirement.txt fresh "
+                "True vs True; run.sh fresh True vs True. Goal "
+                "requires: save a requirement.txt and a run.sh to "
+                "reproduce run.",
+            },
         ]
         current = {
             "min_energy": self._pv("resolved", -2.0),
@@ -2351,7 +2696,9 @@ class TestFoldMetrics:
             "total_saws": self._pv("resolved", 16268.0),
         }
         text, meta = fold_gradient(
-            "gen", recs, "Assess minimum_energy (grading bars unknown)",
+            "gen",
+            recs,
+            "Assess minimum_energy (grading bars unknown)",
             ledger=self._ledger(current, {"p1": dict(current)}),
         )
         assert "METRICS (measured, vs 1 predecessor):" in text
@@ -2368,12 +2715,13 @@ class TestFoldMetrics:
         vs 12') with NO ledger values makes no tied claim — numbers in
         prose are not measured metrics."""
         recs = [
-            {"other": "g1", "rel": "tie",
-             "feedback": "fresh deliverables 12 vs 12"},
+            {"other": "g1", "rel": "tie", "feedback": "fresh deliverables 12 vs 12"},
         ]
         current = {m["id"]: self._pv("missing") for m in self.LEDGER_METRICS}
         text, meta = fold_gradient(
-            "gen", recs, "Assess minimum_energy (grading bars unknown)",
+            "gen",
+            recs,
+            "Assess minimum_energy (grading bars unknown)",
             ledger=self._ledger(current, {"p1": dict(current)}),
         )
         assert "tied" not in text.replace("NOT ASSESSED", "")
@@ -2394,10 +2742,11 @@ class TestFoldMetrics:
             "total_saws": self._pv(
                 "ambiguous",
                 candidates=[
-                    {"source": "results.json:raw_optimal_walk_count.count",
-                     "value": 376.0},
-                    {"source": "results.json:raw_saw_count.count",
-                     "value": 16268.0},
+                    {
+                        "source": "results.json:raw_optimal_walk_count.count",
+                        "value": 376.0,
+                    },
+                    {"source": "results.json:raw_saw_count.count", "value": 16268.0},
                 ],
             ),
         }
@@ -2409,12 +2758,13 @@ class TestFoldMetrics:
             },
         }
         text, meta = fold_gradient(
-            "gen", recs, "Assess minimum_energy (grading bars unknown)",
+            "gen",
+            recs,
+            "Assess minimum_energy (grading bars unknown)",
             ledger=self._ledger(current, preds),
         )
         line = next(
-            ln for ln in text.splitlines()
-            if ln.startswith("NOT ASSESSED: total_saws")
+            ln for ln in text.splitlines() if ln.startswith("NOT ASSESSED: total_saws")
         )
         assert "ambiguous in this generation" in line
         assert "raw_optimal_walk_count.count=376" in line
@@ -2431,7 +2781,9 @@ class TestFoldMetrics:
             "total_saws": self._pv("resolved", 16268.0),
         }
         raw, _ = fold_gradient(
-            "gen", recs, "",
+            "gen",
+            recs,
+            "",
             ledger=self._ledger(current, {"p1": dict(current)}),
         )
         final = gradient_mod.refined_text(raw, REFINER_JSON)
@@ -2459,7 +2811,9 @@ class TestFoldMetrics:
             assert meta["footer_appended"] == has_line, (recs, footer)
         # with a covering ledger the footer is dropped on ties
         text, meta = fold_gradient(
-            "gen", recs_tie, "footer text",
+            "gen",
+            recs_tie,
+            "footer text",
             ledger=self._ledger(resolved, {"p1": dict(resolved)}),
         )
         assert meta["footer_appended"] is False
@@ -2467,7 +2821,9 @@ class TestFoldMetrics:
         # empty-pairs generation: the footer appears even with a covering
         # ledger (nothing was assessed at all)
         text, meta = fold_gradient(
-            "gen", [], "footer text",
+            "gen",
+            [],
+            "footer text",
             ledger=self._ledger(resolved, {"p1": dict(resolved)}),
         )
         assert meta["footer_appended"] is True
@@ -2495,9 +2851,7 @@ class TestFoldMetrics:
                 "total_saws": self._pv("resolved", 16268.0),
             },
         }
-        text, meta = fold_gradient(
-            "gen", recs, "", ledger=self._ledger(current, preds)
-        )
+        text, meta = fold_gradient("gen", recs, "", ledger=self._ledger(current, preds))
         assert "METRICS (measured, vs 3 predecessors):" in text
         assert (
             "- min_energy (lower is better, objective): -2 here; "
@@ -2534,8 +2888,7 @@ class TestPolicyLedgerContract:
         assert expected == policy_mod.POLICY_SHA
         # the hash is sensitive to prompt content (bumps automatically)
         mutated = hashlib.sha256(
-            (policy_mod.V3_PROMPT + "x" + recon_mod.RECON_PROMPT_VERSION)
-            .encode()
+            (policy_mod.V3_PROMPT + "x" + recon_mod.RECON_PROMPT_VERSION).encode()
         ).hexdigest()[:12]
         assert mutated != policy_mod.POLICY_SHA
 
@@ -2572,10 +2925,8 @@ class TestPolicyLedgerContract:
             "            'feedback_looser': f'min_energy {min(a, b)} vs "
             "{max(a, b)}'}\n"
         ) + MAIN_STANZA
-        dA = {"primary_values": {"min_energy": {"status": "resolved",
-                                                "value": -2.0}}}
-        dB = {"primary_values": {"min_energy": {"status": "missing",
-                                                "value": None}}}
+        dA = {"primary_values": {"min_energy": {"status": "resolved", "value": -2.0}}}
+        dB = {"primary_values": {"min_energy": {"status": "missing", "value": None}}}
         v_ab = policy_mod.run_policy(src, dA, dB, timeout=30)
         assert "error" not in v_ab, v_ab
         assert v_ab["winner"] == "tie"  # one side unresolved → not comparable
@@ -2587,9 +2938,7 @@ class TestPolicyLedgerContract:
         assert v_eq["winner"] == "tie"
         assert "-2.0 vs -2.0" in v_eq["feedback_looser"]
         # smoke through the real smoke path: distinct digests, both orders
-        ok, err = policy_mod.smoke_test(
-            src, [dA, dB], timeout=30, max_pairs=3
-        )
+        ok, err = policy_mod.smoke_test(src, [dA, dB], timeout=30, max_pairs=3)
         assert ok, err
 
 
@@ -2602,9 +2951,13 @@ def test_evaluate_wires_metric_ledger_into_scores(tmp_path, monkeypatch):
     recon = dict(
         RECON_JSON,
         primary_metrics=[
-            {"id": "auc", "key": "AUC reported in metrics.json or logs",
-             "direction": "higher", "role": "objective",
-             "aliases": [{"file": "metrics.json", "key": "auc"}]},
+            {
+                "id": "auc",
+                "key": "AUC reported in metrics.json or logs",
+                "direction": "higher",
+                "role": "objective",
+                "aliases": [{"file": "metrics.json", "key": "auc"}],
+            },
         ],
     )
     llm = _ScriptedLLM(recon=recon, text_extract={"auc": 0.83})
@@ -2620,8 +2973,6 @@ def test_evaluate_wires_metric_ledger_into_scores(tmp_path, monkeypatch):
     assert g1["digest"]["primary_values"]["auc"]["source"] == "llm:auc"
     out2 = _run_generation(ev, llm, "cccccccc-2222")
     assert out2["metric_summary"]["auc"]["value"] == 0.83
-    grad = (
-        ev.workflow_dir / "cccccccc-2222" / "textual_gradient.txt"
-    ).read_text()
+    grad = (ev.workflow_dir / "cccccccc-2222" / "textual_gradient.txt").read_text()
     assert "METRICS (measured" in grad
     assert "auc" in grad
