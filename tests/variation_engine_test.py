@@ -212,7 +212,7 @@ def test_directive_flow_embedded_in_mutation_prompt(monkeypatch):
         goal="solve the task",
         wf_info=_FakeWorkflowInfo(),
         genotype="# parent code",
-        run_stderr="",
+        run_stdout="",
         iteration_count=1,
         max_iterations=10,
     )
@@ -224,6 +224,62 @@ def test_directive_flow_embedded_in_mutation_prompt(monkeypatch):
     assert "Do not change the workflow's overall topology" in prompt
 
 
+# ── Evidence routing: verifier diagnosis vs unverified raw log ────────────
+
+_RAW_STDOUT = (
+    "Step 107: write_txt_file('/workspace/conformer_search.py')\n"
+    "Error: [Errno 30] Read-only file system: '/workspace'\n"
+    "Step 120: python /app/workspace/run_pipeline.py\n"
+    "Reached max steps."
+)
+
+
+def test_directive_prefers_verifier_gradient_over_raw_stdout(monkeypatch):
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    ve.mutation_prompt(
+        goal="g", wf_info=_FakeWorkflowInfo(gradient="MISSING_SCRIPT: no run.sh"),
+        genotype="code", run_stdout=_RAW_STDOUT, iteration_count=1, max_iterations=10,
+    )
+    directive_input = _FakeProvider.last.prompt
+    assert "<diagnosis>\nMISSING SCRIPT: no run.sh\n</diagnosis>" in directive_input
+    assert "<raw_log>" not in directive_input
+    assert "Errno 30" not in directive_input
+
+
+def test_directive_routes_raw_stdout_verbatim_without_gradient(monkeypatch):
+    """No parent (cold start): stdout is a raw log, never a diagnosis."""
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    ve.mutation_prompt(
+        goal="g", wf_info=None, genotype="", run_stdout=_RAW_STDOUT,
+        iteration_count=1, max_iterations=10,
+    )
+    directive_input = _FakeProvider.last.prompt
+    assert f"<raw_log>\n{_RAW_STDOUT}\n</raw_log>" in directive_input
+    assert "/app/workspace/run_pipeline.py" in directive_input
+    assert "<diagnosis>" not in directive_input
+
+
+def test_crossover_routes_raw_stdout_only_for_parent_without_gradient():
+    ve = _make_engine()
+    prompt = ve.crossover_prompt(
+        goal="g",
+        wf_infos=[
+            _FakeWorkflowInfo(score=0.7, gradient="CLAIM_X: failed"),
+            _FakeWorkflowInfo(score=0.4, gradient=""),
+        ],
+        genotypes=["code1", "code2"],
+        run_stdouts=[_RAW_STDOUT, _RAW_STDOUT],
+        iteration_count=1,
+    )
+    first_parent, second_parent = prompt.split("### Parent 2")
+    assert "<error_diagnosis>\nCLAIM_X: failed\n</error_diagnosis>" in first_parent
+    assert "<raw_log>" not in first_parent
+    assert f"<raw_log>\n{_RAW_STDOUT}\n</raw_log>" in second_parent
+    assert "<error_diagnosis>" not in second_parent
+
+
 def test_mutation_prompt_has_no_scope_band_text(monkeypatch):
     monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
     ve = _make_engine()
@@ -231,7 +287,7 @@ def test_mutation_prompt_has_no_scope_band_text(monkeypatch):
         goal="solve the task",
         wf_info=_FakeWorkflowInfo(),
         genotype="# parent code",
-        run_stderr="",
+        run_stdout="",
         iteration_count=1,
         max_iterations=10,
     )
@@ -258,7 +314,7 @@ def test_mutation_agent_budget_is_parent_centered(monkeypatch):
     for _ in range(25):
         ve.mutation_prompt(
             goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
-            run_stderr="", iteration_count=1, max_iterations=10,
+            run_stdout="", iteration_count=1, max_iterations=10,
         )
         budget = ve.last_variation_state["agent_budget"]
         assert 2 <= budget <= 4  # parent has 3 agents → within ±1
@@ -273,7 +329,7 @@ def test_mutation_agent_budget_counts_distinct_agents_only(monkeypatch):
              "answers": ["a", "b", "c", "d"]}
     ve.mutation_prompt(
         goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
-        run_stderr="", iteration_count=1, max_iterations=10,
+        run_stdout="", iteration_count=1, max_iterations=10,
     )
     assert 1 <= ve.last_variation_state["agent_budget"] <= 3  # 2 distinct agents
 
@@ -285,7 +341,7 @@ def test_mutation_agent_budget_caps_at_max_possible_agents(monkeypatch):
     for _ in range(10):
         ve.mutation_prompt(
             goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
-            run_stderr="", iteration_count=1, max_iterations=10,
+            run_stdout="", iteration_count=1, max_iterations=10,
         )
         assert 6 <= ve.last_variation_state["agent_budget"] <= 7
 
@@ -297,7 +353,7 @@ def test_mutation_agent_budget_falls_back_to_history(monkeypatch):
     state = {"answers": "raw string, no step_name"}
     ve.mutation_prompt(
         goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
-        run_stderr="", iteration_count=1, max_iterations=10,
+        run_stdout="", iteration_count=1, max_iterations=10,
     )
     assert 1 <= ve.last_variation_state["agent_budget"] <= 2  # no history → 1
 

@@ -1302,7 +1302,7 @@ class EvolutionEngine:
                 goal=task_goal,
                 wf_infos=parent_workflows,
                 genotypes=[pw.code or "" for pw in parent_workflows],
-                run_stderrs=[run_stdout] * len(parent_workflows),
+                run_stdouts=[run_stdout] * len(parent_workflows),
                 iteration_count=runs[-1].iteration_count,
                 max_iterations=runs[-1].max_depth,
                 exploration_probe=exploration_probe,

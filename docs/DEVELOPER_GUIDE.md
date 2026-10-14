@@ -331,16 +331,28 @@ noise-dominated — the directive wording predicted realised edit size
 far better than the scalar.
 
 `llm_think_mutation_directive(agent_answers, textual_gradient_block,
-search_state, goal)` runs a dedicated LLM call before the
-orchestrator. It consumes the parent's per-agent answers, the
-verifier's textual gradient, and the search-state block, and emits
+search_state, goal, exploration_block="", raw_log="")` runs a dedicated
+LLM call before the orchestrator. It consumes the parent's per-agent
+answers, the verifier's textual gradient (`<diagnosis>`), and the
+search-state block, and emits
 a **≤ 3-sentence directive** naming exactly one issue, the kind of
 mutation it implies (prompt tweak, persona change, agent add/remove,
 topology change), the intended magnitude (small tweak, component
 rewrite, structural redesign) justified by the search state, and the
 rationale. The system prompt fixes trust ranks (verifier diagnosis
-trusted, agent self-reports not), and hard limits (one agent
-add/remove per step, default to small incremental changes).
+trusted, agent self-reports not, raw log unverified), and hard limits
+(one agent add/remove per step, default to small incremental changes).
+
+Evidence precedence is set by `_split_directive_evidence(textual_gradient,
+run_stdout)`: the verifier gradient wins (underscores become spaces so
+claim codes read as words); else a non-empty `run_stdout` (stdout or
+error text of the last finished run) goes **verbatim** into a separate
+`<raw_log>` block and the prompt states that no verifier diagnosis is
+available; else a synthetic no-feedback note is the diagnosis. The raw
+log rules forbid turning one error into an environment rule, prescribing
+absolute paths, or moving outputs outside the relative workspace.
+`crossover_prompt(..., run_stdouts=...)` applies the same split per
+parent (stdout tail, last 1024 characters, in `<raw_log>`).
 
 `mutation_prompt(...)` is therefore now a thin wrapper: it passes the
 parent code plus that one directive to the orchestrator inside a

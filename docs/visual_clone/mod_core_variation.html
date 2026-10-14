@@ -130,12 +130,12 @@
 
 <details><summary>prompt builders in detail</summary><div class="dbody">
 <pre>VariationEngine.seed_genome_prompt(goal: str) -&gt; str
-VariationEngine.llm_think_mutation_directive(agent_answers, textual_gradient_block, search_state, goal) -&gt; str
-VariationEngine.mutation_prompt(goal, wf_info, genotype, run_stderr, iteration_count, max_iterations=10) -&gt; str
-VariationEngine.crossover_prompt(goal, wf_infos, genotypes, run_stderrs, iteration_count, max_iterations=10) -&gt; str</pre>
+VariationEngine.llm_think_mutation_directive(agent_answers, textual_gradient_block, search_state, goal, exploration_block="", raw_log="") -&gt; str
+VariationEngine.mutation_prompt(goal, wf_info, genotype, run_stdout, iteration_count, max_iterations=10, exploration_probe=None) -&gt; str
+VariationEngine.crossover_prompt(goal, wf_infos, genotypes, run_stdouts, iteration_count, max_iterations=10, exploration_probe=None) -&gt; str</pre>
 <p>Mutation rules written into the prompt (<code>variation_engine.py:448-453</code>): follow the directive, add or remove at most one agent, use at most <code>agent_budget</code> agents, keep the topology unless the directive says otherwise, keep 90% of the previous code, and edit no prompt outside the directive scope.</p>
 <p>The gradient reaches the prompt as <code>&lt;directive&gt;...&lt;/directive&gt;</code> only. The raw verifier diagnosis and agent answers are consumed by the directive LLM, not by the workflow LLM (<code>variation_engine.py:426-446</code>).</p>
-<p>Gradient text is cleaned before use: underscores become spaces and an empty gradient falls back to the run stderr, then to a fixed failure sentence (<code>variation_engine.py:402-407</code>). There is no length cut any more: the <code>[:2048]</code> slice on line 407 was removed in commit ca72107 (<code>git diff 336fe19</code>), so the full gradient reaches the directive LLM. Each agent answer is still cut at 2048 characters (<code>variation_engine.py:274</code>). Crossover falls back to the last 1024 characters of stderr per parent (<code>variation_engine.py:489</code>).</p>
+<p>Evidence split (<code>VariationEngine._split_directive_evidence</code>, 2026-10-14): a non-empty verifier gradient goes into <code>&lt;diagnosis&gt;</code> with underscores turned into spaces. An empty gradient no longer falls back into <code>&lt;diagnosis&gt;</code>: the run stdout (stdout or error text of the last finished run) goes verbatim into a separate, unverified <code>&lt;raw_log&gt;</code> block and the prompt says no verifier diagnosis is available; with no stdout a fixed failure sentence is the diagnosis. The system prompt forbids turning one raw-log error into an environment rule, prescribing absolute paths, or moving outputs outside the relative workspace. There is no length cut on the gradient: the <code>[:2048]</code> slice was removed in commit ca72107. Each agent answer is still cut at 2048 characters. Crossover shows the last 1024 characters of the run stdout in <code>&lt;raw_log&gt;</code> only for a parent without a gradient (<code>CROSSOVER_RAW_LOG_TAIL_CHARS</code>).</p>
 <p>Gotcha: crossover builds an <code>answers</code> field per parent but never prints it; the prompt shows code and gradient only (<code>variation_engine.py:490</code> vs <code>:505-512</code>).</p>
 </div></details>
 </div>
@@ -228,9 +228,9 @@ VariationEngine.crossover_prompt(goal, wf_infos, genotypes, run_stderrs, iterati
 VariationEngine.setup_llm(config)
 VariationEngine.record_offspring_gradient(gradient, *, is_failure=False, child_score=None, best_before=None) -&gt; None
 VariationEngine.seed_genome_prompt(goal) -&gt; str
-VariationEngine.llm_think_mutation_directive(agent_answers, textual_gradient_block, search_state, goal) -&gt; str
-VariationEngine.mutation_prompt(goal, wf_info, genotype, run_stderr, iteration_count, max_iterations=10) -&gt; str
-VariationEngine.crossover_prompt(goal, wf_infos, genotypes, run_stderrs, iteration_count, max_iterations=10) -&gt; str
+VariationEngine.llm_think_mutation_directive(agent_answers, textual_gradient_block, search_state, goal, exploration_block="", raw_log="") -&gt; str
+VariationEngine.mutation_prompt(goal, wf_info, genotype, run_stdout, iteration_count, max_iterations=10, exploration_probe=None) -&gt; str
+VariationEngine.crossover_prompt(goal, wf_infos, genotypes, run_stdouts, iteration_count, max_iterations=10, exploration_probe=None) -&gt; str
 VariationEngine._sample_agent_count(lo, hi) -&gt; int
 VariationEngine._sample_mutation_agent_budget(parent_agents) -&gt; int
 VariationEngine._count_parent_agents(wf_state) -&gt; int | None
