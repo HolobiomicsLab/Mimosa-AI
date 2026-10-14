@@ -97,7 +97,7 @@ def test_no_parent_mutates_the_last_generation(tmp_path: Path, monkeypatch):
     assert (lineage["evolution_kind"], lineage["parents"]) == ("mutation", [child])
     # The directive LLM saw the child's own gradient, not another run's.
     directive_input = _FakeProvider.last.prompt
-    assert "<diagnosis>\nNO RUN SH in generation 2\n</diagnosis>" in directive_input
+    assert "<diagnosis>\nNO_RUN_SH in generation 2\n</diagnosis>" in directive_input
     assert "generation 1" not in directive_input
     assert "print('generation 2 code')" in runs[2].prompt
 

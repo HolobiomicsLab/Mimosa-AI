@@ -558,11 +558,12 @@ class VariationEngine:
 
         Returns:
             tuple[str, str] — ``(diagnosis, raw_log)``. Exactly one is
-            non-empty. The raw log is stripped but otherwise verbatim.
+            non-empty. Both are stripped but otherwise verbatim: the
+            gradient can name exact identifiers (column names, paths) that
+            the next workflow must reproduce character for character.
         """
         if textual_gradient and textual_gradient.strip():
-            # Claim codes become plain words (rubric-blind diagnosis).
-            return textual_gradient.strip().replace("_", " "), ""
+            return textual_gradient.strip(), ""
         raw_log = (run_stdout or "").strip()
         if raw_log:
             return "", raw_log

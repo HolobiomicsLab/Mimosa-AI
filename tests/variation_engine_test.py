@@ -237,15 +237,18 @@ _RAW_STDOUT = (
 
 
 def test_directive_prefers_verifier_gradient_over_parent_log(monkeypatch):
+    """Live case (ClinTox): the gradient names exact columns; turning
+    underscores into spaces made the directive prescribe 'FDA APPROVED'."""
     monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
     ve = _make_engine()
+    gradient = 'Your output column "FDA_APPROVED_prob" should be "FDA_APPROVED".'
     ve.mutation_prompt(
         goal="g",
-        wf_info=_FakeWorkflowInfo(gradient="MISSING_SCRIPT: no run.sh", run_stdout=_RAW_STDOUT),
+        wf_info=_FakeWorkflowInfo(gradient=gradient, run_stdout=_RAW_STDOUT),
         genotype="code", iteration_count=1, max_iterations=10,
     )
     directive_input = _FakeProvider.last.prompt
-    assert "<diagnosis>\nMISSING SCRIPT: no run.sh\n</diagnosis>" in directive_input
+    assert f"<diagnosis>\n{gradient}\n</diagnosis>" in directive_input
     assert "<raw_log>" not in directive_input
     assert "Errno 30" not in directive_input
 

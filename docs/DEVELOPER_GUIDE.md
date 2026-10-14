@@ -344,8 +344,8 @@ trusted, agent self-reports not, raw log unverified), and hard limits
 (one agent add/remove per step, default to small incremental changes).
 
 Evidence precedence is set by `_split_directive_evidence(textual_gradient,
-run_stdout)`: the verifier gradient wins (underscores become spaces so
-claim codes read as words); else a non-empty `run_stdout` goes
+run_stdout)`: the verifier gradient wins and is passed verbatim (exact
+identifiers such as `FDA_APPROVED` must survive); else a non-empty `run_stdout` goes
 **verbatim** into a separate `<raw_log>` block and the prompt states
 that no verifier diagnosis is available; else a synthetic no-feedback
 note is the diagnosis. `run_stdout` is always the parent's own log
