@@ -545,16 +545,16 @@ class VariationEngine:
 
         The directive LLM must not take a raw run log for verified evidence.
         ``mutation_prompt`` calls it with the parent's textual gradient and
-        the last run stdout. The verifier gradient wins; else a non-empty
-        stdout becomes the raw log; else a synthetic note is the diagnosis.
+        the parent's own run stdout. The verifier gradient wins; else a
+        non-empty stdout becomes the raw log; else a synthetic note is the
+        diagnosis.
 
         Args:
             textual_gradient: str — parent's abstracted verifier gradient
                 from ``WorkflowInfo.abstracted_textual_gradient``; may be
                 empty.
-            run_stdout: str — stdout or error text of the last finished
-                run from ``WorkflowOrchestrator.orchestrate_workflow``; may
-                be empty.
+            run_stdout: str — stdout or error text of the parent run, from
+                ``WorkflowInfo.run_stdout``; may be empty.
 
         Returns:
             tuple[str, str] — ``(diagnosis, raw_log)``. Exactly one is
@@ -652,7 +652,7 @@ class VariationEngine:
             goal: str — task description for the session.
             exploration_block: str — rendered ``<exploration>`` block;
                 empty when no probe fired.
-            raw_log: str — unverified stdout of a previous workflow run
+            raw_log: str — unverified stdout of the parent workflow run
                 from ``_split_directive_evidence``; empty when a verifier
                 diagnosis exists.
 
@@ -732,7 +732,6 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         goal: str,
         wf_info: WorkflowInfo | None,
         genotype: str | None,
-        run_stdout: str,
         iteration_count: int,
         max_iterations: int = 10,
         exploration_probe: dict | None = None,
@@ -741,23 +740,20 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
 
         The evolution engine calls it per iteration with the parent's
         record. It assembles execution evidence (agent answers, the
-        verifier's textual gradient, or else the unverified run stdout as a
-        separate raw log), the search-state block and the exploration
-        block, asks the directive LLM for a mutation directive (or a fixed
-        syntax-fix directive when ``genotype`` is None), and appends the
-        hard mutation instructions.
+        verifier's textual gradient, or else the parent's own unverified
+        run stdout as a separate raw log), the search-state block and the
+        exploration block, asks the directive LLM for a mutation directive
+        (or a fixed syntax-fix directive when ``genotype`` is None), and
+        appends the hard mutation instructions.
 
         Args:
             goal: str — task description for the mutated workflow.
             wf_info: WorkflowInfo | None — parent info supplying score,
-                abstracted textual gradient and state; ``None`` on a cold
-                start.
+                abstracted textual gradient, state and run stdout (shown
+                as an unverified raw log only when no textual gradient
+                exists); ``None`` on a cold start.
             genotype: str | None — parent source code; ``None`` means the
                 previous attempt produced no code.
-            run_stdout: str — stdout (or error text) of the last finished
-                run from ``WorkflowOrchestrator.orchestrate_workflow``;
-                sent as an unverified raw log only when no textual
-                gradient exists.
             iteration_count: int — zero-based index of the current
                 attempt.
             max_iterations: int — total planned attempts (prompt context).
@@ -770,6 +766,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         """
         score      = wf_info.overall_score        if wf_info else 0.0
         textual_gradient  = wf_info.abstracted_textual_gradient if wf_info else ""
+        run_stdout = wf_info.run_stdout           if wf_info else ""
         wf_state   = wf_info.state_result         if wf_info else None
 
         # ── Execution evidence ───────────────────────────────────────────────
@@ -839,7 +836,6 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         goal: str,
         wf_infos: list[WorkflowInfo],
         genotypes: list[str],
-        run_stdouts: list[str],
         iteration_count: int,
         max_iterations: int = 10,
         exploration_probe: dict | None = None,
@@ -852,12 +848,12 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
 
         Args:
             goal: str — task description for the recombined workflow.
-            wf_infos: list[WorkflowInfo] — parent infos, one per genotype.
+            wf_infos: list[WorkflowInfo] — parent infos, one per genotype;
+                each parent's own run stdout tail is shown as an
+                unverified ``<raw_log>`` only when it has no textual
+                gradient.
             genotypes: list[str] — parent source code strings, parallel to
                 ``wf_infos``.
-            run_stdouts: list[str] — run stdout texts parallel to
-                ``wf_infos``; the tail is shown as an unverified
-                ``<raw_log>`` only for parents without a textual gradient.
             iteration_count: int — zero-based index of the current
                 attempt.
             max_iterations: int — total planned attempts (prompt context).
@@ -870,15 +866,16 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         """
         # ── Assemble parent records ──────────────────────────────────────────
         parents = []
-        for i, (wf_info, genotype, run_stdout) in enumerate(
-            zip(wf_infos, genotypes, run_stdouts, strict=False)
+        for i, (wf_info, genotype) in enumerate(
+            zip(wf_infos, genotypes, strict=False)
         ):
             score     = wf_info.overall_score        if wf_info else 0.0
             # Layer 1: rubric-blind textual_gradient instead of raw judge log.
             textual_gradient = (wf_info.abstracted_textual_gradient if wf_info else "").strip()
-            # Raw stdout tail only when no textual_gradient exists.
+            # Parent's own stdout tail only when no textual_gradient exists.
+            run_stdout = wf_info.run_stdout if wf_info else ""
             raw_log = "" if textual_gradient else (
-                (run_stdout or "").strip()[-CROSSOVER_RAW_LOG_TAIL_CHARS:]
+                run_stdout.strip()[-CROSSOVER_RAW_LOG_TAIL_CHARS:]
             )
             answers   = self._extract_agent_answers(wf_info.state_result if wf_info else None)
             parents.append({

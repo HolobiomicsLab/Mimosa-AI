@@ -345,14 +345,24 @@ trusted, agent self-reports not, raw log unverified), and hard limits
 
 Evidence precedence is set by `_split_directive_evidence(textual_gradient,
 run_stdout)`: the verifier gradient wins (underscores become spaces so
-claim codes read as words); else a non-empty `run_stdout` (stdout or
-error text of the last finished run) goes **verbatim** into a separate
-`<raw_log>` block and the prompt states that no verifier diagnosis is
-available; else a synthetic no-feedback note is the diagnosis. The raw
-log rules forbid turning one error into an environment rule, prescribing
-absolute paths, or moving outputs outside the relative workspace.
-`crossover_prompt(..., run_stdouts=...)` applies the same split per
-parent (stdout tail, last 1024 characters, in `<raw_log>`).
+claim codes read as words); else a non-empty `run_stdout` goes
+**verbatim** into a separate `<raw_log>` block and the prompt states
+that no verifier diagnosis is available; else a synthetic no-feedback
+note is the diagnosis. `run_stdout` is always the parent's own log
+(`WorkflowInfo.run_stdout`, read from `<uuid>/run_stdout.log`; empty
+without a parent), so the evidence describes the code being mutated.
+The raw log rules forbid turning one error into an environment rule,
+prescribing absolute paths, or moving outputs outside the relative
+workspace. `crossover_prompt(...)` applies the same split per parent,
+each with its own log (stdout tail, last 1024 characters, in
+`<raw_log>`).
+
+When parent selection returns no parent on the mutation branch,
+`EvolutionEngine._mutation_parent_or_last_child` uses the generation
+that just ran as the parent (fresh `WorkflowInfo`, read after its
+evaluation) if its genotype is on disk; lineage is then
+`kind="mutation"`, `parents=[<uuid>]`. Without a genotype the mutation
+stays parentless (`kind="seed"`).
 
 `mutation_prompt(...)` is therefore now a thin wrapper: it passes the
 parent code plus that one directive to the orchestrator inside a

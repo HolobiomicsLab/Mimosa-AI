@@ -8,6 +8,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import sources.core.variation_engine as variation_engine_module
 from sources.core.variation_engine import VariationEngine
+from sources.core.workflow_info import WorkflowInfo
 
 
 class _FakeConfig:
@@ -51,9 +52,11 @@ class _FakeProvider:
 class _FakeWorkflowInfo:
     """Duck-typed stand-in for WorkflowInfo used by mutation_prompt."""
 
-    def __init__(self, score=0.7, gradient="claim verification failed", state=None):
+    def __init__(self, score=0.7, gradient="claim verification failed", state=None,
+                 run_stdout=""):
         self.overall_score = score
         self.abstracted_textual_gradient = gradient
+        self.run_stdout = run_stdout
         self.state_result = state if state is not None else {
             "step_name": ["solver", "verifier"],
             "answers": ["did x", "did y"],
@@ -212,7 +215,6 @@ def test_directive_flow_embedded_in_mutation_prompt(monkeypatch):
         goal="solve the task",
         wf_info=_FakeWorkflowInfo(),
         genotype="# parent code",
-        run_stdout="",
         iteration_count=1,
         max_iterations=10,
     )
@@ -234,12 +236,13 @@ _RAW_STDOUT = (
 )
 
 
-def test_directive_prefers_verifier_gradient_over_raw_stdout(monkeypatch):
+def test_directive_prefers_verifier_gradient_over_parent_log(monkeypatch):
     monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
     ve = _make_engine()
     ve.mutation_prompt(
-        goal="g", wf_info=_FakeWorkflowInfo(gradient="MISSING_SCRIPT: no run.sh"),
-        genotype="code", run_stdout=_RAW_STDOUT, iteration_count=1, max_iterations=10,
+        goal="g",
+        wf_info=_FakeWorkflowInfo(gradient="MISSING_SCRIPT: no run.sh", run_stdout=_RAW_STDOUT),
+        genotype="code", iteration_count=1, max_iterations=10,
     )
     directive_input = _FakeProvider.last.prompt
     assert "<diagnosis>\nMISSING SCRIPT: no run.sh\n</diagnosis>" in directive_input
@@ -247,13 +250,13 @@ def test_directive_prefers_verifier_gradient_over_raw_stdout(monkeypatch):
     assert "Errno 30" not in directive_input
 
 
-def test_directive_routes_raw_stdout_verbatim_without_gradient(monkeypatch):
-    """No parent (cold start): stdout is a raw log, never a diagnosis."""
+def test_directive_routes_parent_log_verbatim_without_gradient(monkeypatch):
+    """Parent without a gradient: its own log is a raw log, never a diagnosis."""
     monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
     ve = _make_engine()
     ve.mutation_prompt(
-        goal="g", wf_info=None, genotype="", run_stdout=_RAW_STDOUT,
-        iteration_count=1, max_iterations=10,
+        goal="g", wf_info=_FakeWorkflowInfo(gradient="", run_stdout=_RAW_STDOUT),
+        genotype="code", iteration_count=1, max_iterations=10,
     )
     directive_input = _FakeProvider.last.prompt
     assert f"<raw_log>\n{_RAW_STDOUT}\n</raw_log>" in directive_input
@@ -261,16 +264,27 @@ def test_directive_routes_raw_stdout_verbatim_without_gradient(monkeypatch):
     assert "<diagnosis>" not in directive_input
 
 
+def test_directive_without_parent_has_no_raw_log(monkeypatch):
+    """No parent: no log belongs to the mutated code, so none is shown."""
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    ve.mutation_prompt(
+        goal="g", wf_info=None, genotype="", iteration_count=1, max_iterations=10,
+    )
+    directive_input = _FakeProvider.last.prompt
+    assert "<raw_log>" not in directive_input
+    assert "<diagnosis>" in directive_input
+
+
 def test_crossover_routes_raw_stdout_only_for_parent_without_gradient():
     ve = _make_engine()
     prompt = ve.crossover_prompt(
         goal="g",
         wf_infos=[
-            _FakeWorkflowInfo(score=0.7, gradient="CLAIM_X: failed"),
-            _FakeWorkflowInfo(score=0.4, gradient=""),
+            _FakeWorkflowInfo(score=0.7, gradient="CLAIM_X: failed", run_stdout=_RAW_STDOUT),
+            _FakeWorkflowInfo(score=0.4, gradient="", run_stdout=_RAW_STDOUT),
         ],
         genotypes=["code1", "code2"],
-        run_stdouts=[_RAW_STDOUT, _RAW_STDOUT],
         iteration_count=1,
     )
     first_parent, second_parent = prompt.split("### Parent 2")
@@ -280,6 +294,40 @@ def test_crossover_routes_raw_stdout_only_for_parent_without_gradient():
     assert "<error_diagnosis>" not in second_parent
 
 
+def _workflow_with_log(tmp_path: Path, uuid: str, log: str) -> WorkflowInfo:
+    """Write a generation folder holding only ``run_stdout.log``."""
+    folder = tmp_path / uuid
+    folder.mkdir()
+    (folder / "run_stdout.log").write_text(log, encoding="utf-8")
+    return WorkflowInfo(uuid, folder)
+
+
+def test_crossover_shows_each_parent_its_own_log(tmp_path):
+    ve = _make_engine()
+    log_a = "parent A log: solver hit max steps"
+    log_b = "parent B log: CREST no valid input file"
+    prompt = ve.crossover_prompt(
+        goal="g",
+        wf_infos=[
+            _workflow_with_log(tmp_path, "uuid_a", log_a),
+            _workflow_with_log(tmp_path, "uuid_b", log_b),
+        ],
+        genotypes=["code1", "code2"],
+        iteration_count=1,
+    )
+    first_parent, second_parent = prompt.split("### Parent 2")
+    assert f"<raw_log>\n{log_a}\n</raw_log>" in first_parent
+    assert log_b not in first_parent
+    assert f"<raw_log>\n{log_b}\n</raw_log>" in second_parent
+    assert log_a not in second_parent
+
+
+def test_workflow_info_run_stdout_reads_log_or_empty(tmp_path):
+    raw = "\x1b[31mError:\x1b[0m é\n"
+    assert _workflow_with_log(tmp_path, "with_log", raw).run_stdout == raw
+    assert WorkflowInfo("missing", tmp_path / "missing").run_stdout == ""
+
+
 def test_mutation_prompt_has_no_scope_band_text(monkeypatch):
     monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
     ve = _make_engine()
@@ -287,7 +335,6 @@ def test_mutation_prompt_has_no_scope_band_text(monkeypatch):
         goal="solve the task",
         wf_info=_FakeWorkflowInfo(),
         genotype="# parent code",
-        run_stdout="",
         iteration_count=1,
         max_iterations=10,
     )
@@ -314,7 +361,7 @@ def test_mutation_agent_budget_is_parent_centered(monkeypatch):
     for _ in range(25):
         ve.mutation_prompt(
             goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
-            run_stdout="", iteration_count=1, max_iterations=10,
+            iteration_count=1, max_iterations=10,
         )
         budget = ve.last_variation_state["agent_budget"]
         assert 2 <= budget <= 4  # parent has 3 agents → within ±1
@@ -329,7 +376,7 @@ def test_mutation_agent_budget_counts_distinct_agents_only(monkeypatch):
              "answers": ["a", "b", "c", "d"]}
     ve.mutation_prompt(
         goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
-        run_stdout="", iteration_count=1, max_iterations=10,
+        iteration_count=1, max_iterations=10,
     )
     assert 1 <= ve.last_variation_state["agent_budget"] <= 3  # 2 distinct agents
 
@@ -341,7 +388,7 @@ def test_mutation_agent_budget_caps_at_max_possible_agents(monkeypatch):
     for _ in range(10):
         ve.mutation_prompt(
             goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
-            run_stdout="", iteration_count=1, max_iterations=10,
+            iteration_count=1, max_iterations=10,
         )
         assert 6 <= ve.last_variation_state["agent_budget"] <= 7
 
@@ -353,7 +400,7 @@ def test_mutation_agent_budget_falls_back_to_history(monkeypatch):
     state = {"answers": "raw string, no step_name"}
     ve.mutation_prompt(
         goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
-        run_stdout="", iteration_count=1, max_iterations=10,
+        iteration_count=1, max_iterations=10,
     )
     assert 1 <= ve.last_variation_state["agent_budget"] <= 2  # no history → 1
 

@@ -36,7 +36,7 @@
     <rect x="20" y="40" width="170" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="105" y="64" text-anchor="middle">inputs</text>
     <text class="box-sub" x="105" y="84" text-anchor="middle">goal, genotype</text>
-    <text class="box-sub" x="105" y="100" text-anchor="middle">run_stdout</text>
+    <text class="box-sub" x="105" y="100" text-anchor="middle">parent run_stdout.log</text>
     <text class="box-sub" x="105" y="116" text-anchor="middle">WorkflowInfo fields</text>
     <text class="box-sub" x="105" y="132" text-anchor="middle">config</text>
   </g>
@@ -201,7 +201,7 @@
     <rect x="280" y="150" width="250" height="110" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="405" y="172" text-anchor="middle">_split_directive_evidence</text>
     <text class="box-sub" x="405" y="190" text-anchor="middle">gradient (_ becomes space),</text>
-    <text class="box-sub" x="405" y="206" text-anchor="middle">else run_stdout as raw_log,</text>
+    <text class="box-sub" x="405" y="206" text-anchor="middle">else parent's own log as raw_log,</text>
     <text class="box-sub" x="405" y="222" text-anchor="middle">else fixed failure sentence</text>
     <text class="box-sub" x="405" y="238" text-anchor="middle">no length cut</text>
   </g>
@@ -233,7 +233,7 @@
     <rect x="280" y="310" width="250" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="405" y="332" text-anchor="middle">crossover_prompt()</text>
     <text class="box-sub" x="405" y="350" text-anchor="middle">gradient per parent, else</text>
-    <text class="box-sub" x="405" y="366" text-anchor="middle">stdout tail [-1024:] as raw_log</text>
+    <text class="box-sub" x="405" y="366" text-anchor="middle">own log tail [-1024:] as raw_log</text>
     <text class="box-sub" x="405" y="382" text-anchor="middle">no cut on the gradient</text>
   </g>
   <g class="box" id="t8">
@@ -525,10 +525,10 @@
       goal: str, exploration_block: str = "",
       raw_log: str = "") -&gt; str                                    # one LLM call, directive text
   mutation_prompt(self, goal: str, wf_info: WorkflowInfo | None,
-      genotype: str | None, run_stdout: str, iteration_count: int,
+      genotype: str | None, iteration_count: int,
       max_iterations: int = 10, exploration_probe: dict | None = None) -&gt; str  # full mutation prompt
   crossover_prompt(self, goal: str, wf_infos: list[WorkflowInfo],
-      genotypes: list[str], run_stdouts: list[str],
+      genotypes: list[str],
       iteration_count: int, max_iterations: int = 10,
       exploration_probe: dict | None = None) -&gt; str                 # recombination prompt
 

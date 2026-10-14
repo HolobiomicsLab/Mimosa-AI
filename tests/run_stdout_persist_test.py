@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """``run_stdout.log`` persistence through the real ``evolve_generation``.
 
-The directive LLM reads ``run_stdout`` as its fallback diagnosis when a
-generation has no parent gradient; auditors need that exact text on disk.
+The directive LLM reads a parent's ``run_stdout.log`` (through
+``WorkflowInfo.run_stdout``) as an unverified raw log when that parent has
+no verifier gradient; auditors need that exact text on disk.
 """
 
 from __future__ import annotations
