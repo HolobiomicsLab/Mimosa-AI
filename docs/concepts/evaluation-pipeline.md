@@ -46,7 +46,17 @@ The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mi
 3. **Reconnaissance and normalization.** Inventories and compact content
    previews inform the LLM. Schema adapters map differing artifact
    layouts to a common representation. A new schema can extend the
-   adapters without changing the comparison criteria.
+   adapters without changing the comparison criteria. When the goal asks
+   for saved outputs, the criteria include an `output_conformance` gate
+   (before any quality measure): exact goal paths; field names taken from
+   the goal, else copied exactly from the task inputs (no invented
+   `_pred`/`_prob` variants); record identifiers copied verbatim; one
+   output record per input record in input order for per-record results,
+   and only input records for selections. The adapter checks this by
+   reading the input and the output files, and the feedback names each
+   found-vs-expected mismatch. Strict benchmark graders fail correct
+   science delivered in another shape, so this gate is measured, not
+   assumed.
 4. **Pairwise policy.** A cached deterministic Python policy compares
    each pair and returns a verdict, evidence, and feedback for both
    sides. On a tie, comparable goal-relevant visual artifacts can be
