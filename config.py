@@ -96,14 +96,10 @@ class Config:
         ##############
         # Verifier channel (evaluation pipeline)
         ##############
-        # "hybrid" (default) = E19/E19b hybrid verifier
-        # (sources/evaluators/hybrid_verifier); "legacy" = the deprecated
-        # multi-source per-claim verifier (sources/evaluators/verifier.py);
-        # "gold" = ORACLE / BENCHMARK-LEAKING control
-        # (sources/evaluators/gold_feedback): hybrid reward, but the textual
-        # gradient is the benchmark grader's own VER/SR feedback. Research
-        # only (E43) — never report benchmark scores from a gold run.
-        self.verifier_kind: str = "hybrid"
+        # "policy_bt" fits current ratings across generation pairs.
+        # "hybrid" and "legacy" retain their previous scoring rules.
+        # "gold" exposes benchmark answers for research only.
+        self.verifier_kind: str = "policy_bt"
         # verifier_kind="gold" only: also take the reward (QD score, early
         # stop, capsule argmax) from the benchmark grader (full oracle:
         # SR -> 1.0, VER -> 0.5*CBS, else 0.0). Default False = gradient-only.
@@ -146,42 +142,18 @@ class Config:
         # clean recovery leaves the reward uncapped (E24: 29% of
         # workspaces fail clean re-execution).
         self.hybrid_verifier_execution_gate: bool = True
-        # --- policy_bt verifier (verifier_kind="policy_bt"; E44-E48
-        # architecture, defaults from the offline measurements) ---
-        # Reward aggregation over pairwise outcomes: "win_rate" (default —
-        # raw arrival-moment majority vs predecessors; E19c measured BEST:
-        # 0.742 vs BT 0.643) or "bradley_terry".
-        self.policy_bt_reward: str = "win_rate"
-        # Per policy-comparison subprocess timeout (seconds).
+        # Policy comparisons fit one Bradley-Terry tournament.
+        self.policy_bt_reward: str = "bradley_terry"
+        # Comparison subprocess limit, in seconds.
         self.policy_bt_scorer_timeout_s: int = 60
-        # Kimi per-PAIR visual channel for figure-dominant tasks (E26
-        # channel-selection rule; >=50% image share).
+        # Relevant visual artifacts can resolve deterministic ties.
         self.policy_bt_visual_channel: bool = True
-        # E47 evidence-checked gradient refiner (relevance-neutral,
-        # better-grounded at ~$0.003/gradient).
-        self.policy_bt_refiner: bool = True
-        # Max policy-generation repair rounds (E48 repair plumbing).
-        self.policy_bt_repair_rounds: int = 3
-        # 0 = compare all predecessors; else cap comparisons to the N most
-        # recent (budget guard).
-        self.policy_bt_max_pairs: int = 0
-        # Wall-clock cap per generation re-execution.
-        self.policy_bt_reexec_timeout_s: int = 900
-        # One local ./venv per task sandbox, incremental installs across
-        # the task's generations.
-        self.policy_bt_venv_reuse: bool = True
-        # Code-policy tiebreak when the kimi PAIR call ties (unmeasured;
-        # default OFF).
-        self.policy_bt_visual_tiebreak_code: bool = False
-        # 0 = unlimited; cap on fresh kimi pair-calls per generation
-        # (budget guard; overflow pairs fall to the code policy).
-        self.policy_bt_visual_max_pairs_per_gen: int = 0
-        # Verbose per-pair / per-repair stdout lines (plan §6b).
-        self.policy_bt_verbose: bool = False
-        # Incremental recon refresh: at these generation counts, rebuild the
-        # recon config with ALL accumulated digests; if the config changed,
-        # the policy is rewritten (same ladder, updated schema knowledge).
-        self.policy_bt_recon_refresh_gap: int = 2
+        # Maximum repairs for generated policy or adapters.
+        self.policy_bt_repair_rounds: int = 4
+        # Run the required reproduction script on copies.
+        self.policy_bt_reexecute: bool = True
+        # Reproduction limit per generation, in seconds.
+        self.policy_bt_reexec_timeout_s: int = 1800
         #############
         # Orchestrator Workflow generation options
         #############
@@ -509,17 +481,9 @@ class Config:
             "policy_bt_reward": self.policy_bt_reward,
             "policy_bt_scorer_timeout_s": self.policy_bt_scorer_timeout_s,
             "policy_bt_visual_channel": self.policy_bt_visual_channel,
-            "policy_bt_refiner": self.policy_bt_refiner,
             "policy_bt_repair_rounds": self.policy_bt_repair_rounds,
-            "policy_bt_max_pairs": self.policy_bt_max_pairs,
+            "policy_bt_reexecute": self.policy_bt_reexecute,
             "policy_bt_reexec_timeout_s": self.policy_bt_reexec_timeout_s,
-            "policy_bt_venv_reuse": self.policy_bt_venv_reuse,
-            "policy_bt_visual_tiebreak_code": self.policy_bt_visual_tiebreak_code,
-            "policy_bt_visual_max_pairs_per_gen": (
-                self.policy_bt_visual_max_pairs_per_gen
-            ),
-            "policy_bt_verbose": self.policy_bt_verbose,
-            "policy_bt_recon_refresh_gap": self.policy_bt_recon_refresh_gap,
             "openrouter_provider": self.openrouter_provider,
             "default_openrouter_quantizations": self.default_openrouter_quantizations,
             "save_logprobs": self.save_logprobs,
@@ -643,6 +607,8 @@ class Config:
         self.policy_bt_reward = str(
             data.get("policy_bt_reward", self.policy_bt_reward)
         ).lower()
+        if self.verifier_kind == "policy_bt" and self.policy_bt_reward != "bradley_terry":
+            raise ValueError("policy_bt_reward must be 'bradley_terry'")
         self.policy_bt_scorer_timeout_s = int(
             data.get("policy_bt_scorer_timeout_s", self.policy_bt_scorer_timeout_s)
         )
@@ -650,36 +616,14 @@ class Config:
             data.get("policy_bt_visual_channel"),
             self.policy_bt_visual_channel,
         )
-        self.policy_bt_refiner = _json_bool(
-            data.get("policy_bt_refiner"), self.policy_bt_refiner
+        self.policy_bt_reexecute = _json_bool(
+            data.get("policy_bt_reexecute"), self.policy_bt_reexecute
         )
         self.policy_bt_repair_rounds = int(
             data.get("policy_bt_repair_rounds", self.policy_bt_repair_rounds)
         )
-        self.policy_bt_max_pairs = int(
-            data.get("policy_bt_max_pairs", self.policy_bt_max_pairs)
-        )
         self.policy_bt_reexec_timeout_s = int(
             data.get("policy_bt_reexec_timeout_s", self.policy_bt_reexec_timeout_s)
-        )
-        self.policy_bt_venv_reuse = _json_bool(
-            data.get("policy_bt_venv_reuse"), self.policy_bt_venv_reuse
-        )
-        self.policy_bt_visual_tiebreak_code = _json_bool(
-            data.get("policy_bt_visual_tiebreak_code"),
-            self.policy_bt_visual_tiebreak_code,
-        )
-        self.policy_bt_visual_max_pairs_per_gen = int(
-            data.get(
-                "policy_bt_visual_max_pairs_per_gen",
-                self.policy_bt_visual_max_pairs_per_gen,
-            )
-        )
-        self.policy_bt_verbose = _json_bool(
-            data.get("policy_bt_verbose"), self.policy_bt_verbose
-        )
-        self.policy_bt_recon_refresh_gap = max(
-            1, int(data.get("policy_bt_recon_refresh_gap", 2))
         )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get(

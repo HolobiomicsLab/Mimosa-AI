@@ -1,4 +1,6 @@
-"""Hybrid verifier (E35 PRIME, v3) — the default Mimosa verification channel.
+"""[DEPRECATED 2026-10-13] Previous production verifier channel (default 2026-09-24 -> 2026-10-13), superseded by sources/evaluators/policy_bt_verifier (policy/BT verifier, the default since config.py:102). Still used for verifier_kind="hybrid", for the unknown-value fallback in WorkflowEvaluator, and wrapped by the gold research channel. Kept for those paths and research replay. Do not extend.
+
+Hybrid verifier (E35 PRIME, v3) — the previous production channel.
 
 Verifier v3 combines every measured win of the E19..E35 experiment
 series into one production channel:

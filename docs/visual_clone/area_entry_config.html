@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">Entry point and configuration</h1>
-<p class="intro">The shell calls <code>main.py::cli_main</code>, which parses 48 flags and dispatches to one of eight modes. <code>config.py::Config</code> holds every default, then reads a JSON file and applies CLI overrides. This page covers the six files of the entry and config area, plus the <code>verifier_kind</code> choice (policy_bt run default, hybrid previous, legacy, gold).</p>
+<p class="intro">The shell calls <code>main.py::cli_main</code>, which parses 47 flags and dispatches to one of eight modes. <code>config.py::Config</code> holds every default, then reads a JSON file and applies CLI overrides. This page covers the six files of the entry and config area, plus the <code>verifier_kind</code> choice (policy_bt run default, hybrid previous, legacy, gold).</p>
 
 <div id="legend" data-auto></div>
 
@@ -150,9 +150,9 @@
 <table>
 <thead><tr><th>File</th><th>Role</th><th class="size">Lines</th><th>Main symbols</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="../../main.py">main.py</a></td><td>Parses flags and dispatches to one mode.</td><td class="size">559</td><td class="sym">cli_main, main, apply_config_overrides, warn_gold_feedback_mode</td></tr>
-<tr><td class="sym"><a href="../../config.py">config.py</a></td><td>Holds every default field and loads JSON.</td><td class="size">973</td><td class="sym">Config, AddressMCP, _json_bool</td></tr>
-<tr><td class="sym"><a href="../../config_default.json">config_default.json</a></td><td>Local template config; not tracked by git.</td><td class="size">134</td><td class="sym">78 top-level keys</td></tr>
+<tr><td class="sym"><a href="../../main.py">main.py</a></td><td>Parses flags and dispatches to one mode.</td><td class="size">552</td><td class="sym">cli_main, main, apply_config_overrides, warn_gold_feedback_mode</td></tr>
+<tr><td class="sym"><a href="../../config.py">config.py</a></td><td>Holds every default field and loads JSON.</td><td class="size">910</td><td class="sym">Config, AddressMCP, _json_bool</td></tr>
+<tr><td class="sym"><a href="../../config_default.json">config_default.json</a></td><td>Local template config; not tracked by git.</td><td class="size">128</td><td class="sym">72 top-level keys</td></tr>
 <tr><td class="sym"><a href="../../auto-install.sh">auto-install.sh</a></td><td>Installs deps, starts Toolomics and Perspicacite.</td><td class="size">411</td><td class="sym">6 numbered steps</td></tr>
 <tr><td class="sym"><a href="../../cleanup.sh">cleanup.sh</a></td><td>Empties <code>tmp/</code> and <code>sources/workflows</code>.</td><td class="size">32</td><td class="sym">clean_directory</td></tr>
 <tr><td class="sym"><a href="../../workflow_evolution_anim.py">workflow_evolution_anim.py</a></td><td>Pygame replay of the evolution tree and memory.</td><td class="size">1852</td><td class="sym">App, load_all, main</td></tr>
@@ -182,12 +182,12 @@
 </table>
 
 <p class="note">Amber note: <code>--evaluation_cli</code>, <code>--memory_cli</code> and the no-flag wizard return before <code>apply_config_overrides</code>, so flags such as <code>--runner_default_timeout</code> do nothing there.</p>
-<p class="note flag">Red note: <code class="path">docs/reference/cli.md</code> names 38 of the 48 flags; 11 are missing: <code>--hybrid_verifier_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code>, <code>--planner_human_approve</code> and the seven <code>--policy_bt_*</code> flags (grep for <code>`--flag`</code> tokens, 2026-10-10). Its <code>--verifier_kind</code> row still lists only <code>hybrid | legacy | gold</code>.</p>
+<p class="note flag">Red note: <code class="path">docs/reference/cli.md</code> names 37 of the 47 flags; 10 are missing: <code>--hybrid_verifier_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code>, <code>--planner_human_approve</code> and the six <code>--policy_bt_*</code> flags (grep for <code>`--flag`</code> tokens, 2026-10-13). Its <code>--verifier_kind</code> row still lists only <code>hybrid | legacy | gold</code>.</p>
 
 <details><summary>the other flags: behaviour, logging, batch</summary><div class="dbody">
 <p><code>--csv_runs_limit</code> (int, default 200), <code>--disable_judge</code>, <code>--debug</code>, <code>--verbose</code>, <code>--memory_uuid</code>, <code>--max_evolve_iterations</code> (writes <code>config.max_learning_evolve_iterations</code>).</p>
-<p>30 further flags come from <code>main.py::add_config_arguments</code> and are applied by <code>main.py::apply_config_overrides</code>: <code>--workflow_dir</code>, <code>--schema_code_path</code>, <code>--smolagent_factory_code_path</code>, <code>--prompt_workflow_creator</code>, <code>--runner_default_python_version</code>, <code>--runner_default_timeout</code>, <code>--runner_default_max_memory_mb</code>, <code>--runner_default_max_cpu_percent</code>, <code>--runner_temp_dir</code>, <code>--pushover_token</code>, <code>--pushover_user</code>, <code>--verifier_kind</code>, <code>--gold_feedback_reward</code>, <code>--gold_feedback_timeout_s</code>, <code>--hybrid_verifier_num_claims</code>, <code>--hybrid_verifier_refinement_rounds</code>, <code>--hybrid_verifier_scorer_timeout_s</code>, <code>--hybrid_verifier_digest_max_files</code>, <code>--hybrid_verifier_pairwise_mode</code>, <code>--hybrid_verifier_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code>, <code>--policy_bt_reward</code>, <code>--policy_bt_scorer_timeout_s</code>, <code>--policy_bt_visual_channel</code>, <code>--policy_bt_refiner</code>, <code>--policy_bt_reexec_timeout_s</code>, <code>--policy_bt_visual_tiebreak_code</code>, <code>--policy_bt_verbose</code>, <code>--planner_human_approve</code>.</p>
-<p>18 flags are declared in <code>main.py::main</code> itself. 48 in total. Seven flags use <code>argparse.BooleanOptionalAction</code> and also accept a <code>--no-</code> form: <code>--gold_feedback_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code>, <code>--policy_bt_visual_channel</code>, <code>--policy_bt_refiner</code>, <code>--policy_bt_visual_tiebreak_code</code>, <code>--policy_bt_verbose</code> (default <code>None</code> = keep the config value).</p>
+<p>29 further flags come from <code>main.py::add_config_arguments</code> and are applied by <code>main.py::apply_config_overrides</code>: <code>--workflow_dir</code>, <code>--schema_code_path</code>, <code>--smolagent_factory_code_path</code>, <code>--prompt_workflow_creator</code>, <code>--runner_default_python_version</code>, <code>--runner_default_timeout</code>, <code>--runner_default_max_memory_mb</code>, <code>--runner_default_max_cpu_percent</code>, <code>--runner_temp_dir</code>, <code>--pushover_token</code>, <code>--pushover_user</code>, <code>--verifier_kind</code>, <code>--gold_feedback_reward</code>, <code>--gold_feedback_timeout_s</code>, <code>--hybrid_verifier_num_claims</code>, <code>--hybrid_verifier_refinement_rounds</code>, <code>--hybrid_verifier_scorer_timeout_s</code>, <code>--hybrid_verifier_digest_max_files</code>, <code>--hybrid_verifier_pairwise_mode</code>, <code>--hybrid_verifier_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code>, <code>--policy_bt_reward</code>, <code>--policy_bt_scorer_timeout_s</code>, <code>--policy_bt_visual_channel</code>, <code>--policy_bt_reexecute</code>, <code>--policy_bt_reexec_timeout_s</code>, <code>--policy_bt_repair_rounds</code>, <code>--planner_human_approve</code>.</p>
+<p>18 flags are declared in <code>main.py::main</code> itself. 47 in total. Five flags use <code>argparse.BooleanOptionalAction</code> and also accept a <code>--no-</code> form: <code>--gold_feedback_reward</code>, <code>--hybrid_verifier_visual_rung</code>, <code>--hybrid_verifier_execution_gate</code>, <code>--policy_bt_visual_channel</code>, <code>--policy_bt_reexecute</code> (default <code>None</code> = keep the config value).</p>
 <p>5 names are read by <code>main.py::apply_config_overrides</code> with <code>getattr</code>, but no parser declares them, so no CLI flag can set them: <code>early_stop_mode</code>, <code>min_learning_evolve_iterations</code>, <code>plateau_patience</code>, <code>explore_after_plateau</code> and <code>explore_base_rate</code> (a grep for <code>"--early_stop_mode"</code>, <code>"--min_learning_evolve_iterations"</code>, <code>"--plateau_patience"</code>, <code>"--explore_after_plateau"</code> and <code>"--explore_base_rate"</code> finds no <code>add_argument</code>; 2026-10-10). Set them through the JSON config.</p>
 <p>Before the dispatch chain <code>main.py::main</code> also calls <code>apply_config_overrides</code>, <code>warn_gold_feedback_mode</code>, <code>validate_environment</code>, <code>Config.create_paths</code>, <code>Config.validate_paths</code> and builds <code>WorkspaceManager</code>. Every argument-driven mode, <code>--manual</code> included, therefore needs one API key from <code>validate_environment</code>.</p>
 </div></details>
@@ -221,7 +221,7 @@
     <title>Local JSON template, not tracked by git; also the --config path and the installed user config</title>
     <rect x="30" y="92" width="250" height="54" rx="2" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="155" y="114" text-anchor="middle">config_default.json</text>
-    <text class="box-sub" x="155" y="131" text-anchor="middle">78 keys, read by --config</text>
+    <text class="box-sub" x="155" y="131" text-anchor="middle">72 keys, read by --config</text>
   </a>
 
   <a class="box" id="c3" href="#c-config">
@@ -264,7 +264,7 @@
   <text class="edge-label" x="168" y="389">paths checked</text>
 
   <text class="box-sub" x="300" y="40">also: paths.user_config_file() on installed runs</text>
-  <text class="box-sub" x="300" y="118">jsonify() writes 78 top-level keys</text>
+  <text class="box-sub" x="300" y="118">jsonify() writes 72 top-level keys</text>
   <text class="box-sub" x="300" y="196">_reanchor_relative_paths() fixes legacy paths</text>
   <text class="box-sub" x="300" y="212">_json_bool() parses gold_feedback_reward</text>
 </svg>
@@ -274,10 +274,10 @@
 <p class="note say"><span class="chip ok">FIXED</span> 2026-10-12: <code>config.py::Config.from_json</code> now reads <code>judge_model</code> and <code>vision_judge_model</code> via <code>data.get()</code> (config.py:591-594), so JSON configs set the judge models. Regression tests: <code class="path">tests/config_roundtrip_test.py</code> (<code>test_every_jsonify_key_is_read_by_from_json</code>, <code>test_judge_models_survive_a_round_trip</code>). Earlier builds flagged this as a red note: loading any JSON config silently kept the constructor defaults for both fields.</p>
 
 <details id="plumbing"><summary>config defaults versus the local JSON template (my computation)</summary><div class="dbody">
-<p>1 of the 78 JSON keys holds a different value from the <code>config.py</code> default: <code>judge_model</code> (<code>openrouter/z-ai/glm-5.3</code> vs <code>openrouter/deepseek/deepseek-v4.1-flash</code>; since the 2026-10-12 fix, loading this file does switch the judge to glm-5.3). Path, secret and provider-list keys were not compared as values. <code>Config.jsonify</code> emits 78 top-level keys and the local file has the same 78, so neither side is missing a key.</p>
-<p>This local file is a live operator config, not a clean template: it selects <code>verifier_kind</code> <code>policy_bt</code> (the <code>config.py</code> default is <code>hybrid</code>), keeps <code>early_stop_mode</code> <code>auto</code>, and carries the four checkout paths (<code>workflow_dir</code>, <code>memory_dir</code>, <code>runner_temp_dir</code>, <code>runs_capsule_dir</code>).</p>
+<p>3 of the 72 JSON keys hold a different value from the <code>config.py</code> default: <code>smolagent_model_id</code> and <code>capsule_namer_model</code> (the file ships deepseek models, the code default is <code>openrouter/z-ai/glm-5.3-flash</code>) and <code>openrouter_provider</code> (one token differs: the file lists <code>siliconflow</code>, the code lists <code>xiaomi</code>). <code>judge_model</code> now agrees with the code default. Path keys differ only in absolute-vs-relative spelling of the same files; <code>discovery_addresses</code> only in JSON-vs-object spelling. <code>Config.jsonify</code> emits 72 top-level keys and the local file has the same 72, so neither side is missing a key.</p>
+<p>This local file is a live operator config, not a clean template: it selects <code>verifier_kind</code> <code>policy_bt</code> (now the built-in default too, <code>config.py:102</code>), keeps <code>early_stop_mode</code> <code>auto</code>, carries the four checkout paths (<code>workflow_dir</code>, <code>memory_dir</code>, <code>runner_temp_dir</code>, <code>runs_capsule_dir</code>), and its six <code>policy_bt_*</code> fields equal the code defaults (<code>bradley_terry</code>, 60 s, <code>true</code>, 3 rounds, <code>true</code>, 900 s).</p>
 <p>2 fields set in <code>Config.__init__</code> are absent from <code>jsonify</code> and <code>from_json</code>, so a JSON file cannot set them: <code>literrature_grounding</code> (this spelling) and <code>orchestrator_choose_model</code>. <code class="path">tests/config_roundtrip_test.py</code> records both in <code>KNOWN_GAPS</code> (issue #182). 2 more are runtime-only by design: <code>gold_feedback_task_row</code>, <code>gold_feedback_sab_loader</code> (<code>NOT_PERSISTED</code>).</p>
-<p>Computed with an <code>ast</code> pass over <code>config.py</code> plus <code>json.load</code> on <code>config_default.json</code>, 2026-10-10. The file is local and untracked, so another checkout can differ.</p>
+<p>Computed with an <code>ast</code> pass over <code>config.py</code>, plus <code>json.load</code> on <code>config_default.json</code>, 2026-10-10; <code>verifier_kind</code> and the <code>policy_bt_*</code> rows re-read against the working tree 2026-10-13. The file is local and untracked, so another checkout can differ.</p>
 </div></details>
 </div>
 
@@ -311,10 +311,10 @@
     <text class="box-sub" x="130" y="158" text-anchor="middle">any string, no check</text>
   </a>
   <a class="box" id="v3" href="#c-config">
-    <title>Config field, built-in default hybrid; the JSON file overrides it</title>
+    <title>Config field, built-in default policy_bt (config.py:102); the JSON file still overrides it</title>
     <rect x="290" y="75" width="220" height="50" rx="12" fill="rgba(230,251,255,0.08)" stroke="#E6FBFF"/>
     <text class="box-label" x="400" y="96" text-anchor="middle">Config.verifier_kind</text>
-    <text class="box-sub" x="400" y="113" text-anchor="middle">hybrid; file ships policy_bt</text>
+    <text class="box-sub" x="400" y="113" text-anchor="middle">policy_bt (config.py:102); hybrid for unknown</text>
   </a>
   <a class="box" id="v4" href="file_eval_evaluator.html">
     <title>Facade built once in EvolutionEngine.__init__; lower-cases the value</title>
@@ -341,10 +341,10 @@
     <text class="box-sub" x="690" y="190" text-anchor="middle">gold - ORACLE</text>
   </a>
   <a class="box" id="v12" href="mod_evaluators_policy_bt_verifier.html">
-    <title>E44-E48 policy tournament: fresh re-execution, deterministic digest, LLM policy; imported lazily; the run default via config_default.json:16</title>
+    <title>Default channel: reproduction contract, LLM recon, comparison policy, Bradley-Terry fit; imported lazily</title>
     <rect x="860" y="84" width="240" height="50" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="980" y="105" text-anchor="middle">PolicyBTVerifierEvaluator</text>
-    <text class="box-sub" x="980" y="122" text-anchor="middle">policy_bt - run default</text>
+    <text class="box-sub" x="980" y="122" text-anchor="middle">policy_bt - built-in default</text>
   </a>
   <a class="box" id="v8" href="#c-config">
     <title>True = full oracle: the reward also comes from the grader</title>
@@ -394,30 +394,29 @@
   <text class="edge-label" x="246" y="338">sets</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> picks the verifier. <code>legacy</code>, <code>gold</code> and <code>policy_bt</code> are imported lazily, so a non-matching path never loads them. <span class="chip warn">oracle - leaks gold</span> <code>gold</code> reads the benchmark grader's verdict; <code>main.py::warn_gold_feedback_mode</code> prints <code>LEAK_WARNING</code>, and without <code>--science_agent_bench</code> every generation falls back to the hybrid gradient. <code>policy_bt</code> is the E44-E48 channel and the run default (<code>config_default.json:16</code> = <code>"policy_bt"</code>, read 2026-10-13); its package page is <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>.</p>
+<p class="figcap">Diagram 3 - <code>sources/evaluators/evaluator.py::WorkflowEvaluator.__init__</code> picks the verifier. <code>legacy</code>, <code>gold</code> and <code>policy_bt</code> are imported lazily, so a non-matching path never loads them. <span class="chip warn">oracle - leaks gold</span> <code>gold</code> reads the benchmark grader's verdict; <code>main.py::warn_gold_feedback_mode</code> prints <code>LEAK_WARNING</code>, and without <code>--science_agent_bench</code> every generation falls back to the hybrid gradient. <code>policy_bt</code> is the default channel (<code>config.py:102</code>; <code>config_default.json:16</code> = <code>"policy_bt"</code>, read 2026-10-13); its package page is <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>.</p>
 <details><summary>verifier flags: flag | type | default | effect</summary><div class="dbody">
 <table>
 <thead><tr><th>Flag</th><th>Type</th><th>Default</th><th>Effect</th></tr></thead>
 <tbody>
-<tr><td class="sym">--verifier_kind</td><td>str, 4 choices</td><td class="sym">hybrid</td><td>Picks the evaluator built by the facade.</td></tr>
+<tr><td class="sym">--verifier_kind</td><td>str, 4 choices</td><td class="sym">policy_bt (config.py:102)</td><td>Picks the evaluator built by the facade.</td></tr>
 <tr><td class="sym">--gold_feedback_reward / --no-gold_feedback_reward</td><td>BooleanOptionalAction</td><td class="sym">False</td><td>gold only: reward also from the benchmark grader.</td></tr>
 <tr><td class="sym">--gold_feedback_timeout_s</td><td>int</td><td class="sym">1800 s</td><td>gold only: grading cap; 0 or less disables it.</td></tr>
-<tr><td class="sym">--policy_bt_reward</td><td>str, 2 choices</td><td class="sym">win_rate</td><td>policy_bt only: <code>win_rate</code> or <code>bradley_terry</code>.</td></tr>
+<tr><td class="sym">--policy_bt_reward</td><td>str, 1 choice</td><td class="sym">bradley_terry</td><td>policy_bt only: fitted Bradley-Terry ratings, the only supported value.</td></tr>
 <tr><td class="sym">--policy_bt_scorer_timeout_s</td><td>int</td><td class="sym">60 s</td><td>policy_bt only: per policy-comparison subprocess timeout.</td></tr>
-<tr><td class="sym">--policy_bt_visual_channel</td><td>BooleanOptionalAction</td><td class="sym">True</td><td>policy_bt only: kimi per-pair channel for figure tasks.</td></tr>
-<tr><td class="sym">--policy_bt_refiner</td><td>BooleanOptionalAction</td><td class="sym">True</td><td>policy_bt only: E47 evidence-checked gradient refiner.</td></tr>
+<tr><td class="sym">--policy_bt_visual_channel</td><td>BooleanOptionalAction</td><td class="sym">True</td><td>policy_bt only: vision-model tie-break on relevant images.</td></tr>
+<tr><td class="sym">--policy_bt_reexecute / --no-policy_bt_reexecute</td><td>BooleanOptionalAction</td><td class="sym">True</td><td>policy_bt only: run the reproduction script on clean copies.</td></tr>
 <tr><td class="sym">--policy_bt_reexec_timeout_s</td><td>int</td><td class="sym">900 s</td><td>policy_bt only: cap on one generation re-execution.</td></tr>
-<tr><td class="sym">--policy_bt_visual_tiebreak_code</td><td>BooleanOptionalAction</td><td class="sym">False</td><td>policy_bt only: code tiebreak after a kimi pair tie.</td></tr>
-<tr><td class="sym">--policy_bt_verbose</td><td>BooleanOptionalAction</td><td class="sym">False</td><td>policy_bt only: per-pair and per-repair stdout lines.</td></tr>
+<tr><td class="sym">--policy_bt_repair_rounds</td><td>int</td><td class="sym">3 rounds</td><td>policy_bt only: max repairs for generated policy or adapters.</td></tr>
 </tbody>
 </table>
 <blockquote>choices=["hybrid", "legacy", "gold", "policy_bt"],</blockquote>
 <p class="sub">main.py:79 - the real <code>--verifier_kind</code> choices list.</p>
 <details><summary>the --verifier_kind help text, verbatim</summary><div class="dbody">
-<blockquote>Verifier channel: 'hybrid' (E19/E19b, default), 'legacy' (deprecated multi-source verifier), 'policy_bt' (E44-E48: fresh re-execution + deterministic digest + LLM policy tournament), or 'gold' (ORACLE / BENCHMARK-LEAKING research control: benchmark grader feedback as gradient; needs --science_agent_bench; never report its scores)</blockquote>
+<blockquote>Verifier channel: 'policy_bt' (default; cached artifact policy and fitted Bradley-Terry ratings), 'hybrid' (previous temporal-ladder verifier), 'legacy' (deprecated multi-source verifier), or 'gold' (ORACLE / BENCHMARK-LEAKING research control: benchmark grader feedback as gradient; needs --science_agent_bench; never report its scores)</blockquote>
 <p class="sub">main.py:80-83, <code>help=</code> of <code>--verifier_kind</code>.</p>
 </div></details>
-<p>JSON parsing in <code>config.py::Config.from_json</code>: <code>gold_feedback_reward</code>, <code>policy_bt_visual_channel</code>, <code>policy_bt_refiner</code>, <code>policy_bt_venv_reuse</code>, <code>policy_bt_visual_tiebreak_code</code> and <code>policy_bt_verbose</code> go through <code>config.py::_json_bool</code> (<code>"false"</code>, <code>"0"</code>, <code>"no"</code>, <code>"off"</code>, <code>""</code> give <code>False</code>). <code>hybrid_verifier_visual_rung</code> and <code>hybrid_verifier_execution_gate</code> still use <code>bool()</code>, so the JSON string <code>"false"</code> gives <code>True</code> for them (my reading of the code, not run).</p>
+<p>JSON parsing in <code>config.py::Config.from_json</code>: <code>gold_feedback_reward</code>, <code>policy_bt_visual_channel</code> and <code>policy_bt_reexecute</code> go through <code>config.py::_json_bool</code> (<code>"false"</code>, <code>"0"</code>, <code>"no"</code>, <code>"off"</code>, <code>""</code> give <code>False</code>). <code>hybrid_verifier_visual_rung</code> and <code>hybrid_verifier_execution_gate</code> still use <code>bool()</code>, so the JSON string <code>"false"</code> gives <code>True</code> for them (my reading of the code, not run).</p>
 <p>Tests: <code class="path">tests/gold_feedback_test.py</code> checks the defaults, the JSON round trip, that <code>jsonify</code> omits the two runtime-only fields, the CLI flags, <code>warn_gold_feedback_mode</code> and the facade <code>"gold"</code> branch. <code class="path">tests/policy_bt_verifier_test.py</code> checks the policy_bt defaults, JSON round trip, CLI overrides and the facade <code>"policy_bt"</code> branch. <code class="path">tests/config_roundtrip_test.py</code> lists the two runtime-only fields in <code>NOT_PERSISTED</code> and, since the 2026-10-12 fix, asserts every <code>jsonify</code> key is read by <code>from_json</code> and that both judge models survive a round trip.</p>
 </div></details>
 </div>
@@ -427,8 +426,8 @@
 
 <div class="card ice" id="c-main">
 <h4><a href="../../main.py">main.py</a></h4>
-<p class="role">Parses 48 flags, prints the gold leak warning when selected, validates the environment, and dispatches to one mode.</p>
-<p class="meta">559 lines &#183; console script <code>mimosa = main:cli_main</code> &#183; reads: <code>config.py::Config</code>, <code class="path">sources/utils/paths.py</code></p>
+<p class="role">Parses 47 flags, prints the gold leak warning when selected, validates the environment, and dispatches to one mode.</p>
+<p class="meta">552 lines &#183; console script <code>mimosa = main:cli_main</code> &#183; reads: <code>config.py::Config</code>, <code class="path">sources/utils/paths.py</code></p>
 <details><summary>functions and the dispatch order</summary><div class="dbody">
 <pre>cli_main() -&gt; None
 main() -&gt; None
@@ -444,7 +443,7 @@ workflow_generation_evals(args, config) -&gt; None
 normal_execution_mode(args, config) -&gt; None
 setup_signal_handlers() -&gt; None</pre>
 <p>Order inside <code>main.py::main</code>: <code>dotenv.load_dotenv</code> at import, then <code>argparse</code>, config load (<code>--config</code>, else the installed user config), logging, <code>ensure_environment(auto_install=True)</code>, the three early-return branches, <code>apply_config_overrides</code>, <code>warn_gold_feedback_mode</code>, <code>validate_environment</code>, path checks, <code>WorkspaceManager</code>, then the dispatch chain.</p>
-<p><code>main.py::apply_config_overrides</code> applies 30 config flags, among them the seven <code>--policy_bt_*</code> flags added in this wave, and the five early-stop names it reads without a matching parser entry.</p>
+<p><code>main.py::apply_config_overrides</code> applies 29 config flags, among them the six <code>--policy_bt_*</code> flags, and the five early-stop names it reads without a matching parser entry.</p>
 <p><code>main.py::warn_gold_feedback_mode</code> returns <code>False</code> unless <code>verifier_kind</code> is <code>gold</code>. Then it prints <code>LEAK_WARNING</code> (from <code class="path">sources/evaluators/gold_feedback/leak.py</code>), a FULL ORACLE line when <code>gold_feedback_reward</code> is true, and a hybrid-fallback line without <code>--science_agent_bench</code>. Returns <code>True</code>.</p>
 <p><code>main.py::main</code> raises <code>ValueError("No goal provided. Use --task, --goal to start.")</code> when <code>normal_execution_mode</code> gets no task, goal or scenario.</p>
 </div></details>
@@ -453,7 +452,7 @@ setup_signal_handlers() -&gt; None</pre>
 <div class="card ice" id="c-config">
 <h4><a href="../../config.py">config.py</a></h4>
 <p class="role">Owns every default field, loads and dumps JSON, checks paths, and resolves per-model OpenRouter routing.</p>
-<p class="meta">973 lines &#183; classes: <code>Config</code>, <code>AddressMCP</code> &#183; function: <code>_json_bool</code> &#183; reads: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/pricing.py</code></p>
+<p class="meta">910 lines &#183; classes: <code>Config</code>, <code>AddressMCP</code> &#183; function: <code>_json_bool</code> &#183; reads: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/pricing.py</code></p>
 <details><summary>methods, fields and path checks</summary><div class="dbody">
 <pre>_json_bool(value, default) -&gt; bool
 AddressMCP.__post_init__() -&gt; None
@@ -469,7 +468,7 @@ Config._reanchor_relative_paths() -&gt; None
 Config.dump(filepath) -&gt; None
 Config.load(filepath) -&gt; None</pre>
 <p><code>Config.load</code> raises <code>FileNotFoundError</code> when the file is missing. <code>Config.validate_paths</code> asserts that <code>workflow_dir</code>, <code>schema_code_path</code>, <code>smolagent_factory_code_path</code>, <code>prompt_workflow_creator</code>, <code>prompt_planner</code> and <code>workspace_dir</code> exist; <code>create_paths</code> creates <code>workflow_dir</code>, <code>memory_dir</code> and <code>runner_temp_dir</code>.</p>
-<p>New since the previous build: the 12-field <code>policy_bt_*</code> block and the 5 early-stop knobs (<code>early_stop_mode</code>, <code>min_learning_evolve_iterations</code>, <code>plateau_patience</code>, <code>explore_after_plateau</code>, <code>explore_base_rate</code>). <code>Config.from_json</code> validates the stop knobs and raises <code>ValueError</code> on an unknown mode, patience below 1, a negative <code>explore_after_plateau</code> or a base rate outside 0.0-1.0.</p>
+<p>New since the previous build: the 6-field <code>policy_bt_*</code> block and the 5 early-stop knobs (<code>early_stop_mode</code>, <code>min_learning_evolve_iterations</code>, <code>plateau_patience</code>, <code>explore_after_plateau</code>, <code>explore_base_rate</code>). <code>Config.from_json</code> validates the stop knobs and raises <code>ValueError</code> on an unknown mode, patience below 1, a negative <code>explore_after_plateau</code> or a base rate outside 0.0-1.0.</p>
 <p><code>AddressMCP.__post_init__</code> rejects empty IPs and a port outside 0-65535, and fails if <code>port_min &gt; port_max</code>.</p>
 <p>Mutable state lives under <code>paths.py</code> defaults: <code>sources/workflows</code>, <code>sources/memory</code>, <code>runs_capsule/</code>, <code>tmp/</code> in a checkout, XDG dirs in an installed run.</p>
 </div></details>
@@ -477,8 +476,8 @@ Config.load(filepath) -&gt; None</pre>
 
 <div class="card ice" id="config-default">
 <h4><a href="../../config_default.json">config_default.json</a></h4>
-<p class="role">Local template config: 78 top-level keys. <code>python config.py</code> rewrites it with <code>Config.dump</code>. Copy it, edit it, pass it with <code>--config</code>.</p>
-<p class="meta">134 lines &#183; keys: 78 &#183; read by: <code>config.py::Config.from_json</code> &#183; <span class="chip warn">not tracked by git</span> removed in commit <code>09b57da</code>, ignored by <code>config_*.json</code> in <code class="path">.gitignore</code>; AGENTS.md still calls it the template.</p>
+<p class="role">Local template config: 72 top-level keys. <code>python config.py</code> rewrites it with <code>Config.dump</code>. Copy it, edit it, pass it with <code>--config</code>.</p>
+<p class="meta">128 lines &#183; keys: 72 &#183; read by: <code>config.py::Config.from_json</code> &#183; <span class="chip warn">not tracked by git</span> removed in commit <code>09b57da</code>, ignored by <code>config_*.json</code> in <code class="path">.gitignore</code>; AGENTS.md still calls it the template.</p>
 <details><summary>important fields: field | default in config.py | used by</summary><div class="dbody">
 <table>
 <thead><tr><th>Field</th><th>Default in config.py</th><th>Used by</th></tr></thead>
@@ -487,26 +486,20 @@ Config.load(filepath) -&gt; None</pre>
 <tr><td class="sym">discovery_addresses</td><td class="sym">0.0.0.0, ports 5000-5200</td><td class="sym">sources/core/tools_manager.py</td></tr>
 <tr><td class="sym">planner_llm_model</td><td class="sym">openrouter/z-ai/glm-5.3</td><td class="sym">sources/core/planner.py</td></tr>
 <tr><td class="sym">workflow_llm_model</td><td class="sym">openrouter/z-ai/glm-5.3</td><td class="sym">sources/core/workflow_factory.py</td></tr>
-<tr><td class="sym">smolagent_model_id</td><td class="sym">openrouter/deepseek/deepseek-v4-flash-0731</td><td class="sym">sources/core/workflow_factory.py</td></tr>
-<tr><td class="sym">judge_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">sources/evaluators/base.py</td></tr>
-<tr><td class="sym">capsule_namer_model</td><td class="sym">openrouter/deepseek/deepseek-v4.1-flash</td><td class="sym">sources/utils/transfer_toolomics.py</td></tr>
+<tr><td class="sym">smolagent_model_id</td><td class="sym">openrouter/z-ai/glm-5.3-flash</td><td class="sym">sources/core/workflow_factory.py</td></tr>
+<tr><td class="sym">judge_model</td><td class="sym">openrouter/z-ai/glm-5.3-flash</td><td class="sym">sources/evaluators/base.py</td></tr>
+<tr><td class="sym">capsule_namer_model</td><td class="sym">openrouter/z-ai/glm-5.3-flash</td><td class="sym">sources/utils/transfer_toolomics.py</td></tr>
 <tr><td class="sym">vision_judge_model</td><td class="sym">openrouter/moonshotai/kimi-k3</td><td class="sym">sources/evaluators/hybrid_verifier/evaluator.py &#183; legacy: legacy_verifier/verifier.py</td></tr>
-<tr><td class="sym">verifier_kind</td><td class="sym">hybrid (config.py:106); file ships policy_bt</td><td class="sym">sources/evaluators/evaluator.py</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="sym">policy_bt (config.py:102)</td><td class="sym">sources/evaluators/evaluator.py</td></tr>
 <tr><td class="sym">gold_feedback_reward</td><td class="sym">false</td><td class="sym">gold_feedback/evaluator.py, csv_mode.py, main.py</td></tr>
 <tr><td class="sym">gold_feedback_timeout_s</td><td class="sym">1800 s</td><td class="sym">gold_feedback/evaluator.py</td></tr>
 <tr><td class="sym">gold_feedback_task_row / gold_feedback_sab_loader</td><td class="sym">None, runtime only</td><td class="sym">gold_feedback/grader.py, set by csv_mode.py</td></tr>
-<tr><td class="sym">policy_bt_reward</td><td class="sym">win_rate</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
+<tr><td class="sym">policy_bt_reward</td><td class="sym">bradley_terry</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
 <tr><td class="sym">policy_bt_scorer_timeout_s</td><td class="sym">60 s</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
 <tr><td class="sym">policy_bt_visual_channel</td><td class="sym">true</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
-<tr><td class="sym">policy_bt_refiner</td><td class="sym">true</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
 <tr><td class="sym">policy_bt_repair_rounds</td><td class="sym">3 rounds</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
-<tr><td class="sym">policy_bt_max_pairs</td><td class="sym">0 = all predecessors</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
+<tr><td class="sym">policy_bt_reexecute</td><td class="sym">true</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
 <tr><td class="sym">policy_bt_reexec_timeout_s</td><td class="sym">900 s</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
-<tr><td class="sym">policy_bt_venv_reuse</td><td class="sym">true</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
-<tr><td class="sym">policy_bt_visual_tiebreak_code</td><td class="sym">false</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
-<tr><td class="sym">policy_bt_visual_max_pairs_per_gen</td><td class="sym">0 = unlimited</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
-<tr><td class="sym">policy_bt_verbose</td><td class="sym">false</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
-<tr><td class="sym">policy_bt_recon_refresh_gap</td><td class="sym">2 generations</td><td class="sym">policy_bt_verifier/evaluator.py</td></tr>
 <tr><td class="sym">hybrid_verifier_num_claims</td><td class="sym">10 claims</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
 <tr><td class="sym">hybrid_verifier_refinement_rounds</td><td class="sym">2</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
 <tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="sym">60 s</td><td class="sym">hybrid_verifier/evaluator.py</td></tr>
@@ -584,15 +577,16 @@ App.run() ; App.record(path, fps, hold_seconds)</pre>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">main.py</code> (559 lines), <code class="path">config.py</code> (973 lines), <code class="path">config_default.json</code> (134 lines), <code class="path">auto-install.sh</code> (411 lines), <code class="path">cleanup.sh</code> (32 lines), <code class="path">workflow_evolution_anim.py</code> (1852 lines), <code class="path">pyproject.toml</code>, <code class="path">docs/reference/cli.md</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/cli/__init__.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/grader.py</code>, <code class="path">sources/evaluators/gold_feedback/leak.py</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (<code>_set_gold_feedback_task</code> only), <code class="path">tests/config_roundtrip_test.py</code>, <code class="path">tests/gold_feedback_test.py</code>. Greps for mode, symbol and config-field names used the same files plus <code class="path">sources/core/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/benchmark_evaluation/</code> and <code class="path">sources/utils/</code>. Added 2026-10-10: <code class="path">sources/core/stopping.py</code>, <code class="path">sources/evaluators/policy_bt_verifier/evaluator.py</code> (<code>__init__</code> only; the package has <a href="mod_evaluators_policy_bt_verifier.html">its own page</a>), <code class="path">tests/policy_bt_verifier_test.py</code> (<code>test_cli_flags_apply_overrides</code> and <code>test_config_defaults_and_json_roundtrip</code> only), and an <code>ast</code> pass over <code class="path">main.py</code> to count the flags and the <code>BooleanOptionalAction</code> ones.</p>
-<p class="skips">Skipped: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/ensure_env.py</code>, <code class="path">sources/utils/precheck.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">sources/cli/pretty_print.py</code>, <code class="path">sources/cli/onboard_cli.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/cli/memory_chat_cli.py</code> - read for the call targets only, their own pages are <code>area_utils.html</code> and <code>area_cli.html</code>. Skipped <code>sources/core/*</code>, <code>sources/benchmark_evaluation/*</code>, <code>sources/evaluators/*</code>, <code>sources/extensibility/*</code>, <code>sources/transparency/*</code>, <code>sources/modules/*</code> - named as targets only. Skipped as Tier D: <code>docs/*</code> (except <code class="path">docs/reference/cli.md</code>), <code>webui/</code>, <code>datasets/</code>, <code>tests/</code> (except the round-trip, gold-feedback and policy_bt CLI/config tests), <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code>, <code>audits/</code>, <code>CLA/</code>, <code>.venv/</code>, lock files, images and videos. Skipped inside the new package: its 11 other modules (digest, reexec, policy, verdicts, visual, registry, logging_utils, metrics, recon, gradient, __init__) - named as targets only, described on <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>.</p>
+<p>Sources read: <code class="path">main.py</code> (552 lines), <code class="path">config.py</code> (910 lines), <code class="path">config_default.json</code> (128 lines), <code class="path">auto-install.sh</code> (411 lines), <code class="path">cleanup.sh</code> (32 lines), <code class="path">workflow_evolution_anim.py</code> (1852 lines), <code class="path">pyproject.toml</code>, <code class="path">docs/reference/cli.md</code>, <code class="path">sources/utils/paths.py</code>, <code class="path">sources/cli/__init__.py</code>, <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/grader.py</code>, <code class="path">sources/evaluators/gold_feedback/leak.py</code>, <code class="path">sources/benchmark_evaluation/csv_mode.py</code> (<code>_set_gold_feedback_task</code> only), <code class="path">tests/config_roundtrip_test.py</code>, <code class="path">tests/gold_feedback_test.py</code>. Greps for mode, symbol and config-field names used the same files plus <code class="path">sources/core/</code>, <code class="path">sources/evaluators/</code>, <code class="path">sources/benchmark_evaluation/</code> and <code class="path">sources/utils/</code>. Added 2026-10-10: <code class="path">sources/core/stopping.py</code>, <code class="path">sources/evaluators/policy_bt_verifier/evaluator.py</code> (<code>__init__</code> only; the package has <a href="mod_evaluators_policy_bt_verifier.html">its own page</a>), <code class="path">tests/policy_bt_verifier_test.py</code> (<code>test_cli_flags_apply_overrides</code> and <code>test_config_defaults_and_json_roundtrip</code> only), and an <code>ast</code> pass over <code class="path">main.py</code> to count the flags and the <code>BooleanOptionalAction</code> ones.</p>
+<p class="skips">Skipped: <code class="path">sources/utils/paths.py</code>, <code class="path">sources/utils/ensure_env.py</code>, <code class="path">sources/utils/precheck.py</code>, <code class="path">sources/utils/workspace_management.py</code>, <code class="path">sources/utils/transfer_toolomics.py</code>, <code class="path">sources/cli/pretty_print.py</code>, <code class="path">sources/cli/onboard_cli.py</code>, <code class="path">sources/cli/evaluation_cli.py</code>, <code class="path">sources/cli/memory_chat_cli.py</code> - read for the call targets only, their own pages are <code>area_utils.html</code> and <code>area_cli.html</code>. Skipped <code>sources/core/*</code>, <code>sources/benchmark_evaluation/*</code>, <code>sources/evaluators/*</code>, <code>sources/extensibility/*</code>, <code>sources/transparency/*</code>, <code>sources/modules/*</code> - named as targets only. Skipped as Tier D: <code>docs/*</code> (except <code class="path">docs/reference/cli.md</code>), <code>webui/</code>, <code>datasets/</code>, <code>tests/</code> (except the round-trip, gold-feedback and policy_bt CLI/config tests), <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code>, <code>audits/</code>, <code>CLA/</code>, <code>.venv/</code>, lock files, images and videos. Skipped inside the new package: its 10 other modules (artifacts, reexec, recon, policy, visual, tournament, registry, results, prompts, __init__) - named as targets only, described on <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>.</p>
 <p>The working tree had uncommitted changes when this page was built (<code>git status --porcelain</code> lists modified <code>main.py</code>, <code>config.py</code> and <code class="path">docs/reference/cli.md</code>, among others). All counts, defaults and line numbers are from that working tree. <code class="path">docs/getting-started/configuration.md</code> and <code class="path">docs/reference/configuration.md</code> were not opened, so their field lists are not checked here.</p>
 <p>Built at commit <code>336fe19</code>, 2026-09-26. Working tree had uncommitted changes (the flat <code>sources/evaluators/*.py</code> modules are deleted into sub-packages); <code>config.py</code> is unmodified by that diff.</p>
 <p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
 <p>Updated at ca72107 + working tree, 2026-09-28: gold-feedback flags and <code>warn_gold_feedback_mode</code> (Diagram 1, Diagram 3), new <code>config.py</code> fields and <code>_json_bool</code>, the visual-rung and execution-gate flags from <code>4020790</code>, all line and key counts recomputed. <code>config_default.json</code> is a local, untracked file, so its key counts can differ on another checkout.</p>
-<p>Updated at <code>7da1f5e</code> + working tree, 2026-10-10: <code>--verifier_kind</code> gained the fourth choice <code>policy_bt</code> and the seven <code>--policy_bt_*</code> flags; <code>config.py</code>, <code>main.py</code> and <code>config_default.json</code> counts recomputed (973 / 559 / 134 lines, 48 flags, 78 keys); the 12 <code>policy_bt_*</code> fields and the 5 early-stop knobs added to the field table; Diagram 3 extended with the <code>PolicyBTVerifierEvaluator</code> branch and relaid out (12 boxes).</p>
+<p>Updated at <code>7da1f5e</code> + working tree, 2026-10-10: <code>--verifier_kind</code> gained the fourth choice <code>policy_bt</code> and the <code>--policy_bt_*</code> flags (7 then, 6 now); <code>config.py</code>, <code>main.py</code> and <code>config_default.json</code> counts recomputed (973 / 559 / 134 lines, 48 flags, 78 keys at that time); the <code>policy_bt_*</code> fields (12 then, 6 now) and the 5 early-stop knobs added to the field table; Diagram 3 extended with the <code>PolicyBTVerifierEvaluator</code> branch and relaid out (12 boxes).</p>
 <p>Updated 2026-10-12 (working tree, commit <code>7da1f5e</code>): <code>Config.from_json</code> now reads <code>judge_model</code> and <code>vision_judge_model</code> (config.py:591-594). The red note about the unread judge keys became a FIXED note, the plumbing note updated, and the round-trip test description refreshed (261 lines, 6 test funcs).</p>
 <p>Updated 2026-10-13 (<code>c508f11</code> + working tree): diagram 3 re-framed for the default switch &mdash; <code>config_default.json:16</code> ships <code>"policy_bt"</code> (read 2026-10-13), so <code>PolicyBTVerifierEvaluator</code> is the run default, the hybrid box is the previous channel and the <code>Config.verifier_kind</code> box notes the built-in/file split. No flag, count or loader behaviour changed.</p>
+<p>Updated 2026-10-13 (84db677 + working tree): <code>policy_bt</code> is now the built-in default (<code>config.py:102</code>); the six live <code>policy_bt</code> knobs and five <code>BooleanOptionalAction</code> flags replace the removed ones; counts re-derived (47 flags, 552 / 910 / 128 lines, 72 JSON keys, cli.md 37 of 47); <code>--verifier_kind</code> help, the <code>_json_bool</code> list and the model defaults re-read from the working tree.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

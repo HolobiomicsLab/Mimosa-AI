@@ -82,10 +82,15 @@ Once execution finishes, the **WorkflowEvaluator** facade
 ([`evaluators/evaluator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/evaluator.py))
 routes to one of:
 
-- **HybridVerifierEvaluator** (default) — the hybrid temporal-ladder
-  verifier: key claims (`script` → `log` → `result`), deterministic
-  Python policy scorers, pairwise win-rate reward
+- **PolicyBTVerifierEvaluator** (default) — the policy-based
+  Bradley–Terry verifier: reproduction contract (`.sh` rerun in a clean
+  venv), LLM reconnaissance, per-schema adapters and one cached
+  comparison policy, regularized Bradley–Terry tournament reward
   ([Evaluation pipeline](evaluation-pipeline.md)).
+- **HybridVerifierEvaluator** — the previous default: hybrid
+  temporal-ladder verifier (`verifier_kind="hybrid"`); key claims
+  (`script` → `log` → `result`), deterministic Python policy scorers,
+  pairwise win-rate reward.
 - **VerifierEvaluator** — deprecated multi-source per-claim verifier
   (`verifier_kind="legacy"`).
 - **GenericEvaluator** — legacy 4-criterion LLM judge.

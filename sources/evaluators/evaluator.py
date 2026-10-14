@@ -42,14 +42,13 @@ class WorkflowEvaluator:
     """Combined workflow evaluator: generic judge, scenario rubric, and verifier.
 
     Facade over GenericEvaluator, ScenarioEvaluator and the verifier
-    channel. The verifier defaults to the hybrid E19/E19b evaluator
-    (``HybridVerifierEvaluator``); ``config.verifier_kind = "legacy"``
+    channel. The verifier defaults to the policy/BT evaluator
+    (``PolicyBTVerifierEvaluator``); ``config.verifier_kind = "legacy"``
     selects the deprecated multi-source ``VerifierEvaluator`` instead,
     ``"gold"`` the benchmark-leaking oracle control
-    (``GoldFeedbackEvaluator``, research only), and ``"policy_bt"`` the
-    E44-E48 policy/BT verifier (fresh re-execution + deterministic
-    digest + LLM policy tournament). Unknown values fall back to
-    the hybrid verifier.
+    (``GoldFeedbackEvaluator``, research only), and ``"hybrid"`` the
+    temporal-ladder verifier (``HybridVerifierEvaluator``, the previous
+    default). Unknown values fall back to the hybrid verifier.
     """
 
     def __init__(
@@ -87,7 +86,7 @@ class WorkflowEvaluator:
             self.scenario_evaluator = ScenarioEvaluator(
                 config, scenarios_dir=scenarios_dir
             )
-            verifier_kind = str(getattr(config, "verifier_kind", "hybrid")).lower()
+            verifier_kind = str(getattr(config, "verifier_kind", "policy_bt")).lower()
             if verifier_kind == "legacy":
                 # Escape hatch: the deprecated multi-source verifier.
                 # Imported lazily so the default path never loads it.
@@ -106,9 +105,7 @@ class WorkflowEvaluator:
                     config, workspace_dir=verifier_workspace_dir
                 )
             elif verifier_kind == "policy_bt":
-                # E44-E48 architecture: fresh re-execution + deterministic
-                # digest + LLM policy tournament (opt-in; default hybrid).
-                # Imported lazily so the default path never loads it.
+                # Artifact policies with current tournament ratings.
                 from .policy_bt_verifier import PolicyBTVerifierEvaluator
 
                 self.verifier_evaluator = PolicyBTVerifierEvaluator(

@@ -33,7 +33,9 @@ mimosa-ai/
 │   │   ├── schema.py                      # IndividualRun, Plan, Task, …
 │   │   └── evaluators/                    # Verifier backends
 │   │       ├── evaluator.py               # Facade (routes to backends)
-│   │       ├── hybrid_verifier/           # Hybrid temporal-ladder verifier (default): claims, digest,
+│   │       ├── policy_bt_verifier/        # Policy/BT verifier (default): reexec, artifacts,
+│   │       │                              # recon, policy, visual, tournament, registry, results
+│   │       ├── hybrid_verifier/           # Hybrid temporal-ladder verifier (previous default): claims, digest,
 │   │       │                              # scorers, registry, aggregation, gradient, layers
 │   │       ├── verifier.py                # Legacy multi-source per-claim verifier (deprecated)
 │   │       ├── grounding.py               # Perspicacité adapter (legacy verifier / generic)

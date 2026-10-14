@@ -12,7 +12,7 @@
 <div class="wrap">
 
 <h1 class="hud">generic_verifier/generic.py</h1>
-<p class="intro"><code>GenericEvaluator</code> scores one workflow run with four independent LLM judges: goal alignment, agent collaboration, output quality and answer plausibility. It averages the four scores, can subtract a numerical-fraud penalty, and writes <code>evaluation.txt</code> plus the <code>evaluation.generic</code> block of <code>state_result.json</code>. The module header marks it <code>[DEPRECATED](V1)</code>; the default verifier channel is the hybrid package.</p>
+<p class="intro"><code>GenericEvaluator</code> scores one workflow run with four independent LLM judges: goal alignment, agent collaboration, output quality and answer plausibility. It averages the four scores, can subtract a numerical-fraud penalty, and writes <code>evaluation.txt</code> plus the <code>evaluation.generic</code> block of <code>state_result.json</code>. The module header marks it <code>[DEPRECATED](V1)</code>; the default verifier channel is the policy/BT package.</p>
 
 <div id="legend" data-auto></div>
 
@@ -416,6 +416,7 @@
 <p>Move note: the working tree of 2026-09-26 moved this file out of the flat layout into the folder then named <code>generic/</code> and deleted the flat copy; the body is unchanged apart from the import lines, so the line numbers on this page were recomputed against that path.</p>
 <p>Rename note (checked 2026-10-10): that folder is now <code class="path">sources/evaluators/generic_verifier/</code> and the module moved with it on 2026-10-10. Nothing else changed: the file is byte-identical to the <code>HEAD</code> copy (<code>diff -q</code>), it is still 471 lines, so every line number on this page holds; only the links and the titles were repointed.</p>
 <p>Built at commit <code>336fe19</code> (page content), paths re-checked at <code>7da1f5e</code> + working tree, 2026-10-10.</p>
+<p>Updated 2026-10-13 (84db677 + working tree): the intro now names the policy/BT package as the default verifier channel (config.py:102), not the hybrid package.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

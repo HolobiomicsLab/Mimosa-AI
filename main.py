@@ -77,8 +77,8 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
         "--verifier_kind",
         type=str,
         choices=["hybrid", "legacy", "gold", "policy_bt"],
-        help="Verifier channel: 'hybrid' (E19/E19b, default), 'legacy' (deprecated multi-source verifier), "
-        "'policy_bt' (E44-E48: fresh re-execution + deterministic digest + LLM policy tournament), "
+        help="Verifier channel: 'policy_bt' (default; cached artifact policy and fitted Bradley-Terry ratings), "
+        "'hybrid' (previous temporal-ladder verifier), 'legacy' (deprecated multi-source verifier), "
         "or 'gold' (ORACLE / BENCHMARK-LEAKING research control: benchmark grader feedback as gradient; "
         "needs --science_agent_bench; never report its scores)",
     )
@@ -128,9 +128,9 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument(
         "--policy_bt_reward",
         type=str,
-        choices=["win_rate", "bradley_terry"],
-        help="verifier_kind=policy_bt only: reward aggregation (default win_rate — "
-        "E19c measured best; bradley_terry keeps the BT fit as an option)",
+        choices=["bradley_terry"],
+        help="verifier_kind=policy_bt only: fitted Bradley-Terry tournament "
+        "(the only supported reward; refreshes all generations)",
     )
     parser.add_argument(
         "--policy_bt_scorer_timeout_s",
@@ -142,15 +142,15 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
         "--policy_bt_visual_channel",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="verifier_kind=policy_bt only: enable/disable the kimi per-pair "
-        "visual channel for figure-dominant tasks",
+        help="verifier_kind=policy_bt only: use relevant visual artifacts "
+        "to resolve deterministic policy ties (default on)",
     )
     parser.add_argument(
-        "--policy_bt_refiner",
+        "--policy_bt_reexecute",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="verifier_kind=policy_bt only: enable/disable the E47 evidence-checked "
-        "gradient refiner (default on)",
+        help="verifier_kind=policy_bt only: run the required reproduction "
+        "shell script on an isolated workspace copy (default on)",
     )
     parser.add_argument(
         "--policy_bt_reexec_timeout_s",
@@ -159,17 +159,10 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
         "re-execution (seconds, default 900)",
     )
     parser.add_argument(
-        "--policy_bt_visual_tiebreak_code",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="verifier_kind=policy_bt only: code-policy tiebreak when the kimi "
-        "pair call ties (unmeasured; default off)",
-    )
-    parser.add_argument(
-        "--policy_bt_verbose",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="verifier_kind=policy_bt only: per-pair/per-repair stdout lines",
+        "--policy_bt_repair_rounds",
+        type=int,
+        help="verifier_kind=policy_bt only: maximum generated policy or "
+        "adapter repairs (default 3)",
     )
     parser.add_argument(
         "--planner_human_approve",
@@ -215,18 +208,18 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.hybrid_verifier_execution_gate = args.hybrid_verifier_execution_gate
     if getattr(args, "policy_bt_reward", None):
         config.policy_bt_reward = args.policy_bt_reward
+    if config.verifier_kind == "policy_bt" and config.policy_bt_reward != "bradley_terry":
+        raise ValueError("policy_bt_reward must be 'bradley_terry'")
     if getattr(args, "policy_bt_scorer_timeout_s", None):
         config.policy_bt_scorer_timeout_s = args.policy_bt_scorer_timeout_s
     if getattr(args, "policy_bt_visual_channel", None) is not None:
         config.policy_bt_visual_channel = args.policy_bt_visual_channel
-    if getattr(args, "policy_bt_refiner", None) is not None:
-        config.policy_bt_refiner = args.policy_bt_refiner
+    if getattr(args, "policy_bt_reexecute", None) is not None:
+        config.policy_bt_reexecute = args.policy_bt_reexecute
     if getattr(args, "policy_bt_reexec_timeout_s", None):
         config.policy_bt_reexec_timeout_s = args.policy_bt_reexec_timeout_s
-    if getattr(args, "policy_bt_visual_tiebreak_code", None) is not None:
-        config.policy_bt_visual_tiebreak_code = args.policy_bt_visual_tiebreak_code
-    if getattr(args, "policy_bt_verbose", None) is not None:
-        config.policy_bt_verbose = args.policy_bt_verbose
+    if getattr(args, "policy_bt_repair_rounds", None) is not None:
+        config.policy_bt_repair_rounds = args.policy_bt_repair_rounds
     if getattr(args, "early_stop_mode", None):
         config.early_stop_mode = args.early_stop_mode
     if getattr(args, "min_learning_evolve_iterations", None):

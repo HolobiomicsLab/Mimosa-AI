@@ -1105,7 +1105,7 @@ def test_gradient_dead_claims_report_marks_unverifiable():
 
 def test_config_defaults_and_overrides():
     c = Config()
-    assert c.verifier_kind == "hybrid"
+    assert c.verifier_kind == "policy_bt"
     assert c.hybrid_verifier_num_claims == 10
     assert c.hybrid_verifier_refinement_rounds == 2
     assert c.hybrid_verifier_scorer_timeout_s == 60

@@ -151,6 +151,29 @@ Do not take over the agent's reasoning: give each agent a broad task specificati
 
 ---
 
+## Reproduction Contract (MANDATORY)
+
+The verifier requires a reproduction contract. Your workflow MUST leave
+the workspace with a `run.sh` shell script and, when the task needs
+third-party packages, a `requirements.txt`:
+
+1. **Install**: `run.sh` starts with a requirements-install step
+   (e.g. `pip install -r requirements.txt`). Standard-library-only
+   tasks still include the install step with an empty requirements.txt.
+2. **Regenerate**: `run.sh` then executes the workflow's code and
+   regenerates EVERY deliverable file (predictions, results, reports,
+   figures) at its original relative path.
+
+`run.sh` runs with bash from the workspace root, on a clean copy, in a
+fresh virtual environment without API keys. Use relative paths. Do not
+rely on preinstalled packages, cached results, or reporting old
+outputs; a script that only installs dependencies, or whose task code
+is commented out, fails the contract. Any deliverable not regenerated
+by `run.sh` is treated as missing and the generation scores zero.
+
+
+---
+
 ## Example Workflow
 
 Toolkit list variables in the examples below (`PYTHON_MCP`, `FILESYSTEM_MCP`, `WEB_MCP`) are EXAMPLE names only — they do not exist at runtime. Use the actual toolkit MCP variable names from the tool list provided to you (typically `<MCP>_<port number>`). What each MCP toolkit do can be deduced by their tools list.

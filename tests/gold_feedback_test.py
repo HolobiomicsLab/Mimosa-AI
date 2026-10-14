@@ -211,7 +211,7 @@ def _tree(root: Path) -> dict:
 
 def test_config_default_json_and_runtime_fields():
     c = Config()
-    assert c.verifier_kind == "hybrid"
+    assert c.verifier_kind == "policy_bt"
     assert c.gold_feedback_reward is False
     assert c.gold_feedback_task_row is None and c.gold_feedback_sab_loader is None
     c.from_json({"verifier_kind": "gold", "gold_feedback_reward": True})

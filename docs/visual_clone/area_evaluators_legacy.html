@@ -77,11 +77,11 @@
   </a>
 
   <a class="box" id="l6" href="mod_evaluators_hybrid_verifier.html">
-    <title>current default verifier, separate page</title>
+    <title>previous default verifier, separate page</title>
     <rect x="560" y="190" width="260" height="68" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="690" y="214" text-anchor="middle">hybrid verifier (current)</text>
+    <text class="box-label" x="690" y="214" text-anchor="middle">hybrid verifier (previous)</text>
     <text class="box-sub" x="690" y="230" text-anchor="middle">temporal ladder, pairwise reward</text>
-    <text class="box-sub" x="690" y="248" text-anchor="middle">default since 2026-09-24</text>
+    <text class="box-sub" x="690" y="248" text-anchor="middle">previous default, 2026-09-24 &rarr; 2026-10-13</text>
   </a>
 
   <path class="edge" data-from="l1" data-to="l2" d="M220,84 H280" fill="none" stroke="#4F7486" stroke-width="1.5" marker-end="url(#arwd)"/>
@@ -209,10 +209,10 @@ _RUBRIC_VERSION = "v2-fixability-20260912"</pre>
   </a>
 
   <a class="box" id="e3" href="mod_evaluators_hybrid_verifier.html">
-    <title>current default verifier, separate page</title>
+    <title>previous default verifier, separate page</title>
     <rect x="240" y="260" width="200" height="76" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="340" y="288" text-anchor="middle">HybridVerifierEvaluator</text>
-    <text class="box-sub" x="340" y="304" text-anchor="middle">verifier channel default</text>
+    <text class="box-sub" x="340" y="304" text-anchor="middle">previous channel</text>
     <text class="box-sub" x="340" y="322" text-anchor="middle">own page</text>
   </a>
 
@@ -275,6 +275,7 @@ _RUBRIC_VERSION = "v2-fixability-20260912"</pre>
 <p class="skips">Skipped: per-file cards for the five <code class="path">legacy_verifier/verifier*.py</code> modules (deprecated, one diagram and the table cover them); line-by-line reading of <code>legacy_verifier/verifier_per_claim.py</code> bodies (only its public chain and constants); the recovery, visual and package-install branches beyond their entry points; <code class="path">sources/evaluators/hybrid_verifier/</code> (own page, mod_evaluators_hybrid_verifier.html); every <code class="path">__pycache__/</code> directory (generated); <code>tests/verifier*_test.py</code> bodies (reported as coverage only, see area_tests.html); artifact files other than the one quoted <code>evaluation.txt</code> header; Tier D paths (<code>datasets/</code>, <code>webui/</code>, <code>docs/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, lock files, <code>.env</code>-family files).</p>
 <p>Move note: the working tree moved these five modules into <code class="path">sources/evaluators/legacy_verifier/</code> and deleted the flat copies. The content changed only by the move: a <code>[DEPRECATED 2026-09-24]</code> line was prepended to each docstring, <code>from .base import ...</code> became <code>from sources.evaluators.base import ...</code>, and <code>verifier_claims.py</code> now imports <code>.verifier_claim_sources</code> relatively. No function body changed. A later rename (checked 2026-10-10) turned the folder <code>generic/</code> of this package into <code class="path">sources/evaluators/generic_verifier/</code>: the table and the diagram links on this page point at the new folder, and the two files keep their line counts (471 and 801).</p>
 <p>Built at commit <code>7da1f5e</code> + working tree, 2026-10-10.</p>
+<p>Updated 2026-10-13 (84db677 + working tree): the two hybrid boxes are relabelled <em>previous default verifier</em> / <em>previous channel</em> (default 2026-09-24 &rarr; 2026-10-13); the policy/BT verifier is the current default (config.py:102).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

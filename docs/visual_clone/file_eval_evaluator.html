@@ -6,13 +6,13 @@
 <title>sources/evaluators/evaluator.py - Mimosa-AI visual clone</title>
 <link rel="stylesheet" href="_clone.css">
 </head>
-<!-- file_eval_evaluator.html - file digest: sources/evaluators/evaluator.py (216 lines, 7da1f5e + working tree).
+<!-- file_eval_evaluator.html - file digest: sources/evaluators/evaluator.py (213 lines, 84db677 + working tree).
      Sources and skip decisions: see the footer. Read-only page, nothing outside docs/visual_clone/ touched. -->
-<body data-crumb="File digests &gt; sources/evaluators &gt; evaluator.py" data-built="7da1f5e+wt" data-built-date="2026-10-10">
+<body data-crumb="File digests &gt; sources/evaluators &gt; evaluator.py" data-built="84db677+wt" data-built-date="2026-10-13">
 <div class="wrap">
 
 <h1 class="hud">evaluator.py</h1>
-<p class="intro"><code>WorkflowEvaluator</code> is the facade the evolution engine builds once per campaign: it constructs the generic, scenario and verifier evaluators, then routes every <code>evaluate()</code> call by <code>evaluator_type</code>. The verifier channel is chosen once from <code>config.verifier_kind</code>: <code>hybrid</code> (default), <code>legacy</code> (deprecated), <code>gold</code> (oracle) or <code>policy_bt</code>, each behind a lazy import, and any unknown value falls back to hybrid. The module also re-exports the public evaluator names for downstream importers.</p>
+<p class="intro"><code>WorkflowEvaluator</code> is the facade the evolution engine builds once per campaign: it constructs the generic, scenario and verifier evaluators, then routes every <code>evaluate()</code> call by <code>evaluator_type</code>. The verifier channel is chosen once from <code>config.verifier_kind</code>: <code>policy_bt</code> (default), <code>hybrid</code> (previous default), <code>legacy</code> (deprecated) or <code>gold</code> (oracle), each behind a lazy import, and any unknown value falls back to the hybrid verifier. The module also re-exports the public evaluator names for downstream importers.</p>
 
 <div id="legend" data-auto></div>
 
@@ -34,95 +34,95 @@
   </defs>
 
   <g class="box" id="m1">
-    <title>Entry: the evolution engine builds one facade (evolution_engine.py:355) and calls evaluate() per generation (lines 1218-1234).</title>
+    <title>Entry: the evolution engine builds one facade (evolution_engine.py:446) and calls evaluate() per generation (lines 1286-1297).</title>
     <rect x="20" y="130" width="180" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="110" y="164" text-anchor="middle">caller</text>
-    <text class="box-sub" x="110" y="184" text-anchor="middle">evolution_engine.py 355</text>
+    <text class="box-sub" x="110" y="184" text-anchor="middle">evolution_engine.py 446</text>
     <text class="box-sub" x="110" y="200" text-anchor="middle">evaluate(..., "verifier")</text>
-    <text class="box-sub" x="110" y="216" text-anchor="middle">lines 1218-1234</text>
+    <text class="box-sub" x="110" y="216" text-anchor="middle">lines 1286-1297</text>
   </g>
 
   <a class="box" id="m2" href="../../sources/evaluators/evaluator.py">
-    <title>WorkflowEvaluator.__init__ (lines 53-121): builds GenericEvaluator (80) and ScenarioEvaluator (85), then picks the verifier channel.</title>
+    <title>WorkflowEvaluator.__init__ (lines 54-118): builds GenericEvaluator (81) and ScenarioEvaluator (86), then picks the verifier channel.</title>
     <rect x="250" y="120" width="190" height="120" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="345" y="146" text-anchor="middle">__init__ 53</text>
-    <text class="box-sub" x="345" y="166" text-anchor="middle">GenericEvaluator() 80</text>
-    <text class="box-sub" x="345" y="182" text-anchor="middle">ScenarioEvaluator() 85</text>
-    <text class="box-sub" x="345" y="198" text-anchor="middle">reads verifier_kind 88</text>
-    <text class="box-sub" x="345" y="218" text-anchor="middle">stores self.verifier_kind 110</text>
+    <text class="box-label" x="345" y="146" text-anchor="middle">__init__ 54</text>
+    <text class="box-sub" x="345" y="166" text-anchor="middle">GenericEvaluator() 81</text>
+    <text class="box-sub" x="345" y="182" text-anchor="middle">ScenarioEvaluator() 86</text>
+    <text class="box-sub" x="345" y="198" text-anchor="middle">reads verifier_kind 89</text>
+    <text class="box-sub" x="345" y="218" text-anchor="middle">stores self.verifier_kind 118</text>
   </a>
 
   <a class="box" id="m3" href="../../sources/evaluators/legacy_verifier/verifier.py">
-    <title>verifier_kind == "legacy" imports sources/evaluators/legacy_verifier/ inside the branch (line 94) and builds VerifierEvaluator (96).</title>
+    <title>verifier_kind == "legacy" imports sources/evaluators/legacy_verifier/ inside the branch (line 93) and builds VerifierEvaluator (95).</title>
     <rect x="490" y="0" width="200" height="80" rx="12" fill="rgba(79,116,134,0.10)" stroke="#4F7486"/>
-    <text class="box-label" x="590" y="22" text-anchor="middle">legacy branch 91</text>
-    <text class="box-sub" x="590" y="40" text-anchor="middle">lazy import .legacy_verifier 94</text>
-    <text class="box-sub" x="590" y="56" text-anchor="middle">VerifierEvaluator 96</text>
+    <text class="box-label" x="590" y="22" text-anchor="middle">legacy branch 90</text>
+    <text class="box-sub" x="590" y="40" text-anchor="middle">lazy import .legacy_verifier 93</text>
+    <text class="box-sub" x="590" y="56" text-anchor="middle">VerifierEvaluator 95</text>
     <text class="box-sub" x="590" y="72" text-anchor="middle">deprecated</text>
   </a>
 
   <a class="box" id="m3g" href="mod_evaluators_gold_feedback.html">
-    <title>verifier_kind == "gold" imports sources/evaluators/gold_feedback/ inside the branch (line 103) and builds GoldFeedbackEvaluator (105), which wraps its own hybrid verifier.</title>
+    <title>verifier_kind == "gold" imports sources/evaluators/gold_feedback/ inside the branch (line 102) and builds GoldFeedbackEvaluator (104), which wraps its own hybrid verifier.</title>
     <rect x="490" y="84" width="200" height="80" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="590" y="106" text-anchor="middle">gold branch 99</text>
-    <text class="box-sub" x="590" y="124" text-anchor="middle">lazy import .gold_feedback 103</text>
-    <text class="box-sub" x="590" y="140" text-anchor="middle">GoldFeedbackEvaluator 105</text>
+    <text class="box-label" x="590" y="106" text-anchor="middle">gold branch 98</text>
+    <text class="box-sub" x="590" y="124" text-anchor="middle">lazy import .gold_feedback 102</text>
+    <text class="box-sub" x="590" y="140" text-anchor="middle">GoldFeedbackEvaluator 104</text>
     <text class="box-sub" x="590" y="156" text-anchor="middle">ORACLE</text>
   </a>
 
   <a class="box" id="m3p" href="mod_evaluators_policy_bt_verifier.html">
-    <title>verifier_kind == "policy_bt" imports sources/evaluators/policy_bt_verifier/ inside the branch (line 112) and builds PolicyBTVerifierEvaluator (114).</title>
+    <title>verifier_kind == "policy_bt" imports sources/evaluators/policy_bt_verifier/ inside the branch (line 109) and builds PolicyBTVerifierEvaluator (111).</title>
     <rect x="490" y="168" width="200" height="80" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="590" y="190" text-anchor="middle">policy_bt branch 108</text>
-    <text class="box-sub" x="590" y="208" text-anchor="middle">lazy import .policy_bt_verifier 112</text>
-    <text class="box-sub" x="590" y="224" text-anchor="middle">PolicyBTVerifierEvaluator 114</text>
+    <text class="box-label" x="590" y="190" text-anchor="middle">policy_bt branch 107</text>
+    <text class="box-sub" x="590" y="208" text-anchor="middle">lazy import .policy_bt_verifier 109</text>
+    <text class="box-sub" x="590" y="224" text-anchor="middle">PolicyBTVerifierEvaluator 111</text>
     <text class="box-sub" x="590" y="240" text-anchor="middle">E44-E48 channel</text>
   </a>
 
   <a class="box" id="m4" href="mod_evaluators_hybrid_verifier.html">
-    <title>Default branch (any other value) builds HybridVerifierEvaluator with the optional workspace dir (lines 117-119).</title>
+    <title>Default branch (any other value, including unknown) builds HybridVerifierEvaluator with the optional workspace dir (lines 114-117).</title>
     <rect x="490" y="252" width="200" height="80" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="590" y="274" text-anchor="middle">default branch 117</text>
-    <text class="box-sub" x="590" y="292" text-anchor="middle">HybridVerifierEvaluator 118</text>
+    <text class="box-label" x="590" y="274" text-anchor="middle">default branch 114</text>
+    <text class="box-sub" x="590" y="292" text-anchor="middle">HybridVerifierEvaluator 115</text>
     <text class="box-sub" x="590" y="308" text-anchor="middle">workspace_dir forwarded</text>
     <text class="box-sub" x="590" y="324" text-anchor="middle">"hybrid" or unknown value</text>
   </a>
 
   <a class="box" id="m5" href="../../sources/evaluators/evaluator.py">
-    <title>evaluate() (line 123): validates uuid (147), normalizes and validates evaluator_type (150-155).</title>
+    <title>evaluate() (line 131): validates uuid (155), normalizes and validates evaluator_type (158-163).</title>
     <rect x="740" y="130" width="190" height="110" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="835" y="156" text-anchor="middle">evaluate() 134</text>
-    <text class="box-sub" x="835" y="176" text-anchor="middle">checks uuid 158</text>
-    <text class="box-sub" x="835" y="192" text-anchor="middle">lower() the type 161</text>
-    <text class="box-sub" x="835" y="208" text-anchor="middle">unknown: raise 162</text>
-    <text class="box-sub" x="835" y="228" text-anchor="middle">requires scenario_rubric 170</text>
+    <text class="box-label" x="835" y="156" text-anchor="middle">evaluate() 131</text>
+    <text class="box-sub" x="835" y="176" text-anchor="middle">checks uuid 155</text>
+    <text class="box-sub" x="835" y="192" text-anchor="middle">lower() the type 158</text>
+    <text class="box-sub" x="835" y="208" text-anchor="middle">unknown: raise 159</text>
+    <text class="box-sub" x="835" y="228" text-anchor="middle">requires scenario_rubric 167</text>
   </a>
 
   <a class="box" id="m6" href="../../sources/evaluators/generic_verifier/generic.py">
-    <title>Generic route: generic_evaluator.evaluate(uuid, agent_answers) at lines 181 and 189.</title>
+    <title>Generic route: generic_evaluator.evaluate(uuid, agent_answers) at lines 178 and 186.</title>
     <rect x="980" y="250" width="200" height="96" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="1080" y="276" text-anchor="middle">generic route</text>
-    <text class="box-sub" x="1080" y="294" text-anchor="middle">built at line 82</text>
-    <text class="box-sub" x="1080" y="312" text-anchor="middle">called at 181 and 189</text>
+    <text class="box-sub" x="1080" y="294" text-anchor="middle">built at line 81</text>
+    <text class="box-sub" x="1080" y="312" text-anchor="middle">called at 178 and 186</text>
     <text class="box-sub" x="1080" y="330" text-anchor="middle">returns None (writes state)</text>
   </a>
 
   <g class="box" id="m7">
-    <title>Scenario route calls ScenarioEvaluator.evaluate(uuid, scenario_rubric) at line 175; a ScenarioError falls back to generic.</title>
+    <title>Scenario route calls ScenarioEvaluator.evaluate(uuid, scenario_rubric) at line 172; a ScenarioError falls back to generic.</title>
     <rect x="980" y="30" width="200" height="96" rx="12" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="1080" y="56" text-anchor="middle">scenario route 169</text>
-    <text class="box-sub" x="1080" y="74" text-anchor="middle">rubric required 170-173</text>
-    <text class="box-sub" x="1080" y="92" text-anchor="middle">evaluate(uuid, rubric) 175</text>
-    <text class="box-sub" x="1080" y="110" text-anchor="middle">ScenarioError: fallback 176</text>
+    <text class="box-label" x="1080" y="56" text-anchor="middle">scenario route 166</text>
+    <text class="box-sub" x="1080" y="74" text-anchor="middle">rubric required 167-170</text>
+    <text class="box-sub" x="1080" y="92" text-anchor="middle">evaluate(uuid, rubric) 172</text>
+    <text class="box-sub" x="1080" y="110" text-anchor="middle">ScenarioError: fallback 173</text>
   </g>
 
   <g class="box" id="m8">
-    <title>One dict per call: evaluation_type plus uuid, with the verifier result spread in at line 175.</title>
+    <title>One dict per call: evaluation_type plus uuid, with the verifier result spread in at line 183.</title>
     <rect x="980" y="140" width="200" height="96" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="1080" y="166" text-anchor="middle">returns a dict</text>
     <text class="box-sub" x="1080" y="184" text-anchor="middle">evaluation_type, uuid</text>
-    <text class="box-sub" x="1080" y="202" text-anchor="middle">+ verifier keys 186</text>
-    <text class="box-sub" x="1080" y="220" text-anchor="middle">read by the caller 1234</text>
+    <text class="box-sub" x="1080" y="202" text-anchor="middle">+ verifier keys 183</text>
+    <text class="box-sub" x="1080" y="220" text-anchor="middle">read by the caller 1298</text>
   </g>
 
   <g class="box" id="m9">
@@ -157,8 +157,8 @@
   <text class="edge-label" x="395" y="266" text-anchor="middle">same module</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - the facade has two jobs: build the evaluator set in <code>__init__</code> (<code class="path">sources/evaluators/evaluator.py:55-131</code>) and dispatch one call in <code>evaluate()</code> (<code class="path">:134-195</code>). Four verifier branches exist, one per <code>verifier_kind</code> value; the ORACLE branch reads the benchmark gold <span class="chip warn">oracle - leaks gold</span>. Solid arrows are calls, dashed arrows are stored-instance reads; every box also names its real line numbers.</p>
-<p class="note say">The default run path is the verifier route: the evolution engine always passes <code>evaluator_type="verifier"</code> (<code class="path">sources/core/evolution_engine.py:1218-1234</code>), and runs the call in <code>asyncio.to_thread</code> only when <code>judge.verifier_kind == "gold"</code>; the generic and scenario routes exist for other callers.</p>
+<p class="figcap">Diagram 1 - the facade has two jobs: build the evaluator set in <code>__init__</code> (<code class="path">sources/evaluators/evaluator.py:54-118</code>) and dispatch one call in <code>evaluate()</code> (<code class="path">:131-192</code>). Four verifier branches exist, one per <code>verifier_kind</code> value; the ORACLE branch reads the benchmark gold <span class="chip warn">oracle - leaks gold</span>. Solid arrows are calls, dashed arrows are stored-instance reads; every box also names its real line numbers.</p>
+<p class="note say">The default run path is the verifier route: the evolution engine always passes <code>evaluator_type="verifier"</code> (<code class="path">sources/core/evolution_engine.py:1286-1297</code>), and runs the call in <code>asyncio.to_thread</code> only when <code>getattr(self.judge, "verifier_kind", None) == "gold"</code> (lines 1283-1292); the generic and scenario routes exist for other callers.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -182,11 +182,11 @@
     <title>Constructor arguments with their defaults (lines 57-61).</title>
     <rect x="20" y="30" width="290" height="150" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="165" y="54" text-anchor="middle">arguments in</text>
-    <text class="box-sub" x="165" y="76" text-anchor="middle">config: "Config" 57</text>
-    <text class="box-sub" x="165" y="94" text-anchor="middle">scenarios_dir = "datasets/scenarios" 58</text>
-    <text class="box-sub" x="165" y="112" text-anchor="middle">use_bs_penalty = False 59</text>
-    <text class="box-sub" x="165" y="130" text-anchor="middle">bs_fraud_threshold = 5.0 60</text>
-    <text class="box-sub" x="165" y="148" text-anchor="middle">verifier_workspace_dir = None 61</text>
+    <text class="box-sub" x="165" y="76" text-anchor="middle">config: "Config" 56</text>
+    <text class="box-sub" x="165" y="94" text-anchor="middle">scenarios_dir = "datasets/scenarios" 57</text>
+    <text class="box-sub" x="165" y="112" text-anchor="middle">use_bs_penalty = False 58</text>
+    <text class="box-sub" x="165" y="130" text-anchor="middle">bs_fraud_threshold = 5.0 59</text>
+    <text class="box-sub" x="165" y="148" text-anchor="middle">verifier_workspace_dir = None 60</text>
     <text class="box-sub" x="165" y="168" text-anchor="middle">evaluate(): uuid, agent_answers, evaluator_type</text>
   </g>
 
@@ -194,7 +194,7 @@
     <title>Config fields read here or by the child evaluators through BaseEvaluator.__init__.</title>
     <rect x="20" y="220" width="290" height="150" rx="6" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="165" y="244" text-anchor="middle">config fields read</text>
-    <text class="box-sub" x="165" y="266" text-anchor="middle">verifier_kind 90 (default "hybrid")</text>
+    <text class="box-sub" x="165" y="266" text-anchor="middle">verifier_kind 89 (default "policy_bt")</text>
     <text class="box-sub" x="165" y="284" text-anchor="middle">memory_dir, workflow_dir</text>
     <text class="box-sub" x="165" y="302" text-anchor="middle">model_pricing, reasoning_effort</text>
     <text class="box-sub" x="165" y="320" text-anchor="middle">judge_model, max_tokens (base.py)</text>
@@ -209,7 +209,7 @@
     <text class="box-sub" x="465" y="160" text-anchor="middle">self.generic_evaluator</text>
     <text class="box-sub" x="465" y="178" text-anchor="middle">self.scenario_evaluator</text>
     <text class="box-sub" x="465" y="196" text-anchor="middle">self.verifier_evaluator</text>
-    <text class="box-sub" x="465" y="216" text-anchor="middle">self.verifier_kind 121</text>
+    <text class="box-sub" x="465" y="216" text-anchor="middle">self.verifier_kind 118</text>
   </g>
 
   <g class="box" id="e4">
@@ -341,25 +341,25 @@
 <table>
 <thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
 <tbody>
-<tr><td>config field</td><td class="sym">verifier_kind</td><td class="sym">getattr(config, "verifier_kind", "hybrid") line 90</td><td>chooses the hybrid, legacy, gold or policy_bt verifier.</td></tr>
+<tr><td>config field</td><td class="sym">verifier_kind</td><td class="sym">getattr(config, "verifier_kind", "policy_bt") line 89</td><td>chooses the policy_bt, hybrid, legacy or gold verifier.</td></tr>
 <tr><td>config field</td><td class="sym">memory_dir, workflow_dir</td><td class="sym">read by the children's <code>BaseEvaluator.__init__</code></td><td>run folders and judge memory folders.</td></tr>
 <tr><td>config field</td><td class="sym">model_pricing, reasoning_effort, judge_model, max_tokens</td><td class="sym">read by the children's <code>BaseEvaluator.__init__</code></td><td>judge model config and pricing.</td></tr>
-<tr><td>argument</td><td class="sym">scenarios_dir</td><td class="sym">default "datasets/scenarios" line 58</td><td>forwarded to <code>ScenarioEvaluator</code> line 89.</td></tr>
-<tr><td>argument</td><td class="sym">use_bs_penalty, bs_fraud_threshold</td><td class="sym">defaults False and 5.0 lines 59-60</td><td>forwarded to <code>GenericEvaluator</code> lines 84-86.</td></tr>
-<tr><td>argument</td><td class="sym">verifier_workspace_dir</td><td class="sym">default None line 61</td><td>passed as <code>workspace_dir</code> lines 97, 106, 116, 119.</td></tr>
-<tr><td>argument</td><td class="sym">uuid, agent_answers, evaluator_type, scenario_rubric</td><td class="sym">lines 134-140</td><td>route selection and child call arguments.</td></tr>
+<tr><td>argument</td><td class="sym">scenarios_dir</td><td class="sym">default "datasets/scenarios" line 57</td><td>forwarded to <code>ScenarioEvaluator</code> line 86.</td></tr>
+<tr><td>argument</td><td class="sym">use_bs_penalty, bs_fraud_threshold</td><td class="sym">defaults False and 5.0 lines 58-59</td><td>forwarded to <code>GenericEvaluator</code> lines 81-83.</td></tr>
+<tr><td>argument</td><td class="sym">verifier_workspace_dir</td><td class="sym">default None line 60</td><td>passed as <code>workspace_dir</code> lines 95, 104, 111, 115.</td></tr>
+<tr><td>argument</td><td class="sym">uuid, agent_answers, evaluator_type, scenario_rubric</td><td class="sym">lines 131-137</td><td>route selection and child call arguments.</td></tr>
 <tr><td>state key</td><td class="sym">evaluation.&lt;type&gt;</td><td class="sym">written by the children, not here</td><td>score block of the selected evaluator.</td></tr>
 <tr><td>file read</td><td class="sym">datasets/scenarios/*</td><td class="sym">through <code>ScenarioEvaluator</code></td><td>rubric text for the scenario route.</td></tr>
 <tr><td>file write</td><td class="sym">none</td><td class="sym">whole file</td><td>no <code>open()</code> call exists in this module.</td></tr>
-<tr><td>import</td><td class="sym">sources/evaluators/legacy_verifier/verifier.py</td><td class="sym">function-level import line 94</td><td>legacy verifier, imported only on that branch.</td></tr>
-<tr><td>import</td><td class="sym"><a href="mod_evaluators_gold_feedback.html">sources/evaluators/gold_feedback/</a></td><td class="sym">function-level import line 103</td><td>oracle verifier, imported only on that branch.</td></tr>
-<tr><td>import</td><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">sources/evaluators/policy_bt_verifier/</a></td><td class="sym">function-level import line 112</td><td>policy_bt verifier, imported only on that branch.</td></tr>
+<tr><td>import</td><td class="sym">sources/evaluators/legacy_verifier/verifier.py</td><td class="sym">function-level import line 93</td><td>legacy verifier, imported only on that branch.</td></tr>
+<tr><td>import</td><td class="sym"><a href="mod_evaluators_gold_feedback.html">sources/evaluators/gold_feedback/</a></td><td class="sym">function-level import line 102</td><td>oracle verifier, imported only on that branch.</td></tr>
+<tr><td>import</td><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">sources/evaluators/policy_bt_verifier/</a></td><td class="sym">function-level import line 109</td><td>policy_bt verifier, imported only on that branch.</td></tr>
 <tr><td>config field</td><td class="sym">gold_feedback_reward, gold_feedback_timeout_s, gold_feedback_task_row</td><td class="sym">read by <code>GoldFeedbackEvaluator</code>, not here</td><td>gold only: reward source, grading cap, task row.</td></tr>
-<tr><td>config field</td><td class="sym">policy_bt_* (12 fields)</td><td class="sym">read by <code>PolicyBTVerifierEvaluator</code>, not here</td><td>policy_bt only: reward mode, timeouts, channels, refiner.</td></tr>
+<tr><td>config field</td><td class="sym">policy_bt_* (6 fields)</td><td class="sym">read by <code>PolicyBTVerifierEvaluator</code>, not here</td><td>policy_bt only: BT reward mode, scorer timeout, visual channel, repair rounds, re-execute, re-exec timeout (config.py:146-156).</td></tr>
 </tbody>
 </table>
-<p class="note">Amber: <code>use_bs_penalty</code> defaults to <code>False</code> here (line 59) while the same argument defaults to <code>True</code> in <code>GenericEvaluator.__init__</code> (<code class="path">sources/evaluators/generic_verifier/generic.py:41-42</code>). The facade always forwards the flag (line 84), so a facade-built generic evaluator never runs the numerical-fraud penalty. Grep of the repository finds no caller that passes <code>use_bs_penalty=True</code>.</p>
-<p class="note">Amber: the class docstring says the verifier "defaults to the hybrid E19/E19b evaluator" and that unknown values fall back to it (lines 44-53); the code uses the string "hybrid" (line 90) and the <code>else</code> branch (line 117). <code>Config</code> defaults to <code>verifier_kind = "hybrid"</code> (<code class="path">config.py:106</code>); the CLI accepts <code>hybrid</code>, <code>legacy</code>, <code>gold</code>, <code>policy_bt</code> (<code class="path">main.py:80</code>).</p>
+<p class="note">Amber: <code>use_bs_penalty</code> defaults to <code>False</code> here (line 58) while the same argument defaults to <code>True</code> in <code>GenericEvaluator.__init__</code> (<code class="path">sources/evaluators/generic_verifier/generic.py:41-42</code>). The facade always forwards the flag (line 81), so a facade-built generic evaluator never runs the numerical-fraud penalty. Grep of the repository finds no caller that passes <code>use_bs_penalty=True</code>.</p>
+<p class="note say">The class docstring now matches the code (lines 42-52): the verifier defaults to the policy/BT evaluator, <code>"hybrid"</code> is the previous default, and unknown values fall back to the hybrid verifier. <code>Config()</code> itself defaults <code>verifier_kind</code> to <code>"policy_bt"</code> (<code class="path">config.py:102</code>); the CLI accepts <code>hybrid</code>, <code>legacy</code>, <code>gold</code>, <code>policy_bt</code> (<code class="path">main.py:76-84</code>).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -368,12 +368,12 @@
 <pre>WorkflowEvaluator                                                 line 41   facade over three evaluators
   __init__(self, config: "Config", scenarios_dir: str = "datasets/scenarios",
            use_bs_penalty: bool = False, bs_fraud_threshold: float = 5.0,
-           verifier_workspace_dir: str | None = None) -&gt; None     line 55   builds the three children
+           verifier_workspace_dir: str | None = None) -&gt; None     line 54   builds the three children
   evaluate(self, uuid: str, agent_answers: str | None = None,
            evaluator_type: str = "verifier",
-           scenario_rubric: str | None = None) -&gt; dict[str, Any] line 134  routes one evaluation</pre>
-<p>Module-level names, all re-exports: <code>__all__</code> at line 27 lists <code>BaseEvaluator</code>, <code>EvaluatorError</code>, <code>WorkflowDataError</code> (from line 15), <code>GenericEvaluator</code>, <code>LLMEvaluationError</code>, <code>ScoreExtractionError</code> (lines 16-20), <code>HybridVerifierEvaluator</code> (line 21), <code>ScenarioError</code>, <code>ScenarioEvaluator</code> (line 22) and <code>WorkflowEvaluator</code> (line 41). Section comment at lines 24-26 states the legacy <code>VerifierEvaluator</code> is not imported on the default path. Neither <code>VerifierEvaluator</code>, <code>GoldFeedbackEvaluator</code> nor <code>PolicyBTVerifierEvaluator</code> is in <code>__all__</code>; each is imported only inside its branch (<code class="path">:94</code> from <code class="path">.legacy_verifier</code>, <code class="path">:103</code> from <code class="path">.gold_feedback</code>, <code class="path">:112</code> from <code class="path">.policy_bt_verifier</code>). The <code>verifier_kind</code> value is normalised with <code>.lower()</code> at line 90, so <code>GOLD</code> or <code>Policy_BT</code> also match.</p>
-<p>Module level: <code>if __name__ == "__main__":</code> at line 10 appends the repository root to <code>sys.path</code>; a second <code>__main__</code> block at lines 198-216 loads dotenv, builds <code>Config</code>, overrides <code>memory_dir</code> and <code>workflow_dir</code> with relative paths (<code>workflow_dir</code> twice, lines 207-208), then calls <code>evaluate</code> on the hardcoded uuid <code>test-uuid-12345</code> with rubric <code>clintox_nn_rubric</code>. Imports: <code>logging</code>, <code>os</code>, <code>sys</code>, <code>Any</code> at lines 5-8.</p>
+           scenario_rubric: str | None = None) -&gt; dict[str, Any] line 131  routes one evaluation</pre>
+<p>Module-level names, all re-exports: <code>__all__</code> at line 27 lists <code>BaseEvaluator</code>, <code>EvaluatorError</code>, <code>WorkflowDataError</code> (from line 15), <code>GenericEvaluator</code>, <code>LLMEvaluationError</code>, <code>ScoreExtractionError</code> (lines 16-20), <code>HybridVerifierEvaluator</code> (line 21), <code>ScenarioError</code>, <code>ScenarioEvaluator</code> (line 22) and <code>WorkflowEvaluator</code> (line 41). Section comment at lines 24-26 states the legacy <code>VerifierEvaluator</code> is not imported on the default path. Neither <code>VerifierEvaluator</code>, <code>GoldFeedbackEvaluator</code> nor <code>PolicyBTVerifierEvaluator</code> is in <code>__all__</code>; each is imported only inside its branch (<code class="path">:93</code> from <code class="path">.legacy_verifier</code>, <code class="path">:102</code> from <code class="path">.gold_feedback</code>, <code class="path">:109</code> from <code class="path">.policy_bt_verifier</code>). The <code>verifier_kind</code> value is normalised with <code>.lower()</code> at line 89, so <code>GOLD</code> or <code>Policy_BT</code> also match.</p>
+<p>Module level: <code>if __name__ == "__main__":</code> at line 10 appends the repository root to <code>sys.path</code>; a second <code>__main__</code> block at lines 195-213 loads dotenv, builds <code>Config</code>, overrides <code>memory_dir</code> and <code>workflow_dir</code> with relative paths (<code>workflow_dir</code> twice, lines 204-205), then calls <code>evaluate</code> on the hardcoded uuid <code>test-uuid-12345</code> with rubric <code>clintox_nn_rubric</code>. Imports: <code>logging</code>, <code>os</code>, <code>sys</code>, <code>Any</code> at lines 5-8.</p>
 </div></details>
 </div>
 
@@ -383,39 +383,39 @@
 <table>
 <thead><tr><th>Importer</th><th>What it calls</th><th>Where</th></tr></thead>
 <tbody>
-<tr><td class="sym"><a href="mod_core_evolution_engine.html">sources/core/evolution_engine.py</a></td><td><code>WorkflowEvaluator(config)</code> once, then <code>judge.evaluate(..., evaluator_type="verifier")</code> per generation; gold runs it in <code>asyncio.to_thread</code></td><td class="sym">lines 31, 355, 1218-1234</td></tr>
+<tr><td class="sym"><a href="mod_core_evolution_engine.html">sources/core/evolution_engine.py</a></td><td><code>WorkflowEvaluator(config)</code> once, then <code>judge.evaluate(..., evaluator_type="verifier")</code> per generation; gold runs it in <code>asyncio.to_thread</code></td><td class="sym">lines 32, 446, 1283-1297</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/hybrid_verifier_test.py</a></td><td>imports as <code>evaluator_mod</code>; builds the facade twice; stubs two children</td><td class="sym">lines 36, 1208-1247, 1250-1287</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/gold_feedback_test.py</a></td><td>imports as <code>evaluator_mod</code>; facade with <code>gold</code>, <code>GOLD</code>, <code>nonsense</code></td><td class="sym">lines 31, 280-300</td></tr>
-<tr><td class="sym"><a href="area_tests.html">tests/policy_bt_verifier_test.py</a></td><td>imports <code>WorkflowEvaluator</code> directly and checks the built child type</td><td class="sym">lines 1715-1735</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/evaluator_test.py</a></td><td><code>WorkflowEvaluator</code> for the legacy scenario and generic smoke tests</td><td class="sym">line 27 (file skipped at collection, lines 22-25)</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/workflow_evaluator_test.py</a></td><td><code>WorkflowEvaluator</code> in two CLI-style helpers</td><td class="sym">line 25 (module is <code>pytest.mark.skip</code>, lines 29-31)</td></tr>
 <tr><td class="sym"><a href="area_tests.html">tests/scenario_rubric_test.py</a></td><td><code>ScenarioEvaluator</code>, taken from this module's re-export</td><td class="sym">line 14</td></tr>
 </tbody>
 </table>
-<p>No module in <code class="path">sources/</code> other than <code class="path">sources/core/evolution_engine.py</code> imports this file. <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> names <code>WorkflowEvaluator</code> only in a docstring (line 89). <code class="path">sources/benchmark_evaluation/__init__.py:7</code> names <code>sources.evaluators.evaluator</code> in a comment about a removed re-export block; it does not import it.</p>
+<p>No module in <code class="path">sources/</code> other than <code class="path">sources/core/evolution_engine.py</code> imports this file. <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> names <code>WorkflowEvaluator</code> only in a docstring (line 89). <code class="path">sources/benchmark_evaluation/__init__.py:7</code> names <code>sources.evaluators.evaluator</code> in a comment about a removed re-export block; it does not import it. No policy_bt test imports <code>WorkflowEvaluator</code> anymore: the 2026-10-13 rewrite deleted <code>test_factory_selects_policy_bt</code>, and the policy_bt channel is now exercised through the engine-side integration in <code class="path">tests/test_policy_bt_selection.py</code>.</p>
 <h3>Tests that exercise it</h3>
 <ul>
-<li><code class="path">tests/hybrid_verifier_test.py:1208</code> - <code>test_facade_defaults_to_hybrid</code> asserts <code>facade.verifier_kind == "hybrid"</code> (line 1245) and that the legacy module is never imported (line 1247).</li>
+<li><code class="path">tests/hybrid_verifier_test.py:1208</code> - <code>test_facade_defaults_to_hybrid</code> builds the facade with an explicit <code>verifier_kind="hybrid"</code> config (line 1244) and asserts <code>facade.verifier_kind == "hybrid"</code> (line 1245), the hybrid child (line 1246) and that the legacy module is never imported (line 1247). The real <code>Config()</code> default is <code>"policy_bt"</code>, asserted at <code class="path">:1106</code>.</li>
 <li><code class="path">tests/hybrid_verifier_test.py:1250</code> - <code>test_facade_legacy_escape_hatch</code> builds the facade with <code>verifier_kind="legacy"</code> and asserts the legacy object or the patched factory was taken (lines 1286-1287).</li>
 <li><code class="path">tests/hybrid_verifier_test.py:1290</code> - <code>test_legacy_modules_deprecated_but_importable</code> imports the five legacy verifier modules.</li>
 <li><code class="path">tests/gold_feedback_test.py:280</code> - <code>test_facade_selects_gold</code> (<code>gold</code> and <code>GOLD</code>) asserts a <code>GoldFeedbackEvaluator</code> with a stubbed inner hybrid.</li>
 <li><code class="path">tests/gold_feedback_test.py:290</code> - <code>test_facade_unknown_kind_still_falls_back_to_hybrid</code>.</li>
 <li><code class="path">tests/gold_feedback_test.py:878</code> - <code>test_only_gold_evaluation_runs_off_the_event_loop</code> checks the engine-side <code>asyncio.to_thread</code> switch.</li>
-<li><code class="path">tests/policy_bt_verifier_test.py:1915</code> - <code>test_factory_selects_policy_bt</code> builds the facade with <code>verifier_kind="policy_bt"</code> and asserts the child is a <code>PolicyBTVerifierEvaluator</code> (line 1935).</li>
-<li><code class="path">tests/policy_bt_verifier_test.py:1844</code> - <code>test_config_defaults_and_json_roundtrip</code>: <code>Config()</code> keeps <code>verifier_kind == "hybrid"</code> and the <code>policy_bt_*</code> defaults.</li>
-<li><code class="path">tests/policy_bt_verifier_test.py:1723</code> - <code>test_n1_loss_first_pair_returns_scores</code>: the verifier writes <code>pair_outcomes</code> in the <code>won</code>/<code>lost</code>/<code>tie</code> spelling and <code>sources/core/stopping.py::StopController</code> consumes it unchanged.</li>
+<li><code class="path">tests/test_policy_bt_selection.py</code> (233 lines, 10 funcs) covers the engine-side policy_bt integration without importing this facade: <code>EvolutionEngine._refresh_policy_bt_rewards</code>, <code>_select_capsule_run</code> and <code>_stop_pair_outcomes</code> (<code class="path">:129</code>), the capsule rule (<code class="path">:99</code>), and <code>test_config_rejects_retired_policy_reward</code> (<code class="path">:200</code>) which asserts <code>from_json({"policy_bt_reward": "win_rate"})</code> raises <code>ValueError</code>.</li>
+<li><code>Config()</code> now returns <code>verifier_kind == "policy_bt"</code>: asserted by <code class="path">tests/hybrid_verifier_test.py:1106</code> (<code>test_config_defaults_and_overrides</code>) and <code class="path">tests/gold_feedback_test.py:212</code> (<code>test_config_default_json_and_runtime_fields</code>). The old policy_bt package config test was deleted with the 2026-10-13 rewrite.</li>
+<li><code>pair_outcomes</code> contract: <code>evaluate()</code> returns <code>{"first": "win", "second": "win"}</code>-style outcomes (built by <code>results.py:70</code>, <code>_outcome</code> at <code>results.py:54-55</code>); <code>sources/core/evolution_engine.py::_stop_pair_outcomes</code> (lines 113-129) maps <code>"win" &rarr; "won"</code> / <code>"loss" &rarr; "lost"</code> for <code>StopController</code>; asserted by <code class="path">tests/policy_bt_verifier_test.py:94</code> and <code class="path">tests/test_policy_bt_selection.py:129</code>.</li>
+<li><code class="path">tests/policy_bt_verifier_test.py</code> (229 lines, 13 funcs, rewritten 2026-10-13) covers the package directly: BT fit transitivity (<code class="path">:25</code>), registry transactions (<code class="path">:47</code>), the <code>evaluate()</code> lifecycle that refreshes every earlier rating (<code class="path">:94</code>), instrument failures never committed (<code class="path">:111</code>), LLM cost files (<code class="path">:125</code>), missing <code>.sh</code> &rarr; reward 0 with no LLM call (<code class="path">:145</code>), gradient ordering (<code class="path">:158</code>), visual tie-break (<code class="path">:166</code>), the recon malformed-answer loop (<code class="path">:179</code>), torn <code>state_result</code> handling (<code class="path">:200</code>, <code class="path">:210</code>) and the stale-prompt rebuild (<code class="path">:220</code>).</li>
 <li>No test calls <code>evaluate()</code> on a real facade with <code>evaluator_type="scenario"</code> or <code>"generic"</code> and asserts a returned score; the two CLI scripts that do are skipped by <code>pytest.importorskip</code> and <code>pytest.mark.skip</code>.</li>
 </ul>
 <p>Related pages: <a href="file_index.html">file_index.html</a>, <a href="area_evaluators.html">area_evaluators.html</a>, <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>, <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>, <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>, <a href="file_gold_evaluator.html">file_gold_evaluator.html</a>, <a href="file_eval_base.html">file_eval_base.html</a>, <a href="file_eval_generic.html">file_eval_generic.html</a>, <a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a>, <a href="flow_verification.html">flow_verification.html</a>.</p>
 </div>
 
 <footer>
-<p>Sources read: <code class="path">sources/evaluators/evaluator.py</code> (216 lines, every def and class; <code>git diff HEAD</code> and the working tree), <code class="path">sources/evaluators/base.py</code> (lines 89-145), <code class="path">sources/evaluators/generic_verifier/generic.py</code> (lines 29-60), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> and <code class="path">__init__.py</code> (constructor and imports), <code class="path">sources/evaluators/policy_bt_verifier/__init__.py</code> and <code class="path">evaluator.py</code> (class and constructor), <code class="path">sources/core/evolution_engine.py</code> (lines 31, 355, 1218-1234), <code class="path">sources/core/stopping.py</code> (StopController), <code class="path">config.py</code> (lines 95-175), <code class="path">config_default.json</code> (key <code>verifier_kind</code>, line 16; 78 keys), <code class="path">main.py</code> (lines 76-176), <code class="path">tests/hybrid_verifier_test.py</code> (lines 36, 1208-1300), <code class="path">tests/gold_feedback_test.py</code> (lines 31, 257-300, 875-880), <code class="path">tests/policy_bt_verifier_test.py</code> (lines 1524-1552, 1648-1673, 1715-1735), <code class="path">tests/evaluator_test.py</code> (lines 20-27), <code class="path">tests/workflow_evaluator_test.py</code> (lines 22-31), <code class="path">tests/scenario_rubric_test.py</code> (line 14), <code class="path">sources/benchmark_evaluation/__init__.py</code> (line 7), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code> and <code class="path">_clone.js</code> for the page skeleton.</p>
-<p class="skips">Skipped: the bodies of the child evaluators (their own digest pages own them); the hybrid verifier, gold feedback and policy_bt package internals (see <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> and <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>); the duplicate assignment of <code>config.workflow_dir</code> at lines 207-208 quoted only in the inventory; the <code>__main__</code> smoke calls themselves (not executed); <code class="path">.env</code>-style files (not opened, only their loader call at line 204 is named); runtime folders <code class="path">sources/workflows/</code> and <code class="path">sources/memory/</code> (not read). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
+<p>Sources read: <code class="path">sources/evaluators/evaluator.py</code> (213 lines, every def and class; <code>git diff HEAD</code> and the working tree), <code class="path">sources/evaluators/base.py</code> (lines 89-145), <code class="path">sources/evaluators/generic_verifier/generic.py</code> (lines 29-60), <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> and <code class="path">__init__.py</code> (constructor and imports), <code class="path">sources/evaluators/policy_bt_verifier/__init__.py</code> and <code class="path">evaluator.py</code> (class and constructor), <code class="path">sources/core/evolution_engine.py</code> (lines 32, 446, 1283-1297), <code class="path">sources/core/stopping.py</code> (StopController), <code class="path">config.py</code> (lines 95-175, 481-486, 610-611), <code class="path">config_default.json</code> (key <code>verifier_kind</code>, line 16), <code class="path">main.py</code> (lines 76-176), <code class="path">tests/hybrid_verifier_test.py</code> (lines 36, 1106-1300), <code class="path">tests/gold_feedback_test.py</code> (lines 31, 212-300, 875-880), <code class="path">tests/policy_bt_verifier_test.py</code> (lines 1-229, all 13 funcs), <code class="path">tests/test_policy_bt_selection.py</code> (lines 1-233), <code class="path">tests/evaluator_test.py</code> (lines 20-27), <code class="path">tests/workflow_evaluator_test.py</code> (lines 22-31), <code class="path">tests/scenario_rubric_test.py</code> (line 14), <code class="path">sources/benchmark_evaluation/__init__.py</code> (line 7), <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">_clone.css</code> and <code class="path">_clone.js</code> for the page skeleton.</p>
+<p class="skips">Skipped: the bodies of the child evaluators (their own digest pages own them); the hybrid verifier, gold feedback and policy_bt package internals (see <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> and <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>); the duplicate assignment of <code>config.workflow_dir</code> at lines 204-205 quoted only in the inventory; the <code>__main__</code> smoke calls themselves (not executed); <code class="path">.env</code>-style files (not opened, only their loader call at line 201 is named); runtime folders <code class="path">sources/workflows/</code> and <code class="path">sources/memory/</code> (not read). Nothing was modified outside <code class="path">docs/visual_clone/</code>.</p>
 <p>Change note: commit <code>4020790</code> committed the <code>hybrid</code>/<code>legacy</code> switch and the lazy legacy import; the <code>gold</code> branch arrived at <code>ca72107</code>. The <code>policy_bt</code> branch (lines 108-116) is untracked in the working tree at <code>7da1f5e</code>, together with the <code>generic/</code> &rarr; <code>generic_verifier/</code> rename that moved the module-level import to line 16.</p>
 <p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. Updated at <code>7da1f5e</code> + working tree, 2026-10-10: <code>policy_bt</code> branch box and rows, every line reference re-derived from the 216-line file, the <code>generic_verifier/</code> import and link, the policy_bt test rows.</p>
-<p>Updated at <code>c508f11</code> + working tree, 2026-10-12: the three policy_bt test line references re-pointed after the schema-error refresh fix grew the test file (2 627 &rarr; 2 889 lines, 84 &rarr; 86 funcs). The facade itself is unchanged.</p>
-<p>Updated again on 2026-10-12 (same commit + working tree): the policy_bt operator-logging upgrade grew the test file again (2 889 &rarr; 2 978 lines, 86 &rarr; 90 funcs; 4 logging tests appended after line 1973, so the three cited test line references still hold). The facade itself is unchanged.</p>
+<p>Updated at <code>c508f11</code> + working tree, 2026-10-12: the pre-rewrite policy_bt test file grew from 2 627 to 2 978 lines (84 &rarr; 90 funcs) through the schema-error refresh and logging upgrades; the facade itself was unchanged.</p>
+<p>Updated 2026-10-13 (<code>84db677</code> + working tree): the policy_bt package was rewritten (12 modules, 3 700 lines; reporting.py landed mid-sync) and its test file shrank to 229 lines / 13 funcs, so the three old policy_bt test rows (lines 1715-1935) were replaced with the current suite plus the engine-side selection tests. The facade changed today: the class docstring now names <code>policy_bt</code> as the default, <code>config.py:102</code> defaults <code>verifier_kind</code> to <code>"policy_bt"</code>, the <code>policy_bt_*</code> knob set shrank to the six live fields (config.py:146-156), and the file is 213 lines; every box, row and line reference on this page was re-derived from the current tree.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

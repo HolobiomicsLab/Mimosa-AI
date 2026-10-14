@@ -1,12 +1,11 @@
 # Evaluation pipeline
 
-> This page describes the **judge** that runs after every workflow
-> execution — the hybrid verifier
-> ([`sources/evaluators/hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/),
-> default since 2026-09-24; the legacy
-> [`VerifierEvaluator`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/verifier.py)
-> is described further down). It is the **pressure signal that drives
-> workflow evolution**, not a benchmark grader.
+> This page describes the **judge** that runs after each workflow
+> execution. The default is the policy-based **Bradley–Terry verifier**
+> ([`sources/evaluators/policy_bt_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/)).
+> It supplies the **pressure signal that drives workflow evolution**,
+> not a benchmark grade. The previous hybrid and legacy verifiers remain
+> available and are described below.
 >
 > If you are looking for ScienceAgentBench or PaperBench grading — those
 > are different systems that compare the workflow's output against
@@ -14,28 +13,114 @@
 > [ScienceAgentBench evaluation](../science_agent_bench_evaluation.md)
 > and [PaperBench evaluation](../papers_bench_evaluation.md).
 
-The current default is the **hybrid temporal-ladder verifier**
-([`sources/evaluators/hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/)).
-Per task it extracts a small ladder of stage-tagged **key claims**
-(`script` → `log` → `result`), turns each claim into a cached
-deterministic **Python policy scorer** that grades any single workspace
-of the task on a continuous 0..1 scale, and computes the reward as a
-**pairwise win-rate** over the task's previous generations, each pair
-decided at the earliest ladder stage where the generations differ. The
-signal fed back to the mutator is the **textual gradient**
-(`evaluation.verifier.abstracted_textual_gradient` in
-`state_result.json`, plus the `textual_gradient.txt` sidecar), which
-leads with the *elimination point* — the earliest stage/claim where
-this generation lost to a rival.
+The default, `verifier_kind = "policy_bt"`, compares the artifacts of
+each generation with those of its predecessors. A cached Python policy
+decides the pairs. Relevant visual evidence can resolve a policy tie.
+The complete set of wins, losses, and ties fits a **Bradley–Terry
+tournament**, which updates the current reward of **every generation**
+after each evaluation.
 
-The previous default — the multi-source per-claim `VerifierEvaluator`
-with its five claim sources (`a`/`b`/`c`/`e`/`g`), self-rated claim
-importances, importance-weighted mean and 0.89 hard-fail cap — is
+The feedback passed to the mutator remains the **textual gradient**
+(`evaluation.verifier.abstracted_textual_gradient` in `state_result.json`,
+plus `textual_gradient.txt`). It explains decisive differences and
+prioritizes the earliest stage at which the current generation lost.
+
+The older multi-source per-claim `VerifierEvaluator` — with its five
+claim sources (`a`/`b`/`c`/`e`/`g`), self-rated claim importances,
+importance-weighted mean, and 0.89 hard-fail cap — is
 **deprecated (2026-09-24)** and described in
 [Legacy multi-source verifier](#legacy-multi-source-verifier-deprecated)
 below; it remains reachable via `verifier_kind = "legacy"`.
 
-## The hybrid temporal-ladder verifier (default since 2026-09-24)
+## Policy-based Bradley–Terry verifier (default)
+
+The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/DESIGN.md#2-how-it-would-work):
+
+1. **Reproduction contract.** Each generation must contain a shell
+   (`.sh`) script that installs its requirements and regenerates its
+   outputs. A missing or invalid script makes the generation ineligible:
+   reward is zero and feedback states the required correction.
+2. **Owned artifact copies.** The verifier inspects copies of saved
+   generation workspaces, never changes the original artifacts, and
+   optionally runs the reproduction script on a copy.
+3. **Reconnaissance and normalization.** Inventories and compact content
+   previews inform the LLM. Schema adapters map differing artifact
+   layouts to a common representation. A new schema can extend the
+   adapters without changing the comparison criteria.
+4. **Pairwise policy.** A cached deterministic Python policy compares
+   each pair and returns a verdict, evidence, and feedback for both
+   sides. On a tie, comparable goal-relevant visual artifacts can be
+   sent to the configured vision model; otherwise the pair stays tied.
+5. **Current ratings.** The accumulated pair results fit a regularized
+   Bradley–Terry model. The first eligible generation starts at 0.5;
+   an ineligible generation remains at zero.
+
+Re-execution (`policy_bt_reexecute`, default `true`) runs the script
+with bash on the copy, in a fresh venv with no API keys; existing
+outputs are moved aside first, so stale artifacts cannot pass. This is
+trusted local shell execution — **not** an OS security sandbox. Run
+logs are copied into `.policy_bt_reexec/` inside the snapshot so
+adapters can read stdout-only metrics.
+
+**Adapters run in a small Python subset** (stdlib `json`/`math`/`struct`
+calls plus harness-provided read capabilities and CSV parsing — no
+`numpy`/`pandas`/binary scientific readers). Formats outside that
+subset stay "unknown" (`null`), never a fabricated loss.
+
+Per generation the verifier writes `evaluation.txt` (reward, tournament
+version, execution record, and the pair verdicts), `textual_gradient.txt`,
+`policy_bt_evidence.json`, and `verifier_policy_bt.log`. The tournament
+state for a task session lives in
+`<workflow_dir>/.policy_bt/<sha256(goal, session)>/tournament.json`
+with one `snapshots/<uuid>/` copy per generation. Verifier LLM calls
+are saved as `memory/<uuid>/verifier_policy_bt_<channel>_<n>.json` and
+counted in the run cost.
+
+If the verifier itself fails before scoring — bad LLM answer,
+adapter/policy error, venv creation failure — the generation is NOT
+scored: `state_result.json` carries
+`skipped_reason = "verifier_instrument_error"` and the engine treats it
+as a failed generation, keeping it out of the QD archive.
+
+### Current ratings versus arrival scores
+
+Each result carries `verifier_kind = "policy_bt"`, `tournament_rewards`
+(workflow UUID to current rating), and `tournament_version`.
+Earlier `state_result.json` verifier blocks receive the latest rating.
+The engine updates all in-memory run rewards and QD archive rewards
+**before survivor selection**. QD scores retain the existing novelty,
+quality, and length-penalty composition. Parent selection reads the
+updated archive and reloads persisted workflow scores.
+
+`arrival_reward` records the score at the generation's first evaluation;
+the reward curve and existing per-generation history remain historical.
+Those historical values do not choose QD survivors or the final capsule.
+The policy-BT capsule is the generation with the **highest current
+tournament rating**, not the stop controller's head-to-head champion.
+The existing relative-score stopping rule remains in use; hybrid and
+legacy stopping and capsule behavior are unchanged. Each evolution
+session receives a fresh tournament registry scope.
+
+### Configuration
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `verifier_kind` | `"policy_bt"` | Select the policy tournament verifier |
+| `policy_bt_reward` | `"bradley_terry"` | Only supported policy-BT reward |
+| `policy_bt_reexecute` | `true` | Run the required reproduction script |
+| `policy_bt_reexec_timeout_s` | `900` | Reproduction wall-clock limit |
+| `policy_bt_scorer_timeout_s` | `60` | Policy comparison time limit |
+| `policy_bt_repair_rounds` | `3` | Maximum policy or adapter repairs |
+| `policy_bt_visual_channel` | `true` | Allow relevant visual tie resolution |
+
+Use `--no-policy_bt_reexecute` to inspect existing artifacts without
+running the script. The script requirement still applies. Use
+`--policy_bt_reexecute` to enable execution again. Configuration JSON
+preserves these choices. Old policy `win_rate`, refiner, pair-limit,
+environment-reuse, visual-first, verbose, and recon-gap controls are
+no longer part of this verifier.
+
+## The hybrid temporal-ladder verifier (previous default)
 
 Implemented in
 [`sources/evaluators/hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/):
@@ -321,7 +406,7 @@ above and stays as-is beside custom layers.
 
 | Knob | Default | What it controls |
 | ---- | ------- | ---------------- |
-| `verifier_kind` | `hybrid` | `hybrid` (default), `legacy` (deprecated multi-source per-claim verifier) or `gold` (oracle control — leaks the benchmark, see [Gold feedback (oracle) mode](#gold-feedback-oracle-mode)) |
+| `verifier_kind` | `policy_bt` | Select `hybrid` explicitly for the pipeline in this section; `legacy` and the benchmark-leaking `gold` control also remain available |
 | `hybrid_verifier_num_claims` | `10` | target key-claim count per task (extraction accepts ±2) |
 | `hybrid_verifier_refinement_rounds` | `2` | max replacement claims per generation for dead claims |
 | `hybrid_verifier_scorer_timeout_s` | `60` | per scorer-subprocess timeout (seconds) |

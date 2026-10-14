@@ -340,7 +340,7 @@ _run_reward_is_fallback(run: IndividualRun, candidates: list[IndividualRun]) -&g
 <tr><td class="sym">length_penalty_lambda</td><td class="size">0.05</td><td>strength of that penalty</td></tr>
 <tr><td class="sym">export_astra</td><td class="size">False</td><td>opt-in ASTRA trace export</td></tr>
 <tr><td class="sym">workflow_dir</td><td class="size">paths.default_workflow_dir()</td><td>where runs and jsonl files land</td></tr>
-<tr><td class="sym">verifier_kind</td><td class="size">"hybrid"</td><td>read by <code>WorkflowEvaluator</code>; engine reads <code>judge.verifier_kind</code></td></tr>
+<tr><td class="sym">verifier_kind</td><td class="size">"policy_bt"</td><td>read by <code>WorkflowEvaluator</code>; engine reads <code>judge.verifier_kind</code></td></tr>
 </tbody>
 </table>
 <p><code>learned_score_threshold</code> is <code>0.9</code> in <code>config.py:186</code> and <code>0.92</code> in <code>config_default.json</code>:66.</p>
@@ -499,6 +499,7 @@ WorkflowOrchestrator._parse_generation_error(error) -&gt; tuple[str, str]</pre>
 <p>Line numbers are hints from the working tree at build time.</p>
 <p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. <code>sources/core/evolution_engine.py</code> has both committed changes (capsule pick in <code>4020790</code>) and ca72107 ones (gold thread branch, <code>benchmark_grader</code> rule).</p>
 <p>Updated at commit <code>336fe19</code>, 2026-09-26: evaluator paths repointed after the <code>generic/</code>, <code>scenario/</code> and <code>legacy_verifier/</code> package split.</p>
+<p>Updated 2026-10-13 (84db677 + working tree): <code>verifier_kind</code> default corrected to <code>"policy_bt"</code> (config.py:102) in the config table.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

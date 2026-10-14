@@ -59,10 +59,10 @@
     <text class="box-sub" x="792" y="102" text-anchor="middle">verifier_kind branch</text>
   </a>
 
-  <a class="box" id="d1_H" href="mod_evaluators_hybrid_verifier.html">
-    <title>HybridVerifierEvaluator.evaluate: the default verifier, called inline.</title>
+  <a class="box" id="d1_H" href="mod_evaluators_policy_bt_verifier.html">
+    <title>PolicyBTVerifierEvaluator.evaluate: the default verifier, called inline.</title>
     <rect x="715" y="140" width="155" height="40" rx="12" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="792" y="157" text-anchor="middle">hybrid (default)</text>
+    <text class="box-label" x="792" y="157" text-anchor="middle">policy_bt (default)</text>
     <text class="box-sub" x="792" y="172" text-anchor="middle">inline call</text>
   </a>
 
@@ -136,7 +136,7 @@
   <text class="box-sub" x="15" y="440">solid = call | dashed = reads/writes data | one pass round the cycle = one evolve_generation() call</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1 - the closed loop, 11 boxes. At the score step <code>WorkflowEvaluator</code> picks the verifier by <code>config.verifier_kind</code> (<code class="path">sources/evaluators/evaluator.py:88-110</code>): <code>"hybrid"</code> (default), <code>"legacy"</code> (deprecated) or <code>"gold"</code>, an ORACLE mode <span class="chip warn">oracle - leaks gold</span>. Only gold runs in <code>asyncio.to_thread</code> (<code class="path">sources/core/evolution_engine.py:921-932</code>). The gradient text is the only feedback the mutator receives: it reads <code>WorkflowInfo.abstracted_textual_gradient</code> and never touches the verifier's score vectors. With gold, that text is the benchmark grader's VER/SR feedback.</p>
+<p class="figcap">Diagram 1 - the closed loop, 11 boxes. At the score step <code>WorkflowEvaluator</code> picks the verifier by <code>config.verifier_kind</code> (<code class="path">sources/evaluators/evaluator.py:90-117</code>): <code>"policy_bt"</code> (default), <code>"hybrid"</code> (previous channel), <code>"legacy"</code> (deprecated) or <code>"gold"</code>, an ORACLE mode <span class="chip warn">oracle - leaks gold</span>. Only gold runs in <code>asyncio.to_thread</code> (<code class="path">sources/core/evolution_engine.py:1281-1293</code>). The gradient text is the only feedback the mutator receives: it reads <code>WorkflowInfo.abstracted_textual_gradient</code> and never touches the verifier's score vectors. With gold, that text is the benchmark grader's VER/SR feedback.</p>
 
 <p class="note say">The reward travelling from the verifier to the archive is a scalar; the per-claim scores behind it stay in the verifier, and the mutation prompt sees the whole gradient text (the 2 048-character cut is gone from the working tree).</p>
 <p class="note">After the last round, <code>_select_best_run</code> picks the capsule run and skips fallback rewards (<a href="file_core_evolution_engine.html">file_core_evolution_engine.html</a>, Diagram 4). Honest runs also skip oracle generations when they build the parent pool (<code>WorkflowSelector.discover_workflows</code>, see <a href="mod_core_selection.html">mod_core_selection.html</a>).</p>
@@ -257,12 +257,12 @@
 <tr><td class="sym"><code>n_parents</code><br><span class="sub">config.py:203</span></td><td class="size">2</td><td>Parents drawn when crossover fires.</td></tr>
 <tr><td class="sym"><code>parent_threshold_similarity</code><br><span class="sub">config.py:205</span></td><td class="size">0.95</td><td>Cold-start goal-similarity floor for candidate parents.</td></tr>
 <tr><td class="sym"><code>parent_threshold_score</code><br><span class="sub">config.py:207</span></td><td class="size">0.01</td><td>Cold-start minimum score for candidate parents.</td></tr>
-<tr><td class="sym"><code>verifier_kind</code><br><span class="sub">config.py:106</span></td><td class="size">hybrid</td><td>Verifier at the score step: hybrid, legacy (deprecated) or gold (ORACLE).</td></tr>
-<tr><td class="sym"><code>gold_feedback_reward</code><br><span class="sub">config.py:110</span></td><td class="size">False</td><td>Gold only: reward also comes from the benchmark grader.</td></tr>
-<tr><td class="sym"><code>hybrid_verifier_pairwise_mode</code><br><span class="sub">config.py:130</span></td><td class="size">temporal</td><td>Decides each pair at the earliest differing ladder stage.</td></tr>
-<tr><td class="sym"><code>hybrid_verifier_reward</code><br><span class="sub">config.py:138</span></td><td class="size">win_rate</td><td>Reward over pairs: win rate, or Bradley&ndash;Terry strengths.</td></tr>
-<tr><td class="sym"><code>hybrid_verifier_num_claims</code><br><span class="sub">config.py:122</span></td><td class="size">10</td><td>Target key-claim count per task; extraction accepts plus or minus 2.</td></tr>
-<tr><td class="sym"><code>hybrid_verifier_scorer_timeout_s</code><br><span class="sub">config.py:126</span></td><td class="size">60 s</td><td>Timeout for one policy-scorer subprocess.</td></tr>
+<tr><td class="sym"><code>verifier_kind</code><br><span class="sub">config.py:102</span></td><td class="size">policy_bt</td><td>Verifier at the score step: policy_bt, hybrid (previous), legacy (deprecated) or gold (ORACLE).</td></tr>
+<tr><td class="sym"><code>gold_feedback_reward</code><br><span class="sub">config.py:106</span></td><td class="size">False</td><td>Gold only: reward also comes from the benchmark grader.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_pairwise_mode</code><br><span class="sub">config.py:126</span></td><td class="size">temporal</td><td>Decides each pair at the earliest differing ladder stage.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_reward</code><br><span class="sub">config.py:134</span></td><td class="size">win_rate</td><td>Reward over pairs: win rate, or Bradley&ndash;Terry strengths.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_num_claims</code><br><span class="sub">config.py:118</span></td><td class="size">10</td><td>Target key-claim count per task; extraction accepts plus or minus 2.</td></tr>
+<tr><td class="sym"><code>hybrid_verifier_scorer_timeout_s</code><br><span class="sub">config.py:122</span></td><td class="size">60 s</td><td>Timeout for one policy-scorer subprocess.</td></tr>
 </tbody>
 </table>
 
@@ -380,6 +380,7 @@
 <p>Sources read for this page: <code class="path">UPDATE_VISUAL_CLONE.md</code>, <code class="path">docs/visual_clone/_reference.html</code>, <code class="path">docs/visual_clone/_clone.css</code>, <code class="path">docs/visual_clone/_clone.js</code>, <code class="path">sources/core/evolution_engine.py</code>, <code class="path">sources/core/selection.py</code>, <code class="path">sources/core/variation_engine.py</code>, <code class="path">sources/core/genotype_embedding.py</code>, <code class="path">sources/core/code_features.py</code>, <code class="path">sources/core/workflow_selection.py</code>, <code class="path">sources/core/lineage.py</code>, <code class="path">sources/core/workflow_info.py</code>, <code class="path">sources/core/orchestrator.py</code>, <code class="path">sources/utils/run_metrics.py</code>, <code class="path">sources/evaluators/evaluator.py</code>, <code class="path">sources/evaluators/gold_feedback/evaluator.py</code> (entry and artifact writes only), <code class="path">sources/evaluators/hybrid_verifier/evaluator.py</code>, <code class="path">sources/evaluators/hybrid_verifier/gradient.py</code>, <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code>, <code class="path">sources/evaluators/hybrid_verifier/registry.py</code>, <code class="path">config.py</code>, <code class="path">config_default.json</code>, and one real gradient file under <code class="path">sources/workflows/</code>.</p>
 <p class="skips">Skipped: <code class="path">sources/core/factory.py</code>, <code>workflow_factory.py</code>, <code>single_agent_factory.py</code> and <code>schema.py</code> (builder helpers, not the loop) &#183; <code class="path">sources/core/failure_fingerprint.py</code> (written by the verifier, not read by the loop) &#183; <code class="path">sources/core/orchestrator.py</code> in depth (one arrow here; its own flow is <a href="flow_task_run.html">flow_task_run.html</a>) &#183; <code class="path">sources/evaluators/hybrid_verifier/claims.py</code>, <code>layers.py</code>, <code>scorers.py</code>, <code>inventory.py</code>, <code>digest.py</code> (verifier internals; <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>) &#183; <code>sources/evaluators/legacy_verifier/</code> (deprecated; one box only) &#183; gold grader internals (<a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a>) &#183; <code>webui/</code>, <code>datasets/</code>, <code>logs/</code>, <code>CLA/</code>, lock files and secret files (Tier D) &#183; <code class="path">diversity_experiments/code_reference/selection.py</code> (a frozen copy of selection.py for an experiment, not the runtime loop).</p>
 <p>Built at commit <code>ca72107</code> + working tree, 2026-09-28. Every default and line number above was read from the working tree, not from commit <code>4020790</code>. Changes drawn: the <code>verifier_kind</code> branch at the score step (gold added in ca72107), the removed 2 048-character gradient cut, and the capsule pick <code>_select_best_run</code>.</p>
+<p>Updated 2026-10-13 (84db677 + working tree): the verifier box now names <code>policy_bt (default)</code> and links to the policy_bt package page; the caption lists policy_bt as the run default with hybrid as the previous channel; config table verifier line references re-synced (<code>verifier_kind</code> config.py:102).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

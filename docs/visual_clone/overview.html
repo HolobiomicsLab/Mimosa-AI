@@ -10,7 +10,7 @@
 <div class="wrap">
 
 <h1 class="hud">Mimosa-AI, whole system</h1>
-<p class="intro">For each task Mimosa synthesizes a workflow as plain Python, runs it in a sandbox, verifies the run with the verifier that <code>verifier_kind</code> selects, and evolves the workflow across generations. Four channels exist: <code>policy_bt</code> (the run default: fresh re-execution plus an LLM policy tournament, win-rate reward vs predecessors), <code>hybrid</code> (previous channel, temporal ladder), <code>legacy</code> (deprecated) and <code>gold</code> (oracle, leaks the benchmark gold). Five layers carry that loop; the verifier's gradient text steers the next mutation.</p>
+<p class="intro">For each task Mimosa synthesizes a workflow as plain Python, runs it in a sandbox, verifies the run with the verifier that <code>verifier_kind</code> selects, and evolves the workflow across generations. Four channels exist: <code>policy_bt</code> (the built-in default: reproduction contract, LLM comparison policy, fitted Bradley-Terry ratings), <code>hybrid</code> (previous channel, temporal ladder), <code>legacy</code> (deprecated) and <code>gold</code> (oracle, leaks the benchmark gold). Five layers carry that loop; the verifier's gradient text steers the next mutation.</p>
 
 <div id="legend" data-auto></div>
 
@@ -71,10 +71,10 @@
   </a>
 
   <a class="box" id="verifier" href="area_evaluators.html">
-    <title>Layer 4 - WorkflowEvaluator builds one verifier from config.verifier_kind: policy_bt (run default), hybrid (previous), legacy (deprecated) or gold (oracle)</title>
+    <title>Layer 4 - WorkflowEvaluator builds one verifier from config.verifier_kind: policy_bt (built-in default), hybrid (previous), legacy (deprecated) or gold (oracle)</title>
     <rect x="60" y="470" width="270" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
     <text class="box-label" x="195" y="488" text-anchor="middle">L4 Verifier (verifier_kind)</text>
-    <text class="box-sub" x="195" y="504" text-anchor="middle">policy_bt = run default | hybrid PREVIOUS</text>
+    <text class="box-sub" x="195" y="504" text-anchor="middle">policy_bt = built-in default | hybrid PREVIOUS</text>
     <text class="box-sub" x="195" y="518" text-anchor="middle">legacy DEPRECATED | gold ORACLE</text>
   </a>
 
@@ -182,10 +182,10 @@
 <tr><td>L4 hybrid</td><td class="sym">HybridVerifierEvaluator</td><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py::HybridVerifierEvaluator</a></td><td>Previous channel; also built for unknown values. Reward 0-1, gradient.</td></tr>
 <tr><td>L4 legacy</td><td class="sym">VerifierEvaluator <span class="tag dep">DEPRECATED</span></td><td class="sym"><a href="../../sources/evaluators/legacy_verifier/verifier.py">legacy_verifier/verifier.py::VerifierEvaluator</a></td><td>Old per-claim verifier, only when <code>legacy</code>.</td></tr>
 <tr><td>L4 gold</td><td class="sym">GoldFeedbackEvaluator <span class="tag">ORACLE</span></td><td class="sym"><a href="../../sources/evaluators/gold_feedback/evaluator.py">gold_feedback/evaluator.py::GoldFeedbackEvaluator</a></td><td>Hybrid reward, benchmark-grader gradient; research control only.</td></tr>
-<tr><td>L4 policy_bt</td><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">PolicyBTVerifierEvaluator</a></td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">policy_bt_verifier/evaluator.py::PolicyBTVerifierEvaluator</a></td><td>Run default. Re-execution, LLM policy tournament, win-rate reward.</td></tr>
+<tr><td>L4 policy_bt</td><td class="sym"><a href="mod_evaluators_policy_bt_verifier.html">PolicyBTVerifierEvaluator</a></td><td class="sym"><a href="../../sources/evaluators/policy_bt_verifier/evaluator.py">policy_bt_verifier/evaluator.py::PolicyBTVerifierEvaluator</a></td><td>Built-in default. Reproduction contract, LLM policy tournament, Bradley-Terry ratings.</td></tr>
 </tbody>
 </table>
-<p class="note say">The run default is <code>verifier_kind = "policy_bt"</code>: the local, untracked <code>config_default.json</code> is a live operator file and its line 16 ships <code>"policy_bt"</code> (read 2026-10-13). <code>config.py:106</code> keeps <code>"hybrid"</code> as the built-in fallback, and the facade builds <code>HybridVerifierEvaluator</code> for <code>"hybrid"</code> or any unknown value (<code class="path">sources/evaluators/evaluator.py:117-120</code>); the CLI accepts four values, <code>hybrid</code>, <code>legacy</code>, <code>gold</code> and <code>policy_bt</code> (<code class="path">main.py:78</code>). <code>legacy</code> is deprecated since 2026-09-24 (AGENTS.md); <code>gold</code> leaks the benchmark and <code>main.py::warn_gold_feedback_mode</code> prints a warning; <code>policy_bt</code> productionizes E44-E48.</p>
+<p class="note say">The default is <code>verifier_kind = "policy_bt"</code>: <code>config.py:102</code> sets it in <code>Config.__init__</code>, and the local, untracked <code>config_default.json</code> (line 16) ships the same value (read 2026-10-13). The facade builds <code>HybridVerifierEvaluator</code> only for <code>"hybrid"</code> or any unknown value (<code class="path">sources/evaluators/evaluator.py:90, 114-117</code>); the CLI accepts four values, <code>hybrid</code>, <code>legacy</code>, <code>gold</code> and <code>policy_bt</code> (<code class="path">main.py:78</code>). <code>legacy</code> is deprecated since 2026-09-24 (AGENTS.md); <code>gold</code> leaks the benchmark and <code>main.py::warn_gold_feedback_mode</code> prints a warning; <code>policy_bt</code> is the default channel.</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -194,7 +194,7 @@
 <div class="card l2"><h4><a href="flow_task_run.html">flow_task_run.html</a></h4><p class="role">One task from CLI to first score: synthesis, sandbox run, verification.</p></div>
 <div class="card l2"><h4><a href="flow_evolution_loop.html">flow_evolution_loop.html</a></h4><p class="role">Generation N to N+1: gradient, mutation, archive, novelty, early stop.</p></div>
 <div class="card l4"><h4><a href="flow_verification.html">flow_verification.html</a></h4><p class="role">Verification hub: the policy_bt default and the previous hybrid channel.</p></div>
-<div class="card l4"><h4><a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a></h4><p class="role">The verifier in use: re-execution, digest, policy tournament, win-rate.</p></div>
+<div class="card l4"><h4><a href="flow_policy_bt_verification.html">flow_policy_bt_verification.html</a></h4><p class="role">The verifier in use: reproduction contract, policy tournament, Bradley-Terry fit.</p></div>
 <div class="card l3"><h4><a href="flow_sab_batch.html">flow_sab_batch.html</a></h4><p class="role">Batch mode over a CSV: per-task runs, ablations, benchmark grades.</p></div>
 </div>
 </div>
@@ -249,7 +249,7 @@
 
 <div class="panel"><span class="br"></span>
 <h2>The loop in numbers</h2>
-<details open><summary>defaults: config.py vs the local config_default.json (78 keys, untracked)</summary><div class="dbody">
+<details open><summary>defaults: config.py vs the local config_default.json (72 keys, untracked)</summary><div class="dbody">
 <table>
 <thead><tr><th>Field</th><th class="size">config.py</th><th class="size">config_default.json</th><th>Effect</th></tr></thead>
 <tbody>
@@ -260,24 +260,26 @@
 <tr><td class="sym">crossover_rate</td><td class="size">0.4</td><td class="size">0.4</td><td>Chance of crossover instead of mutation.</td></tr>
 <tr><td class="sym">learned_score_threshold</td><td class="size">0.9</td><td class="size">0.9</td><td>Threshold early stop; relative rewards use the plateau.</td></tr>
 <tr><td class="sym">selection_strategy</td><td class="size">qd</td><td class="size">qd</td><td>See <a href="mod_core_selection.html">mod_core_selection.html</a>.</td></tr>
-<tr><td class="sym">verifier_kind</td><td class="size">hybrid</td><td class="size">policy_bt</td><td>Verifier: <code>hybrid</code>, <code>legacy</code>, <code>gold</code> or <code>policy_bt</code>.</td></tr>
+<tr><td class="sym">verifier_kind</td><td class="size">policy_bt</td><td class="size">policy_bt</td><td>Verifier: <code>hybrid</code>, <code>legacy</code>, <code>gold</code> or <code>policy_bt</code>.</td></tr>
 <tr><td class="sym">gold_feedback_reward</td><td class="size">False</td><td class="size">false</td><td>gold only: grader reward too (full oracle).</td></tr>
 <tr><td class="sym">gold_feedback_timeout_s</td><td class="size">1800</td><td class="size">1800</td><td>gold only: grading cap per generation, in seconds.</td></tr>
 <tr><td class="sym">hybrid_verifier_num_claims</td><td class="size">10</td><td class="size">10</td><td>Target claim count per task.</td></tr>
 <tr><td class="sym">hybrid_verifier_pairwise_mode</td><td class="size">temporal</td><td class="size">temporal</td><td>Ladder aggregation mode.</td></tr>
 <tr><td class="sym">hybrid_verifier_reward</td><td class="size">win_rate</td><td class="size">win_rate</td><td>Reward kind.</td></tr>
 <tr><td class="sym">hybrid_verifier_scorer_timeout_s</td><td class="size">60</td><td class="size">60</td><td>Policy scorer subprocess timeout, in seconds.</td></tr>
-<tr><td class="sym">policy_bt_reward</td><td class="size">win_rate</td><td class="size">win_rate</td><td>policy_bt only: <code>win_rate</code> or <code>bradley_terry</code>.</td></tr>
+<tr><td class="sym">policy_bt_reward</td><td class="size">bradley_terry</td><td class="size">bradley_terry</td><td>policy_bt only: fitted Bradley-Terry ratings, the only supported value.</td></tr>
+<tr><td class="sym">policy_bt_scorer_timeout_s</td><td class="size">60</td><td class="size">60</td><td>policy_bt only: comparison subprocess timeout, in seconds.</td></tr>
+<tr><td class="sym">policy_bt_visual_channel</td><td class="size">True</td><td class="size">true</td><td>policy_bt only: vision-model tie-break on relevant images.</td></tr>
+<tr><td class="sym">policy_bt_reexecute</td><td class="size">True</td><td class="size">true</td><td>policy_bt only: run the reproduction script on clean copies.</td></tr>
 <tr><td class="sym">policy_bt_reexec_timeout_s</td><td class="size">900</td><td class="size">900</td><td>policy_bt only: cap on fresh re-execution, in seconds.</td></tr>
-<tr><td class="sym">policy_bt_visual_channel</td><td class="size">True</td><td class="size">true</td><td>policy_bt only: kimi per-pair figures for figure tasks.</td></tr>
-<tr><td class="sym">policy_bt_refiner</td><td class="size">True</td><td class="size">true</td><td>policy_bt only: E47 evidence-checked gradient refiner.</td></tr>
+<tr><td class="sym">policy_bt_repair_rounds</td><td class="size">3</td><td class="size">3</td><td>policy_bt only: max repairs for generated policy or adapters.</td></tr>
 <tr><td class="sym">early_stop_mode</td><td class="size">auto</td><td class="size">auto</td><td>auto, threshold, plateau or none.</td></tr>
 <tr><td class="sym">plateau_patience</td><td class="size">3</td><td class="size">3</td><td>Stop after N generations with no new champion.</td></tr>
 <tr><td class="sym">runner_default_timeout</td><td class="size">10800</td><td class="size">10800</td><td>Sandbox wall clock per workflow, in seconds.</td></tr>
 <tr><td class="sym">runner_default_python_version</td><td class="size">3.12</td><td class="size">3.12</td><td>Sandbox interpreter.</td></tr>
 </tbody>
 </table>
-<p>Values read on 2026-10-10 with <code>uv run python</code> on <code>Config()</code> and <code>json.load</code> (my computation); the local <code class="path">config_default.json</code> now agrees with <code>config.py</code> on every row here. <code>config_default.json</code> is not tracked by git, so another checkout may differ. A JSON file passed with <code>--config</code> wins over <code>config.py</code>.</p>
+<p>Values read with <code>uv run python</code> on <code>Config()</code> and <code>json.load</code> (my computation; rows re-read 2026-10-13); the local <code class="path">config_default.json</code> agrees with <code>config.py</code> on the rows shown here. <code>config_default.json</code> is not tracked by git, so another checkout may differ. A JSON file passed with <code>--config</code> wins over <code>config.py</code>.</p>
 </div></details>
 </div>
 
@@ -292,7 +294,7 @@
 <tr><td>AGENTS.md audit step 5: join <code>ablations</code> to generations by <code>uuid</code>.</td><td><code>ablations[i].uuid</code>: 8-character suffix (632 of 1166); <code>evolution_index</code> wrong in 125 of 207.</td><td class="sym"><a href="../../run_notes">run_notes/**/*.json</a></td></tr>
 <tr><td>AGENTS.md: <code>check_package.py</code> does pre-flight CVE blocklisting (litellm 1.82.8).</td><td>Entry commented out; <code>safe_versions</code> empty; nothing calls <code>PackageCheck</code>.</td><td class="sym"><a href="../../sources/security/check_package.py">check_package.py:6-9</a></td></tr>
 <tr><td><code class="path">docs/DEVELOPER_GUIDE.md</code> uses the path <code class="path">sources/evaluation/</code>.</td><td>The folder is <code class="path">sources/benchmark_evaluation/</code>.</td><td class="sym"><a href="../../sources/benchmark_evaluation">sources/benchmark_evaluation/</a></td></tr>
-<tr><td><code class="path">docs/reference/cli.md:59</code> lists <code>--verifier_kind</code> as <code>hybrid | legacy | gold</code> and names 38 of the 48 flags.</td><td><code>policy_bt</code> is the fourth channel; 11 flags are undocumented, including the seven <code>--policy_bt_*</code> ones.</td><td class="sym"><a href="../../main.py">main.py:79</a>, <a href="../../docs/reference/cli.md">cli.md:59</a></td></tr>
+<tr><td><code class="path">docs/reference/cli.md:59</code> lists <code>--verifier_kind</code> as <code>hybrid | legacy | gold</code> and names 37 of the 47 flags.</td><td><code>policy_bt</code> is the fourth channel; 10 flags are undocumented, including the six <code>--policy_bt_*</code> ones.</td><td class="sym"><a href="../../main.py">main.py:79</a>, <a href="../../docs/reference/cli.md">cli.md:59</a></td></tr>
 <tr><td>Docs quote <code>population_size = 20</code>, <code>k = 15</code> and <code>crossover_rate = 0.25</code>.</td><td><code>config.py</code>: 16, 16, 0.4, 0.9. <code>config_default.json</code>: 16, 16, 0.25, 0.92.</td><td class="sym"><a href="../../config.py">config.py:186-202</a>, <a href="../../config_default.json">config_default.json</a></td></tr>
 <tr><td>AGENTS.md: <code>config_default.json</code> is the template config to copy.</td><td>Not tracked by git: removed in <code>09b57da</code>, ignored by <code>config_*.json</code>.</td><td class="sym"><a href="../../.gitignore">.gitignore</a>, <code>git ls-files</code></td></tr>
 <tr><td><code>config.py</code> comment: <code>legacy</code> is <code class="path">sources/evaluators/verifier.py</code>.</td><td>That file is gone; the facade imports <code class="path">sources/evaluators/legacy_verifier/</code>.</td><td class="sym"><a href="../../config.py">config.py:99-101</a>, <a href="../../sources/evaluators/evaluator.py">evaluator.py:89-95</a></td></tr>
@@ -328,8 +330,9 @@
 <p class="skips">Skipped: <code>docs/</code>, <code>datasets/</code>, <code>run_notes/</code>, <code>runs_capsule/</code>, <code class="path">sources/workflows/</code>, <code class="path">sources/memory/</code>, <code>logs/</code>, <code>webui/</code>, <code>.venv/</code>, <code>tmp/</code>, <code>CLA/</code>, lock files and secret files - Tier D in UPDATE_VISUAL_CLONE.md section 4; the runtime folders get a pattern page instead (data_runs.html). The four verifier channels are summarized here only: their internals live on <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>, <a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>, <a href="mod_evaluators_gold_feedback.html">mod_evaluators_gold_feedback.html</a> and <a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a>.</p>
 <p>Built at commit <code>7e8463b</code>, 2026-10-02. Working tree had uncommitted changes at build time.</p>
 <p>Updated at ca72107 + working tree, 2026-09-28: L4 box shows the <code>verifier_kind</code> choice, new benchmark-gold box (gold mode only), the gradient arrow moved to the left edge, the L4 table rows, the defaults table and the config line references re-derived. The run_notes counts in the docs table were not re-counted.</p>
-<p>Updated at 7da1f5e + working tree, 2026-10-10: the L4 box and the L4 table rows now list four channels (<code>policy_bt</code> added, fresh re-execution plus policy tournament); the L0 intro and the <code>verifier_kind</code> rows match <code>config.py:106</code> and <code>main.py:80</code>; new flow card and zoom row for the policy_bt pages; the defaults table was re-read from <code>Config()</code> and the local <code>config_default.json</code> (78 keys, four stale cells fixed, <code>policy_bt_*</code> and stop-mode rows added).</p>
+<p>Updated at 7da1f5e + working tree, 2026-10-10: the L4 box and the L4 table rows now list four channels (<code>policy_bt</code> added, fresh re-execution plus policy tournament); the L0 intro and the <code>verifier_kind</code> rows match <code>config.py</code> and <code>main.py:80</code> (hybrid was the built-in default then); new flow card and zoom row for the policy_bt pages; the defaults table was re-read from <code>Config()</code> and the local <code>config_default.json</code> (78 keys then, four stale cells fixed, <code>policy_bt_*</code> and stop-mode rows added).</p>
 <p>Updated 2026-10-12 (working tree, commit <code>7da1f5e</code>): removed the docs-vs-code row about <code>Config.from_json</code> ignoring <code>judge_model</code> / <code>vision_judge_model</code> - fixed in <code>config.py:591-594</code> with regression tests in <code class="path">tests/config_roundtrip_test.py</code>.</p>
+<p>Updated 2026-10-13 (84db677 + working tree): <code>policy_bt</code> is the built-in default (<code>config.py:102</code>) and the six live policy_bt knobs are listed (removed knobs dropped); win-rate claims replaced with fitted Bradley-Terry ratings; cli.md counts re-derived (37 of 47 flags); defaults table re-read (72 keys).</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

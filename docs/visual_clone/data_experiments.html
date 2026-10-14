@@ -166,9 +166,9 @@
   </a>
 
   <a class="box" href="mod_evaluators_hybrid_verifier.html">
-    <title>The best channel design shipped as the default verifier.</title>
+    <title>The best channel design; default 2026-09-24, now the previous channel.</title>
     <rect x="20" y="190" width="400" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
-    <text class="box-label" x="220" y="216" text-anchor="middle">production verifier</text>
+    <text class="box-label" x="220" y="216" text-anchor="middle">previous verifier</text>
     <text class="box-sub" x="220" y="232" text-anchor="middle">sources/evaluators/hybrid_verifier/</text>
   </a>
   
@@ -190,9 +190,9 @@
   <text class="edge-label" x="783" y="140" text-anchor="start">writes plan</text>
 </svg>
 </div>
-<p class="figcap">Lifecycle - one reading in six boxes. Mint = data and the shipped verifier; cyan = the experiment channels and the instrument; arc blue = the audits; ultraviolet = the plan. The cycle-5 audits re-graded the arena (<code>HANDOFF.md &sect;3.4</code>) and fed <code>improve_experiment.md</code>.</p>
+<p class="figcap">Lifecycle - one reading in six boxes. Mint = data and the previous verifier channel; cyan = the experiment channels and the instrument; arc blue = the audits; ultraviolet = the plan. The cycle-5 audits re-graded the arena (<code>HANDOFF.md &sect;3.4</code>) and fed <code>improve_experiment.md</code>.</p>
 
-<p class="sub">Key numbers, source in <code>experiments_verifiers/HANDOFF.md</code>: best ranker <code>e30_online</code> <b>0.759</b> pairs-correct (&sect;3.1); gold gradient ceiling <b>0.695</b> relevance (&sect;3.2); E41 CAGE label noise 0.108 flip &rarr; <b>0.854</b> fresh-regrade ceiling (&sect;3.4). Production verifier: <code>sources/evaluators/hybrid_verifier/</code> (&sect;2).</p>
+<p class="sub">Key numbers, source in <code>experiments_verifiers/HANDOFF.md</code>: best ranker <code>e30_online</code> <b>0.759</b> pairs-correct (&sect;3.1); gold gradient ceiling <b>0.695</b> relevance (&sect;3.2); E41 CAGE label noise 0.108 flip &rarr; <b>0.854</b> fresh-regrade ceiling (&sect;3.4). Previous verifier channel, default 2026-09-24 &rarr; 2026-10-13: <code>sources/evaluators/hybrid_verifier/</code> (&sect;2).</p>
 </div>
 
 <div class="panel"><span class="br"></span>
@@ -369,22 +369,22 @@
   </a>
 
   <a class="box" href="mod_evaluators_hybrid_verifier.html">
-    <title>Current default verifier; ports these conventions.</title>
+    <title>Previous channel; ports these conventions.</title>
     <rect x="520" y="24" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="532" y="51">hybrid_verifier/scorers.py</text>
   </a>
   <a class="box" href="mod_evaluators_hybrid_verifier.html">
-    <title>Current default verifier; ports these conventions.</title>
+    <title>Previous channel; ports these conventions.</title>
     <rect x="520" y="92" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="532" y="119">hybrid_verifier/inventory.py</text>
   </a>
   <a class="box" href="mod_evaluators_hybrid_verifier.html">
-    <title>Current default verifier; ports these conventions.</title>
+    <title>Previous channel; ports these conventions.</title>
     <rect x="520" y="160" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="532" y="187">hybrid_verifier/aggregation.py</text>
   </a>
   <a class="box" href="mod_evaluators_hybrid_verifier.html">
-    <title>Current default verifier; ports these conventions.</title>
+    <title>Previous channel; ports these conventions.</title>
     <rect x="520" y="228" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="532" y="255">hybrid_verifier/__init__.py</text>
   </a>
@@ -399,7 +399,7 @@
   <text class="edge-label" x="385" y="244" text-anchor="middle">cites measured results</text>
 </svg>
 </div>
-<p class="figcap">Diagram 3 - the shipped hybrid verifier cites the experiment files in its docstrings. Left boxes are the experiment side, right boxes the package side (<a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>).</p>
+<p class="figcap">Diagram 3 - the hybrid verifier (previous channel) cites the experiment files in its docstrings. Left boxes are the experiment side, right boxes the package side (<a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>).</p>
 
 <table>
 <thead><tr><th>Symbol in the package</th><th>Ports which experiment file</th><th>Quoted name</th></tr></thead>
@@ -1178,6 +1178,7 @@
 <p>Built at <code>7da1f5e</code>, 2026-09-30 (data_experiments refresh for E1-E42), extended 2026-10-02 with the E44 KUMITE panel (sources: results/E44_kumite_2026-10-02.md read in full, harness/e44_gradient_anatomy.md, harness/e44_scout_failure_modes.md, ls of harness/e44_*.py and results/_e44/) and then with the E45 SPARTAN panel (sources: results/E45_spartan_2026-10-02.md + .json read in full, harness/e45_spartan.py, ls of results/_e45/ and results/_e44/measure/), then 2026-10-03 with the E46 hybrid-visual panel (sources: results/E46_hybrid_visual_2026-10-03.md + .json read in full, results/_e44/measure/nonvisual.json read, ls of harness/e46_hybrid.py + e46_results.py and results/_e46/), then with the E47 REFINER panel (sources: results/E47_refiner_2026-10-03.md + .json read in full, qualitative counts re-derived from the 57 files in results/_e47/refined/, harness/e47_refiner.py, ls of results/_e47/), then with the E48 FIXES panel (sources: results/E48_fixes_2026-10-03.md + .json read in full, fix sites grepped in harness/e45_spartan.py + e46_hybrid.py + e44_llm.py, ls of results/_e45/pre48/ and results/_e46/pre48/). First built at <code>336fe19</code>, 2026-09-26, refreshed at <code>ca72107</code> + working tree on 2026-09-28. experiments_verifiers/ is git-ignored; E41 was still writing into results/ at 2026-09-28 17:37 CEST and finished later (verdict in <code>E41_cage_2026-09-28.md</code>).</p>
 
 <p class="note">Amber (link repair, 2026-10-10): six report targets this page used to link to are no longer in the repository, <code class="path">experiments_verifiers/improve_experiment.md</code>, <code>REPORT_experiments.html</code>, <code>REPORT_cycle2_E12-E19.html</code>, <code>REPORT_e10_weights_visualization.html</code>, <code>REPORT_e11_theory.html</code> and <code>REPORT_excluded_task_bug_and_sane_replay.html</code>; those links are now plain text. The surviving single-file reports live in <code class="path">experiments_verifiers/html_report_human_only/</code> (<code>REPORT_all_experiments_2026-09-30.html</code>, <code>REPORT_cycle1_E1-E7_verifier_experiments.html</code>, <code>REPORT_cycles2-4_E12-E32_verifier_experiments.html</code>, <code>REPORT_E44_kumite_2026-10-02.html</code>, <code>REPORT_verifier_direction_reflection_2026-10-08.html</code>, <code>REPORT_verifier_literature_vs_failure_modes_2026-09-30.html</code>); the file names were not mapped one to one, so no link was invented.</p>
+<p>Updated 2026-10-13 (84db677 + working tree): the lifecycle and ported-conventions diagrams mark <code>sources/evaluators/hybrid_verifier/</code> as the previous channel (default 2026-09-24 &rarr; 2026-10-13); the policy/BT verifier (config.py:102) is the current default.</p>
 </footer>
 </div>
 <script src="_clone.js"></script>

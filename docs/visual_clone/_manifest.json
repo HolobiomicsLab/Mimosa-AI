@@ -1,14 +1,14 @@
 {
-  "built_commit": "c508f11",
-  "built_date": "2026-10-12",
-  "build_note": "Update build (BT policy verifier, E44-E48). The manifest was at ca72107 (previous build 2026-09-28, plus two data_experiments refreshes on 2026-10-02/03). HEAD is 7da1f5e; the wave is built from the WORKING TREE, because sources/evaluators/policy_bt_verifier/, sources/evaluators/generic_verifier/ and sources/core/stopping.py are untracked and several core and evaluator files are modified. Stamp in the top bar: \"7da1f5e+wt\". 20 pages touched (3 new). The other pages keep their earlier stamps; pages whose covered code changed in this period but were not re-synced are: data_runs.html (run_notes grew), file_core_evolution_engine.html, mod_core_variation.html, file_core_llm_provider.html (line counts only), area_security_transparency.html. E26-E34, E36, E38-E42 harness experiments still have no page. Later wave, same day (c508f11 + working tree): policy_bt schema-error refresh bug-fix sync. verdicts.py::code_pair_verdict propagates schema_error on a both-orders signal; evaluator.py re-evaluation (_reevaluate_one_pair/_replace_pair_record/_reevaluate_schema_pairs/_recount_pairs/_log_reevaluated_pair, _outcome_spellings/_OUTCOME_CANONICAL) records won/lost/tie and recomputes tallies; tests 84->86 (2 new). 7 pages touched: mod_evaluators_policy_bt_verifier, flow_policy_bt_verification, area_evaluators, area_tests, file_eval_evaluator, data_audits, index. Provenance: audits/policy_bt_schema_refresh_reward_bugs.md. Later wave, same day (c508f11 + working tree): policy_bt operator-logging sync - StageLogger color/paint/preview/table emitters (_color_output TTY gate, _STAGE_TAG_STYLES), evaluator POLICY previews + FILES artifact diff + BT standings table after REWARD, tests 86->90. 6 pages touched (mod_evaluators_policy_bt_verifier with new diagram 13, flow_policy_bt_verification, area_evaluators, area_tests, file_eval_evaluator, index).",
+  "built_commit": "84db677",
+  "built_date": "2026-10-13",
+  "build_note": "policy_bt default + rewrite sync (2026-10-13, HEAD 84db677 + working tree). config.py:102 now defaults verifier_kind to policy_bt; the fix wave deleted digest/metrics/gradient/verdicts/logging_utils from policy_bt_verifier/ and the package is 12 modules / 3700 lines; the reward is the regularized Bradley-Terry fit; the knob set shrank to 6. hybrid_verifier/ modules carry a [DEPRECATED 2026-10-13] docstring header. workflow_v15.md gained the Reproduction Contract section. 17 pages re-synced (mod_evaluators_policy_bt_verifier.html and flow_policy_bt_verification.html rebuilt), index + this manifest updated; data_runs.html checked, no change.",
   "pages": {
     "area_benchmark_evaluation.html": {
       "covers": [
         "sources/benchmark_evaluation/*.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "datasets/ScienceAgentBench/{datasets,datasets_chemistry,gold_programs,scoring_rubrics}: Tier D, counted only",
         "98 of 111 grader scripts: pattern check only"
@@ -39,8 +39,8 @@
         "sources/evaluators/policy_bt_verifier/*.py",
         "sources/core/stopping.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-12",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "sources/utils/*, sources/cli/*: read only for call targets, owned by area_utils.html / area_cli.html",
         "Tier D: docs/*, webui/, datasets/, run_notes/, runs_capsule/, sources/workflows/, sources/memory/, logs/, audits/, CLA/"
@@ -58,8 +58,8 @@
         "sources/evaluators/policy_bt_verifier/*.py",
         "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "c508f11",
-      "date": "2026-10-12",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [],
       "working_tree": true
     },
@@ -68,8 +68,8 @@
         "sources/evaluators/legacy_verifier/*.py",
         "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "per-file cards for verifier*.py: one diagram + one table only",
         "recovery/visual/package-install branch bodies (entry points only)"
@@ -116,8 +116,8 @@
         "sources/core/stopping.py",
         "sources/evaluators/policy_bt_verifier/*.py"
       ],
-      "commit": "c508f11",
-      "date": "2026-10-12",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "tests/__pycache__/*.pyc: generated output, not source",
         "test bodies: page is a coverage matrix, not per-test text",
@@ -157,8 +157,8 @@
         "experiments_verifiers/results/*",
         "diversity_experiments/*"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "experiments_verifiers/.env: never opened (secrets rule)",
         "results/_e24_venv/: virtualenv, size counted only",
@@ -213,8 +213,8 @@
         "config.py",
         "sources/evaluators/evaluator.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "sources/core/factory.py, workflow_factory.py, single_agent_factory.py, schema.py: builder helpers, not the loop",
         "sources/core/failure_fingerprint.py: written by the verifier, not read by the loop",
@@ -265,8 +265,8 @@
         "sources/evaluators/gold_feedback/grader.py",
         "sources/benchmark_evaluation/snapshot_grading.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "sources/core/planner.py, single_agent_factory.py: --goal and --single_agent paths, outside this flow",
         "sources/evaluators/{verifier,verifier_*,generic,scenario,bs_detection}.py: not on the default verifier path",
@@ -283,8 +283,8 @@
         "sources/benchmark_evaluation/snapshot_grading.py",
         "sources/evaluators/policy_bt_verifier/*.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "sources/evaluators/verifier*.py etc: covered by area_evaluators_legacy.html"
       ],
@@ -306,8 +306,8 @@
         "sources/core/failure_fingerprint.py",
         "sources/core/orchestrator.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "sources/utils/* one-line roles only, no cards",
         "sources/core/genotype_embedding.py: only its entry point embed_genotype is shown"
@@ -397,8 +397,8 @@
       "covers": [
         "sources/evaluators/hybrid_verifier/*.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [
         "sources/evaluators/*.py at folder root: covered by area_evaluators.html / area_evaluators_legacy.html",
         "experiments_verifiers/ harnesses: not opened, out of scope"
@@ -418,8 +418,8 @@
         "sources/evaluators/gold_feedback/*.py",
         "sources/core/stopping.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-12",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [],
       "working_tree": true
     },
@@ -1410,8 +1410,8 @@
       "covers": [
         "sources/core/evolution_engine.py"
       ],
-      "commit": "ca72107",
-      "date": "2026-09-28",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [],
       "working_tree": true
     },
@@ -1999,8 +1999,8 @@
         "sources/evaluators/policy_bt_verifier/*.py",
         "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "c508f11",
-      "date": "2026-10-12",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [],
       "working_tree": true
     },
@@ -2009,8 +2009,8 @@
         "sources/evaluators/generic/generic.py",
         "sources/evaluators/generic_verifier/*.py"
       ],
-      "commit": "7da1f5e",
-      "date": "2026-10-10",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "skipped": [],
       "working_tree": true
     },
@@ -2278,8 +2278,8 @@
         "experiments_verifiers/harness/e44_digest.py, e44_bt.py, e45_spartan.py: cited by the package docstrings, not read",
         "one digest page per module: the 12 files get cards on this page instead (Tier B rule)"
       ],
-      "commit": "c508f11",
-      "date": "2026-10-12",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "working_tree": true
     },
     "flow_policy_bt_verification.html": {
@@ -2295,8 +2295,8 @@
         "sources/evaluators/policy_bt_verifier/__init__.py: re-export list only",
         "CSV batch grading path (VER/SR/CBS, CapsuleEvaluator): not on this flow"
       ],
-      "commit": "c508f11",
-      "date": "2026-10-12",
+      "commit": "84db677",
+      "date": "2026-10-13",
       "working_tree": true
     },
     "file_core_stopping.html": {
@@ -2716,6 +2716,33 @@
         "_manifest.json"
       ],
       "note": "policy_bt operator-logging sync (working tree, same day as the schema-refresh fix): logging_utils.py 186->336 lines - StageLogger gained color= kwarg + _color_output() (TTY auto-detect, NO_COLOR wins), paint(), preview(label, text, max_lines, max_chars) (bounded numbered console block with '+N more lines' marker, FULL text in the JSON sink, stage PREVIEW) and table(label, header, rows, row_styles) (aligned console table, widths measured on plain cells, row-level ANSI, stage TABLE); stage/payload/detail/warn lines paint their tags per _STAGE_TAG_STYLES while the [policy_bt][<uuid8>] TAG message shape stays grep-safe with colors off. evaluator.py 2167->2278 lines - POLICY previews the LLM-written source after fresh/rewrite writes (_commit_new_policy) and after a schema-refresh rewrite (_apply_schema_refresh); each fresh pair emits a FILES payload (artifact-name diff A-only/B-only/common, from _artifact_names = deliverables + json_metrics + json_flags; full lists in the sink; cached pairs skip); REWARD is followed by a live bradley-terry standings table (_log_tournament/_print_standings: the reward's own fit in bradley_terry mode, display-only free fit in win_rate mode; current gen row green with a middot-this marker). tests/policy_bt_verifier_test.py 2889->2978 lines, 86->90 tests (4 new logging tests; 90/90 pass). mod page: new diagram 13 (operator log) + logging_utils/evaluator cards re-synced + counts; flow page: stage-tag line refs re-derived (REEXEC 722 ... DONE 1956), steps 8/12/14 carry PREVIEW/FILES/TABLE, notes row added; area_evaluators: package 6649->6910; area_tests: row + totals 16335/623; file_eval_evaluator: note only (cited test line refs still hold)."
+    },
+    {
+      "date": "2026-10-13",
+      "commit": "84db677",
+      "working_tree": true,
+      "pages": [
+        "area_benchmark_evaluation.html",
+        "area_entry_config.html",
+        "area_evaluators.html",
+        "area_evaluators_legacy.html",
+        "area_tests.html",
+        "data_experiments.html",
+        "file_core_evolution_engine.html",
+        "file_eval_evaluator.html",
+        "file_eval_generic.html",
+        "flow_evolution_loop.html",
+        "flow_task_run.html",
+        "flow_verification.html",
+        "mod_core_evolution_engine.html",
+        "mod_evaluators_hybrid_verifier.html",
+        "overview.html",
+        "mod_evaluators_policy_bt_verifier.html",
+        "flow_policy_bt_verification.html",
+        "index.html",
+        "_manifest.json"
+      ],
+      "note": "policy_bt default + rewrite sync: config.py:102 defaults verifier_kind to policy_bt; digest/metrics/gradient/verdicts/logging_utils deleted (package now 12 modules / 3700 lines), reward = regularized BT fit refreshed per generation, 6 live knobs, reproduction contract added to workflow_v15.md, hybrid_verifier marked [DEPRECATED 2026-10-13]. mod_evaluators_policy_bt_verifier.html and flow_policy_bt_verification.html rebuilt; 15 pages re-grounded; index + manifest updated; data_runs checked, no change."
     }
   ],
   "review": {
@@ -2749,7 +2776,7 @@
       "footer skips",
       "no secrets"
     ],
-    "last": "2026-10-10: independent read-only review by vc-review-1010 over the whole clone (187 pages, 325 symbols, 68 facts): checks 1-5, 8, 10 PASS (links, offline rule, box budget, text budget/banned words, symbol existence, menu/manifest agreement, secrets). 12 findings, all fixed the same day: 1 wrong export claim, 1 wrong knob count, 1 wrong main_script_source value set, 1 claim contradicted by dead code (pending_recon), 5 line-number offsets, 3 stale three-channel strings, 1 stamp, 1 count (experiment_pages 57->56) and a set of file-card signatures that are now labelled as abbreviated. After the fixes: 0 broken links in the whole clone, 0 external URLs, 0 diagrams over 12 boxes, 0 banned words, 0 secret patterns. Unchecked by the reviewer: JS behaviour (no browser), runtime behaviour (no execution), the dated runtime observations of file_core_stopping.html (their /tmp folders are gone), and the 16 formerly linked report targets (absent from the checkout)."
+    "last": "2026-10-13: policy_bt sync. Workers re-derived every quote and line ref from the current working tree; each page verified against the acceptance list (no deleted module, no removed knob, no config.py:106-hybrid claim, stamps 84db677+wt). Coordinator checks: manifest JSON valid, internal link targets verified on the 17 re-synced pages + index, no external URLs, hybrid deprecation headers compile. Full review panel skipped for this refresh (all pages edited by their owning workers)."
   },
   "counts": {
     "pages": 187,
@@ -2760,15 +2787,12 @@
   },
   "working_tree": true,
   "stale": {
-    "checked": "2026-10-10",
+    "checked": "2026-10-13",
     "basis": "per-page covers intersected with the paths changed since the page's build commit (tracked diff ca72107..HEAD + working tree, Tier D excluded); pages re-synced in this wave are excluded",
     "pages": {
       "data_modules_prompts.html": [
         "sources/modules/state_schema.py",
         "sources/prompts/workflow_v15.md"
-      ],
-      "file_core_evolution_engine.html": [
-        "sources/core/evolution_engine.py"
       ],
       "file_core_variation_engine.html": [
         "sources/core/variation_engine.py"
@@ -2791,27 +2815,8 @@
       "file_hybrid_scorers.html": [
         "sources/evaluators/hybrid_verifier/scorers.py"
       ],
-      "flow_evolution_loop.html": [
-        "config.py",
-        "sources/core/evolution_engine.py",
-        "sources/core/variation_engine.py",
-        "sources/core/workflow_info.py",
-        "sources/evaluators/evaluator.py",
-        "sources/evaluators/hybrid_verifier/gradient.py"
-      ],
       "flow_sab_batch.html": [
         "main.py"
-      ],
-      "flow_task_run.html": [
-        "config.py",
-        "main.py",
-        "sources/core/evolution_engine.py",
-        "sources/core/variation_engine.py",
-        "sources/core/workflow_info.py",
-        "sources/evaluators/evaluator.py"
-      ],
-      "mod_core_evolution_engine.html": [
-        "sources/core/evolution_engine.py"
       ],
       "mod_core_lineage.html": [
         "sources/core/workflow_info.py",
@@ -2825,13 +2830,6 @@
       ],
       "mod_core_variation.html": [
         "sources/core/variation_engine.py"
-      ],
-      "mod_evaluators_hybrid_verifier.html": [
-        "sources/evaluators/hybrid_verifier/digest.py",
-        "sources/evaluators/hybrid_verifier/evaluator.py",
-        "sources/evaluators/hybrid_verifier/gradient.py",
-        "sources/evaluators/hybrid_verifier/layers.py",
-        "sources/evaluators/hybrid_verifier/scorers.py"
       ]
     }
   }

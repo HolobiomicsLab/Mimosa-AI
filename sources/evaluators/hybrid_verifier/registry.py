@@ -1,4 +1,6 @@
-"""Per-task hybrid-verifier registry (rubric-cache-style persistence).
+"""[DEPRECATED 2026-10-13] Previous production verifier channel (default 2026-09-24 -> 2026-10-13), superseded by sources/evaluators/policy_bt_verifier (policy/BT verifier, the default since config.py:102). Still used for verifier_kind="hybrid", for the unknown-value fallback in WorkflowEvaluator, and wrapped by the gold research channel. Kept for those paths and research replay. Do not extend.
+
+Per-task hybrid-verifier registry (rubric-cache-style persistence).
 
 One JSON file per task under the verifier scratch root, keyed by
 ``sha256(goal + registry_version)`` — the same keying scheme as the legacy

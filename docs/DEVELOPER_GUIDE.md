@@ -39,18 +39,27 @@ evaluation).
 #### 3. Verifier-driven evaluation
 
 The judge that produces the evolutionary pressure signal is the
-**hybrid temporal-ladder verifier**
-([`sources/evaluators/hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/),
-default since 2026-09-24). Per task it extracts 8–12 stage-tagged key
-claims forming a temporal ladder (`script` → `log` → `result`), turns
-each claim into a cached **deterministic Python policy scorer** that
-grades any workspace of the task on a continuous 0..1 scale, and
-computes the reward as a **pairwise win-rate** over the task's previous
-generations — each pair decided at the earliest ladder stage where the
-two differ. The single output handed to the mutator is the
-**textual gradient**, which leads with the elimination point: the
-earliest stage/claim where this generation lost, with measured
-evidence.
+**policy-based Bradley–Terry verifier**
+([`sources/evaluators/policy_bt_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/),
+the default). Per task session it keeps one tournament registry: each
+generation's workspace is snapshotted and must carry a **reproduction
+contract** — a `.sh` script that installs requirements and regenerates
+every output (missing or invalid → reward 0 and a gradient naming the
+fix). An LLM reconnaissance builds a complete artifact inventory with
+bounded previews; per-schema **adapters** normalize differing artifact
+layouts, and ONE cached **deterministic comparison policy** decides
+every pair — both argument orders plus self-tie checks, run in a
+restricted interpreter subprocess. A vision model can break
+deterministic ties when both sides have relevant images. The reward is
+a **regularized Bradley–Terry fit** over all pair verdicts, refreshed
+for every generation after each evaluation. The single output handed to
+the mutator is the **textual gradient**, which leads with the earliest
+decisive loss, with measured evidence.
+
+The previous production channel (2026-09-24 to 2026-10) was the hybrid
+temporal-ladder verifier
+([`sources/evaluators/hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/)),
+still available via `verifier_kind = "hybrid"`.
 
 > Note — this verifier is **not** the ScienceAgentBench or PaperBench
 > grader. Those benchmarks compare workflow outputs against author-
@@ -86,8 +95,8 @@ Source: [diagrams/architecture_overall.mermaid](diagrams/architecture_overall.me
   via the `EvolutionEngine` (QD selection over a session archive).
 - Layer `3` executes those workflows in a sandboxed runner with
   SmolAgents.
-- Layer `4` runs the hybrid temporal-ladder verifier and reports
-  `overall_score` (the pairwise win-rate reward) and the
+- Layer `4` runs the policy-based Bradley–Terry verifier and reports
+  `overall_score` (the current tournament rating) and the
   `abstracted_textual_gradient` back into the loop; QD selection ranks
   on `overall_score`.
 
@@ -123,9 +132,11 @@ mimosa-ai/
 │   │   ├── llm_provider.py                # Multi-provider LLM abstraction
 │   │   ├── planner.py                     # Goal → Task decomposition (Layer 0)
 │   │   ├── schema.py                      # IndividualRun, Plan, Task, SelectionLog
-│   │   └── evaluators/
+│   │       ├── evaluators/
 │   │       ├── evaluator.py               # WorkflowEvaluator facade (routes to backends)
-│   │       ├── hybrid_verifier/           # Hybrid temporal-ladder verifier (default): claims, digest,
+│   │       ├── policy_bt_verifier/        # Policy/BT verifier (default): reexec, artifacts,
+│   │       │                              # recon, policy, visual, tournament, registry, results
+│   │       ├── hybrid_verifier/           # Hybrid temporal-ladder verifier (previous default): claims, digest,
 │   │       │                              # scorers, registry, aggregation, gradient, layers
 │   │       ├── verifier.py                # Legacy multi-source per-claim verifier (deprecated)
 │   │       ├── grounding.py               # Perspicacite literature-grounding adapter (legacy verifier / generic)
@@ -249,7 +260,7 @@ Key collaborators (instantiated in `__init__`):
 - `WorkflowSelector` — parent retrieval.
 - `WorkflowOrchestrator` — grounding → factory → sandbox.
 - `VariationEngine` — mutation / crossover prompt assembly.
-- `WorkflowEvaluator` — hybrid temporal-ladder verifier (default).
+- `WorkflowEvaluator` — policy/BT verifier (default).
 - `SelectionPressure` — QD archive (population_size=50, k=15,
   novelty_weight=0.25).
 
@@ -274,10 +285,10 @@ Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
 QD mode it maintains a session archive of up to `population_size`
 members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
 (`w = novelty_weight = 0.25`). Quality is sourced from `reward` (the
-verifier's `overall_score` — under the hybrid verifier, the pairwise
-win-rate over the task's previous generations), and admission is
-gated by the validity check (improvement over baseline or
-`qd_score > admit_threshold`); when capacity is hit, the lowest-
+verifier's `overall_score` — under the policy/BT verifier, the current
+regularized Bradley–Terry rating over the task's previous generations),
+and admission is gated by the validity check (improvement over baseline
+or `qd_score > admit_threshold`); when capacity is hit, the lowest-
 `qd_score` member is evicted. Parent draw applies an inverse-child-count
 penalty `÷(1 + n_children_already)` and a hard
 `MAX_CHILDREN_PER_PARENT = 2` cap to spread offspring.
@@ -391,7 +402,8 @@ genotype.
 
 | Backend          | File              | Use                                   |
 |------------------|-------------------|---------------------------------------|
-| `HybridVerifierEvaluator` | `hybrid_verifier/` | **Default**: hybrid temporal-ladder verifier (claims → policy scorers → pairwise reward) |
+| `PolicyBTVerifierEvaluator` | `policy_bt_verifier/` | **Default**: reproduction contract → LLM recon → adapters + one comparison policy → regularized Bradley–Terry tournament reward |
+| `HybridVerifierEvaluator` | `hybrid_verifier/` | Previous default: hybrid temporal-ladder verifier (claims → policy scorers → pairwise win-rate reward; `verifier_kind="hybrid"`) |
 | `VerifierEvaluator` | `verifier.py`     | Legacy multi-source per-claim verifier (deprecated; `verifier_kind="legacy"`) |
 | `GoldFeedbackEvaluator` | `gold_feedback/` | ORACLE / BENCHMARK-LEAKING research control (`verifier_kind="gold"`): hybrid reward + benchmark-grader gradient; never report its scores |
 | `GenericEvaluator`  | `generic.py`     | Legacy 4-criterion LLM judge          |
@@ -401,7 +413,7 @@ genotype.
 
 The facade is `WorkflowEvaluator` (`evaluator.py`); the evolution engine
 calls it with `evaluator_type="verifier"`, and the backend is chosen by
-`config.verifier_kind` (`hybrid` default | `legacy` | `gold`; unknown values fall back to `hybrid`).
+`config.verifier_kind` (`policy_bt` default | `hybrid` | `legacy` | `gold`; unknown values fall back to `hybrid`).
 
 ### 9. Benchmark evaluation — [`sources/evaluation/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluation/)
 
@@ -472,11 +484,68 @@ main.py --evaluation_cli      # guided model/workspace/mode picker (EvaluationCL
 
 ---
 
-## Evaluation & the hybrid temporal-ladder verifier
+## Evaluation & the policy-based Bradley–Terry verifier
 
-Source diagram: [`docs/diagrams/verifiers_judge.mermaid`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/docs/diagrams/verifiers_judge.mermaid).
+For each generation (`sources/evaluators/policy_bt_verifier/`):
 
-For each generation (`sources/evaluators/hybrid_verifier/`):
+1. **Reproduction gate.** The workspace is snapshotted into the
+   per-task-session registry
+   (`<workflow_dir>/.policy_bt/<sha256(goal, session)>/snapshots/<uuid>/`).
+   An LLM assesses the generation's `.sh` reproduction contract: the
+   script must install requirements and regenerate every output. A
+   missing or invalid script gives reward 0 and a gradient naming the
+   fix — this applies even when re-execution is off. With
+   `policy_bt_reexecute` (default) the script reruns with bash on the
+   copy, in a fresh venv with no API keys, after existing outputs are
+   moved aside — stale outputs cannot pass. This is trusted local shell
+   execution, **not** an OS security sandbox; run logs are copied to
+   `.policy_bt_reexec/` inside the snapshot so adapters can read
+   stdout-only metrics.
+2. **Reconnaissance.** One LLM call produces a complete artifact
+   inventory with bounded previews and explicit byte-page inspection,
+   then freezes the task criteria. New artifact schemas extend
+   **adapters**; the criteria never change.
+3. **One comparison policy.** One cached deterministic Python policy
+   compares pairs through the adapters, in a restricted interpreter
+   subprocess (stdlib `json`/`math`/`struct` calls plus harness-provided
+   read capabilities only — no `numpy`/`pandas`/binary readers; formats
+   outside the subset stay "unknown", never a fabricated loss). Both
+   argument orders and self-tie checks must agree; a static screen, a
+   runtime smoke, and ≤ `policy_bt_repair_rounds` repairs protect the
+   accepted policy. On a policy tie, relevant images on both sides go
+   to the configured vision model (`policy_bt_visual_channel`).
+4. **Tournament reward.** All pair verdicts fit a regularized
+   Bradley–Terry model; after each evaluation EVERY generation of the
+   task session gets a new current rating (`arrival_reward` keeps the
+   rating at arrival time). The policy-BT capsule is the argmax of the
+   current ratings. The only allowed `policy_bt_reward` value is
+   `"bradley_terry"`; `"win_rate"` raises an error.
+5. **Evidence-checked gradient.** The **textual gradient**
+   (`abstracted_textual_gradient` + the `textual_gradient.txt`
+   sidecar) folds the pair diagnoses, earliest decisive losses first,
+   quoting measured evidence. It is the **only** verifier signal the
+   mutator sees.
+6. **Artifacts.** Per generation: `evaluation.txt` (reward, tournament
+   version, execution record, PAIR VERDICTS), `textual_gradient.txt`,
+   `policy_bt_evidence.json`, `verifier_policy_bt.log`. If the
+   verifier itself fails (bad LLM answer, policy/adapter error, venv
+   creation failure), the generation is NOT scored:
+   `state_result.json` carries
+   `skipped_reason = "verifier_instrument_error"` and the engine keeps
+   it out of the QD archive.
+
+Verifier LLM calls are saved per generation under
+`memory/<uuid>/verifier_policy_bt_<channel>_<n>.json` and counted in
+the run cost. The workflow-creator prompt
+(`sources/prompts/workflow_v15.md`) instructs agents to leave a `run.sh`
+reproduction script; generations built from older prompt versions
+without one score 0.
+
+### The hybrid temporal-ladder verifier (previous default)
+
+The previous production channel (2026-09-24 to 2026-10,
+`sources/evaluators/hybrid_verifier/`, still available via
+`verifier_kind = "hybrid"`) evaluated one generation as:
 
 1. **Temporal-ladder claim extraction**: ONE judge call per task (cached
    in the per-task registry) turns the goal + a workspace inventory
@@ -535,8 +604,9 @@ Detail — including the deprecated multi-source per-claim verifier
 
 ![Evaluation pipeline — legacy multi-source verifier](images/evaluation_pipeline.png)
 
-*(The figure depicts the deprecated legacy verifier; see the mermaid
-source diagram above for the current hybrid flow.)*
+*(The figure depicts the deprecated legacy verifier; the mermaid source
+diagram `docs/diagrams/verifiers_judge.mermaid` depicts the hybrid
+flow, while the policy/BT flow is described above.)*
 
 ---
 

@@ -1,4 +1,6 @@
-"""Zero-variance filter, pairwise comparison modes and reward.
+"""[DEPRECATED 2026-10-13] Previous production verifier channel (default 2026-09-24 -> 2026-10-13), superseded by sources/evaluators/policy_bt_verifier (policy/BT verifier, the default since config.py:102). Still used for verifier_kind="hybrid", for the unknown-value fallback in WorkflowEvaluator, and wrapped by the gold research channel. Kept for those paths and research replay. Do not extend.
+
+Zero-variance filter, pairwise comparison modes and reward.
 
 Aggregation modes (``hybrid_verifier_pairwise_mode``):
 

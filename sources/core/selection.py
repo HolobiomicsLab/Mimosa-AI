@@ -290,6 +290,28 @@ class SelectionPressure:
         """Read-only access to the population archive."""
         return list(self._archive)
 
+    def refresh_rewards(self, rewards: dict[str, float]) -> None:
+        """Update archive quality before the engine selects survivors or parents.
+
+        The engine supplies current tournament ratings. Keep each member's
+        novelty and length penalty, and use the usual QD composition.
+
+        Args:
+            rewards (dict[str, float]): Current fitted ratings by workflow UUID.
+
+        Returns:
+            None. Matching archive members are updated in place.
+        """
+        novelty_range = self._novelty_range()
+        for member in self._archive:
+            if member.uuid not in rewards:
+                continue
+            member.reward = rewards[member.uuid]
+            member.qd_score = self._compose_qd_score(
+                member.reward, member.novelty_score,
+                member.genotype_chars, novelty_range,
+            )
+
     # ------------------------------------------------------------------
     # Greedy strategy (backward-compatible)
     # ------------------------------------------------------------------

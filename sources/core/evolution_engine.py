@@ -12,6 +12,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
 from sources.cli.pretty_print import (
@@ -68,10 +69,64 @@ def _to_jsonable(obj: Any) -> Any:
     return obj
 
 def _verifier_block(run: "IndividualRun") -> dict:
-    """The run's persisted hybrid-verifier scores (``{}`` when absent)."""
+    """Return the run's persisted verifier scores, or an empty dictionary."""
     evaluation = (run.state_result or {}).get("evaluation") or {}
     block = evaluation.get("verifier")
     return block if isinstance(block, dict) else {}
+
+
+def _refresh_policy_bt_rewards(
+    runs: list["IndividualRun"], selection: SelectionPressure,
+) -> None:
+    """Give survivor selection the latest tournament ratings.
+
+    The engine calls this after loading the newest verifier result.
+    Arrival scores stay in the verifier record; live scores change in place.
+
+    Args:
+        runs (list[IndividualRun]): Completed runs in arrival order.
+        selection (SelectionPressure): Current session archive to update.
+
+    Returns:
+        None. Run records and matching archive members are updated.
+    """
+    latest = _verifier_block(runs[-1]) if runs else {}
+    if latest.get("verifier_kind") != "policy_bt" or "tournament_rewards" not in latest:
+        return
+    rewards = latest["tournament_rewards"]
+    for run in runs:
+        if run.current_uuid not in rewards:
+            continue
+        run.state_result = run.state_result or {}
+        block = run.state_result.setdefault("evaluation", {}).setdefault("verifier", {})
+        block.setdefault("arrival_reward", run.reward)
+        run.reward = run.reward_uncapped = rewards[run.current_uuid]
+        run.reward_is_fallback = False
+        block.update(
+            verifier_kind="policy_bt", reward=run.reward, overall_score=run.reward,
+            overall_score_uncapped=run.reward, reward_fallback=False,
+            tournament_rewards=rewards, tournament_version=latest["tournament_version"],
+        )
+    selection.refresh_rewards(rewards)
+
+
+def _stop_pair_outcomes(verifier: dict) -> dict[str, str] | None:
+    """Translate policy tournament outcomes for the existing stop controller.
+
+    The engine supplies the current verifier block. Older channels retain
+    their existing outcome values.
+
+    Args:
+        verifier (dict): Persisted evaluation.verifier result.
+
+    Returns:
+        dict[str, str] | None: Predecessor UUIDs mapped to controller outcomes.
+    """
+    outcomes = verifier.get("pair_outcomes")
+    if verifier.get("verifier_kind") != "policy_bt" or outcomes is None:
+        return outcomes
+    labels = {"win": "won", "loss": "lost", "tie": "tie"}
+    return {uuid: labels[outcome] for uuid, outcome in outcomes.items()}
 
 
 #: Frontier probe (review 2026-10-09 §4.3): how many recent generations
@@ -81,6 +136,11 @@ _EXPLORE_TIE_WINDOW = 2
 #: Seed for the base-rate RNG. Fixed (not run-dependent) so identical
 #: configs replay identically; the base rate defaults to 0 anyway.
 _EXPLORE_RNG_SEED = 20261009
+
+#: Verifier outcomes that carry no reward and must not enter the QD archive.
+_UNSCORED_VERIFIER_REASONS = frozenset(
+    {"workflow_generation_or_execution_failed", "verifier_instrument_error"}
+)
 
 
 def _objective_tie_window(
@@ -305,6 +365,9 @@ def _select_best_run(runs: list[IndividualRun]) -> IndividualRun | None:
     if not candidates:
         return None
     key = lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count)  # noqa: E731
+    policy_runs = [r for r in candidates if _verifier_block(r).get("verifier_kind") == "policy_bt"]
+    if policy_runs:
+        return max(policy_runs, key=key)
     pairwise = [r for r in candidates if not _run_reward_is_fallback(r, candidates)]
 
     # N1-residual (E39: protein_protein/vasp_chgcar, E38: factors): when the
@@ -322,6 +385,34 @@ def _select_best_run(runs: list[IndividualRun]) -> IndividualRun | None:
             return max(measured_fallbacks, key=key)
 
     return max(pairwise or candidates, key=key)
+
+
+def _select_capsule_run(
+    runs: list[IndividualRun], controller: StopController, verifier_kind: str | None,
+) -> tuple[IndividualRun | None, str]:
+    """Choose the workspace to export after the evolution session.
+
+    The engine supplies completed runs and its stop controller. Policy BT
+    uses current fitted ratings; older relative verifiers keep their champion.
+
+    Args:
+        runs (list[IndividualRun]): Session runs with refreshed rewards.
+        controller (StopController): Existing stopping state for this session.
+        verifier_kind (str | None): Active evaluator channel.
+
+    Returns:
+        tuple[IndividualRun | None, str]: Selected run and selection reason.
+    """
+    best = _select_best_run(runs)
+    if verifier_kind == "policy_bt" or (best and _verifier_block(best).get("verifier_kind") == "policy_bt"):
+        return best, "argmax current Bradley-Terry rating"
+    rule = "argmax arrival-moment reward (_select_best_run)"
+    if controller.selects_champion and controller.champion:
+        champion = next((r for r in runs if r.current_uuid == controller.champion), None)
+        if champion is not None:
+            return champion, f"final champion {controller.champion} (head-to-head)"
+        print_warn(f"[STOP] champion {controller.champion} has no run in this session; falling back to {rule}")
+    return best, rule
 
 
 class EvolutionEngine:
@@ -590,6 +681,9 @@ class EvolutionEngine:
         if n_parents is None:
             n_parents = getattr(self.config, "n_parents", 2)
 
+        if getattr(self.config, "verifier_kind", None) == "policy_bt":
+            self.workflow_selector.workflows_info = self.workflow_selector.discover_workflows()
+
         selected, use_crossover = self.workflow_selector.select_parent_workflows(
             goal=goal,
             selection_pressure=self.selection,
@@ -672,6 +766,7 @@ class EvolutionEngine:
         # starts with a clean slate (prevents observer-history contamination
         # across rows).
         self.selection._archive = []
+        self.config.policy_bt_session_id = uuid4().hex
         self.variation.score_history.clear()
         self.variation.textual_gradient_history.clear()
         self.variation.agent_count_history.clear()
@@ -740,36 +835,9 @@ class EvolutionEngine:
 
         # ── Restore workspace to the best run's saved state ──────────────────
         try:
-            capsule_rule = "argmax arrival-moment reward (_select_best_run)"
-            best_run = _select_best_run(runs)
-            if (
-                stop_controller.selects_champion
-                and stop_controller.champion
-            ):
-                # Relative modes ship the FINAL CHAMPION: the argmax over
-                # arrival-moment rewards is meaningless across generations
-                # (a 1.0 vs 1 predecessor ranks equal to a 1.0 vs 10, and
-                # earlier generations can never be re-ranked).
-                champion_run = next(
-                    (
-                        r
-                        for r in runs
-                        if r.current_uuid == stop_controller.champion
-                    ),
-                    None,
-                )
-                if champion_run is not None:
-                    best_run = champion_run
-                    capsule_rule = (
-                        f"final champion {stop_controller.champion} "
-                        "(head-to-head)"
-                    )
-                else:
-                    print_warn(
-                        "[STOP] champion "
-                        f"{stop_controller.champion} has no run in this "
-                        f"session; falling back to {capsule_rule}"
-                    )
+            best_run, capsule_rule = _select_capsule_run(
+                runs, stop_controller, getattr(self.judge, "verifier_kind", None),
+            )
             if best_run and best_run.current_uuid:
                 print_info(
                     f"Best run [{capsule_rule}]: {best_run.current_uuid} "
@@ -870,7 +938,7 @@ class EvolutionEngine:
         verifier = (wf_info.state_result or {}).get("evaluation", {}).get("verifier", {})
         is_failure = (
             on_error
-            or verifier.get("skipped_reason") == "workflow_generation_or_execution_failed"
+            or verifier.get("skipped_reason") in _UNSCORED_VERIFIER_REASONS
         )
         if uuid:
             # Reward wiring (N1): score, uncapped score and the fallback
@@ -901,6 +969,7 @@ class EvolutionEngine:
         runs[-1].current_uuid = uuid
         runs[-1].answers = wf_info.answers if wf_info else []
         runs[-1].state_result = wf_info.state_result if wf_info else {}
+        _refresh_policy_bt_rewards(runs, self.selection)
         agents_answers = self.extract_agents_behavior(wf_info.state_result) if wf_info else ""
         self.show_answers(agents_answers)
         if rewards_history is not None and wf_info is not None:
@@ -915,11 +984,7 @@ class EvolutionEngine:
                 uuid=uuid or "",
                 iteration=runs[-1].iteration_count,
                 reward=wf_info.overall_score,
-                pair_outcomes=(
-                    verifier.get("pair_outcomes")
-                    if isinstance(verifier, dict)
-                    else None
-                ),
+                pair_outcomes=_stop_pair_outcomes(verifier),
                 failed=is_failure or not uuid,
             )
 
@@ -947,7 +1012,7 @@ class EvolutionEngine:
                 )
 
         # ── Survivor validation: gate + populate _archive (steady-state population)
-        if uuid and not on_error:
+        if uuid and not is_failure:
             baseline_runs = runs[:-1] if len(runs) > 1 else [runs[-1]]
             verdict = self.selection.validate_survivor(
                 baseline_runs=baseline_runs,
