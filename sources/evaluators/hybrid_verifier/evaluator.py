@@ -99,10 +99,6 @@ _SHORT_CIRCUIT_GRADIENT = (
     "workflow code failed to generate or execute; ensure code is properly "
     "formatted and that the workflow runs without crashing"
 )
-#: Normalised pair-outcome spelling for the engine contract (stop plan
-# 2026-10-08 §2.5): both verifiers persist ``pair_outcomes`` under
-# ``evaluation.verifier`` as ``{prev_uuid: "won" | "lost" | "tie"}`` —
-# the engine's StopController reads only that key. The hybrid's
 # internal vocabulary (aggregation.py) is win/loss/tie.
 _PAIR_OUTCOME_SPELLING = {"win": "won", "loss": "lost", "tie": "tie"}
 

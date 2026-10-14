@@ -83,7 +83,8 @@ exclude = [
     "tmp", # temporary files used by WorkflowRunner
     "./tmp", # temporary files used by WorkflowRunner
     "main.py",
-    "sources/prompts"
+    "sources/prompts",
+    "sources/evaluators/policy_bt_verifier/toto" # frozen sample workspace (runtime artifact, not source)
 ]
 
 [tool.ruff.lint]

@@ -1,3 +1,16 @@
+"""Parent selection over persisted workflow generations (Layer 2).
+
+This file owns the evolution engine's view of the ``workflows/``
+archive: it discovers valid, scored generation folders, ranks them by
+goal similarity (MiniLM embeddings with a lexical Jaccard fallback),
+and draws parents under the selection-pressure strategy — steady-state
+sampling from the live archive, or a cold-start similarity scan over
+disk. It also enforces the oracle leak guard, so genotypes scored by
+the benchmark-leaking gold verifier are never reused in a non-gold
+run. The evolution engine imports :class:`WorkflowSelector` and
+queries it before producing each new generation.
+"""
+
 import logging
 import re
 import sys
@@ -17,6 +30,10 @@ logger = logging.getLogger(__name__)
 class _WorkflowScoreAdapter:
     """Lightweight wrapper so that :class:`SelectionPressure.select_parent(s)`
     can rank :class:`WorkflowInfo` objects via their ``overall_score``.
+
+    Cold-start parent selection builds one adapter per disk candidate.
+    The only invariant is the alias: ``reward`` always mirrors
+    ``workflow_info.overall_score`` at bind time.
 
     Attributes:
         workflow_info: The wrapped :class:`WorkflowInfo`.
@@ -38,13 +55,25 @@ class _WorkflowScoreAdapter:
 
 
 class WorkflowSelector:
-    """Discover persisted workflows and pick parents under evolutionary pressure."""
+    """Discover persisted workflows and draw parents under evolutionary pressure.
+
+    The evolution engine constructs one selector per run with the
+    application config, and the discovery result is cached on the
+    instance. Parent choice runs in two modes: steady-state sampling
+    from the live selection archive, or a cold-start similarity scan
+    over disk records.
+    """
 
     def __init__(self, config: Config) -> None:
-        """Load on-disk workflows and prepare the similarity embedder.
+        """Scan persisted workflows and defer the similarity embedder.
+
+        The constructor calls it once with the run config. It fills the
+        ``workflows_info`` cache from disk; the MiniLM embedder is not
+        loaded here — see :meth:`_get_model` for the lazy strategy.
 
         Args:
-            config: Application configuration providing ``workflow_dir``.
+            config: Application configuration providing ``workflow_dir``
+                (config file).
         """
         self.config = config
         self.workflows_folder = Path(config.workflow_dir)
@@ -57,7 +86,18 @@ class WorkflowSelector:
         self._model_load_failed = False
 
     def _get_model(self):
-        """Return the MiniLM embedder, or None when it cannot be loaded."""
+        """Return the MiniLM embedder, or ``None`` when it cannot be loaded.
+
+        Similarity helpers call it before every comparison. The first
+        call loads ``all-MiniLM-L6-v2`` (a Hugging Face download; set
+        ``HF_ENDPOINT`` to a mirror when the hub is unreachable); later
+        calls reuse the cached model. After one failed load it stops
+        retrying, and callers take the lexical fallback.
+
+        Returns:
+            The loaded sentence-transformer model, or ``None`` when
+            loading failed.
+        """
         if self._model is not None or self._model_load_failed:
             return self._model
         try:
@@ -75,7 +115,20 @@ class WorkflowSelector:
 
     @staticmethod
     def _lexical_similarity(a: str, b: str) -> float:
-        """Jaccard similarity over word tokens; offline fallback for MiniLM."""
+        """Jaccard similarity over word tokens; offline fallback for MiniLM.
+
+        :meth:`cosine_similarity` calls it when the embedder is
+        unavailable, so goal matching keeps working without network
+        access.
+
+        Args:
+            a: First text; lowercased and tokenized internally.
+            b: Second text; lowercased and tokenized internally.
+
+        Returns:
+            float: ``|tokens_a ∩ tokens_b| / |tokens_a ∪ tokens_b|``,
+            or ``0.0`` when either text has no word tokens.
+        """
         tokens_a = set(re.findall(r"\w+", a.lower()))
         tokens_b = set(re.findall(r"\w+", b.lower()))
         if not tokens_a or not tokens_b:
@@ -85,10 +138,18 @@ class WorkflowSelector:
     def discover_workflows(self) -> dict[str, WorkflowInfo]:
         """Scan the workflow folder and return valid, scored workflows.
 
+        The constructor and tests call it to fill the selector's
+        candidate cache. A folder counts only when it validates, holds a
+        non-empty state result, and carries loadable genotype code. The
+        oracle leak guard applies: in a non-gold run, folders marked by
+        :func:`is_oracle_generation` are skipped and counted in a
+        warning, so benchmark-leaking genotypes cannot re-enter
+        evolution.
+
         Returns:
-            Mapping of UUID to :class:`WorkflowInfo` for every folder that is
-            valid, has a non-empty state result and loadable code. Empty when
-            the workflow directory is missing.
+            dict[str, WorkflowInfo]: Mapping of UUID to
+            :class:`WorkflowInfo`; empty when the workflow directory is
+            missing.
         """
         workflows = {}
 
@@ -143,16 +204,17 @@ class WorkflowSelector:
     def cosine_similarity(self, a: str, b: str) -> float:
         """Calculate cosine similarity between two strings.
 
-        Uses MiniLM embeddings when the model is available; otherwise falls
-        back to lexical (Jaccard) similarity so selection keeps working
-        offline.
+        Goal-matching helpers call it to rank stored workflows against a
+        new task. MiniLM embeddings are used when the model is
+        available; otherwise :meth:`_lexical_similarity` keeps selection
+        working offline.
 
         Args:
             a: First text to embed.
             b: Second text to embed.
 
         Returns:
-            Similarity between 0.0 and 1.0.
+            float: Similarity between 0.0 and 1.0.
         """
         model = self._get_model()
         if model is None:
@@ -173,13 +235,22 @@ class WorkflowSelector:
     ) -> list[WorkflowInfo]:
         """Find workflows with similar goals using original unwrapped tasks.
 
+        Cold-start parent selection calls it to rank persisted
+        generations against the new task. Only the last 512 characters
+        of each text are compared, which keeps long wrapped goals
+        comparable.
+
         Args:
-            goal: The task to match against (will be compared with original_task of workflows)
-            threshold: Minimum similarity score (0.0-1.0)
-            debug: Whether to print debug information
+            goal: The task to match against (compared with each
+                workflow's ``original_task``).
+            threshold: Minimum similarity score (0.0-1.0).
+            debug: When ``True``, print each candidate with its
+                similarity to stdout.
 
         Returns:
-            list[WorkflowInfo]: Workflows sorted by similarity, filtered by threshold
+            list[WorkflowInfo]: Workflows sorted by similarity
+            (descending) and filtered to ``>= threshold``; empty when no
+            workflows were discovered.
         """
         assert threshold >= 0.0, "Threshold must be non-negative"
         assert threshold <= 1.0, "Threshold must be at most 1.0"
@@ -213,13 +284,16 @@ class WorkflowSelector:
     ) -> list[WorkflowInfo]:
         """Sort workflows by their overall score.
 
+        :meth:`select_best_workflows` calls it after similarity
+        filtering to keep only strong candidates.
+
         Args:
-            workflows_info: Workflows to rank.
-            threshold: Minimum ``overall_score`` retained in the output.
+            workflows_info: Candidate workflows to rank (caller state).
+            threshold: Minimum ``overall_score`` kept in the output.
 
         Returns:
-            Workflows sorted descending by ``overall_score`` and filtered to
-            those at or above `threshold`.
+            list[WorkflowInfo]: Workflows sorted descending by
+            ``overall_score`` and filtered to ``>= threshold``.
         """
         sorted_workflows = sorted(
             workflows_info, key=lambda wf: wf.overall_score, reverse=True
@@ -229,29 +303,39 @@ class WorkflowSelector:
     def select_best_workflows(
         self, goal: str, threshold_similarity: float = 0.9, threshold_score: float = 0.1
     ) -> list[WorkflowInfo]:
-        """Choose a workflow that matches the goal with a minimum threshold.
+        """Choose workflows that match the goal past both thresholds.
+
+        Cold-start parent selection and the ``__main__`` smoke block
+        call it to shortlist candidates for evolutionary pressure.
 
         Args:
             goal: Task description used for similarity matching.
-            threshold_similarity: Minimum cosine similarity to retain.
-            threshold_score: Minimum workflow score to retain.
+            threshold_similarity: Minimum cosine similarity to keep
+                (0.0-1.0).
+            threshold_score: Minimum workflow score to keep.
 
         Returns:
-            Workflows that pass both the similarity and score thresholds.
+            list[WorkflowInfo]: Workflows passing both thresholds, best
+            match first; empty when nothing qualifies.
         """
         similar_workflows = self.sort_similar_workflows(goal, threshold_similarity)
         best_workflows = self.sort_workflows_by_score(similar_workflows, threshold_score)
         return best_workflows
 
     def _rehydrate_workflow_info(self, uuid: str) -> WorkflowInfo | None:
-        """Materialize a WorkflowInfo from disk by UUID. Returns None if invalid.
+        """Materialize a WorkflowInfo from disk by UUID, or return ``None``.
+
+        :meth:`_select_from_archive` calls it to turn sampled archive
+        members back into full info objects; candidates whose folder
+        vanished or no longer validates are dropped silently.
 
         Args:
-            uuid: Workflow UUID (folder name) to rehydrate.
+            uuid: Workflow UUID (folder name) to rehydrate (disk scan).
 
         Returns:
-            A valid :class:`WorkflowInfo`, or ``None`` when `uuid` is empty
-            or the on-disk record fails validation.
+            WorkflowInfo | None: The valid info object, or ``None``
+            when `uuid` is empty or the on-disk record fails
+            validation.
         """
         if not uuid:
             return None
@@ -261,12 +345,15 @@ class WorkflowSelector:
     def _count_children_on_disk(self) -> dict[str, int]:
         """Build ``{parent_uuid: n_children}`` from the on-disk lineage records.
 
-        Used to penalise repeatedly-mined parents during parent draw — without
-        this, a single high-qd ancestor monopolises the offspring stream
-        (observed empirically in early evolution runs).
+        Archive sampling and cold-start selection pass the result to the
+        selection pressure so repeatedly mined parents lose draws —
+        without it, a single high-scoring ancestor monopolises the
+        offspring stream (observed in early evolution runs).
 
         Returns:
-            Mapping of parent UUID to the number of recorded direct children.
+            dict[str, int]: Mapping of parent UUID to the number of
+            recorded direct children; empty when the lineage scan finds
+            no records.
         """
         counts: dict[str, int] = {}
         for rec in _scan_lineage(self.workflows_folder).values():
@@ -281,18 +368,24 @@ class WorkflowSelector:
         n_parents: int,
         crossover_rate: float,
     ) -> tuple[list[WorkflowInfo], bool]:
-        """Archive-driven parent selection (steady-state, current session).
+        """Archive-driven parent selection (steady state, current session).
+
+        :meth:`select_parent_workflows` calls it when the selection
+        pressure already holds a live archive, so parents come from the
+        current session's population instead of a fresh disk scan.
 
         Args:
             selection_pressure: Pressure instance whose ``_archive`` is
-                sampled for parents.
+                sampled for parents (caller state).
             n_parents: Maximum parents to draw when crossover fires.
-            crossover_rate: Probability of crossover over mutation.
+            crossover_rate: Probability of crossover over mutation
+                (caller config).
 
         Returns:
-            ``(workflows, use_crossover)``. ``workflows`` is empty when
-            rehydration fails for every sampled member; ``use_crossover`` is
-            forced to ``False`` if fewer than two parents survive rehydration.
+            tuple[list[WorkflowInfo], bool]: ``(workflows, use_crossover)``.
+            ``workflows`` is empty when rehydration fails for every
+            sampled member; ``use_crossover`` is forced to ``False`` if
+            fewer than two parents survive rehydration.
         """
         archive = selection_pressure._archive
         child_counts = self._count_children_on_disk()
@@ -328,22 +421,31 @@ class WorkflowSelector:
     ) -> tuple[list[WorkflowInfo], bool]:
         """Select one or more parent workflows under evolutionary pressure.
 
-        Steady-state path: when `selection_pressure._archive` is populated,
-        sample parents from the live archive (current-session population).
-        Cold-start path: fall back to similarity-filtered disk scan for
-        cross-task transfer when the archive is empty.
+        The evolution engine calls it once per generation before
+        variation. Steady-state path: when ``selection_pressure._archive``
+        is populated, parents are sampled from the live archive
+        (current-session population). Cold-start path: fall back to a
+        similarity-filtered disk scan for cross-task transfer when the
+        archive is empty.
 
         Args:
-            goal: Task description to match against stored workflows.
-            selection_pressure: The SelectionPressure instance that governs strategy and
-                decides crossover vs mutation.
-            n_parents: Maximum number of parents when crossover fires (≥ 2).
-            crossover_rate: Probability ∈ [0, 1] that crossover is attempted.
-            threshold_similarity: Cosine-similarity floor for cold-start candidates.
-            threshold_score: Minimum workflow score for cold-start candidates.
+            goal: Task description to match against stored workflows
+                (current run).
+            selection_pressure: The SelectionPressure instance that
+                governs strategy and decides crossover vs mutation.
+            n_parents: Maximum number of parents when crossover fires
+                (≥ 2).
+            crossover_rate: Probability ∈ [0, 1] that crossover is
+                attempted.
+            threshold_similarity: Cosine-similarity floor for
+                cold-start candidates.
+            threshold_score: Minimum workflow score for cold-start
+                candidates.
 
         Returns:
-            (list[WorkflowInfo], use_crossover)
+            tuple[list[WorkflowInfo], bool]: ``(selected_workflows,
+            use_crossover)``; the list is empty when no candidate
+            qualifies, and ``use_crossover`` is ``False`` in that case.
         """
         # Steady-state: archive-driven selection
         if selection_pressure._archive:

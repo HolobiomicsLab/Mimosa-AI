@@ -4,7 +4,9 @@ Lineage tracking for evolved workflows.
 Each workflow folder gets a ``lineage_<uuid>.json`` sidecar recording which
 parent(s) produced it and via which variation operator. The visualizer in
 :mod:`sources.utils.evolution_tree` reads these files to draw the evolution
-tree across an entire run / a project's workflow directory.
+tree across an entire run / a project's workflow directory. The
+evolution engine writes one record right after it materializes a new
+workflow (:func:`record_lineage`).
 
 Format::
 
@@ -28,7 +30,9 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+# Sidecar file name inside each workflow folder.
 LINEAGE_FILE_TEMPLATE = "lineage_{uuid}.json"
+# Accepted evolution kinds; unknown kinds are coerced to "seed".
 VALID_KINDS = {"seed", "mutation", "crossover"}
 
 
@@ -41,6 +45,11 @@ def record_lineage(
     goal: str | None = None,
 ) -> Path | None:
     """Persist a lineage record for a newly created workflow.
+
+    The evolution engine calls it right after a new workflow folder is
+    created, so the evolution-tree visualizer can rebuild parent links
+    later. Unknown ``kind`` values are coerced to ``seed`` with a
+    warning.
 
     Args:
         workflow_dir: Project's workflow directory (parent of ``<uuid>/``).
@@ -87,6 +96,9 @@ def record_lineage(
 def load_lineage(workflow_dir: str | Path, uuid: str) -> dict | None:
     """Read a lineage record from disk.
 
+    :func:`scan_all` and archive tooling call it to fetch one workflow's
+    parent links and evolution kind.
+
     Args:
         workflow_dir: Project's workflow directory (parent of ``<uuid>/``).
         uuid: Workflow UUID whose lineage record should be read.
@@ -111,7 +123,18 @@ def load_lineage(workflow_dir: str | Path, uuid: str) -> dict | None:
 
 
 def _read_workflow_goal(folder: Path, uuid: str) -> str | None:
-    """Return the trimmed contents of ``goal_<uuid>.txt``, or None if absent/unreadable."""
+    """Read one workflow's saved goal text.
+
+    :func:`scan_all` calls it when a goal filter is active.
+
+    Args:
+        folder: Path of one workflow folder under the workflow directory.
+        uuid: Workflow UUID; names the ``goal_<uuid>.txt`` file.
+
+    Returns:
+        The trimmed goal text, or ``None`` when the file is missing or
+        unreadable.
+    """
     target = folder / f"goal_{uuid}.txt"
     try:
         return target.read_text(encoding="utf-8").strip()
@@ -124,7 +147,9 @@ def scan_all(
 ) -> dict[str, dict]:
     """Enumerate every workflow folder and return ``{uuid: lineage_or_synthetic}``.
 
-    Workflows without a ``lineage_*.json`` are synthesised as orphan seeds so
+    The evolution-tree visualizer and workflow selection call this to
+    get the parent-child map of a whole workflow directory. Workflows
+    without a ``lineage_*.json`` are synthesised as orphan seeds so
     the tree visualizer can still place them. This makes the tooling
     backward-compatible with workflows generated before lineage tracking
     landed.

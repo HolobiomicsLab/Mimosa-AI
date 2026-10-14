@@ -308,6 +308,12 @@ Each iteration also writes structured metrics for post-hoc analysis:
   `agent_budget` sample) that produced this offspring. Historical files
   from before the controller removal may additionally hold
   `effective_boldness` / `respeciation_gate_open`.
+- `sources/workflows/<uuid>/run_stdout.log` — the raw workflow execution
+  output returned by the orchestrator, stored verbatim (UTF-8, ANSI
+  escapes kept), written right after execution and before evaluation.
+  Failed runs store the error text instead. When a generation has no
+  parent gradient, this is the text the directive LLM receives as its
+  fallback diagnosis.
 - `sources/workflows/qd_archive.jsonl` — append-only, one line per
   `validate_survivor` call. Records the candidate's descriptor,
   `qd_score`, `novelty_score`, admission verdict, and the `evicted_uuid`
@@ -316,7 +322,7 @@ Each iteration also writes structured metrics for post-hoc analysis:
   mutation/crossover/seed prompt assembled. Lets you retrace the
   search-state observer without rerunning the engine.
 
-All three are best-effort and fail-soft: an I/O error logs a warning
+All four are best-effort and fail-soft: an I/O error logs a warning
 but never aborts a run.
 
 ## See also

@@ -206,6 +206,7 @@ mimosa-ai/
 │           ├── workflow_genotype_<uuid>.py
 │           ├── state_result.json
 │           ├── evolution_prompt_<uuid>.md
+│           ├── run_stdout.log
 │           ├── lineage_<uuid>.json
 │           ├── reward_progress.png
 │           └── memory/

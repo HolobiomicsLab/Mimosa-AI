@@ -1,5 +1,11 @@
-"""
-This class handles the creation and assembly of Single agent code.
+"""Craft the executable script for one single-agent baseline run.
+
+This module owns Mimosa-AI's single-agent code emitter: it turns a goal
+into a ready-to-run SmolAgents script plus cost-tracking folders. The
+workflow orchestrator constructs :class:`SingleAgentFactory` from here
+when a task runs as one agent instead of a full workflow graph. Crafting
+happens once per run, before the workflow runner (Layer 3) executes
+anything.
 """
 
 import logging
@@ -12,18 +18,23 @@ from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .factory import Factory
 
 class SingleAgentFactory(Factory):
-    """Build executable Python code for a single SmolAgent run.
+    """Craft the runnable script for a single-agent baseline run.
 
-    Mirrors :class:`WorkflowFactory` but emits a one-agent script instead of
-    a LangGraph workflow. Supports cost tracking by reusing the same folder
-    structure (workflow + memory) as the multi-agent path.
+    The workflow orchestrator constructs it with the global ``Config``
+    and calls it once per single-agent run. It mirrors
+    :class:`WorkflowFactory` but emits a one-agent script, and it keeps
+    the same workflow/memory folder pair so cost tracking stays uniform.
     """
 
     def __init__(self, config: "Config") -> None:
-        """Initialize the workflow crafting system.
+        """Store the config, the output folders, and a module logger.
+
+        Called by the orchestrator at startup with the global config.
 
         Args:
-            config: Configuration object containing paths and settings.
+            config: Global ``Config`` object from caller state; supplies
+                ``workflow_dir``, ``memory_dir``, model ids, and engine
+                settings.
         """
         self.workflow_dir = config.workflow_dir
         self.memory_dir = config.memory_dir
@@ -32,19 +43,27 @@ class SingleAgentFactory(Factory):
 
 
     async def craft_single_agent(self, goal: str, original_task: str | None = None) -> tuple[str, str, str]:
-        """Craft a single-agent script with cost tracking support.
+        """Craft a single-agent script and its cost-tracking folders.
+
+        The orchestrator calls this once per single-agent run, passing
+        the knowledge-wrapped goal and the raw task. It resolves the
+        primary model, loads MCP tool code and the system prompt, renders
+        the executable script, and writes the metadata files to disk.
 
         Args:
-            goal: The goal description (may be knowledge-wrapped).
-            original_task: The original unwrapped task for similarity matching.
+            goal: Goal text from the planner; may be knowledge-wrapped.
+            original_task: Original unwrapped task from caller state,
+                used for similarity matching. Optional.
 
         Returns:
-            Tuple ``(complete_code, workflow_genotype_code, uuid_str)``. For the
-            single-agent case ``complete_code`` and ``workflow_genotype_code``
-            are identical.
+            Tuple ``(complete_code, workflow_genotype_code, uuid_str)``.
+            Both code entries hold the same executable script;
+            ``uuid_str`` is the run id of the form
+            ``single_agent_<timestamp>_<8-hex>``.
 
         Raises:
-            RuntimeError: If MCP tools or the system prompt cannot be loaded.
+            RuntimeError: If MCP tool code or the system prompt cannot
+                be loaded.
         """
         INSTRUCTIONS = goal
         timestamp = time.strftime("%Y%m%d_%H%M%S")

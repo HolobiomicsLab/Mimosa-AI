@@ -1,7 +1,14 @@
 
-"""
-VariationEngine: prompt assembly and search-state observation for LLM-guided
-workflow evolution.
+"""Variation prompts and search-state observation for the evolution loop.
+
+Layer 2: ``VariationEngine`` assembles mutation and crossover prompts plus
+the read-only ``<search_state>`` block the directive LLM conditions on.
+``sources.core.evolution_engine`` imports the engine and ``exploration_state``
+and calls them once per offspring, after the verifier scored the parent run.
+Module helpers package frontier-probe results for the ``<exploration>``
+prompt block and for persistence. Prompt templates live inline; deterministic
+guardrails (agent caps, the <=1-agent rule, the keep-90% mandate) stay in
+code, never in the LLM's hands.
 """
 
 import logging
@@ -24,25 +31,31 @@ def frontier_target(
     delta: float = 0.25,
     min_step: float = 0.1,
 ) -> float | int | None:
-    """Sign-aware exploratory target for one metric (review 2026-10-09 §4.3).
+    """Sign-aware exploratory target for one metric.
 
-    ``target = value ∓ max(|value|·delta, min_step)`` in the improving
-    direction — a signed value is NEVER multiplied (the imaginary-gradient
-    defect that pushed ``minimum_energy`` −2 "down" to −1.5). The result
-    is clipped to ``bounds`` when goal-derivable and rounded to an int
-    when the metric is integer-valued.
+    ``render_exploration_block`` calls it when a metric spec marks an
+    objective with a known direction; the result becomes an "arithmetic
+    target" line in the ``<exploration>`` block. ``target = value ∓
+    max(|value|·delta, min_step)`` in the improving direction; a signed
+    value is never multiplied.
 
     Args:
-        value: Current measured value of the metric.
-        direction: Improving direction, ``"higher"`` or ``"lower"``.
-        bounds: Optional ``[lo, hi]`` the metric cannot leave.
-        integer: Round the target to a whole number when True.
-        delta: Relative step size (fraction of ``|value|``).
-        min_step: Absolute floor for the step (covers ``value == 0``).
+        value: float — current measured value of the metric, from the
+            verifier's metric summary.
+        direction: str — improving direction, ``"higher"`` or ``"lower"``,
+            from the metric spec; other values yield ``None``.
+        bounds: tuple[float, float] | list[float] | None — ``[lo, hi]``
+            limits the metric cannot leave; ``None`` skips clipping.
+        integer: bool — round the target to a whole number when True,
+            from the metric spec.
+        delta: float — relative step size as a fraction of ``|value|``.
+        min_step: float — absolute floor for the step; covers
+            ``value == 0``.
 
     Returns:
-        A strictly better target inside ``bounds``, or ``None`` when no
-        strictly better value exists (e.g. the bound is already reached).
+        float | int | None — a strictly better target inside ``bounds``;
+        ``None`` when ``direction`` is unknown or no strictly better value
+        exists (the bound is already reached).
     """
     if direction not in ("higher", "lower"):
         return None
@@ -66,14 +79,18 @@ def frontier_target(
 def exploration_state(probe: dict | None) -> dict:
     """Compact, JSON-persistable summary of one probe evaluation.
 
+    ``sources.core.evolution_engine`` calls it after each frontier probe and
+    persists the result under ``variation_state.exploration`` for telemetry
+    and later inspection.
+
     Args:
-        probe: A probe dict from
-            :func:`sources.core.evolution_engine.evaluate_exploration_probe`,
-            or ``None`` when no evaluation happened.
+        probe: dict | None — probe result from
+            ``sources.core.evolution_engine.evaluate_exploration_probe``;
+            ``None`` when no evaluation happened.
 
     Returns:
-        ``{"triggered": bool, "reason": str, "metrics": [...]}`` — the
-        exact shape persisted under ``variation_state.exploration``.
+        dict — ``{"triggered": bool, "reason": str, "metrics": [...]}``,
+        the exact shape persisted under ``variation_state.exploration``.
     """
     probe = probe or {}
     return {
@@ -87,27 +104,28 @@ def render_exploration_block(
     probe: dict | None,
     metric_specs: dict[str, dict] | None = None,
 ) -> str:
-    """Render the labelled ``<exploration>`` block (review §4.3).
+    """Render the labelled ``<exploration>`` prompt block.
 
-    The block is a SEARCH-POLICY request, never a measurement: it states
-    the deterministic search state (champion plateau, metric ties read
-    from the verifier's ``metric_summary``), asks for ONE bolder change,
-    and forbids changing reported numbers without a producing method.
-    It is injected ALONGSIDE the directive/diagnosis, never instead of
-    it.
+    ``VariationEngine.mutation_prompt`` calls it with the frontier-probe
+    state. The block is a SEARCH-POLICY request, never a measurement: it
+    states the deterministic search state, asks for one bolder change, and
+    forbids changing reported numbers without a producing method.
 
     Args:
-        probe: Probe dict with ``triggered``/``reason``/``champion``/
-            ``since_change``/``n_pairs``/``generations_compared``/
-            ``metrics``; an absent or untriggered probe renders "".
-        metric_specs: Optional ``{metric_id: spec}`` with ``role``,
-            ``direction``, ``bounds``, ``integer``. When a spec marks an
-            ``objective`` metric with a known direction, a sign-aware
-            arithmetic target (:func:`frontier_target`) is appended.
-            Default ``None`` = text-only (no invented numbers).
+        probe: dict | None — probe state with ``triggered``/``reason``/
+            ``champion``/``since_change``/``n_pairs``/
+            ``generations_compared``/``metrics``; an absent or untriggered
+            probe renders "".
+        metric_specs: dict[str, dict] | None — ``{metric_id: spec}`` with
+            ``role``, ``direction``, ``bounds`` and ``integer`` from the
+            verifier's metric summary. When a spec marks an ``objective``
+            metric with a known direction, a sign-aware arithmetic target
+            from ``frontier_target`` is appended. ``None`` renders
+            text-only (no invented numbers).
 
     Returns:
-        The multi-line ``<exploration>…</exploration>`` block, or "".
+        str — the multi-line ``<exploration>…</exploration>`` block, or ""
+        when the probe is absent or untriggered.
     """
     if not probe or not probe.get("triggered"):
         return ""
@@ -157,7 +175,7 @@ def render_exploration_block(
         )
         if target is not None:
             lines.append(
-                f"Optional arithmetic target (derived, not measured): "
+                f"Arithmetic target to attempt to reach: "
                 f"{metric['id']} = {target}."
             )
     lines.append(
@@ -170,18 +188,28 @@ def render_exploration_block(
 class VariationEngine:
     """Assemble mutation/crossover prompts and expose search-state diagnostics.
 
-    Mutation magnitude is implicit: the directive LLM judges how bold the
-    next change should be from the deterministic ``<search_state>`` block
-    (parent score, iteration progress, plateau streak, success rate,
-    score trajectory). Deterministic guardrails (agent-count caps, the
-    <=1-agent rule, the keep-90% mandate) stay in code.
+    ``sources.core.evolution_engine`` constructs one engine per session and
+    calls ``mutation_prompt``/``crossover_prompt`` per offspring. Mutation
+    magnitude stays implicit: the directive LLM judges how bold the next
+    change should be from the deterministic ``<search_state>`` block
+    (parent score, iteration progress, plateau streak, success rate, score
+    trajectory). Deterministic guardrails (agent-count caps, the <=1-agent
+    rule, the keep-90% mandate) stay in code.
     """
 
     def __init__(self, config) -> None:
-        """Initialise empty history buffers."""
+        """Create empty history buffers and wire the directive LLM.
+
+        Called once per session by the evolution engine.
+
+        Args:
+            config: session config supplying ``workflow_llm_model`` and the
+                LLM knobs used by ``setup_llm``.
+
+        Returns:
+            None.
+        """
         self.textual_gradient_history: list[tuple[str, bool]] = []
-        # Per-offspring (child_score, best_before, is_failure) for the
-        # search-state observer diagnostics (plateau streak, success rate).
         self.score_history: list[tuple[float | None, float | None, bool]] = []
         self.agent_count_history: list[int] = []
         self.max_possible_agents = 7
@@ -192,6 +220,23 @@ class VariationEngine:
         self.setup_llm(config)
 
     def setup_llm(self, config):
+        """Build the LLM client used for mutation directives.
+
+        ``__init__`` calls it with the session config; later directive calls
+        go through ``self.llm_config``.
+
+        Args:
+            config: session config supplying ``workflow_llm_model``,
+                ``reasoning_effort``, ``max_tokens`` and the OpenRouter
+                routing helpers.
+
+        Returns:
+            None.
+
+        Raises:
+            Exception: when the LLM configuration cannot be built from the
+                config values.
+        """
         self.judge_model = config.workflow_llm_model
         try:
             provider, model = self.judge_model.split("/", 1) if "/" in self.judge_model else ("openai", self.judge_model)
@@ -215,36 +260,46 @@ class VariationEngine:
         child_score: float | None = None,
         best_before: float | None = None,
     ) -> None:
-        """Append an offspring's prompt-gradient diagnosis and outcome to history.
+        """Append one offspring's textual-gradient diagnosis and outcome.
+
+        The evolution engine calls it after each offspring is scored so the
+        search-state observer can compute plateau streaks, success rate and
+        the score trajectory.
 
         Args:
-            gradient: Free-text diagnosis of the offspring's failure mode.
-                Empty values are replaced with a sentinel placeholder.
-            is_failure: Whether the offspring failed to execute at all
-                (excluded from plateau-counter and success-rate stats).
-            child_score: Overall score of the produced offspring, in ``[0, 1]``.
-                ``None`` when unavailable; such entries do not contribute to
+            gradient: str — free-text diagnosis of the offspring's failure
+                mode, from the verifier's textual gradient; empty values are
+                replaced with a sentinel placeholder.
+            is_failure: bool — True when the offspring failed to execute at
+                all; such entries are excluded from plateau and success-rate
+                stats.
+            child_score: float | None — overall score of the produced
+                offspring in [0, 1]; ``None`` entries do not contribute to
                 the success-rate signal.
-            best_before: Best score achieved across the population *before*
-                this offspring was produced. Used together with
-                ``child_score`` to decide whether the offspring improved on
-                the best-so-far (observer diagnostics only).
+            best_before: float | None — best score across the population
+                before this offspring; paired with ``child_score`` to decide
+                improvement (observer diagnostics only).
+
+        Returns:
+            None.
         """
         text = (gradient or "").strip() or "UNKNOWN_GRADIENT: No feedback captured."
         self.textual_gradient_history.append((text, bool(is_failure)))
         self.score_history.append((child_score, best_before, bool(is_failure)))
 
     def _sample_agent_count(self, lo: int, hi: int) -> int:
-        """Sample a uniformly random agent count within ``[lo, hi]``.
+        """Sample one agent count uniformly within ``[lo, hi]``.
 
-        Bounds are clamped to the hard caps ``[1, max_possible_agents]``.
+        Mutation budgeting calls it; bounds are clamped to the hard caps
+        ``[1, max_possible_agents]``.
 
         Args:
-            lo: Inclusive lower bound on the agent count.
-            hi: Inclusive upper bound on the agent count.
+            lo: int — inclusive lower bound on the agent count.
+            hi: int — inclusive upper bound on the agent count.
 
         Returns:
-            An integer in ``[lo, hi]``.
+            int — the sampled count in ``[lo, hi]`` after clamping; ``lo``
+            itself when the clamped bounds meet.
         """
         lo = max(1, min(lo, self.max_possible_agents))
         hi = max(lo, min(hi, self.max_possible_agents))
@@ -253,20 +308,19 @@ class VariationEngine:
         return int(np.random.randint(lo, hi + 1))
 
     def _sample_mutation_agent_budget(self, parent_agents: int) -> int:
-        """Sample a mutation agent budget around the PARENT's agent count.
+        """Sample a mutation agent budget around the parent's agent count.
 
-        The window is ``[max(1, parent_agents - 1),
-        min(max_possible_agents, parent_agents + 1)]`` with a uniform draw
-        inside it, so complexity drifts by at most one agent per mutation
-        regardless of any schedule. Appends the sample to
-        ``self.agent_count_history``.
+        ``mutation_prompt`` calls it per offspring so complexity drifts by
+        at most one agent per mutation; the draw is appended to
+        ``agent_count_history``.
 
         Args:
-            parent_agents: Number of distinct agents in the parent workflow.
+            parent_agents: int — number of distinct agents in the parent
+                workflow, from ``_count_parent_agents``.
 
         Returns:
-            The sampled agent budget, within ``[1, max_possible_agents]`` and
-            within one agent of the parent count.
+            int — budget within ``[1, max_possible_agents]`` and within one
+            agent of the parent count.
         """
         lo = max(1, parent_agents - 1)
         hi = min(self.max_possible_agents, parent_agents + 1)
@@ -278,14 +332,17 @@ class VariationEngine:
     def _count_parent_agents(wf_state: dict | None) -> int | None:
         """Count distinct agents in the parent's last executed state.
 
-        ``step_name`` may contain repeat visits from retry loops, so the
-        count is over unique names.
+        Mutation budgeting calls it to anchor the agent budget. Repeat
+        visits share one name, so the count is over unique ``step_name``
+        values.
 
         Args:
-            wf_state: Parent ``state_result`` mapping, or ``None``.
+            wf_state: dict | None — parent ``state_result`` mapping from the
+                run record; ``None`` when no state exists.
 
         Returns:
-            Number of distinct agents, or ``None`` when unknown.
+            int | None — number of distinct agents, or ``None`` when the
+            state is missing or carries no step names.
         """
         if not wf_state:
             return None
@@ -297,8 +354,13 @@ class VariationEngine:
     def _iters_since_improvement(self) -> int:
         """Length of the current run of scored offspring that did not beat best-so-far.
 
-        Failures and ``None``-scored entries are skipped (no count, no break).
-        Returns ``0`` when the most recent scored offspring improved.
+        ``_search_state_block`` calls it for the plateau signal. Failures
+        and entries without both scores are skipped; the count stops at the
+        first offspring that beat its ``best_before``.
+
+        Returns:
+            int — consecutive non-improving scored offspring; ``0`` when
+            the most recent scored offspring improved.
         """
         count = 0
         for c, b, is_failure in reversed(self.score_history):
@@ -312,22 +374,18 @@ class VariationEngine:
     _PLATEAU_PATIENCE = 6   # Observer-only: normalises the plateau streak.
 
     def _compute_success_rate(self, window: int = 5) -> float | None:
-        """Fraction of recent scored offspring that improved on best-so-far.
+        """Fraction of recent scored offspring that beat best-so-far.
 
-        Diagnostic observer only (historically the success-counting half
-        of Rechenberg's 1/5 rule): the value is reported in the
-        ``<search_state>`` block and in telemetry; it no longer drives any
-        controller arithmetic.
-
-        Offspring marked ``is_failure`` and those without recorded
-        scores are excluded.
+        ``_search_state_block`` calls it with the default window. Entries
+        marked ``is_failure`` and entries without both scores are excluded.
 
         Args:
-            window: Number of recent scored offspring to consider.
+            window: int — number of recent scored offspring to consider
+                (default 5).
 
         Returns:
-            Success rate in ``[0, 1]``, or ``None`` when the history holds
-            fewer than two scored offspring with comparable ``best_before``.
+            float | None — success rate in [0, 1]; ``None`` when fewer than
+            two comparable entries exist in the window.
         """
         scored = [
             (c, b)
@@ -341,15 +399,19 @@ class VariationEngine:
         return sum(1 for c, b in recent if c > b + 1e-6) / len(recent)
 
     def _recent_score_trajectory(self, window: int = 5) -> list[float]:
-        """Return the last ``window`` recorded offspring scores.
+        """Return the last recorded offspring scores, oldest first.
 
-        Failed and unscored offspring are skipped.
+        ``_search_state_block`` calls it to show the score trajectory in
+        the search-state block. Failures and unscored offspring are
+        skipped.
 
         Args:
-            window: Maximum number of recent scores to return.
+            window: int — maximum number of recent scores to return
+                (default 5).
 
         Returns:
-            Recent child scores, oldest first; possibly empty.
+            list[float] — recent child scores, oldest first; possibly
+            empty.
         """
         return [
             c for c, _b, fail in self.score_history
@@ -359,22 +421,21 @@ class VariationEngine:
     def _search_state_block(
         self, parent_score: float, iteration_count: int, max_iterations: int,
     ) -> str:
-        """Assemble the deterministic, read-only search-state block.
+        """Assemble the read-only ``<search_state>`` block for the directive.
 
-        Feeds the directive LLM plain search statistics — parent score,
-        iteration progress, plateau streak, recent success rate and a
-        short score-only trajectory. Contains no rubric or diagnosis text,
-        preserving the verifier's rubric-blindness firewall. Also refreshes
-        ``self.last_variation_state`` for telemetry.
+        ``mutation_prompt`` calls it right before the directive LLM runs.
+        The block carries parent score, iteration progress, plateau streak,
+        recent success rate and a short score-only trajectory, and it
+        refreshes ``last_variation_state`` for telemetry.
 
         Args:
-            parent_score: Parent reward in ``[0, 1]``.
-            iteration_count: Zero-based index of the current attempt.
-            max_iterations: Total planned attempts.
+            parent_score: float — parent reward in [0, 1], clipped here.
+            iteration_count: int — zero-based index of the current attempt.
+            max_iterations: int — total planned attempts.
 
         Returns:
-            A multi-line, read-only ``<search_state>`` payload (without the
-            enclosing tags).
+            str — multi-line ``<search_state>`` payload without the
+            enclosing tags.
         """
         iters_since_improvement = self._iters_since_improvement()
         plateau = min(1.0, iters_since_improvement / self._PLATEAU_PATIENCE)
@@ -409,15 +470,19 @@ class VariationEngine:
 
     @staticmethod
     def _extract_agent_answers(wf_state: dict | None) -> str:
-        """Flatten per-agent answers from workflow state into a readable string.
+        """Flatten per-agent answers from workflow state into text.
+
+        Mutation and crossover prompts call it so the directive LLM reads
+        compact agent answers instead of raw state; each answer is
+        truncated to 16384 characters.
 
         Args:
-            wf_state: Workflow state dict containing ``answers`` and (when a
-                list) parallel ``step_name`` entries.
+            wf_state: dict | None — workflow state dict with ``answers``
+                and, for list answers, parallel ``step_name`` entries.
 
         Returns:
-            A newline-joined ``agent <name>: <truncated answer>...`` block, or
-            the raw ``answers`` string for non-list values; a sentinel string
+            str — newline-joined ``agent <name>: <answer>...`` lines for
+            list answers, the raw string otherwise, or a sentinel line
             when no answers were captured.
         """
         if not wf_state or "answers" not in wf_state:
@@ -433,13 +498,18 @@ class VariationEngine:
     # ── Prompt builders ───────────────────────────────────────────────────────
 
     def seed_genome_prompt(self, goal: str) -> str:
-        """Build the prompt for the very first workflow generation (generation 0).
+        """Build the generation-0 seed prompt.
+
+        The engine calls it before the first workflow exists, to obtain a
+        small random-topology starting genome for the goal.
 
         Args:
-            goal: Task description the seeded workflow should target.
+            goal: str — task description the seeded workflow should
+                target, from the session goal.
 
         Returns:
-            A prompt suggesting a random topology and a small starting agent budget.
+            str — prompt suggesting a random topology and a small starting
+            agent budget.
         """
         n_agents = self._sample_agent_count(1, 4)  # small random starting count
         return (
@@ -447,6 +517,7 @@ class VariationEngine:
             f"Goal to assemble a workflow for:\n{goal}\n"
             f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
+
     def llm_think_mutation_directive(
         self,
         agent_answers: str,
@@ -455,26 +526,28 @@ class VariationEngine:
         goal: str,
         exploration_block: str = "",
     ) -> str:
-        """Ask a dedicated LLM for the next mutation directive.
+        """Ask the directive LLM for the next mutation directive.
 
-        The directive decides *implicitly* how bold the next change should
-        be: the system prompt tells the LLM to judge magnitude itself from
-        the deterministic search state (recent improvements -> small tweak;
-        long plateau or 0% success -> bolder restructuring). There is no
-        boldness level or scope band to obey — only the search facts.
+        ``mutation_prompt`` calls it with the parent evidence; the system
+        prompt tells the LLM to judge the change magnitude itself from the
+        deterministic search state. Degenerate output (shorter than 20
+        characters) triggers one retry, then a deterministic fallback
+        directive.
 
         Args:
-            agent_answers: Flattened per-agent answers of the parent run.
-            textual_gradient_block: Rubric-blind diagnosis from the verifier.
-            search_state: Read-only ``<search_state>`` payload built by
-                ``_search_state_block`` (scores only, no rubric text).
-            goal: Task description.
-            exploration_block: Rendered ``<exploration>`` block (review
-                §4.3), passed ALONGSIDE the diagnosis when the frontier
-                probe triggered; empty string when it did not.
+            agent_answers: str — flattened parent answers from
+                ``_extract_agent_answers``.
+            textual_gradient_block: str — rubric-blind diagnosis from the
+                verifier's textual gradient.
+            search_state: str — read-only ``<search_state>`` payload from
+                ``_search_state_block``.
+            goal: str — task description for the session.
+            exploration_block: str — rendered ``<exploration>`` block;
+                empty when no probe fired.
 
         Returns:
-            The directive text (≤ 3 sentences, one named issue).
+            str — directive text of at most three sentences naming one
+            issue; never empty.
         """
         sys_msg = """
 You are an expert at pinpointing the root cause of failures in multi-agent workflows.
@@ -486,7 +559,7 @@ The diagnosis is trusted and should be used to inform your directive.
 An <exploration> block, when present, is a search-policy request, not a measured fact; the <diagnosis> remains the only measured evidence.
 The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the diagnosis.
 You will also be given a read-only <search_state> block with deterministic search statistics: parent score, iteration progress, iterations since the last improvement, recent success rate, and the recent score trajectory.
-You decide yourself how bold the next change should be, justified by the search state: recent improvements and a rising score trajectory call for small incremental tweaks; a long plateau, a 0% success rate, or repeated identical failures call for bolder restructuring (such as adding agents, rewriting prompt, changing prompt persona, etc...).
+You decide yourself how bold the next change should be, justified by the search state: recent improvements and a rising score trajectory call for small incremental tweaks; a long plateau, a 0% success rate, or repeated identical failures call for bolder restructuring (such as adding agents, pressure to use another approach or algorithm, rewriting prompt, changing prompt persona, etc...).
 Do not add or remove more than 1 agent at a time. Ask to add an agent whenever decomposition of the problem might help.
 Most of the time, suggest small, incremental changes to the workflow. Suggest large change if the diagnosis and the search state indicate that the current approach is flawed.
 If 'no agent answers' were captured, or that you see a python/syntax error, simply instruct to carefully craft the syntax for workflow creation, select tools correctly, and respect the generation guidelines (you do not make guidelines, the system reading your directive will know what it is; never specify what to fix, just give a general hint at fixing the syntax)
@@ -520,10 +593,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             config=self.llm_config,
         )
         directive = provider(prompt)
-        # Guard against truncated/degenerate directive output (reasoning
-        # overrun can return empty or single-token content, e.g. "∈"):
-        # retry once with an output-only nudge, then fall back to a
-        # deterministic directive — never embed a fragment verbatim.
+        # Guard against truncated/degenerate directive output
         if not directive or len(directive.strip()) < 20:
             self.logger.warning(
                 "Directive LLM returned empty/degenerate output "
@@ -556,33 +626,33 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         max_iterations: int = 10,
         exploration_probe: dict | None = None,
     ) -> str:
-        """Build a prompt for one mutation step in the evolutionary search.
+        """Build the full mutation prompt for one offspring.
 
-        The prompt has three layers:
-          1. Voice framing   — sets the LLM's reasoning tone for this iteration.
-          2. Execution grounding — previous code, agent answers, and judge eval.
-          3. Optional frontier probe — a labelled ``<exploration>`` block
-             (review 2026-10-09 §4.3) injected AFTER the directive and
-             BEFORE the mutation instructions when the engine's plateau/
-             tie trigger fired. It augments; it never replaces the
-             directive or the verifier's diagnosis.
+        The evolution engine calls it per iteration with the parent's
+        record. It assembles execution evidence (agent answers, textual
+        gradient or stderr fallback), the search-state block and the
+        exploration block, asks the directive LLM for a mutation directive
+        (or a fixed syntax-fix directive when ``genotype`` is None), and
+        appends the hard mutation instructions.
 
         Args:
-            goal: Task description for the mutated workflow.
-            wf_info: Parent workflow info supplying score, gradient and state;
-                ``None`` for cold-start variants.
-            genotype: Source code of the parent workflow; ``None`` means the
-                previous attempt failed before producing code.
-            run_stderr: Stderr tail used as a fallback gradient when no
-                semantic diagnosis is available.
-            iteration_count: Zero-based index of the current attempt.
-            max_iterations: Total planned attempts (used for prompt context).
-            exploration_probe: Frontier-probe state from the engine
-                (:func:`render_exploration_block` decides whether a block
-                is rendered); ``None`` injects nothing.
+            goal: str — task description for the mutated workflow.
+            wf_info: WorkflowInfo | None — parent info supplying score,
+                abstracted textual gradient and state; ``None`` on a cold
+                start.
+            genotype: str | None — parent source code; ``None`` means the
+                previous attempt produced no code.
+            run_stderr: str — stderr tail used as fallback gradient when
+                no textual gradient exists.
+            iteration_count: int — zero-based index of the current
+                attempt.
+            max_iterations: int — total planned attempts (prompt context).
+            exploration_probe: dict | None — frontier-probe state;
+                ``render_exploration_block`` decides whether a block is
+                rendered; ``None`` injects nothing.
 
         Returns:
-            The fully assembled mutation prompt string.
+            str — the fully assembled mutation prompt.
         """
         score      = wf_info.overall_score        if wf_info else 0.0
         textual_gradient  = wf_info.abstracted_textual_gradient if wf_info else ""
@@ -614,10 +684,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         agent_budget = self._sample_mutation_agent_budget(parent_agents)
         self.last_variation_state["agent_budget"] = int(agent_budget)
 
-        # Frontier probe (review §4.3): labelled search-policy request,
-        # rendered from the engine's trigger state. Passed to the
-        # directive LLM alongside the diagnosis AND injected verbatim
-        # into this prompt — never instead of the diagnosis.
+        # Frontier probe (review §4.3): labelled search-policy request.
         exploration_block = render_exploration_block(exploration_probe)
         self.last_variation_state["exploration"] = exploration_state(
             exploration_probe
@@ -666,32 +733,29 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         max_iterations: int = 10,
         exploration_probe: dict | None = None,
     ) -> str:
-        """Build a prompt for a crossover step: recombine N parent workflows into one offspring.
+        """Build a crossover prompt recombining N parents into one offspring.
 
-        Parents are sorted best → worst so the LLM sees the strongest candidates first.
+        The engine calls it when parent selection chose crossover. Parents
+        are sorted best-first so the LLM sees strong candidates first, and
+        the prompt caps agents at the largest parent count.
 
         Args:
-            goal: Task description for the recombined workflow.
-            wf_infos: Parent workflow infos, one per genotype.
-            genotypes: Parent source code strings, parallel to `wf_infos`.
-            run_stderrs: Parent stderr tails used as fallback gradients.
-            iteration_count: Zero-based index of the current attempt.
-            max_iterations: Total planned attempts (used for prompt context).
-            exploration_probe: Frontier-probe state from the engine; the
-                labelled ``<exploration>`` block (review 2026-10-09 §4.3)
-                is injected after the parent diagnoses and before the
-                recombination instructions when triggered.
+            goal: str — task description for the recombined workflow.
+            wf_infos: list[WorkflowInfo] — parent infos, one per genotype.
+            genotypes: list[str] — parent source code strings, parallel to
+                ``wf_infos``.
+            run_stderrs: list[str] — parent stderr tails used as fallback
+                gradients.
+            iteration_count: int — zero-based index of the current
+                attempt.
+            max_iterations: int — total planned attempts (prompt context).
+            exploration_probe: dict | None — frontier-probe state; the
+                labelled ``<exploration>`` block is injected after the
+                parent diagnoses when triggered; ``None`` injects nothing.
 
         Returns:
-            The fully assembled crossover prompt string.
+            str — the fully assembled crossover prompt.
         """
-        # Frontier probe state is persisted through the same
-        # last_variation_state path as the mutation prompt.
-        exploration_block = render_exploration_block(exploration_probe)
-        self.last_variation_state["exploration"] = exploration_state(
-            exploration_probe
-        )
-
         # ── Assemble parent records ──────────────────────────────────────────
         parents = []
         for i, (wf_info, genotype, stderr) in enumerate(
@@ -733,7 +797,6 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             "## PARENT WORKFLOWS:",
             "\n\n".join(parents_block),
             "",
-            *([exploration_block] if exploration_block else []),
             "## YOUR TASK:",
             "Do not pick one parent and patch it. Genuinely recombine.",
             "Do not create a workflow with more agents than the workflow with the highest agent count among the parents. Hard cap to prevent runaway complexity.",
@@ -748,14 +811,17 @@ if __name__ == "__main__":
     np.random.seed(0)
 
     class _SmokeConfig:
+        """Minimal config stub for this offline smoke check."""
         workflow_llm_model = "openai/gpt-4o-mini"
         reasoning_effort = "low"
         max_tokens = 8192
 
         def openrouter_provider_for(self, model):
+            """Return None; routing is not exercised by this smoke check."""
             return None
 
         def openrouter_quantizations_for(self, model):
+            """Return None; quantization is not exercised by this smoke check."""
             return None
 
     # ── _iters_since_improvement: empty history ──────────────────────────

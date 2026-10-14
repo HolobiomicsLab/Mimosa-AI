@@ -1,3 +1,17 @@
+"""Layer 0 planner for Mimosa-AI: goal to plan to executed tasks.
+
+This module owns :class:`Planner`, which turns a free-text goal into a
+literature-grounded, validated :class:`Plan` of :class:`PlanStep` objects and
+then executes each step through the Layer 2 evolution engine. It also defines
+the planner error surface: ``UserInterventionRequired``,
+``PlanValidationError``, and ``DependencyError``. The CLI goal mode
+(``sources/cli/onboard_cli.py``), the CSV benchmark mode
+(``sources/benchmark_evaluation/csv_mode.py``), the ``sources.core``
+re-exports, and the planner tests import this module. It runs when an
+operator starts a multi-step goal session or a benchmark evaluation, before
+any workflow executes.
+"""
+
 import json
 import os
 import re
@@ -37,36 +51,65 @@ from .workflow_selection import WorkflowSelector
 class UserInterventionRequired(Exception):
     """A decision needs a human, and no human is reachable.
 
-    Raised instead of blocking on ``input()`` when stdin is not a TTY, so an
-    unattended run fails with the question it could not ask rather than with
-    ``EOF when reading a line``.
+    ``start_planner`` and ``_request_human_plan_validation`` raise it when
+    plan approval is requested but stdin is not a TTY, so an unattended run
+    fails with the question it could not ask rather than with
+    ``EOF when reading a line``. Unattended callers catch it and turn plan
+    approval off.
     """
 
 
 class PlanValidationError(Exception):
-    """Exception raised when plan validation fails."""
+    """Raised when a generated plan fails structural validation.
+
+    ``make_plan`` and ``_parse_and_validate_plan`` raise it when the LLM plan
+    has no steps, an empty goal, or a step that cannot be built. Callers
+    catch it to retry plan generation.
+    """
     pass
 
 
 class DependencyError(Exception):
-    """Exception raised when task dependencies are not satisfied."""
+    """Raised when a task's dependencies are not satisfied.
+
+    It documents the dependency-gate failure case for planner users and is
+    re-exported by ``sources.core``. No code in this module raises it today;
+    the dependency gate currently reports through ``ValueError`` and console
+    messages.
+    """
     pass
 
 
 class Planner:
-    """
-    Enhanced planner class for long-term task planning with dependency management
-    and input/output verification.
+    """Layer 0 planner: decompose a goal and drive step execution.
+
+    The CLI goal mode, the CSV benchmark mode, and tests construct one
+    ``Planner`` per session right after config loading. The planner turns
+    the goal into a validated :class:`Plan`, runs every step through the
+    Layer 2 evolution engine, and records each outcome in ``task_history``.
+    Key invariant: ``task_history`` only grows with executed steps, and
+    ``current_plan`` always holds the accepted plan.
     """
 
     def __init__(self, config: "Config", enable_tts: bool = True) -> None:
-        """Initialize the planner.
+        """Set up planner state and collaborators.
+
+        The planner owner (CLI goal mode, CSV benchmark mode, tests) calls
+        it once, right after config loading. It stores the config, builds
+        the evolution engine, workflow selector, Pushover notifier, and TTS
+        service, resolves the planner LLM config from the configured model
+        pattern, and records the host platform for visualization choices.
 
         Args:
-            config: Configuration object exposing workspace paths, planner
-                LLM settings, Pushover credentials, and reasoning effort.
-            enable_tts: When True, instantiate a text-to-speech service used
-                for announcing task lifecycle events.
+            config: Runtime configuration object (from the run config file)
+                exposing workspace paths, planner LLM settings, Pushover
+                credentials, reasoning effort, and max_tokens.
+            enable_tts: When True (constructor default), instantiate a
+                text-to-speech service used for announcing task lifecycle
+                events.
+
+        Returns:
+            None.
 
         Raises:
             ValueError: If ``config`` is ``None``.
@@ -98,14 +141,19 @@ class Planner:
         self.tts = create_tts_service() if enable_tts else None
 
     def perspicacite_grounding(self, goal: str) -> str:
-        """Query Perspicacite-AI for literature-grounded planning guidance.
+        """Fetch literature-grounded planning guidance from Perspicacite-AI.
+
+        ``make_scientific_grounded_prompt`` calls it before plan generation,
+        passing the operator's free-text goal. It sends a fixed
+        literature-review prompt to the Perspicacite service
+        (``sources.utils.perspicacite_client``) and returns the service text.
 
         Args:
-            goal: The task description for which scientific context is needed.
+            goal: Free-text task description; comes from the operator's goal.
 
         Returns:
-            The literature-grounded response text, or a fallback message when
-            the service is unavailable or returns no relevant context.
+            str: The literature guidance text, or a fallback message when the
+            service fails or returns nothing.
         """
         prompt = f"""You are a scientific literature specialist supporting an AI expert on a task.
 
@@ -138,12 +186,19 @@ CONSTRAINTS: Prioritize reproducible, well-cited methods. Flag domain convention
             return "Query failed. Unable to help with scientific litterature"
 
     def make_scientific_grounded_prompt(self, goal: str) -> str:
-        """
-        Create a scientific-grounded prompt by incorporating relevant scientific knowledge.
+        """Wrap the goal with retrieved scientific context.
+
+        ``make_plan`` calls it to build the user prompt for each planning
+        round. It queries Perspicacite-AI for literature first, then embeds
+        that context plus the goal in a planning prompt that demands detailed
+        task descriptions with full input and output file paths.
+
         Args:
-            goal: The original goal description
+            goal: Original free-text goal; comes from the operator through
+                ``start_planner``.
+
         Returns:
-            str: Enhanced prompt with scientific context
+            str: The planning prompt with scientific context embedded.
         """
         print_phase(
             "🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
@@ -161,16 +216,28 @@ Important: Every task description should be very detailled and specific with the
 """
 
     def make_plan(self, system_prompt: str, goal_prompt: str, max_retries: int = 3) -> Plan:
-        """
-        Generate a workflow plan using the LLM with retry logic and multiple parsing strategies.
+        """Generate a validated plan from the planner LLM, with retries.
+
+        ``_generate_plan_with_human_validation`` calls it once per planning
+        round. It grounds the goal with literature, calls the planner LLM
+        through the cached ``LLMProvider("plan_creator")``, extracts the
+        JSON code block, and validates the plan; failed attempts wait with
+        exponential backoff and, after the first, retry with the error text
+        embedded. Exhausted attempts send a Pushover alert before raising.
+
         Args:
-            system_prompt: The system prompt for plan generation
-            goal_prompt: The goal description
-            max_retries: Maximum number of retry attempts (default: 3)
+            system_prompt: Planner system prompt; read from the configured
+                prompt file by ``_read_prompt``.
+            goal_prompt: Goal text, possibly already extended with the
+                workspace file listing, human feedback, or error context.
+            max_retries: Generation attempt budget; caller state, default 3.
+
         Returns:
-            Plan: Validated plan object
+            Plan: The validated plan.
+
         Raises:
-            ValueError: If plan generation or validation fails after all retries
+            ValueError: If either prompt is empty, or all attempts fail
+                (parsing, validation, or LLM transport errors).
         """
         if not system_prompt or not isinstance(system_prompt, str):
             raise ValueError("❌ Planner: system_prompt must be a non-empty string")
@@ -238,12 +305,17 @@ Important: Every task description should be very detailled and specific with the
         raise ValueError(f"❌ Planner: Failed to generate a valid plan from the LLM. {error_details}") from last_error
 
     def _parse_and_validate_plan(self, plan_dict: dict[str, Any], goal: str) -> Plan:
-        """
-        Parse and validate a plan dictionary into a Plan object.
+        """Convert a raw plan dictionary into a validated Plan.
+
+        ``make_plan`` calls it right after JSON extraction; the input is LLM
+        output. It checks the steps list, builds each ``PlanStep`` with
+        defaults for missing fields, anchors every step to the canonical
+        goal, and finally builds the validated ``Plan``.
 
         Args:
             plan_dict: Dictionary containing plan data, with at least a
-                non-empty ``"steps"`` list and optionally a ``"goal"`` string.
+                non-empty ``"steps"`` list and optionally a ``"goal"`` string;
+                comes from the LLM response.
             goal: Fallback goal text used when ``plan_dict`` does not supply
                 one, and as the canonical goal stored on the returned plan.
 
@@ -251,7 +323,8 @@ Important: Every task description should be very detailled and specific with the
             Plan: Validated plan object.
 
         Raises:
-            PlanValidationError: If plan validation fails.
+            PlanValidationError: If steps are missing, not a list, empty, or
+                a step or the plan cannot be constructed.
         """
         if "steps" not in plan_dict:
             raise PlanValidationError("❌ Planner: No steps found in the generated plan")
@@ -293,14 +366,17 @@ Important: Every task description should be very detailled and specific with the
 
     @staticmethod
     def _extract_json_from_code_block(text: str) -> dict[str, Any] | None:
-        """Extract JSON from markdown code blocks (```json ... ```).
+        """Pull a JSON object out of a fenced ```json code block.
+
+        ``make_plan`` calls it on the raw LLM response (LLM output). It
+        collects the lines inside the fenced block and parses them as JSON.
 
         Args:
             text: Raw text potentially containing a fenced JSON code block.
 
         Returns:
-            The decoded JSON object, or ``None`` when no JSON code block is
-            found.
+            dict[str, Any] | None: The decoded JSON object, or ``None`` when
+            no JSON code block is found.
 
         Raises:
             json.JSONDecodeError: If the extracted block is not valid JSON.
@@ -326,13 +402,19 @@ Important: Every task description should be very detailled and specific with the
 
     @staticmethod
     def _enhance_prompt_with_error(original_prompt: str, error_msg: str) -> str:
-        """
-        Enhance the prompt with error context for retry attempts.
+        """Fold the previous failure into the goal for the next retry.
+
+        ``make_plan`` calls it between retries (after the first attempt) so
+        the LLM avoids repeating the error. It embeds the error text plus
+        strict JSON formatting requirements above the original request.
+
         Args:
-            original_prompt: Original goal prompt
-            error_msg: Error message from previous attempt
+            original_prompt: Goal prompt of the current planning round.
+            error_msg: Error text from the failed attempt; comes from parse
+                or validation failures.
+
         Returns:
-            str: Enhanced prompt
+            str: The retry prompt with error context embedded.
         """
         enhancement = f"""
 IMPORTANT: Previous attempt failed with error:
@@ -350,12 +432,16 @@ Original request:
         return enhancement
 
     def _read_prompt(self) -> str:
-        """
-        Read the planner prompt from the configuration.
+        """Load the planner system prompt from the configured file.
+
+        ``_generate_plan_with_human_validation`` calls it once per planning
+        round. It reads ``config.prompt_planner`` from the file system.
+
         Returns:
-            str: The prompt content
+            str: The prompt file content.
+
         Raises:
-            RuntimeError: If prompt file cannot be read
+            RuntimeError: If the prompt file cannot be read.
         """
         try:
             with open(self.config.prompt_planner, encoding='utf-8') as f:
@@ -364,12 +450,20 @@ Original request:
             raise RuntimeError(f"❌ Planner: Error reading prompt: {str(e)}") from e
 
     def _build_knowledge_aware_task(self, task_description: str) -> str:
-        """
-        Create a task prompt that includes knowledge from previous tasks.
+        """Prefix a step task with answers learned from completed tasks.
+
+        ``run_attempts`` calls it before every evolution attempt; the input
+        is the wrapped step task text. It collects the final answers of
+        COMPLETED tasks in ``task_history`` and embeds them as prior
+        knowledge above the task.
+
         Args:
-            task_description: The current task description
+            task_description: Current step task text; comes from the plan
+                step.
+
         Returns:
-            str: Enhanced task description with previous knowledge
+            str: The task text unchanged when no completed answers exist,
+            else the text wrapped with a "learned knowledge" section.
         """
         if not self.task_history:
             return task_description
@@ -393,15 +487,19 @@ Original request:
         ])
 
     def _check_stop_condition(self, plan: Plan) -> bool:
-        """Return True if the plan contains an explicit ``stop`` step.
+        """Report whether the plan contains an explicit ``stop`` step.
+
+        ``start_planner`` calls it right after plan acceptance; the input is
+        the generated plan. It scans every step for the sentinel name or task
+        "stop" so the LLM can end a session without execution.
 
         Args:
             plan: The plan whose steps are scanned for a sentinel ``stop`` name
                 or task.
 
         Returns:
-            True when any step's task or name (case-insensitive, stripped)
-            equals ``"stop"``; False otherwise.
+            bool: True when any step's task or name (case-insensitive,
+            stripped) equals ``"stop"``; False otherwise.
         """
         for step in plan.steps:
             if step.task.lower().strip() == "stop" or step.name.lower().strip() == "stop":
@@ -409,10 +507,15 @@ Original request:
         return False
 
     def _display_plan(self, plan: Plan) -> None:
-        """
-        Display the plan steps in a readable format.
+        """Print the plan to the console for the operator.
+
+        ``_generate_plan_with_human_validation`` calls it before validation,
+        so goal-mode operators see what they approve. It prints the goal
+        and, per step, the name, complexity, task, dependencies, inputs, and
+        expected outputs.
+
         Args:
-            plan: The plan to display
+            plan: The plan to display.
         """
         print_phase("📋 EXECUTION PLAN")
         print(f"  {BOLD}Goal:{RESET} {plan.goal}\n")
@@ -428,8 +531,12 @@ Original request:
             print()
 
     def _request_human_plan_validation(self, plan: Plan) -> tuple[bool, str]:
-        """
-        Request human validation of the generated plan.
+        """Ask the operator to approve the displayed plan or send feedback.
+
+        ``_generate_plan_with_human_validation`` calls it when plan approval
+        is on, after ``_display_plan`` has printed the plan. It reads one
+        line from stdin: an empty line approves, typed text becomes
+        regeneration feedback.
 
         Args:
             plan: The plan presented to the user for review (used by the
@@ -464,11 +571,16 @@ Original request:
             return False, user_input
 
     def _generate_plan_with_human_validation(self, goal: str, human_approve: bool = False) -> Plan:
-        """
-        Generate a plan with iterative human validation and feedback loop.
+        """Generate a plan, looping until approval when validation is on.
+
+        ``start_planner`` calls it before any execution. Each round reads the
+        system prompt, generates a plan, displays it, and — when approval is
+        on — waits for the operator; typed feedback is folded into the next
+        goal.
 
         Args:
-            goal: The goal description for the planner.
+            goal: Free-text goal; comes from the operator via
+                ``start_planner``.
             human_approve: When True, prompt the user to approve or revise the
                 generated plan before accepting it; when False, the first
                 successfully generated plan is returned immediately.
@@ -478,6 +590,8 @@ Original request:
 
         Raises:
             ValueError: If plan generation fails.
+            UserInterventionRequired: If approval is requested but stdin is
+                not a TTY.
         """
         system_prompt = self._read_prompt()
         plan_approved = False
@@ -498,13 +612,16 @@ Original request:
         return plan
 
     def _init_visualization(self, plan: Plan) -> None:
-        """
-        Initialize the pygame visualization window.
-        On macOS, pygame must run on the main thread due to Cocoa requirements.
-        On Linux and Windows, it can run in a separate thread for better performance.
+        """Start the pygame visualization for the accepted plan.
+
+        ``start_planner`` calls it once, after the plan is accepted; the
+        input is the accepted plan. On macOS the window is driven from the
+        main thread (Cocoa requirement); on Linux and Windows a daemon
+        thread pumps events at 30 FPS. Any failure disables visualization,
+        and the run continues without it.
 
         Args:
-            plan: The execution plan to visualize
+            plan: The execution plan to visualize.
         """
         if not self.use_visualization:
             return
@@ -517,6 +634,11 @@ Original request:
             # On macOS, event handling must be done from main thread (will be called periodically)
             if not self.is_macos:
                 def visualization_loop():
+                    """Pump visualization events from the daemon thread.
+
+                    Only the non-macOS branch starts this thread; it drains
+                    window events at 30 FPS until the visualizer stops.
+                    """
                     import pygame
                     clock = pygame.time.Clock()
                     while self.visualizer and self.visualizer.is_running():
@@ -537,12 +659,16 @@ Original request:
             self.visualizer = None
 
     def _update_visualization(self, total_cost: float = 0.0) -> None:
-        """
-        Update the visualization with the current task states.
-        On macOS, also handle events since we can't use a separate thread.
+        """Refresh the visualization window with current task states.
+
+        ``start_planner`` calls it around every step; the input is the
+        running ``task_history`` and the cumulative cost. On macOS it also
+        pumps pygame events from the main thread, because no event thread
+        exists there. Errors are warned and swallowed so the run continues.
 
         Args:
-            total_cost: The cumulative cost to display
+            total_cost: Cumulative cost so far; accumulated by
+                ``start_planner``.
         """
         if self.visualizer and self.use_visualization:
             try:
@@ -555,8 +681,15 @@ Original request:
                 print_warn(f"Error updating visualization: {str(e)}")
 
     def _cleanup_visualization(self) -> None:
-        """
-        Clean up and close the visualization window.
+        """Close the visualization window and stop its event thread.
+
+        ``start_planner`` calls it on success and inside its error handler,
+        so the window never outlives the run. It stops the event loop,
+        closes the window, joins the thread for at most 0.5 s, and clears
+        the visualizer state. Errors are warned and swallowed.
+
+        Returns:
+            None.
         """
         if self.visualizer:
             try:
@@ -576,15 +709,19 @@ Original request:
 
 
     def _get_workspace_files(self) -> list[str]:
-        """
-        Get all files in the workspace directory recursively.
-        Paths are always returned with forward slashes so that comparisons
-        against plan-defined paths (which use forward slashes) work correctly
-        on every platform including Windows.
+        """List all workspace files recursively as relative POSIX paths.
+
+        Snapshot capture, input/output verification, and the produced-output
+        diff all call it; the input is the file system state under
+        ``workspace_path``. It skips hidden files and junk directories
+        (dot-folders, ``__pycache__``, ``node_modules``, ``.git``) and always
+        returns forward slashes so comparisons against plan-defined paths
+        work on every platform including Windows.
 
         Returns:
-            list[str]: List of relative file paths from workspace root
-                       using forward slashes as separator.
+            list[str]: Relative file paths from the workspace root, using
+            forward slashes as separator; empty when the workspace is
+            missing or the walk fails.
         """
         files = []
         try:
@@ -611,24 +748,36 @@ Original request:
         return files
 
     def _capture_workspace_snapshot(self) -> list[str]:
-        """
-        Capture a snapshot of current workspace files before step execution.
+        """Record the workspace file set before a step runs.
+
+        ``start_planner`` calls it immediately before ``run_attempts`` so the
+        step's produced outputs can be diffed afterwards. It stores the file
+        list on ``self._workspace_files_before_step``.
 
         Returns:
-            list[str]: The list of workspace files captured (also stored on
-            ``self._workspace_files_before_step`` for later diffing).
+            list[str]: The captured file list (the same list stored on
+            ``self._workspace_files_before_step``).
         """
         self._workspace_files_before_step = self._get_workspace_files()
         print_info(f"Workspace snapshot: {len(self._workspace_files_before_step)} file(s)")
         return self._workspace_files_before_step
 
     def _verify_required_inputs(self, step: PlanStep) -> tuple[bool, list[str]]:
-        """
-        Verify that all required inputs for a step are available.
+        """Check that a step's required inputs exist in the workspace.
+
+        No caller in the codebase today; it is the input-side gate that
+        pairs with ``_verify_expected_outputs``. It scans the current
+        workspace files and compares each declared input (normalised to
+        forward slashes) against them.
+
         Args:
-            step: The plan step to verify
+            step: The plan step whose ``required_inputs`` are checked; comes
+                from the accepted plan.
+
         Returns:
-            Tuple[bool, List[str]]: (all_available, missing_inputs)
+            tuple[bool, list[str]]: (all_available, missing_inputs) — True
+            when every required input exists, else the list of missing input
+            paths.
         """
         missing_inputs = []
 
@@ -642,13 +791,22 @@ Original request:
         return len(missing_inputs) == 0, missing_inputs
 
     def _verify_expected_outputs(self, step: PlanStep) -> tuple[bool, list[str]]:
-        """
-        Verify that expected outputs files were produced.
+        """Check that a step's expected outputs exist in the workspace.
+
+        ``_can_execute_step`` calls it for finished dependencies and
+        ``run_attempts`` for the just-finished step; the input is a
+        ``PlanStep``. A workspace file matches an expected output when its
+        path contains the expected path, or when at least 70 percent of the
+        expected file-stem words (split on ``_``, ``-``, ``.``) appear in
+        the file stem.
+
         Args:
-            step: The plan step
-            produced_outputs: List of actually produced outputs
+            step: The plan step whose ``expected_outputs`` are checked.
+
         Returns:
-            Tuple[bool, List[str]]: (all_produced, missing_outputs)
+            tuple[bool, list[str]]: (all_produced, missing_outputs) — True
+            when every expected output matches a workspace file, else the
+            list of unmatched expected paths.
         """
         missing_outputs = []
         workspace_files = self._get_workspace_files()
@@ -670,12 +828,20 @@ Original request:
         return len(missing_outputs) == 0, missing_outputs
 
     def _can_execute_step(self, step: PlanStep) -> tuple[bool, list[str]]:
-        """
-        Check if a step can be executed based on its dependencies.
+        """Check that a step's dependencies completed with outputs on disk.
+
+        ``start_planner`` calls it before each step that declares
+        dependencies; the input is the next ``PlanStep``. A dependency
+        passes when its ``Task`` in ``task_history`` is COMPLETED and its
+        expected outputs pass ``_verify_expected_outputs``.
+
         Args:
-            step: The plan step to check
+            step: The plan step to check.
+
         Returns:
-            Tuple[bool, List[str]]: (can_execute, missing_dependencies)
+            tuple[bool, list[str]]: (can_execute, missing_dependencies) —
+            True when every dependency is done, else the names of missing or
+            output-incomplete dependencies.
         """
         missing_deps = []
 
@@ -694,11 +860,22 @@ Original request:
         return len(missing_deps) == 0, missing_deps
 
     def request_user_exit(self, msg: str) -> None:
-        """Send a notification and prompt the user to continue or exit.
+        """Ask the operator to continue or abort when the run is stuck.
+
+        ``start_planner`` calls it when a step cannot proceed (for example on
+        missing dependencies). It sends a Pushover notification, prints the
+        message, and reads one y/n line from stdin.
 
         Args:
             msg: Message shown both in the Pushover notification body and
                 printed to stdout before the prompt.
+
+        Returns:
+            None: When the operator answers y or yes.
+
+        Raises:
+            SystemExit: When the operator answers anything else; the process
+                exits with status 1.
         """
         self.notifier.send_message(
             f"Mimosa is requesting exit:\n{msg}",
@@ -718,14 +895,22 @@ Original request:
         cached_wf_allow: bool = True,
         original_task: str | None = None,
     ) -> list[IndividualRun]:
-        """
-        Execute Iterative-Learning for a given task.
+        """Run one step's iterative learning, reusing cached workflows first.
+
+        ``run_attempts`` calls it for every attempt; the input is the
+        knowledge-wrapped task text. On the first attempt it looks for a
+        near-perfect cached workflow through the ``WorkflowSelector`` and,
+        when one succeeded before, returns that single run; otherwise it
+        starts a fresh evolution session (Layer 2) and returns its runs.
 
         Args:
-            task: Task description string (may be knowledge-wrapped).
-            judge: Whether to use judge evaluation.
+            task: Task description string (may be knowledge-wrapped); comes
+                from ``run_attempts``.
+            judge: Whether to use judge evaluation; comes from the run
+                configuration.
             cached_wf_allow: Whether to allow reusing high-quality cached
-                workflows discovered by the workflow selector.
+                workflows discovered by the workflow selector; True on the
+                first attempt only.
             original_task: Original unwrapped task for similarity matching;
                 used in preference to ``task`` for cache lookup.
 
@@ -794,15 +979,20 @@ Original request:
             raise ValueError(f"❌ Planner: Evolution execution failed: {str(e)}") from e
 
     def _get_evolve_success(self, run: IndividualRun) -> bool:
-        """Return the final success flag recorded in ``run.state_result``.
+        """Read the final success flag from a run's ``state_result``.
+
+        ``run_attempts`` calls it to decide step completion; the input is the
+        last ``IndividualRun`` of an attempt. It reads the last element of
+        ``state_result["success"]``, where the verifier persists per-step
+        success flags.
 
         Args:
             run: An individual evolution run whose ``state_result`` carries a
                 ``"success"`` list of booleans.
 
         Returns:
-            The last element of the ``success`` list, or ``False`` when the
-            field is missing or malformed.
+            bool: The last element of the ``success`` list, or ``False`` when
+            the field is missing or malformed.
         """
         run_state_result = getattr(run, 'state_result', None) or {}
         success_list = run_state_result.get('success', [False]) if isinstance(run_state_result, dict) else [False]
@@ -815,15 +1005,27 @@ Original request:
         step: PlanStep,
         judge: bool,
     ) -> PlanStep:
-        """
-        Execute multiple attempts for a step with comprehensive error handling.
+        """Execute one plan step with retries and record the outcome.
+
+        ``start_planner`` calls it for every step of the accepted plan. Each
+        attempt wraps the step task with prior knowledge, runs
+        ``evolve_runs``, and appends a ``Task`` to ``task_history``. A run
+        with success and a score of at least 0.7 is accepted after its
+        expected outputs are checked on disk; low scores retry until
+        ``max_attempts``. Attempt cost and the last score land on the step,
+        and TTS announces progress and results when enabled.
+
         Args:
-            attempt_counts: Dictionary tracking attempt counts per step
-            max_attempts: Maximum number of attempts allowed
-            step: The plan step to execute
-            judge: Whether to use judge evaluation
+            attempt_counts: Per-step attempt counters shared across the plan;
+                caller state from ``start_planner`` (recreated when None).
+            max_attempts: Retry budget per step; comes from
+                ``max_task_retry`` (clamped to at least 1 when invalid).
+            step: The plan step to execute; comes from the accepted plan.
+            judge: Whether to use judge evaluation; run configuration flag.
+
         Returns:
-            PlanStep: The updated step with execution status
+            PlanStep: The same step with cost, score, and status updated
+            (unchanged when ``step`` is None).
         """
         if step is None:
             print_err("Step is None, cannot execute")
@@ -929,17 +1131,29 @@ Original request:
         max_task_retry: int = 5,
         human_approve: bool = False,
     ) -> list[Task]:
-        """
-        Start the planner with a given goal with comprehensive error handling.
+        """Plan a goal and execute every step end to end.
+
+        The CLI goal mode and the CSV benchmark mode call it; the input is
+        the operator's free-text goal. It prepends the workspace file listing
+        to the goal, generates and approves a plan (optionally with a human
+        in the loop), runs every step with retries through the evolution
+        engine, notifies Pushover on failure and completion, and cleans up
+        the visualization window on any exit path.
+
         Args:
-            goal: The goal description for the planner
-            judge: Whether to use a judge for evaluation
-            max_task_retry: Maximum number of retries for each task
+            goal: Free-text operator goal.
+            judge: Whether to use a judge for evaluation; run configuration
+                flag, default True.
+            max_task_retry: Maximum number of retries for each task; caller
+                state, default 5.
             human_approve: When True, show the plan and wait for the operator
                 to approve it (Enter) or send it back with feedback before
                 any step runs. Interactive runs only.
+
         Returns:
-            List[Task]: List of executed tasks
+            List[Task]: The executed task history; returned early when the
+            plan carries the ``stop`` sentinel.
+
         Raises:
             ValueError: If goal is invalid or planning fails
             UserInterventionRequired: If approval was requested but stdin is

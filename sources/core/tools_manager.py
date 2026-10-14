@@ -1,5 +1,12 @@
-"""
-This class manages the discovery and interaction with MCP tools.
+"""MCP tool discovery and registration for the Mimosa-AI workflow stack.
+    This module owns Layer 1 tool discovery: it finds MCP servers through
+    ToolHive or by probing network addresses, normalizes their endpoint
+    URLs, and captures each server's tool list. The workflow runner
+    (Layer 3) imports ToolManager at start-up, discovers servers, and asks
+    it for the client prompt and client code that each agent embeds.
+    Discovery runs once per workflow; the generated client snippets then
+    run inside the sandboxed workflow.
+
 """
 
 import asyncio
@@ -22,23 +29,29 @@ from sources.cli.pretty_print import (
 def normalize_mcp_endpoint(
     raw_url: str, transport: str
 ) -> tuple[str, str, dict[str, Any]]:
-    """
-    Normalize MCP endpoint URL and transport for consistent client usage.
+    """Normalize an MCP endpoint URL and transport for client connections.
+        ToolHive discovery calls it with every server URL before building an
+        MCP descriptor, so all clients connect the same way. It strips the URL
+        fragment (keeping the container name as a hint), maps transport
+        aliases to canonical names, and appends the ``/mcp`` path for
+        streamable-http servers while keeping the original path for SSE.
 
-    Returns (url, transport, extra_params)
-    - Strips URL fragments (not sent over HTTP)
-    - Forces /mcp/ endpoint path for streamable-http servers
-    - Preserves /sse endpoint path for SSE servers
+        Args:
+            raw_url (str): Server URL from the ToolHive listing, possibly
+                carrying a fragment.
+            transport (str): Transport name from discovery or
+                auto-detection. Accepted: ``"stdio"``, ``"sse"``, ``"http"``,
+                ``"streamable-http"``, ``"streamable"``.
 
-    Args:
-        raw_url: Raw URL from ToolHive (may include fragment)
-        transport: Transport type (sse, streamable-http)
+        Returns:
+            tuple[str, str, dict[str, Any]]: Normalized URL, canonical
+            transport (``"sse"`` or ``"streamable-http"``), and an extras
+            dict holding ``container_hint`` when the URL carried a fragment.
 
-    Returns:
-        Tuple of (normalized_url, normalized_transport, extras_dict)
+        Raises:
+            ValueError: When the transport is not one of the accepted
+            names.
 
-    Raises:
-        ValueError: If transport type is unsupported
     """
     extras = {}
 
@@ -80,24 +93,47 @@ def normalize_mcp_endpoint(
 
 
 class Tool:
-    """Represent a single MCP tool with a name and human-readable description."""
+    """Name and describe one tool exposed by an MCP server.
+        ToolManager builds Tool instances while parsing a server's tool list,
+        and the client generators embed these fields into prompts and code.
+        Invariant: ``name`` is non-empty; ``description`` may be blank.
+
+    """
 
     def __init__(self, name: str, description: str = "") -> None:
-        """Initialize a Tool.
+        """Store the tool's name and description.
+            ToolManager calls it with fields parsed from a server's JSON tool
+            listing.
 
-        Args:
-            name: Identifier of the tool as exposed by the MCP server.
-            description: Optional human-readable description of the tool.
+            Args:
+                name (str): Tool identifier as exposed by the MCP server.
+                description (str): Human-readable tool text from the listing;
+                    defaults to empty.
+
+            Returns:
+                None.
+
         """
         self.name = name
         self.description = description
 
     def __repr__(self) -> str:
-        """Return a short string representation of the tool."""
+        """Return a one-line summary of the tool.
+            Logs and debugging code use it to show a tool compactly.
+
+            Returns:
+                str: ``"<name>: <description>"``.
+
+        """
         return f"""{self.name}: {self.description}"""
 
 class MCP:
-    """Represent a discovered MCP server and its available tools."""
+    """Describe one discovered MCP server and its tools.
+        ToolManager builds an MCP for every server found during discovery and
+        keeps the instances in its registry for later prompt and code
+        generation. Invariant: ``tools`` is always a list (never ``None``).
+
+    """
 
     def __init__(
         self,
@@ -110,20 +146,30 @@ class MCP:
         discovery_url: str | None = None,
         client_url: str | None = None,
     ) -> None:
-        """Initialize an MCP server descriptor.
+        """Store the server descriptor fields.
+            ToolManager calls it during discovery with values from the ToolHive
+            listing or from a network probe.
 
-        Args:
-            name: Display name for the MCP server.
-            tools: List of Tool instances exposed by the server. Defaults to an
-                empty list when None.
-            address: Hostname or IP address of the server.
-            port: TCP port the server listens on.
-            toolhive_name: ToolHive server name used for lifecycle management
-                commands (start/stop/restart).
-            transport: Transport type used to talk to the server. One of
-                ``"streamable-http"``, ``"sse"``, or ``"stdio"``.
-            discovery_url: URL used during discovery/testing of the server.
-            client_url: URL used for client connections at runtime.
+            Args:
+                name (str | None): Display name for the server, derived from the
+                    ToolHive name or from the probed port.
+                tools (list[Tool] | None): Tools exposed by the server; ``None``
+                    becomes an empty list.
+                address (str | None): Host name or IP the server listens on.
+                port (int | None): TCP port of the server.
+                toolhive_name (str | None): ToolHive server name used by
+                    lifecycle commands (stop, restart); ``None`` for
+                    network-discovered servers.
+                transport (str): Transport name: ``"streamable-http"``,
+                    ``"sse"``, or ``"stdio"``. Defaults to streamable-http.
+                discovery_url (str | None): Normalized URL used during
+                    discovery and testing.
+                client_url (str | None): Normalized URL used by generated
+                    clients at runtime.
+
+            Returns:
+                None.
+
         """
         self.name = name
         self.tools = tools if tools is not None else []
@@ -136,43 +182,70 @@ class MCP:
 
     @property
     def tool_names(self) -> list[str]:
-        """Get list of tool names for backwards compatibility.
+        """Expose the tool names without the Tool objects.
+            The client generators and tool verification use this to inspect a
+            server's tool set by name.
 
-        Returns:
-            List of tool name strings extracted from ``self.tools``.
+            Returns:
+                list[str]: Name of each tool in ``tools``; empty when the server
+                exposes none.
+
         """
         return [tool.name for tool in self.tools]
 
     def __repr__(self) -> str:
-        """Return a short string representation of the MCP server."""
+        """Return a one-line summary of the server.
+            Logs and debugging code use it to show a server compactly.
+
+            Returns:
+                str: Server name, tool count, and ``address:port``.
+
+        """
         return f"""{self.name}: {len(self.tools)} tools available | running on {self.address}:{self.port}"""
 
 
 class ToolManager:
-    """
-    Manager for MCP tools discovery and management.
-    This class manage provide method for discovery of MCPs either throught toolhive or on network (streamable-http MCP).
-    Due to some issue with latency/freezing of toolhive based MCPs we currently use network based MCPs only, but toolhive support is ready for possible future usage.
+    """Discover MCP servers and generate client prompts and code for them.
+        The workflow runner (Layer 3) creates one manager at start-up, runs
+        ``discover_mcp_servers``, and renders each found server into agent
+        client snippets. Two discovery backends exist: ToolHive lifecycle
+        commands and a direct network scan. Because ToolHive servers showed
+        latency and freezing in practice, the ToolHive branch is currently
+        disabled inside ``discover_mcp_servers``; the network scan stays live
+        and ToolHive support remains ready for future use. Invariant:
+        discovered servers accumulate in the ``mcps`` registry.
+
     """
 
     def __init__(self, config: "Config | None" = None, mcps: list[MCP] | None = None) -> None:
-        """Initialize the ToolManager.
+        """Create the manager and probe for ToolHive availability.
+            The workflow runner constructs it once per session, optionally
+            passing its Config and a pre-filled server list. It stores both and
+            records whether the ``thv`` command works.
 
-        Args:
-            config: Application Config instance. A default :class:`Config` is
-                instantiated when None.
-            mcps: Initial list of known MCP servers. Defaults to an empty list
-                when None.
+            Args:
+                config (Config | None): Application configuration object from
+                    the caller; a default Config is created when ``None``.
+                mcps (list[MCP] | None): Known servers from the caller; ``None``
+                    becomes an empty list.
+
+            Returns:
+                None.
+
         """
         self.mcps = mcps if mcps is not None else []
         self.use_toolhive = self._check_toolhive_available()
         self.config = config if config is not None else Config()
 
     def _check_toolhive_available(self) -> bool:
-        """Check if ToolHive is available on the system.
+        """Probe whether the ToolHive CLI is installed and working.
+            The constructor calls it once to set the ToolHive-usage flag. It runs
+            ``thv version`` with a five-second timeout and checks the exit code.
 
-        Returns:
-            True if the ``thv version`` command succeeds, False otherwise.
+            Returns:
+                bool: ``True`` when ``thv version`` exits zero; ``False`` when
+                the command fails, times out, or is missing.
+
         """
         try:
             result = subprocess.run(
@@ -187,13 +260,18 @@ class ToolManager:
             return False
 
     def _attempt_mcp_stop(self, mcp_name: str) -> bool:
-        """Attempt to stop a ToolHive MCP server.
+        """Stop one ToolHive server by name.
+            The full-restart helper calls it when a server exposes no tools and
+            must be recovered. It runs ``thv stop`` with a five-second timeout.
 
-        Args:
-            mcp_name: ToolHive server name to stop.
+            Args:
+                mcp_name (str): ToolHive server name from the discovery
+                    listing.
 
-        Returns:
-            True if the ``thv stop`` command succeeded, False otherwise.
+            Returns:
+                bool: ``True`` when ``thv stop`` exits zero; ``False`` on
+                failure, timeout, or missing binary.
+
         """
         try:
             result = subprocess.run(
@@ -210,13 +288,19 @@ class ToolManager:
             return False
 
     def _attempt_mcp_restart(self, mcp_name: str) -> bool:
-        """Attempt to restart a ToolHive MCP server.
+        """Restart one ToolHive server by name.
+            The full-restart helper calls it after a stop; ToolHive has no plain
+            start command, so restart is the only start path. It runs ``thv
+            restart`` with a five-second timeout.
 
-        Args:
-            mcp_name: ToolHive server name to restart.
+            Args:
+                mcp_name (str): ToolHive server name from the discovery
+                    listing.
 
-        Returns:
-            True if the ``thv restart`` command succeeded, False otherwise.
+            Returns:
+                bool: ``True`` when ``thv restart`` exits zero; ``False`` on
+                failure, timeout, or missing binary.
+
         """
         try:
             result = subprocess.run(
@@ -233,31 +317,37 @@ class ToolManager:
             return False
 
     def _attempt_full_mcp_restart(self, mcp_name: str) -> bool:
-        """Attempt to fully restart an MCP server (stop, then restart).
+        """Stop and then restart one ToolHive server.
+            Discovery calls it when a server answers but exposes no tools,
+            because a plain restart does not always recover a hanging server.
 
-        It appears mcp restart does not always work if the server is already
-        running or hanging, so this method first stops the server and then
-        restarts it.
+            Args:
+                mcp_name (str): ToolHive server name from the discovery
+                    listing.
 
-        Args:
-            mcp_name: ToolHive server name to fully restart.
+            Returns:
+                bool: ``True`` when both the stop and the restart succeed;
+                ``False`` when either step fails.
 
-        Returns:
-            True if both stop and restart succeeded, False otherwise.
         """
         if not self._attempt_mcp_stop(mcp_name):
             return False
         return self._attempt_mcp_restart(mcp_name)
 
     def _get_tools_with_descriptions(self, server_url: str) -> list[Tool]:
-        """Get tools with descriptions using the ``thv mcp list tools`` command.
+        """Fetch one server's tool list through the ToolHive CLI.
+            ToolHive discovery calls it with each server URL to fill MCP
+            descriptors. It runs ``thv mcp list tools`` in JSON mode with a
+            ten-second timeout, parses the listing, and skips tools whose fields
+            cannot be read.
 
-        Args:
-            server_url: URL of the MCP server to query.
+            Args:
+                server_url (str): Server URL from the discovery listing.
 
-        Returns:
-            List of :class:`Tool` instances parsed from the command output.
-            An empty list is returned on errors, timeouts, or JSON parse failures.
+            Returns:
+                list[Tool]: Parsed tools with names and descriptions; empty when
+                the command fails, times out, or the JSON cannot be parsed.
+
         """
         try:
             result = subprocess.run(
@@ -309,16 +399,18 @@ class ToolManager:
             return []
 
     async def discover_toolhive_servers(self) -> list[MCP]:
-        """Discover all MCP servers running via ToolHive.
+        """Find every running ToolHive server and its tools.
+            ``discover_mcp_servers`` normally skips this method, but the manager
+            keeps it for ToolHive deployments. It lists servers with ``thv list``,
+            skips entries that are not running or lack a URL, auto-detects the
+            transport from the URL path, normalizes the endpoint, and probes each
+            server for tools. A server without tools is stopped and restarted
+            once, and discovery then reruns from the start.
 
-        Queries ``thv list`` for running servers, normalizes their endpoints,
-        and probes each one for available tools. Servers that yield no tools
-        are restarted and discovery is retried.
+            Returns:
+                list[MCP]: Descriptors for running servers that expose tools;
+                empty when the listing fails or no server qualifies.
 
-        Returns:
-            List of :class:`MCP` descriptors for ToolHive servers that are
-            running and exposing at least one tool. Returns an empty list on
-            errors or timeouts.
         """
         try:
             result = subprocess.run(
@@ -434,17 +526,27 @@ class ToolManager:
         port_max: int = 5250,
         timeout: float = 2.0,
     ) -> list[MCP]:
-        """Discover MCP servers on an address across a port range.
+        """Probe one address across a port range for MCP servers.
+            Network discovery calls it for each configured discovery address. For
+            every port in the range it tries an MCP client connection to
+            ``http://<address>:<port>/mcp`` and records the servers that answer
+            with tools. The client connection itself uses a fixed three-second
+            timeout; the declared ``timeout`` argument is only reported in the
+            timeout log line.
 
-        Args:
-            address: Hostname or IP address to probe.
-            port_min: First port to probe (inclusive). Defaults to 5000.
-            port_max: Last port to probe (inclusive). Defaults to 5250.
-            timeout: Per-port timeout in seconds when probing. Defaults to 2.0.
+            Args:
+                address (str): Host name or IP to probe, from the config.
+                port_min (int): First port to probe, inclusive; config default
+                    5000.
+                port_max (int): Last port to probe, inclusive; config default
+                    5250.
+                timeout (float): Declared per-port probe timeout from the
+                    config, echoed in log output.
 
-        Returns:
-            List of :class:`MCP` descriptors for each port that responded with
-            at least one tool.
+            Returns:
+                list[MCP]: One descriptor per port that served tools, named
+                ``mcp_<port>``; empty when no port responds.
+
         """
         mcps = []
 
@@ -474,14 +576,16 @@ class ToolManager:
         return mcps
 
     async def discover_network_mcp_servers(self) -> list[MCP]:
-        """Discover MCP servers on the localhost network.
+        """Scan all configured discovery addresses for MCP servers.
+            ``discover_mcp_servers`` calls it as the live discovery path. It
+            walks the discovery addresses from the config, aggregates the
+            per-address probe results, and skips addresses that fail with a
+            logged error.
 
-        Iterates over ``self.config.discovery_addresses`` and probes each one
-        using :meth:`discover_mcp_at_address`.
+            Returns:
+                list[MCP]: Descriptors from every address that served tools;
+                empty when none respond or the config lists no addresses.
 
-        Returns:
-            List of :class:`MCP` descriptors aggregated across all configured
-            discovery addresses.
         """
         mcps = []
         for addr in self.config.discovery_addresses:
@@ -495,13 +599,17 @@ class ToolManager:
         return mcps
 
     async def verify_tools(self) -> bool:
-        """Verify that at least a bash tool (``execute_command``) is available.
+        """Check that at least one server exposes the shell tool.
+            The workflow runner calls it after discovery to confirm that agents
+            can execute commands. It scans the registered servers for a tool
+            named ``execute_command`` and waits two seconds before reporting
+            failure so the warning stays readable.
 
-        Scans every MCP in ``self.mcps`` for a tool named ``execute_command``.
+            Returns:
+                bool: ``True`` when any registered server exposes
+                ``execute_command``; ``False`` when none does or when a tool
+                object lacks the expected fields.
 
-        Returns:
-            True if any MCP exposes ``execute_command``, False otherwise (also
-            False if a tool object lacks the expected attributes).
         """
         bash_found = False
         for mcp in self.mcps:
@@ -518,18 +626,20 @@ class ToolManager:
         return True
 
     async def discover_mcp_servers(self) -> list[MCP]:
-        """Discover MCP servers via ToolHive and on the local network.
+        """Discover MCP servers through the live network path.
+            The workflow runner calls this entry point at start-up before
+            building agent clients. The ToolHive branch is currently disabled in
+            code, so only the network scan runs; found servers are appended to
+            the registry. When nothing is found it warns and returns an empty
+            list.
 
-        Due to freezing issues with ToolHive-based MCPs, the ToolHive discovery
-        path is currently disabled and only network-based MCPs are returned.
-        The discovered servers are also appended to ``self.mcps``.
+            Returns:
+                list[MCP]: The registry after discovery; empty when no server
+                was found.
 
-        Returns:
-            List of :class:`MCP` descriptors discovered. Returns an empty list
-            if no servers are found.
+            Raises:
+                RuntimeError: When discovery raises an unexpected error.
 
-        Raises:
-            RuntimeError: If the ToolHive discovery path raises an exception.
         """
         try:
             print_info("🔍 Discovering MCP servers via ToolHive...")
@@ -554,34 +664,40 @@ class ToolManager:
             ) from e
 
     def _get_client_variable_name(self, mcp: MCP) -> str:
-        """Generate a variable name for the MCP client based on its name.
+        """Derive the Python variable name for one server's tool collection.
+            The prompt and code generators call it so every generated snippet
+            binds the tools to a stable name. It upper-cases the server name,
+            replaces spaces with underscores, and appends ``_TOOLS``.
 
-        Args:
-            mcp: MCP server descriptor whose ``name`` field is used.
+            Args:
+                mcp (MCP): Server descriptor built during discovery.
 
-        Returns:
-            Upper-cased, underscore-separated variable name suffixed with
-            ``_TOOLS``.
+            Returns:
+                str: Variable name such as ``"MY_SERVER_TOOLS"``.
+
         """
         name = mcp.name
         name = name.replace(" ", "_").upper()
         return name + "_TOOLS"
 
     def get_client_prompt(self, mcp: MCP) -> str:
-        """Generate a prompt for the MCP client with tool descriptions.
+        """Render a text prompt describing one server's tools.
+            Agent builders embed this prompt in the model context so the model
+            knows which tool collection to call. It lists each tool name with the
+            first line of its description and binds the collection to the derived
+            variable name.
 
-        Args:
-            mcp: MCP server descriptor to describe in the prompt.
+            Args:
+                mcp (MCP): Server descriptor holding at least one tool.
 
-        Returns:
-            Multi-line prompt string listing each tool's name and first line of
-            its description.
+            Returns:
+                str: Multi-line prompt text naming the tool collection.
 
-        Raises:
-            AssertionError: If ``mcp`` is not an :class:`MCP` instance.
-            ValueError: If ``mcp.tools`` is empty.
-            AttributeError: If a tool is missing the required ``name``
-                attribute.
+            Raises:
+                AssertionError: When ``mcp`` is not an MCP instance.
+                ValueError: When the server exposes no tools.
+                AttributeError: When a tool lacks a usable name.
+
         """
         assert isinstance(mcp, MCP), "Expected MCP instance"
         if not mcp.tools:
@@ -610,20 +726,24 @@ class ToolManager:
         """
 
     def get_client_code(self, mcp: MCP) -> str:
-        """Generate transport-aware client code for a specific MCP server.
+        """Generate Python client code that binds one server's tools.
+            The workflow runner embeds this snippet in generated workflows so the
+            code can call the server's tools at runtime. It picks the endpoint
+            URL (client URL, then discovery URL, then ``address:port``
+            construction) and emits an smolagents MCPClient setup bound to the
+            derived variable name.
 
-        Args:
-            mcp: MCP server descriptor for which to generate client code.
+            Args:
+                mcp (MCP): Server descriptor built during discovery.
 
-        Returns:
-            Python source string that instantiates a Smolagents ``MCPClient``,
-            fetches its tools, and binds them to a variable named after the
-            server (see :meth:`_get_client_variable_name`).
+            Returns:
+                str: Python source snippet that creates the client and binds its
+                tools.
 
-        Raises:
-            ValueError: If ``mcp.tools`` is empty, if the transport is
-                ``"stdio"`` (unsupported), or if no URL information is
-                available to build an HTTP endpoint.
+            Raises:
+                ValueError: When the server exposes no tools, when the transport
+                is ``"stdio"``, or when no URL can be built.
+
         """
         if not mcp.tools:
             raise ValueError("MCP tools list cannot be empty.")

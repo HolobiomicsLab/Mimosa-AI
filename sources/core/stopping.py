@@ -22,6 +22,12 @@ and ships the final champion as the capsule.
 The controller is deliberately pure (no I/O, no engine imports): the
 engine creates it once per session, feeds it one ``observe()`` per
 completed generation, and asks ``should_stop()`` after each iteration.
+
+In Mimosa-AI's layered architecture this is the Layer 2 evolution engine's
+stop policy: ``sources/core/evolution_engine.py`` builds the controller
+from the run configuration's early-stop knobs at session start, and the
+stop-controller tests (``tests/evolution_engine_stop_test.py``,
+``tests/test_policy_bt_selection.py``) drive it directly.
 """
 
 from __future__ import annotations
@@ -36,9 +42,13 @@ VALID_STOP_MODES = ("auto", "threshold", "plateau", "none")
 class StopController:
     """Session-scoped stop decision for one evolution run.
 
-    The controller tracks a single champion uuid plus the number of
-    generations since the champion last changed, and converts that state
-    into a stop/no-stop decision. Mode semantics:
+    The evolution engine builds exactly one controller per session from the
+    run configuration's early-stop knobs, and the stop-controller tests
+    drive it directly. The controller tracks a single champion uuid plus the number
+    of generations since the champion last changed, and converts that state
+    into a stop/no-stop decision. Key invariant: only a head-to-head "won"
+    outcome against the current champion replaces the champion; ties and
+    failed generations only advance the plateau counter. Mode semantics:
 
     - ``"auto"`` — resolved once at construction from the verifier kind:
       ``plateau`` for relative verifiers (:data:`RELATIVE_VERIFIER_KINDS`),
@@ -49,18 +59,6 @@ class StopController:
     - ``"plateau"`` — champion-plateau rule; the threshold is ignored.
     - ``"none"`` — no early stop; only the ``max_iter`` hard cap applies.
 
-    Args:
-        mode: Requested stop mode (``auto`` is resolved, never stored).
-        min_iter: No early stop (any mode) before this many completed
-            generations. Clamped into ``[1, max_iter]``; ``1`` restores
-            the ungated legacy behaviour.
-        patience: Champion-plateau patience — stop once this many
-            consecutive generations failed to produce a new champion.
-        threshold: Reward threshold used by ``threshold`` mode only.
-        max_iter: The engine's hard generation cap; ``should_stop``
-            reports a ``max`` stop at the last iteration.
-        verifier_kind: Verifier kind used to resolve ``auto`` and to
-            decide whether capsule selection ships the champion.
     """
 
     def __init__(
@@ -72,6 +70,32 @@ class StopController:
         max_iter: int = 16,
         verifier_kind: str | None = None,
     ) -> None:
+        """Validate the mode, resolve ``auto``, and clamp the knobs.
+
+        The evolution engine calls it once per session; all inputs come from
+        the run configuration's early-stop knobs and the active verifier
+        kind. An unknown mode raises; ``auto`` resolves to
+        ``plateau`` for relative verifiers and ``threshold`` otherwise.
+
+        Args:
+            mode: Requested stop mode (``auto`` is resolved, never stored).
+            min_iter: No early stop (any mode) before this many completed
+                generations. Clamped into ``[1, max_iter]``; ``1`` restores
+                the ungated legacy behaviour.
+            patience: Champion-plateau patience — stop once this many
+                consecutive generations failed to produce a new champion.
+            threshold: Reward threshold used by ``threshold`` mode only.
+            max_iter: The engine's hard generation cap; ``should_stop``
+                reports a ``max`` stop at the last iteration.
+            verifier_kind: Verifier kind used to resolve ``auto`` and to
+                decide whether capsule selection ships the champion.
+
+        Returns:
+            None.
+
+        Raises:
+            ValueError: If ``mode`` is not one of :data:`VALID_STOP_MODES`.
+        """
         kind = str(verifier_kind or "").strip().lower()
         self._relative = kind in RELATIVE_VERIFIER_KINDS
         resolved = str(mode or "auto").strip().lower()
@@ -105,6 +129,11 @@ class StopController:
         failed: bool,
     ) -> None:
         """Record one completed generation.
+
+        The evolution engine calls it once per completed generation, passing
+        the arrival reward and the persisted head-to-head pair outcomes from
+        the verifier. It updates the champion and the plateau counter; the
+        next ``should_stop`` call reads that state.
 
         Args:
             uuid: The generation's workflow uuid (may be empty when
@@ -150,6 +179,12 @@ class StopController:
     def should_stop(self, iteration: int) -> tuple[bool, str]:
         """Decide whether the run stops after generation ``iteration``.
 
+        The evolution engine calls it after each iteration to gate the next
+        one; the input is the completed iteration index. The hard cap wins
+        first, then ``min_iter`` gates every early stop, then the mode rule
+        applies (threshold reads the last reward; plateau reads champion
+        stagnation; "none" never stops early).
+
         Args:
             iteration: 0-based iteration index that just completed.
 
@@ -187,37 +222,58 @@ class StopController:
     # ------------------------------------------------------------------ #
     @property
     def champion(self) -> str | None:
-        """Current champion uuid, or None while no real verdict arrived."""
+        """Current champion uuid, or None while no real verdict arrived.
+
+        The engine logs it between generations. Returns ``str | None``: the
+        reigning champion's uuid, None before the first non-error verdict.
+        """
         return self._champion
 
     @property
     def since_change(self) -> int:
-        """Generations since the champion last changed (failed incl.)."""
+        """Generations since the champion last changed (failed incl.).
+
+        The engine reads it for plateau logging. Returns ``int``: the count
+        of generations without a champion change, failed ones included.
+        """
         return self._since_change
 
     @property
     def last_reward(self) -> float | None:
-        """Most recently observed reward (any scale)."""
+        """Most recently observed reward (any scale).
+
+        The engine logs it between generations. Returns ``float | None``:
+        the reward of the last ``observe`` call, None before the first one.
+        """
         return self._last_reward
 
     @property
     def relative(self) -> bool:
-        """Whether the verifier reward is pairwise (relative)."""
+        """Whether the verifier reward is pairwise (relative).
+
+        The engine reads it when picking capsule-selection semantics.
+        Returns ``bool``: True for the relative verifier kinds.
+        """
         return self._relative
 
     @property
     def selects_champion(self) -> bool:
         """Whether capsule selection should ship the final champion.
 
-        True for the plateau/none modes with a relative verifier — the
-        argmax over arrival-moment rewards is meaningless across
-        generations there (a 1.0 vs 1 predecessor ranks equal to a 1.0
-        vs 10, and earlier generations can never be re-ranked).
+        The engine reads it when exporting the capsule after the run. True
+        for the plateau/none modes with a relative verifier — the argmax
+        over arrival-moment rewards is meaningless across generations there
+        (a 1.0 vs 1 predecessor ranks equal to a 1.0 vs 10, and earlier
+        generations can never be re-ranked). Returns ``bool``.
         """
         return self.mode in ("plateau", "none") and self._relative
 
     def resolution_note(self) -> str:
-        """One-line explanation of the resolved mode (for the [STOP] log)."""
+        """One-line explanation of the resolved mode (for the [STOP] log).
+
+        The engine logs it once at session start. Returns ``str``: the
+        threshold, patience, and iteration bounds of the resolved mode.
+        """
         if self.mode == "plateau":
             return (
                 "relative reward: threshold disabled; champion-plateau "
@@ -234,5 +290,9 @@ class StopController:
 
     @staticmethod
     def _tag(uuid: str) -> str:
-        """Short log tag for a uuid (full Mimosa uuids are long)."""
+        """Short log tag for a uuid (full Mimosa uuids are long).
+
+        Internal helper; the controller's own messages call it. Returns
+        ``str``: the last 8 characters, or the input unchanged when shorter.
+        """
         return uuid[-8:] if len(uuid) > 8 else uuid

@@ -1,9 +1,12 @@
-"""
-Core sub-package for Mimosa-AI.
+"""Core sub-package of Mimosa-AI: planning, crafting, running, evolving.
 
-Contains the central orchestration, planning, workflow management, LLM
-provider abstraction, and evolutionary-improvement machinery that drives
-the agent system.
+This package re-exports the central machinery of the layered system: the
+planner and data schemas (Layer 0), MCP tool discovery (Layer 1), the
+evolution engine with its selection and variation engines (Layer 2), and
+the code factories plus workflow runner (Layer 3). Callers import these
+names from ``sources.core`` instead of reaching into submodule files.
+Importing the package only wires the submodules together; it runs no
+agent logic itself.
 """
 
 from .llm_provider import LLMConfig, LLMProvider

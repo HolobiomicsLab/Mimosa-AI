@@ -1,3 +1,13 @@
+"""Multi-provider LLM access for every Mimosa-AI layer that calls a model.
+    This module wraps litellm behind two objects: LLMConfig, which holds model,
+    provider, key, and sampling settings from the config file, and LLMProvider,
+    which sends prompts, retries transient failures, and caches responses. The
+    Layer 0 planner, agent prompts, and the Layer 2 evolution engine obtain
+    their model clients through it. It runs on every LLM call and writes a
+    JSON call record per agent under the memory directory.
+
+"""
+
 import glob
 import json
 import logging
@@ -11,17 +21,20 @@ import litellm
 
 
 def extract_model_pattern(llm_model: str) -> tuple[str, str]:
-    """Split a model identifier into provider and model components.
+    """Split a model identifier into its provider and model parts.
+        Config parsing code uses this to turn a config-file model string such as
+        ``"openrouter/deepseek-v3"`` into routing fields. It receives the raw
+        model string and returns the part before the first slash and the part
+        after it. A string with no slash maps to provider ``"anthropic"``.
 
-    Supports the OpenRouter-style ``provider/model`` format and falls back to
-    ``"anthropic"`` as the provider for bare model names.
+        Args:
+            llm_model (str): Model identifier from the config file, with or
+                without a ``provider/`` prefix.
 
-    Args:
-        llm_model: Model identifier, optionally prefixed by a provider name
-            and a forward slash.
+        Returns:
+            tuple[str, str]: ``(provider, model)`` strings. The provider is
+            ``"anthropic"`` when the input carries no slash.
 
-    Returns:
-        Tuple of ``(provider, model)`` strings.
     """
     # Extract provider and model from OpenRouter format (provider/model)
     if "/" in llm_model:
@@ -35,7 +48,14 @@ def extract_model_pattern(llm_model: str) -> tuple[str, str]:
 
 @dataclass
 class LLMConfig:
-    """Configuration for Large Language Model interactions."""
+    """Hold model, provider, and sampling settings for one LLM endpoint.
+        Callers build it with explicit arguments or through ``from_dict`` from
+        the config file, then pass it to LLMProvider. As an invariant, after
+        construction the provider name is lower case, the temperature is a
+        float, and an empty key is filled from the provider's environment
+        variable.
+
+    """
 
     model: str = "anthropic/claude-sonnet-4-5"
     provider: str = "anthropic"
@@ -52,26 +72,36 @@ class LLMConfig:
     )
 
     def __init__(self, model: str = model, provider: str = provider, temperature: float = 1.0, key: str = "", reasoning_effort: str = "medium", max_tokens: int = 8192, openrouter_provider: list[str] | str | None = None, openrouter_quantizations: list[str] | tuple[str, ...] | None = ("bf16", "fp16", "fp8")) -> None:
-        """Initialize an LLMConfig from explicit arguments.
+        """Build a config from explicit arguments and validate it.
+            The config loader and default constructions call it with values read
+            from the config file or with class defaults. It stores the fields,
+            wraps a single-string provider preference into a list, copies the
+            quantization filter into a list, and runs the post-init validation.
 
-        Args:
-            model: Model identifier (e.g. ``"claude-sonnet-4-5"`` or
-                ``"anthropic/claude-sonnet-4-5"``).
-            provider: Provider name (lower-cased internally). Examples:
-                ``"anthropic"``, ``"openai"``, ``"deepseek"``, ``"openrouter"``.
-            temperature: Sampling temperature; coerced to float by
-                ``__post_init__``.
-            key: API key. If empty, the relevant ``*_API_KEY`` environment
-                variable is consulted.
-            reasoning_effort: One of ``"minimal"``, ``"low"``, ``"medium"``,
-                ``"high"``.
-            max_tokens: Maximum number of tokens to request from the model.
-            openrouter_provider: Provider routing for OpenRouter. A single
-                string is wrapped into a list. ``None`` disables provider
-                pinning.
-            openrouter_quantizations: Quantization exclusion filter for
-                OpenRouter. ``None`` disables the filter; an iterable is
-                converted to a list of strings.
+            Args:
+                model (str): Model identifier from the config file, with or
+                    without a ``provider/`` prefix.
+                provider (str): Provider name from the config file, stored lower
+                    case. Examples: ``"anthropic"``, ``"openai"``, ``"deepseek"``,
+                    ``"openrouter"``.
+                temperature (float): Sampling temperature from the config file.
+                key (str): API key from the config file. When empty, the
+                    provider's ``*_API_KEY`` environment variable fills it.
+                reasoning_effort (str): Reasoning effort from the config file.
+                    One of ``"minimal"``, ``"low"``, ``"medium"``, ``"high"``.
+                max_tokens (int): Token budget per request from the config file.
+                openrouter_provider (list[str] | str | None): OpenRouter provider
+                    preference from the config file. A string becomes a one-item
+                    list; ``None`` disables provider pinning.
+                openrouter_quantizations (list[str] | tuple[str, ...] | None):
+                    Quantization exclusion filter for OpenRouter from the config
+                    file. ``None`` disables the filter; the tuple default selects
+                    the runtime safety filter. Stored as a list.
+
+            Raises:
+                ValueError: When ``reasoning_effort`` is not an allowed value
+                (raised by the post-init validation this constructor runs).
+
         """
         self.model = model
         self.provider = provider.lower()
@@ -91,7 +121,17 @@ class LLMConfig:
         self.__post_init__()
 
     def __post_init__(self) -> None:
-        """Validate configuration after initialization."""
+        """Fill provider defaults and validate the reasoning effort.
+            The constructor runs it right after storing the fields. It reads the
+            provider environment variables when the key is empty, coerces the
+            temperature to float, and checks the reasoning effort against the
+            allowed set.
+
+            Raises:
+                ValueError: When ``reasoning_effort`` is not one of
+                ``"minimal"``, ``"low"``, ``"medium"``, or ``"high"``.
+
+        """
         # Set appropriate API key based on provider
         if self.provider == "anthropic" and not self.key:
             self.key = os.getenv("ANTHROPIC_API_KEY", "")
@@ -127,19 +167,19 @@ class LLMConfig:
 
     @classmethod
     def from_dict(cls, config: dict[str, Any] | None = None) -> "LLMConfig":
-        """Construct an :class:`LLMConfig` from a dictionary.
+        """Build a config from a plain dictionary.
+            Call sites that hold settings as dicts use this constructor to adapt
+            them without mutating the dict. Missing keys fall back to the
+            constructor defaults, and the quantization filter is forwarded only
+            when the dict contains it.
 
-        Maintains backward compatibility with callers that pass configuration
-        as a plain dict. Missing keys fall back to constructor defaults.
-        ``openrouter_quantizations`` is only forwarded when explicitly present
-        in ``config``.
+            Args:
+                config (dict[str, Any] | None): Settings from the config file.
+                    ``None`` is treated as an empty mapping.
 
-        Args:
-            config: Mapping of configuration values. ``None`` is treated as an
-                empty mapping.
+            Returns:
+                LLMConfig: A new validated instance built from the mapping.
 
-        Returns:
-            A new :class:`LLMConfig` instance.
         """
         config = config or {}
         kwargs = dict(
@@ -159,14 +199,15 @@ class LLMConfig:
 
 
 class LLMProvider:
-    """Handles interactions with various LLM APIs including OpenAI, Anthropic, and DeepSeek.
+    """Send prompts to the configured provider and return text responses.
+        The planner, agents, and workflow steps that need model output hold one
+        instance built from an LLMConfig. On top of litellm it adds disk
+        caching keyed by agent name, retry with backoff, temperature and
+        quantization fallbacks, token-budget handling, and usage accounting.
+        Invariant: the first exactly matching cached response wins, and each
+        successful call is saved as a JSON record when a memory path and an
+        agent name are set.
 
-    Supported providers:
-    - anthropic: Claude models (claude-3-5-sonnet, claude-3-opus, etc.)
-    - openai: GPT models (gpt-4, gpt-3.5-turbo, o1, o3, etc.)
-    - deepseek: DeepSeek models (deepseek-chat, deepseek-coder, etc.)
-
-    Uses litellm for unified API access across providers.
     """
 
     def __init__(
@@ -177,17 +218,28 @@ class LLMProvider:
         config: LLMConfig | None = None,
         use_flat_cache: bool = False,
     ) -> None:
-        """Initialize the LLM provider with API clients.
+        """Create a provider for one agent and its cache location.
+            The workflow runner and agents construct it at start-up with the agent
+            name, the memory directory, and an LLMConfig. It stores these values
+            and creates a named logger; no network call happens here.
 
-        Args:
-            agent_name: Name of the agent for cache identification.
-            memory_path: Path to memory directory used for cache files.
-            system_msg: System message prepended to every prompt.
-            config: LLM configuration. A default :class:`LLMConfig` is created
-                when None.
-            use_flat_cache: If True, cache files are stored/searched directly
-                in ``memory_path`` without UUID subfolders (useful for plan
-                generation).
+            Args:
+                agent_name (str | None): Agent identifier from the caller; it
+                    names the cache file. ``None`` disables cache lookups.
+                memory_path (str | None): Memory directory from the caller;
+                    cache records are written under it. ``None`` disables saving.
+                system_msg (str | None): System message from the caller,
+                    prepended to every prompt. ``None`` sends no system message.
+                config (LLMConfig | None): Model and sampling settings from the
+                    config file. A default LLMConfig is built when ``None``.
+                use_flat_cache (bool): Cache mode flag from the caller. ``True``
+                    reads and writes ``<memory_path>/<agent_name>.json`` directly;
+                    ``False`` searches UUID subfolders of the memory directory's
+                    parent (defaulting to ``sources/memory`` when unset).
+
+            Returns:
+                None.
+
         """
         if not config:
             config = LLMConfig()
@@ -201,11 +253,15 @@ class LLMProvider:
         self.logger = logging.getLogger(__name__)
 
     def _supports_reasoning_tokens(self) -> bool:
-        """Check if the current model supports reasoning tokens.
+        """Report whether the configured model supports reasoning controls.
+            ``__call__`` consults this before adding reasoning-effort parameters.
+            It matches the lower-cased model name from the config against known
+            reasoning-capable markers, so it needs no network access.
 
-        Returns:
-            True if the model name contains a known reasoning-capable marker
-            (see the list below), False otherwise.
+            Returns:
+                bool: ``True`` when the model name contains a known marker, else
+                ``False``.
+
         """
         model_name = self.config.model.lower()
         reasoning_models = [
@@ -220,45 +276,62 @@ class LLMProvider:
         return any(reasoning_model in model_name for reasoning_model in reasoning_models)
 
     def _is_claude_model(self) -> bool:
-        """Check if the current model is a Claude model.
+        """Report whether the target model is a Claude model.
+            ``__call__`` uses this to omit temperature and reasoning parameters
+            that Anthropic endpoints reject or ignore. It checks the provider
+            field and the model name from the config.
 
-        Returns:
-            True when the provider is ``"anthropic"`` or the model name
-            contains ``"claude"``, False otherwise.
+            Returns:
+                bool: ``True`` when the provider is ``"anthropic"`` or the model
+                name contains ``"claude"``, else ``False``.
+
         """
         return self.config.provider == "anthropic" or "claude" in self.config.model.lower()
 
     def _token_budget_param(self) -> str:
-        """Name of the completion-budget parameter the endpoint expects.
+        """Return the token-budget parameter name the endpoint expects.
+            ``__call__`` uses this key when building completion parameters,
+            because OpenAI's newer models reject the legacy ``max_tokens`` name
+            while other providers still expect it. It reads the provider from the
+            config.
 
-        OpenAI deprecated ``max_tokens`` in favour of
-        ``max_completion_tokens`` and its newer models hard-reject
-        ``max_tokens`` with a 400 (litellm only rewrites the param for
-        models it knows, so unreleased ones like ``gpt-6.1-sol`` leak the
-        legacy param through). ``max_completion_tokens`` is accepted by
-        every OpenAI chat model; all other providers keep ``max_tokens``.
+            Returns:
+                str: ``"max_completion_tokens"`` for the ``"openai"`` provider,
+                else ``"max_tokens"``.
 
-        Returns:
-            ``"max_completion_tokens"`` for the openai provider, else
-            ``"max_tokens"``.
         """
         return "max_completion_tokens" if self.config.provider == "openai" else "max_tokens"
 
     def _supports_prompt_caching(self) -> bool:
-        """True for providers that honour Anthropic-style ``cache_control`` hints.
+        """Report whether the provider honours explicit cache breakpoints.
+            ``_apply_cache_control`` consults this before marking the system
+            message. It reads the provider from the config and needs no network
+            access.
 
-        Anthropic direct caches the marked prefix; OpenRouter forwards the
-        hint to upstreams that support it and silently ignores it elsewhere.
-        OpenAI caches long prompts automatically and needs no flag.
+            Returns:
+                bool: ``True`` for the ``"anthropic"`` and ``"openrouter"``
+                providers, else ``False``.
+
         """
         return self.config.provider in ("anthropic", "openrouter")
 
     def _apply_cache_control(self, messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """Return a copy of ``messages`` with an ephemeral breakpoint on the system block.
+        """Copy the message list and mark the system block as cacheable.
+            ``__call__`` passes each request's message list so repeated prefixes
+            hit the provider prompt cache. The input list is left untouched; only
+            a plain string system message gains an ephemeral cache-control
+            breakpoint, and only when a system message exists and the provider
+            supports caching.
 
-        Leaves the input list untouched so persistence and the exact-match
-        disk cache keep their plain-string shape. Only the system message is
-        marked — one of Anthropic's four allowed breakpoints.
+            Args:
+                messages (list[dict[str, Any]]): Chat messages built by
+                    ``__call__`` from the system message and the user prompt.
+
+            Returns:
+                list[dict[str, Any]]: A copy of the messages with the system
+                block marked. The unchanged input list when caching does not
+                apply.
+
         """
         if not self.sys_msg or not self._supports_prompt_caching():
             return messages
@@ -279,28 +352,38 @@ class LLMProvider:
         return out
 
     def save_call(self, call: dict[str, Any]) -> None:
-        """Save the API call details to a JSON file.
+        """Persist one call record as JSON next to the agent's cache files.
+            ``__call__`` invokes it after each successful completion so later
+            runs and spend reports can audit the exchange. It writes the record
+            dict to ``<memory_path>/<agent_name>.json``, overwriting any previous
+            record.
 
-        Args:
-            call: Dictionary containing API call details to persist. Written
-                to ``<memory_path>/<agent_name>.json``.
+            Args:
+                call (dict[str, Any]): Call record built by ``__call__`` from the
+                    API response, the message list, and the effective settings.
+
+            Returns:
+                None.
+
         """
         path = os.path.join(self.memory_path, f"{self.agent_name}.json")
         with open(path, "w") as f:
             json.dump(call, f, indent=2)
 
     def _find_cache_match(self, prompt: str) -> str | None:
-        """Look up a cached response matching the current agent and prompt.
+        """Look up a cached response for this agent and exact prompt.
+            ``__call__`` calls it first on every request so identical agent,
+            system-message, and prompt triples reuse the stored answer without a
+            network call. It compares the expected message list against each
+            candidate cache record and returns the first exact match.
 
-        Searches either flat cache (single ``<memory_path>/<agent>.json`` file)
-        or UUID-subfolder cache depending on ``self.use_flat_cache``.
+            Args:
+                prompt (str): User prompt text from the caller.
 
-        Args:
-            prompt: User prompt to match against cached messages.
+            Returns:
+                str | None: Cached response text from the matching record, else
+                ``None`` when no record matches or caching is disabled.
 
-        Returns:
-            Cached response string when an exact message-list match is found,
-            otherwise None.
         """
         if not self.agent_name:
             return None
@@ -353,15 +436,21 @@ class LLMProvider:
         return None
 
     def _messages_match(self, expected: list[dict[str, Any]], cached: list[dict[str, Any]]) -> bool:
-        """Compare two message arrays for exact role/content match.
+        """Compare two message lists field by field.
+            ``_find_cache_match`` uses it to decide whether a cache record was
+            produced for exactly the current conversation. It checks equal length
+            and equal ``role`` and ``content`` at every position.
 
-        Args:
-            expected: Message list assembled from current sys_msg and prompt.
-            cached: Message list loaded from a cache file.
+            Args:
+                expected (list[dict[str, Any]]): Messages built from the current
+                    system message and prompt.
+                cached (list[dict[str, Any]]): Messages loaded from a cache
+                    record.
 
-        Returns:
-            True when both lists have identical length and identical
-            ``role``/``content`` values per position, False otherwise.
+            Returns:
+                bool: ``True`` when both lists match position for position, else
+                ``False``.
+
         """
         if len(expected) != len(cached):
             return False
@@ -379,30 +468,54 @@ class LLMProvider:
 
     @staticmethod
     def _is_temperature_error(error: Exception) -> bool:
-        """True when the API rejected ``temperature``, read from ``error.param``."""
+        """Decide whether an API error rejected the temperature parameter.
+            The retry loop in ``__call__`` consults it to fall back to temperature
+            1.0. It inspects the ``param`` attribute that provider SDK errors
+            carry.
+
+            Args:
+                error (Exception): Exception raised by the API call.
+
+            Returns:
+                bool: ``True`` when the error names ``"temperature"`` as the
+                rejected parameter, else ``False``.
+
+        """
         return getattr(error, "param", None) == "temperature"
 
     @staticmethod
     def _is_quantization_routing_error(error: Exception) -> bool:
-        """True when OpenRouter found no live endpoint for the requested quantizations.
+        """Decide whether OpenRouter rejected the quantization filter.
+            The retry loop in ``__call__`` consults it to drop the filter and
+            retry. It matches OpenRouter's "no endpoints found" failure text with
+            a quantization mention, which appears when the filter excludes every
+            live endpoint.
 
-        OpenRouter answers 404 ("No endpoints found for the request with
-        quantization: ...") when the ``quantizations`` routing filter excludes
-        every provider currently serving the model — e.g. stale precheck data
-        or an endpoint that was requantized. Dropping the filter lets
-        OpenRouter route to any available endpoint.
+            Args:
+                error (Exception): Exception raised by the API call.
+
+            Returns:
+                bool: ``True`` when the error text names both missing endpoints
+                and quantization, else ``False``.
+
         """
         error_str = str(error).lower()
         return "no endpoints found" in error_str and "quantization" in error_str
 
     def _is_retryable_error(self, error: Exception) -> bool:
-        """Check if an error is retryable (temporary/transient).
+        """Decide whether a failed API call is worth retrying.
+            The retry loop in ``__call__`` consults it before backing off. It
+            matches the error type name and message text against transient
+            failure patterns such as overload, rate limits, timeouts, and
+            context-window errors.
 
-        Args:
-            error: The exception to check
+            Args:
+                error (Exception): Exception raised by the API call.
 
-        Returns:
-            True if the error is retryable, False otherwise
+            Returns:
+                bool: ``True`` for known transient or context-window errors, else
+                ``False``.
+
         """
         error_type_name = type(error).__name__.lower()
         error_str = str(error).lower()
@@ -429,14 +542,19 @@ class LLMProvider:
         return any(pattern in error_str for pattern in retryable_patterns)
 
     def _calculate_backoff_wait(self, attempt: int, max_wait: int = 500) -> float:
-        """Calculate exponential backoff with jitter.
+        """Compute the wait time before the next retry attempt.
+            The retry loop in ``__call__`` sleeps for this duration between
+            attempts. It doubles the base wait with each attempt and adds up to
+            10 percent jitter, capped at the maximum wait.
 
-        Args:
-            attempt: The attempt number (0-indexed)
-            max_wait: Maximum wait time in seconds (default 500s)
+            Args:
+                attempt (int): Zero-indexed retry attempt number from the loop.
+                max_wait (int): Upper bound in seconds; the loop passes 500.
 
-        Returns:
-            Number of seconds to wait before the next attempt
+            Returns:
+                float: Seconds to sleep before the next attempt, never above
+                ``max_wait``.
+
         """
         # Exponential backoff: 2^attempt with jitter
         base_wait = min(2 ** attempt, max_wait)
@@ -447,7 +565,18 @@ class LLMProvider:
 
     @staticmethod
     def _usage_dict(usage: Any) -> dict:
-        """Plain dict from a litellm usage object ({} when absent)."""
+        """Convert a litellm usage object into a plain dict.
+            ``_merge_usage`` and ``__call__`` use it for token accounting across
+            retries. It copies dict input, unwraps objects exposing ``json()``,
+            and yields an empty dict when usage is missing or unreadable.
+
+            Args:
+                usage (Any): Usage object from a litellm response, or ``None``.
+
+            Returns:
+                dict: Plain token-counter mapping; empty when nothing is usable.
+
+        """
         if usage is None:
             return {}
         if isinstance(usage, dict):
@@ -459,11 +588,20 @@ class LLMProvider:
 
     @classmethod
     def _merge_usage(cls, acc: dict | None, usage: Any) -> dict:
-        """Sum token counters across retry attempts (P5.3).
+        """Add one attempt's usage counters into the accumulated totals.
+            ``__call__`` merges the usage of abandoned retry attempts so per-agent
+            spend reflects the full cost of a request. Numeric values are summed;
+            other values keep the latest reading; booleans are skipped.
 
-        Numeric fields (tokens) add up; anything non-numeric keeps the
-        latest value. The result replaces ``usage`` in the dumped call
-        record so per-agent spend reflects the FULL cost of retries.
+            Args:
+                acc (dict | None): Totals merged so far, or ``None`` on the
+                    first call.
+                usage (Any): Usage object from the attempt being merged, or
+                    ``None``.
+
+            Returns:
+                dict: New mapping with summed numeric counters.
+
         """
         out = dict(acc or {})
         for k, v in cls._usage_dict(usage).items():
@@ -476,24 +614,34 @@ class LLMProvider:
         return out
 
     def __call__(self, prompt: str, timeout: int = 180, use_cache: bool = True) -> str:
-        """Send a prompt to the configured LLM and return its text response.
+        """Return the model's text answer for a prompt.
+            Agents, the planner, and workflow steps call the provider instance
+            directly with prompt text and read the returned string. It checks the
+            cache first, then calls litellm with retries, backoff, and fallbacks:
+            a rejected temperature falls back to 1.0, a rejected quantization
+            filter is dropped, context-window errors shrink the user prompt up to
+            three times, and a length-truncated answer is retried once with a
+            doubled token budget capped at 32768. Non-retryable failures raise,
+            as does retry exhaustion. On success it logs token usage, saves the
+            call record when a memory path and an agent name are set, and returns
+            the text.
 
-        Wraps the call in caching, retry-with-backoff, optional context-window
-        shrinkage, and result persistence.
+            Args:
+                prompt (str): User prompt text from the caller.
+                timeout (int): Per-attempt request timeout in seconds from the
+                    caller; defaults to 180.
+                use_cache (bool): Cache flag from the caller. ``True`` returns a
+                    cached answer when one matches; ``False`` always calls the
+                    API.
 
-        Args:
-            prompt: User prompt to send.
-            timeout: Per-attempt timeout in seconds for the underlying
-                ``litellm.completion`` call. Defaults to 180.
-            use_cache: When True, attempt to return a cached response before
-                making a network call. Defaults to True.
+            Returns:
+                str: Response text, or ``"<LLM response error>"`` when the model
+                returns null content.
 
-        Returns:
-            Text content of the LLM's response (cached or freshly produced).
+            Raises:
+                RuntimeError: On a non-retryable API error, or when retries are
+                exhausted.
 
-        Raises:
-            RuntimeError: When a non-retryable error is raised by the
-                underlying API call.
         """
         cached_response = self._find_cache_match(prompt) if use_cache else None
         if cached_response:
