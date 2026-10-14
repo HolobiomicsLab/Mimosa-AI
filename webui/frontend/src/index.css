@@ -352,34 +352,51 @@ textarea.input { resize: vertical; line-height: 1.5; }
 .log-tail { max-height: 420px; background: #090d14; }
 .log-tail.failed { border-color: #ef6a6a88; }
 
-/* ── per-claim verification breakdown ── */
-.claim-list { margin-top: 14px; display: flex; flex-direction: column; gap: 1px; }
-.claim-row {
-  display: flex; gap: 10px; padding: 9px 2px; border-top: 1px solid var(--border);
+/* ── Policy-BT verification (VerificationPanel) ── */
+.vstack { display: flex; flex-direction: column; gap: 18px; }
+.outcome-bar { height: 8px; border-radius: 5px; overflow: hidden; display: flex; background: var(--panel-2); }
+.gate-reason {
+  font-size: 13px; line-height: 1.45; padding: 9px 12px; margin-bottom: 12px;
+  border: 1px solid; border-radius: 8px;
 }
-.claim-status {
-  flex: none; align-self: flex-start; margin-top: 1px; width: 52px; text-align: center;
+.gate-reason.ok { color: var(--ok); border-color: #4ec98a55; background: #4ec98a12; }
+.gate-reason.bad { color: var(--bad); border-color: #ef6a6a66; background: #ef6a6a12; }
+.verdict-list { display: flex; flex-direction: column; }
+.verdict-row { display: flex; gap: 10px; padding: 10px 2px; border-top: 1px solid var(--border); }
+.verdict-row:first-child { border-top: none; padding-top: 0; }
+.verdict-badge {
+  flex: none; align-self: flex-start; margin-top: 1px; width: 46px; text-align: center;
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
   padding: 2px 0; border-radius: 5px; color: #0b0e14;
 }
-.claim-status.ok { background: var(--ok); }
-.claim-status.bad { background: var(--bad); }
-.claim-status.warn { background: var(--warn); }
-.claim-status.dim { background: #6b7688; }
-.claim-body { min-width: 0; flex: 1; }
-.claim-desc { font-size: 13px; line-height: 1.4; }
-.claim-details { font-size: 12px; color: var(--text-dim); margin-top: 3px; line-height: 1.45; }
-.claim-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 5px; }
-.claim-tags .muted { font-size: 10.5px; }
-.claim-file {
+.verdict-badge.ok { background: var(--ok); }
+.verdict-badge.bad { background: var(--bad); }
+.verdict-badge.dim { background: #6b7688; }
+.verdict-body { min-width: 0; flex: 1; }
+.verdict-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; }
+.verdict-text { font-size: 13px; line-height: 1.45; margin-top: 5px; white-space: pre-wrap; }
+.verdict-sub { font-size: 12px; color: var(--text-dim); margin-top: 3px; line-height: 1.45; }
+.verdict-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 6px; }
+.verdict-tags .muted { font-size: 10.5px; }
+.verdict-file {
   font-family: var(--mono); font-size: 10.5px; color: var(--text-dim);
   background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; padding: 0 6px;
 }
-.claim-toggle {
-  align-self: flex-start; margin-top: 8px; background: transparent; border: none;
-  color: var(--accent); font-size: 12px; padding: 2px 0;
+.verdict-file.ok { color: var(--ok); border-color: #4ec98a55; }
+.verdict-file.bad { color: var(--bad); border-color: #ef6a6a66; }
+.link-btn {
+  background: transparent; border: none; padding: 0;
+  color: var(--accent); font-size: 12px;
 }
-.claim-toggle:hover { background: transparent; text-decoration: underline; }
+.link-btn:hover { background: transparent; text-decoration: underline; }
+details.vdetails { margin-top: 8px; }
+details.vdetails > summary { cursor: pointer; color: var(--accent); font-size: 12px; padding: 2px 0; }
+.vdetails-body { padding: 6px 0 2px; display: flex; flex-direction: column; gap: 6px; }
+.vtable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.vtable th, .vtable td { text-align: left; padding: 5px 8px; border-top: 1px solid var(--border); vertical-align: top; }
+.vtable th { color: var(--text-faint); font-weight: 500; border-top: none; }
+.vtable tr.differs td { background: #f2c14e0d; }
+.vtable tr.decisive td { background: #f2c14e24; }
 
 .banner.error { border-color: #ef6a6a66; background: #ef6a6a12; color: var(--bad); margin-bottom: 12px; }
 .banner.error a, .banner.error code { color: inherit; }

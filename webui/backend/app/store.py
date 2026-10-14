@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .settings import get_settings
+from .verification import read_policy_bt_report
 
 # A run dir is recognised by any of these artifacts existing inside it.
 _RUN_MARKERS = ("run_metrics.json", "state_result.json")
@@ -131,67 +132,6 @@ def read_evaluation_scores(run_id: str) -> dict[str, Any] | None:
         else:
             scores[key] = val
     return scores
-
-
-# Per-claim block in a verifier evaluation.txt, e.g.
-#   [claim_id] (importance=10; literal deliverable) The workflow's output ...
-#     relevant_files: ['hello.py']
-#     kind=executable status=pass score=1.0
-#     details: Output contains 'hello'
-_CLAIM_HEADER = re.compile(r"^\[([^\]]+)\]\s*\(importance=(\d+);\s*(.*?)\)\s*(.*)$")
-_KIND_LINE = re.compile(r"kind=(\S+)\s+status=(\S+)\s+score=(\S+)")
-_QUOTED = re.compile(r"'([^']*)'|\"([^\"]*)\"")
-
-
-def _parse_relevant_files(value: str) -> list[str]:
-    return [a or b for a, b in _QUOTED.findall(value)]
-
-
-def read_evaluation_claims(run_id: str) -> list[dict[str, Any]] | None:
-    """Parse the per-claim pass/fail detail out of a verifier evaluation.txt.
-
-    Returns one dict per claim (id, importance, rationale, description, status,
-    score, kind, relevant_files, details). Returns None for non-verifier report
-    formats (no claim blocks) or a missing/empty file.
-    """
-    text = _read_text(run_path(run_id) / "evaluation.txt")
-    if not text:
-        return None
-    claims: list[dict[str, Any]] = []
-    current: dict[str, Any] | None = None
-    for raw in text.splitlines():
-        header = _CLAIM_HEADER.match(raw) if raw.startswith("[") else None
-        if header:
-            if current:
-                claims.append(current)
-            current = {
-                "id": header.group(1),
-                "importance": int(header.group(2)),
-                "rationale": header.group(3).strip(),
-                "description": header.group(4).strip(),
-                "relevant_files": [],
-                "kind": None,
-                "status": None,
-                "score": None,
-                "details": None,
-            }
-            continue
-        if current is None:
-            continue
-        line = raw.strip()
-        if line.startswith("relevant_files:"):
-            current["relevant_files"] = _parse_relevant_files(line.split(":", 1)[1])
-        elif line.startswith("kind="):
-            kind = _KIND_LINE.search(line)
-            if kind:
-                current["kind"] = kind.group(1)
-                current["status"] = kind.group(2)
-                current["score"] = _coerce_number(kind.group(3))
-        elif line.startswith("details:"):
-            current["details"] = line.split(":", 1)[1].strip()
-    if current:
-        claims.append(current)
-    return claims or None
 
 
 _LIVE_WINDOW_S = 180  # a run touched within this window is treated as in-flight
@@ -335,8 +275,7 @@ def run_detail(run_id: str) -> dict[str, Any] | None:
             or None,
             "textual_gradient": _read_text(run_dir / "textual_gradient.txt"),
             "evaluation_text": _read_text(run_dir / "evaluation.txt"),
-            "evaluation_scores": read_evaluation_scores(run_id),
-            "evaluation_claims": read_evaluation_claims(run_id),
+            "verification": read_policy_bt_report(run_dir),
             "genotype": _read_text(_find(run_dir, "workflow_genotype_*.py") or Path("/x")),
             "evolution_prompt": _read_text(
                 _find(run_dir, "evolution_prompt_*.md") or Path("/x")
