@@ -993,12 +993,11 @@ class EvolutionEngine:
         assertion_history = []  # Track [passed, total] per iteration
         self.viz_utils.create_rewards_curve_plot(goal)
 
+        goal += """
+        The computational pipeline should be reproducible. Make sure to include proper requirements files and a run.sh script to install dependencies and run end-to-end.
+        """
+
         # ── Stop control (stop-condition plan 2026-10-08) ─────────────
-        # Resolved once per session: relative-reward verifiers (hybrid,
-        # policy_bt) must not stop on an absolute score threshold — their
-        # overall_score is a pairwise win-rate/BT rating, so 0.9 means
-        # "first clean sweep" or "never". They get the champion-plateau
-        # rule instead (sources/core/stopping.py).
         stop_controller = StopController(
             mode=self.config.early_stop_mode,
             min_iter=self.config.min_learning_evolve_iterations,
