@@ -19,6 +19,10 @@ from pathlib import Path
 from typing import Any
 
 from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
+from sources.benchmark_evaluation.execution_sandbox import (
+    PINNED_CONSTRAINTS,
+    SANDBOX_PYTHON_VERSION,
+)
 from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.benchmark_evaluation.snapshot_grading import grade_directory
 from sources.cli.pretty_print import (
@@ -37,6 +41,30 @@ from sources.utils.transfer_toolomics import LocalTransfer
 EVAL_LOG_FILE = Path("logs") / "evaluation_csv_mode.log"
 EVAL_LOG_MAX_BYTES = 10 * 1024 * 1024
 EVAL_LOG_BACKUP_COUNT = 5
+
+
+def sab_environment_block() -> str:
+    """Describe the ScienceAgentBench grading environment for the agent goal.
+
+    Agents must write code and a requirements.txt that the grader can install.
+    ``CsvEvaluationMode._generate_task_science_agent_bench`` calls it for every
+    SAB task. It builds the text from the sandbox's own Python version and
+    version caps, so the goal and the grading venv cannot drift apart.
+
+    Returns:
+        str: Multi-line ``EXECUTION ENVIRONMENT`` section for the task prompt.
+    """
+    caps = ", ".join(PINNED_CONSTRAINTS)
+    return (
+        "EXECUTION ENVIRONMENT (grading):\n"
+        f"Your final script is re-run and graded with Python {SANDBOX_PYTHON_VERSION} "
+        "in a fresh environment. Packages are installed from the script's imports "
+        f"and capped at these versions: {caps}.\n"
+        "Write code that works with these versions (for example pandas 1.5 and "
+        "numpy 1.x APIs). In requirements.txt, list package names without pins or "
+        "with pins inside these caps: a newer pin such as pandas==2.2.2, "
+        "numpy>=2 or deepchem==2.8.0 cannot be installed there."
+    )
 
 
 def _attach_eval_log_file_handler(logger: logging.Logger) -> None:
@@ -652,6 +680,8 @@ DATASET STRUCTURE:
 
 DATASET PREVIEW:
 {dataset_preview}
+
+{sab_environment_block()}
 
 EXPECTED OUTPUT:
 1. Results file — save to the EXACT path: {output_path}

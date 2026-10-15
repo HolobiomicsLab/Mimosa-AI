@@ -102,6 +102,17 @@ version drift:
   `oggm`→`salem`+`tables`+`geopandas`), and special-case installs
   (`deepchem`→`dgl`, `DeepPurpose`→`descriptastorus`, `qsprpred`→
   `papyrus-scaffold-visualizer`+`kaleido`).
+- **Deps come from imports only.** Per-task deps are always discovered with
+  `pipreqs` plus the rules above; a capsule `requirements.txt` is ignored.
+  Mimosa capsules ship one for the Policy-BT reproduction gate, and its
+  post-era pins (`pandas==2.2.2`, `deepchem==2.8.0`, `numpy==2.2.6`) cannot
+  co-resolve with the version caps — installing it excluded 7 of 12
+  generations as infra on 2026-10-14.
+- **The agent is told this environment.** Every SAB goal carries an
+  `EXECUTION ENVIRONMENT (grading)` section built from
+  `SANDBOX_PYTHON_VERSION` and `PINNED_CONSTRAINTS`
+  (`csv_mode.sab_environment_block`), asking for code within those versions
+  and a `requirements.txt` without newer pins.
 
 The venv is built **once per process** and reused across tasks (per-program deps
 installed on top), so the first task pays the heavy install and the rest reuse it.
