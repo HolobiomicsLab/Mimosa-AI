@@ -139,7 +139,9 @@ class PreCheck:
         provider_routing: dict = {
             "order": [or_provider],
             "allow_fallbacks": False,
-            "require_parameters": True,
+            # Same rule as the runtime: OpenRouter's Claude endpoints list no
+            # temperature/logprobs, so requiring them would drop every endpoint.
+            "require_parameters": not model.startswith("anthropic/"),
         }
         if quantizations:
             provider_routing["quantizations"] = quantizations

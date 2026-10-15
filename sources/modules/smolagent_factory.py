@@ -9,6 +9,7 @@ import base64
 import json
 import re
 import time
+import sys
 import uuid
 import logging
 from typing import Callable
@@ -212,11 +213,16 @@ class SmolAgentFactory:
                     if isinstance(self.openrouter_provider, str)
                     else list(self.openrouter_provider)
                 )
+                # OpenRouter's Claude endpoints list neither temperature nor
+                # logprobs in supported_parameters, so require_parameters=True
+                # leaves no endpoint (404 "No endpoints found that can handle
+                # the requested parameters"). Relax it for anthropic/* only;
+                # Claude then returns no logprobs.
                 extra_kwargs["extra_body"] = {
                     "provider": {
                         "order": order,
                         "allow_fallbacks": False,
-                        "require_parameters": True,
+                        "require_parameters": not str(self.model_id).startswith("openrouter/anthropic/"),
                     }
                 }
             # OpenAI deprecated `max_tokens` for `max_completion_tokens`;
@@ -423,6 +429,32 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
         except Exception as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
 
+    def report_agent_failure(self, error: BaseException, attempts: int) -> None:
+        """Print a loud banner for an agent whose every run attempt raised.
+
+        Written to stderr so it lands in run_stdout.log and in the stderr the
+        orchestrator reports, right above the re-raised traceback.
+        """
+        message = f"{type(error).__name__}: {error}"
+        if len(message) > 2000:
+            message = message[:2000] + " ...[truncated, full traceback below]"
+        lines = [
+            f"AGENT '{self.name}' FAILED ({attempts}/{attempts} attempts raised)",
+            f"model: {self.model_id}  engine: {self.engine_name}",
+            f"error: {message}",
+        ]
+        if "No endpoints found that can handle the requested parameters" in str(error):
+            lines.append(
+                "hint: OpenRouter rejected the request parameters for every allowed "
+                f"provider ({self.openrouter_provider}). With require_parameters=True, "
+                "a provider that does not support temperature or logprobs is "
+                "filtered out; change smolagent_model_id, disable save_logprobs, "
+                "or run PreCheck to select compatible providers."
+            )
+        bar = "!" * 100
+        banner = "\n".join([bar, "!!! WARNING: AGENT EXECUTION ERROR (not a timeout)", bar, *lines, bar])
+        print(f"\n{banner}\n", file=sys.stderr, flush=True)
+
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
         import threading
         workflow_uuid = state.get("workflow_uuid", None)
@@ -430,6 +462,7 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
             self.load_agent_memory(workflow_uuid, instructions)
 
         timeout_seconds = getattr(self, 'timeout', 180)
+        max_attempts = 3
         result = {'response': None, 'exception': None, 'completed': False}
 
         def _run_agent():
@@ -437,32 +470,37 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
             error = True
             count = 0
             warning = False
-            while error and count < 3:
+            while error and count < max_attempts:
                 if warning:
                     instructions += "\nWARNING: Last run failed due to context exceeded, read file content carefully (content[:2048]), same for tool output usage (output[:2048])"
                 try:
                     result['response'] = self.agent.run(instructions)
                     result['completed'] = True
+                    result['exception'] = None
                     error = False
                     warning = True
                 except Exception as e:
-                    print(str(e))
-                    print("retrying...")
-                    error = True
                     count += 1
-                #result['exception'] = e
-                #result['completed'] = True
+                    print(f"Agent '{self.name}' attempt {count}/{max_attempts} failed: {type(e).__name__}: {e}")
+                    if count < max_attempts:
+                        print("retrying...")
+                    result['exception'] = e
+                    error = True
 
         agent_thread = threading.Thread(target=_run_agent, daemon=True)
         agent_thread.start()
         agent_thread.join(timeout=timeout_seconds)
 
         try:
-            if not result['completed']:
+            if agent_thread.is_alive():
                 # no save here: the except branch below saves once for all failures
                 raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
-            if result['exception']:
-                raise result['exception']
+            if not result['completed']:
+                error = result['exception'] or RuntimeError(
+                    f"Agent '{self.name}' thread exited without a result or exception"
+                )
+                self.report_agent_failure(error, max_attempts)
+                raise error
             self.save_memories(workflow_uuid=workflow_uuid)
             return result['response']
         except Exception as e:

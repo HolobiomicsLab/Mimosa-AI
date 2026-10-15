@@ -99,6 +99,18 @@ but none of them serves the model you asked for. Either:
 - Widen the whitelist (the default includes 25+ providers), or
 - Switch to a model with broader provider support.
 
+### `No endpoints found that can handle the requested parameters` (404)
+
+With `require_parameters: true`, OpenRouter drops every endpoint that does
+not list each sent parameter. Generated agents send `temperature` and, with
+`save_logprobs`, `logprobs`/`top_logprobs`. Models whose endpoints list none
+of these (OpenRouter's Claude endpoints) end up with no endpoint at all.
+Mimosa therefore sends `require_parameters: false` for `openrouter/anthropic/*`
+models. Those models return no logprobs, so the run prints
+`logprobs requested but none returned`. For other models that hit this 404,
+switch `smolagent_model_id` or set `save_logprobs: false`. The agent failure
+banner in `run_stdout.log` shows the exact error.
+
 ## Runtime / execution
 
 ### Sandbox hits `runner_default_timeout`

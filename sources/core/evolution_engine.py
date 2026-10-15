@@ -1102,7 +1102,8 @@ class EvolutionEngine:
             )
         on_error = not executed
         if on_error:
-            print_err(f"Workflow failed:\n{run_stdout[:512]}")
+            # Tracebacks end with the raised exception; the head is runner noise.
+            print_err(f"Workflow failed:\n...{run_stdout[-1024:]}")
         # ── Snapshot workspace results produced by this run ───────────────────
         if workspace_mgr is not None and uuid:
             workspace_mgr.save_run_snapshot(uuid)
