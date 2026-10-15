@@ -33,3 +33,4 @@ def test_sab_goal_states_grading_python_and_every_version_cap():
     missing = [cap for cap in PINNED_CONSTRAINTS if cap not in goal]
     assert missing == []
     assert goal.index("EXECUTION ENVIRONMENT") < goal.index("EXPECTED OUTPUT")
+    assert "TF_USE_LEGACY_KERAS=1" in goal

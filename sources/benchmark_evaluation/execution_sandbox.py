@@ -147,6 +147,117 @@ SOURCE_BUILD_CONSTRAINTS: dict[str, list[str]] = {
     "phonopy": ["scikit-build-core<0.10", "numpy<2.0"],
 }
 
+# Variables every graded program runs with (see ExecutionSandbox._subprocess_env).
+# tensorflow 2.17 pairs with Keras 3, but the base stack pins tf_keras<=2.17.0;
+# this flag routes tf.keras back to it. Without it, benchmark-era code dies on
+# APIs Keras 3 removed: tf.keras.optimizers.legacy (modnet 0.4.1,
+# modnet/models/vanilla.py:471/1329) and BatchNormalization kwargs (E7:
+# aquatic/brain_blood capsules); deepchem 2.5 TF models fail with "'str' object
+# has no attribute 'as_numpy_dtype'" (Policy-BT rerun, 2026-10-15).
+GRADING_ENV = {"TF_USE_LEGACY_KERAS": "1"}
+# Hides any GPU (CUDA/XLA plumbing such as a missing libdevice fails VER).
+CPU_ONLY_ENV = {"CUDA_VISIBLE_DEVICES": "", "TF_CPP_MIN_LOG_LEVEL": "2"}
+# A directory holding this file is a virtual environment, never program source.
+VENV_MARKER = "pyvenv.cfg"
+
+
+def resolve_sandbox_python() -> str:
+    """Resolve a Python SANDBOX_PYTHON_VERSION interpreter for the venv.
+
+    The grading sandbox and the Policy-BT verifier rerun (``grading_runtime``)
+    must use the same interpreter. Resolution order: the
+    ``$MIMOSA_SANDBOX_PYTHON`` override, then ``python<version>`` on PATH.
+    The interpreter's own version is verified so the venv is never built
+    with the wrong Python (which is how the eval previously drifted onto the
+    harness interpreter). The REAL executable (``sys.executable``) is
+    returned, not the candidate: a pyenv shim fails in the verifier's
+    credential-free environment ("pyenv: python3.10: command not found",
+    2026-10-15) because it needs the parent PATH and HOME.
+
+    Returns:
+        str: Absolute path of a verified interpreter binary.
+
+    Raises:
+        RuntimeError: When no candidate reports the required version.
+    """
+    candidates = []
+    override = os.environ.get("MIMOSA_SANDBOX_PYTHON")
+    if override:
+        candidates.append(override)
+    which = shutil.which(f"python{SANDBOX_PYTHON_VERSION}")
+    if which:
+        candidates.append(which)
+
+    probe = "import sys; print(sys.version.split()[0]); print(sys.executable)"
+    for cand in candidates:
+        try:
+            out = subprocess.run(
+                [cand, "-c", probe], capture_output=True, text=True, timeout=30
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        lines = out.stdout.splitlines()
+        if out.returncode == 0 and len(lines) == 2 and lines[0].startswith(
+            f"{SANDBOX_PYTHON_VERSION}."
+        ):
+            return lines[1]
+
+    raise RuntimeError(
+        f"Eval sandbox requires Python {SANDBOX_PYTHON_VERSION}; none found "
+        f"(looked at $MIMOSA_SANDBOX_PYTHON and python{SANDBOX_PYTHON_VERSION} on "
+        f"PATH). Install it (apt install python{SANDBOX_PYTHON_VERSION} "
+        f"python{SANDBOX_PYTHON_VERSION}-venv) or set $MIMOSA_SANDBOX_PYTHON."
+    )
+
+
+def grading_runtime() -> dict:
+    """Describe the grading environment for the Policy-BT verifier rerun.
+
+    The verifier must accept exactly the installs the grader accepts. On
+    2026-10-15 it reran ScienceAgentBench capsules with host Python 3.11
+    and no caps, so ``deepchem==2.7.1`` (Requires-Python <3.11) failed there
+    while the grader would install it. ``CsvEvaluationMode`` stores this
+    value in ``config.policy_bt_reexec_runtime`` when SAB mode starts.
+
+    Returns:
+        dict: ``{"python": str, "constraints": list[str], "env": dict[str, str]}``
+        — the verified Python 3.10 interpreter, PINNED_CONSTRAINTS and the
+        variables every graded program runs with.
+    """
+    return {"python": resolve_sandbox_python(),
+            "constraints": list(PINNED_CONSTRAINTS),
+            "env": {**GRADING_ENV, **CPU_ONLY_ENV}}
+
+
+def _is_virtualenv(directory: Path) -> bool:
+    """Tell whether a capsule directory is a virtual environment.
+
+    Agents sometimes build a venv inside the workspace (2026-10-15: a
+    2.2 GB ``.venv`` with 26,694 ``.py`` files). Its site-packages must not
+    reach pipreqs or the grading copies.
+
+    Args:
+        directory (Path): Directory inside the capsule.
+
+    Returns:
+        bool: True when ``pyvenv.cfg`` sits directly in it.
+    """
+    return (directory / VENV_MARKER).is_file()
+
+
+def _skip_virtualenvs(directory: str, names: list[str]) -> set[str]:
+    """``shutil.copytree`` ignore hook leaving out nested virtual environments.
+
+    Args:
+        directory (str): Directory being copied.
+        names (list[str]): Its entry names.
+
+    Returns:
+        set[str]: Child names that are virtual environments.
+    """
+    return {name for name in names if _is_virtualenv(Path(directory) / name)}
+
+
 
 class EvalInfraError(RuntimeError):
     """Raised when the eval harness/environment fails — not the agent's code.
@@ -249,41 +360,6 @@ class ExecutionSandbox:
         # Ensure base + capsule dependencies are present in the shared venv.
         self._setup_environment()
 
-    def _resolve_sandbox_python(self) -> str:
-        """Resolve a Python SANDBOX_PYTHON_VERSION interpreter for the venv.
-
-        Resolution order: the ``$MIMOSA_SANDBOX_PYTHON`` override, then
-        ``python<version>`` on PATH. The interpreter's ``--version`` is verified
-        so we never silently build the venv with the wrong Python (which is how
-        the eval previously drifted onto the harness interpreter).
-        """
-        candidates = []
-        override = os.environ.get("MIMOSA_SANDBOX_PYTHON")
-        if override:
-            candidates.append(override)
-        which = shutil.which(f"python{SANDBOX_PYTHON_VERSION}")
-        if which:
-            candidates.append(which)
-
-        for cand in candidates:
-            try:
-                out = subprocess.run(
-                    [cand, "--version"], capture_output=True, text=True, timeout=30
-                )
-            except (OSError, subprocess.SubprocessError):
-                continue
-            if (out.stdout or out.stderr).strip().startswith(
-                f"Python {SANDBOX_PYTHON_VERSION}."
-            ):
-                return cand
-
-        raise RuntimeError(
-            f"Eval sandbox requires Python {SANDBOX_PYTHON_VERSION}; none found "
-            f"(looked at $MIMOSA_SANDBOX_PYTHON and python{SANDBOX_PYTHON_VERSION} on "
-            f"PATH). Install it (apt install python{SANDBOX_PYTHON_VERSION} "
-            f"python{SANDBOX_PYTHON_VERSION}-venv) or set $MIMOSA_SANDBOX_PYTHON."
-        )
-
     def _venv_fingerprint(self) -> str:
         """Hash of (base_packages, constraints) — the shared-venv cache key."""
         h = hashlib.sha256()
@@ -350,7 +426,7 @@ class ExecutionSandbox:
 
             base_dir = tempfile.mkdtemp(prefix="mimosa_base_venv_")
             venv_path = Path(base_dir) / "venv"
-            py = self._resolve_sandbox_python()
+            py = resolve_sandbox_python()
             self.logger.info(
                 f"[SANDBOX] Creating shared Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py} "
                 f"(fingerprint {fingerprint})"
@@ -505,7 +581,7 @@ class ExecutionSandbox:
         """
         reported = {p.lower() for p in present}
         missed: list[str] = []
-        for py in self.capsule_path.rglob("*.py"):  # worker scripts too (E37 R6)
+        for py in self._capsule_python_files():  # worker scripts too (E37 R6)
             try:
                 tree = ast.parse(py.read_text(errors="replace"))
             except (SyntaxError, OSError):
@@ -611,10 +687,27 @@ class ExecutionSandbox:
         never saw it, and the grading venv shipped without deepchem.
         Relative paths are preserved so same-named files cannot collide.
         """
-        for py in self.capsule_path.rglob("*.py"):
+        for py in self._capsule_python_files():
             target = dest / py.relative_to(self.capsule_path)
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(py, target)
+
+    def _capsule_python_files(self) -> list[Path]:
+        """List the capsule's own Python files, recursively, outside any venv.
+
+        Dependency discovery (pipreqs copy and AST fallback) calls it so that
+        worker scripts in subdirectories count, while a workspace virtual
+        environment's site-packages (26,694 files in a 2026-10-15 capsule)
+        never reaches pipreqs.
+
+        Returns:
+            list[Path]: Sorted absolute paths of ``*.py`` files.
+        """
+        files: list[Path] = []
+        for directory, subdirs, names in os.walk(self.capsule_path):
+            subdirs[:] = [d for d in subdirs if not _is_virtualenv(Path(directory) / d)]
+            files += [Path(directory) / name for name in names if name.endswith(".py")]
+        return sorted(files)
 
     def _run_pipreqs(self) -> Path | None:
         """Run pipreqs over the capsule's Python files; return requirements.in or None."""
@@ -673,18 +766,9 @@ class ExecutionSandbox:
         # them by name.
         env["PATH"] = str(self.venv_path / "bin") + os.pathsep + env.get("PATH", "")
         if self.cpu_only:
-            env["CUDA_VISIBLE_DEVICES"] = ""
-            env["TF_CPP_MIN_LOG_LEVEL"] = env.get("TF_CPP_MIN_LOG_LEVEL", "2")
-        # tensorflow 2.17 pairs with Keras 3, but the authors' base stack pins
-        # tf_keras<=2.17.0 (BASIC_PACKAGES) — a no-op unless this flag routes
-        # tf.keras back to it. Without it, benchmark-era code dies on APIs
-        # Keras 3 removed: tf.keras.optimizers.legacy (modnet 0.4.1,
-        # modnet/models/vanilla.py:471/1329: "keras.optimizers.legacy is not
-        # supported in Keras 3") and BatchNormalization kwargs (E7: aquatic/
-        # brain_blood capsules, "Unrecognized keyword arguments passed to
-        # BatchNormalization"). Setting it restores the authors' Keras-2
-        # semantics under the existing tf_keras pin.
-        env["TF_USE_LEGACY_KERAS"] = "1"
+            env["CUDA_VISIBLE_DEVICES"] = CPU_ONLY_ENV["CUDA_VISIBLE_DEVICES"]
+            env.setdefault("TF_CPP_MIN_LOG_LEVEL", CPU_ONLY_ENV["TF_CPP_MIN_LOG_LEVEL"])
+        env.update(GRADING_ENV)  # legacy Keras; see GRADING_ENV
         return env
 
     def run_generated_code(
@@ -920,8 +1004,11 @@ class ExecutionSandbox:
                         copied_files.append((item.name, size))
                         total_bytes += size
                     elif item.is_dir():
+                        if _is_virtualenv(item):
+                            self.logger.info(f"[SANDBOX] Skipped virtual environment {item.name}/")
+                            continue
                         dir_items = sum(1 for _ in item.rglob('*') if _.is_file())
-                        shutil.copytree(item, dest, dirs_exist_ok=True)
+                        shutil.copytree(item, dest, dirs_exist_ok=True, ignore=_skip_virtualenvs)
                         copied_dirs.append((item.name, dir_items))
                 except (shutil.Error, OSError, PermissionError) as e:
                     errors.append((item.name, str(e)))

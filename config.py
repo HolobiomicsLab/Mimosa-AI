@@ -154,6 +154,9 @@ class Config:
         self.policy_bt_reexecute: bool = True
         # Reproduction limit per generation, in seconds.
         self.policy_bt_reexec_timeout_s: int = 1800
+        # Rerun interpreter, pip caps and env; empty = host Python, no caps.
+        # ScienceAgentBench mode sets the grader's (grading_runtime()).
+        self.policy_bt_reexec_runtime: dict = {}
         #############
         # Orchestrator Workflow generation options
         #############
@@ -484,6 +487,7 @@ class Config:
             "policy_bt_repair_rounds": self.policy_bt_repair_rounds,
             "policy_bt_reexecute": self.policy_bt_reexecute,
             "policy_bt_reexec_timeout_s": self.policy_bt_reexec_timeout_s,
+            "policy_bt_reexec_runtime": self.policy_bt_reexec_runtime,
             "openrouter_provider": self.openrouter_provider,
             "default_openrouter_quantizations": self.default_openrouter_quantizations,
             "save_logprobs": self.save_logprobs,
@@ -624,6 +628,9 @@ class Config:
         )
         self.policy_bt_reexec_timeout_s = int(
             data.get("policy_bt_reexec_timeout_s", self.policy_bt_reexec_timeout_s)
+        )
+        self.policy_bt_reexec_runtime = dict(
+            data.get("policy_bt_reexec_runtime") or self.policy_bt_reexec_runtime
         )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get(

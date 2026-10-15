@@ -72,6 +72,20 @@ trusted local shell execution — **not** an OS security sandbox. Run
 logs are copied into `.policy_bt_reexec/` inside the snapshot so
 adapters can read stdout-only metrics.
 
+The rerun runtime is `policy_bt_reexec_runtime`: `python` (venv
+interpreter), `constraints` (pip caps, applied to every install through
+`PIP_CONSTRAINT`) and `env` (extra variables that cannot override the
+isolation variables). Empty means the host interpreter with no caps.
+ScienceAgentBench mode fills it with the grader's own runtime
+(`execution_sandbox.grading_runtime()`: Python 3.10, `PINNED_CONSTRAINTS`,
+`TF_USE_LEGACY_KERAS=1`), so the verifier accepts exactly the installs the
+grader accepts. A failed or output-less rerun gets one LLM root-cause
+diagnosis from bounded evidence (runtime, script, requirements, stderr
+head and tail), added to the reason before the raw stderr tail; if that
+call fails, `diagnosis_error` records why and the tail alone remains.
+A workspace virtual environment (a directory holding `pyvenv.cfg`) is
+snapshotted as its `pyvenv.cfg` only.
+
 **Adapters run in a small Python subset** (stdlib `json`/`math`/`struct`
 calls plus harness-provided read capabilities and CSV parsing — no
 `numpy`/`pandas`/binary scientific readers). Formats outside that

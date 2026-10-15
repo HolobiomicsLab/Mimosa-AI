@@ -20,8 +20,10 @@ from typing import Any
 
 from sources.benchmark_evaluation.capsule_evaluator import CapsuleEvaluator
 from sources.benchmark_evaluation.execution_sandbox import (
+    GRADING_ENV,
     PINNED_CONSTRAINTS,
     SANDBOX_PYTHON_VERSION,
+    grading_runtime,
 )
 from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
 from sources.benchmark_evaluation.snapshot_grading import grade_directory
@@ -46,24 +48,29 @@ EVAL_LOG_BACKUP_COUNT = 5
 def sab_environment_block() -> str:
     """Describe the ScienceAgentBench grading environment for the agent goal.
 
-    Agents must write code and a requirements.txt that the grader can install.
+    Agents must write code, a requirements.txt and a run.sh that both the
+    Policy-BT reproduction check and the grader can install and run.
     ``CsvEvaluationMode._generate_task_science_agent_bench`` calls it for every
-    SAB task. It builds the text from the sandbox's own Python version and
-    version caps, so the goal and the grading venv cannot drift apart.
+    SAB task. It builds the text from the sandbox's own Python version, caps
+    and variables, so the goal and both environments cannot drift apart.
 
     Returns:
         str: Multi-line ``EXECUTION ENVIRONMENT`` section for the task prompt.
     """
     caps = ", ".join(PINNED_CONSTRAINTS)
+    env = ", ".join(f"{key}={value}" for key, value in GRADING_ENV.items())
     return (
-        "EXECUTION ENVIRONMENT (grading):\n"
-        f"Your final script is re-run and graded with Python {SANDBOX_PYTHON_VERSION} "
-        "in a fresh environment. Packages are installed from the script's imports "
-        f"and capped at these versions: {caps}.\n"
+        "EXECUTION ENVIRONMENT (reproduction check and grading):\n"
+        f"run.sh and your final script are re-run with Python {SANDBOX_PYTHON_VERSION} "
+        "in a fresh virtual environment, with every pip install capped at these "
+        f"versions: {caps}. {env} is set.\n"
         "Write code that works with these versions (for example pandas 1.5 and "
-        "numpy 1.x APIs). In requirements.txt, list package names without pins or "
-        "with pins inside these caps: a newer pin such as pandas==2.2.2, "
-        "numpy>=2 or deepchem==2.8.0 cannot be installed there."
+        "numpy 1.x APIs; with TensorFlow/Keras code, list tf_keras). In "
+        "requirements.txt, list package names without pins or with pins inside "
+        "these caps: a newer pin such as pandas==2.2.2, numpy>=2 or "
+        "deepchem==2.8.0 cannot be installed there. In run.sh, use plain `pip` "
+        "and `python`: do not create a virtual environment in the workspace and "
+        "do not call an interpreter by absolute path."
     )
 
 
@@ -641,6 +648,24 @@ All file operations MUST be performed within this subfolder.
     Goal to achieve: {prompt}
     {workspace_instruction}
         """.strip()
+
+    def _use_grading_runtime_for_verifier(self) -> None:
+        """Make the Policy-BT rerun use the ScienceAgentBench grading runtime.
+
+        The verifier rewards only runs it can reproduce, so it must accept
+        exactly what the grader accepts. Both SAB loops call it once when SAB
+        mode starts; the evaluator reads ``config.policy_bt_reexec_runtime``
+        at each rerun, and isolated per-task configs copy it.
+
+        Returns:
+            None. Mutates ``self.config``.
+        """
+        runtime = grading_runtime()
+        self.config.policy_bt_reexec_runtime = runtime
+        self.logger.info(
+            f"[SAB] Policy-BT reruns use {runtime['python']} with "
+            f"{len(runtime['constraints'])} version caps and {runtime['env']}"
+        )
 
     def _generate_task_science_agent_bench(self, row, workspace_subfolder: str | None = None):
         task_inst = (row.get('task_inst') or '').strip()
@@ -1414,6 +1439,7 @@ EXPECTED OUTPUT:
         if dataset_type == "science_agent_bench":
             sab_loader = ScienceAgentBenchLoader()
             self.logger.info("[CONCURRENT] ScienceAgentBench mode activated")
+            self._use_grading_runtime_for_verifier()
 
         # Read CSV and prepare task contexts
         task_contexts: list[TaskContext] = []
@@ -1523,6 +1549,7 @@ EXPECTED OUTPUT:
         if dataset_type == "science_agent_bench":
             sab_loader = ScienceAgentBenchLoader()
             self.logger.info("[PAPERS DATASET MODE] ScienceAgentBench mode activated")
+            self._use_grading_runtime_for_verifier()
 
         file_transfer = LocalTransfer(
             config=self.config,

@@ -109,10 +109,20 @@ version drift:
   co-resolve with the version caps — installing it excluded 7 of 12
   generations as infra on 2026-10-14.
 - **The agent is told this environment.** Every SAB goal carries an
-  `EXECUTION ENVIRONMENT (grading)` section built from
-  `SANDBOX_PYTHON_VERSION` and `PINNED_CONSTRAINTS`
-  (`csv_mode.sab_environment_block`), asking for code within those versions
-  and a `requirements.txt` without newer pins.
+  `EXECUTION ENVIRONMENT (reproduction check and grading)` section built
+  from `SANDBOX_PYTHON_VERSION`, `PINNED_CONSTRAINTS` and `GRADING_ENV`
+  (`csv_mode.sab_environment_block`): code within those versions, a
+  `requirements.txt` without newer pins, and a `run.sh` using plain
+  `pip`/`python` with no workspace venv.
+- **The Policy-BT verifier reruns in the same environment.** SAB mode sets
+  `config.policy_bt_reexec_runtime = grading_runtime()`, so `run.sh` is
+  re-executed with the same Python 3.10 binary (resolved past any pyenv
+  shim), caps and `TF_USE_LEGACY_KERAS=1` as graded programs (2026-10-15:
+  on host Python 3.11 the verifier failed `deepchem==2.7.1`, which only
+  exists for Python < 3.11).
+- **Virtual environments are never graded.** A capsule directory holding
+  `pyvenv.cfg` is left out of the pipreqs scan, the AST fallback and the
+  execution/eval copies.
 
 The venv is built **once per process** and reused across tasks (per-program deps
 installed on top), so the first task pays the heavy install and the rest reuse it.

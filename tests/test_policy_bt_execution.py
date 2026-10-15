@@ -20,6 +20,7 @@ from sources.evaluators.policy_bt_verifier.artifacts import (
     snapshot,
 )
 from sources.evaluators.policy_bt_verifier.reexec import (
+    FAILURE_PROMPT,
     LOG_LIMIT_BYTES,
     ReproductionInstrumentError,
     _run,
@@ -228,6 +229,71 @@ def test_zero_exit_without_regeneration_does_not_pass_on_old_outputs(tmp_path):
     assert result["files"]["missing_outputs"] == ["result.data"]
     assert not (owned / "result.data").exists()
     assert (source / "result.data").read_text() == "old result"
+
+
+def test_rerun_applies_configured_runtime_without_breaking_isolation(tmp_path):
+    """SAB runtime: caps reach every pip call, variables reach the script, and a
+    configured variable can never replace the venv-first PATH."""
+    command = 'printf "%s|%s" "$(cat "$PIP_CONSTRAINT")" "$POLICY_BT_GRADING_FLAG" > result.data\n'
+    source = _workspace(tmp_path / "source", command)
+    owned = snapshot(source, tmp_path / "owned")
+    runtime = {"python": sys.executable, "constraints": ["numpy<2.0"],
+               "env": {"POLICY_BT_GRADING_FLAG": "1", "PATH": "/hijacked"}}
+    config = {"policy_bt_reexec_timeout_s": 60, "policy_bt_reexec_runtime": runtime}
+    result = reproduce(owned, config, lambda _: _answer())
+    assert result["eligible"], result["reason"]
+    assert (owned / "result.data").read_text() == "numpy<2.0|1"
+    major_minor = f"{sys.version_info.major}.{sys.version_info.minor}."
+    assert result["runtime"]["python_version"].startswith(major_minor)
+
+
+def _failing_workspace(tmp_path: Path) -> Path:
+    """Snapshot a rerun that fails like the 2026-10-15 deepchem install."""
+    body = 'echo "ERROR: 2.7.1 Requires-Python >=3.7,<3.11" >&2\necho "ERROR: No matching distribution" >&2\nexit 3\n'
+    return snapshot(_workspace(tmp_path / "source", body), tmp_path / "owned")
+
+
+def test_failed_rerun_reason_carries_llm_root_cause(tmp_path):
+    """The gradient used to get only pip's version-list tail; the decisive
+    Requires-Python line and the venv's Python version must reach the LLM."""
+    prompts = []
+
+    def ask(prompt):
+        prompts.append(prompt)
+        if prompt.startswith(FAILURE_PROMPT):
+            return json.dumps({"diagnosis": "deepchem 2.7.1 needs Python <3.11."})
+        return _answer()
+
+    result = reproduce(_failing_workspace(tmp_path), {"policy_bt_reexec_timeout_s": 60}, ask)
+    assert result["status"] == "execution_failed"
+    assert "Diagnosis: deepchem 2.7.1 needs Python <3.11." in result["reason"]
+    assert "Stderr tail:" in result["reason"]
+    assert "Requires-Python >=3.7,<3.11" in prompts[-1]
+    assert result["runtime"]["python_version"] in prompts[-1]
+
+
+def test_failed_diagnosis_call_keeps_stderr_reason_and_records_error(tmp_path):
+    """A provider failure on the diagnosis cannot unscore the generation."""
+    def ask(prompt):
+        if prompt.startswith(FAILURE_PROMPT):
+            raise RuntimeError("LLM API error")
+        return _answer()
+
+    result = reproduce(_failing_workspace(tmp_path), {"policy_bt_reexec_timeout_s": 60}, ask)
+    assert result["status"] == "execution_failed"
+    assert "Diagnosis:" not in result["reason"] and "No matching distribution" in result["reason"]
+    assert result["diagnosis_error"] == "RuntimeError: LLM API error"
+
+
+def test_snapshot_keeps_only_the_marker_of_a_workspace_virtualenv(tmp_path):
+    """2026-10-15: a 2.2 GB .venv pushed the recon prompt over the 8 MB limit."""
+    source = tmp_path / "source"
+    (source / ".venv" / "lib").mkdir(parents=True)
+    (source / ".venv" / "pyvenv.cfg").write_text("version = 3.10.20\n")
+    (source / ".venv" / "lib" / "site.py").write_text("x = 1\n")
+    (source / "task.py").write_text("print(1)\n")
+    copy = snapshot(source, tmp_path / "copy")
+    assert sorted(item["path"] for item in inventory(copy)) == [".venv/pyvenv.cfg", "task.py"]
 
 
 def test_timeout_kills_descendants_before_they_write(tmp_path):

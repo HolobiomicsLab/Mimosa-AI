@@ -2,7 +2,9 @@
 
 Symbolic links are copied as links, but inventory never follows them. A snapshot
 is an evidence copy, not a security boundary. Callers must not execute untrusted
-programs on the host merely because the programs are in a snapshot.
+programs on the host merely because the programs are in a snapshot. A virtual
+environment (a directory holding ``pyvenv.cfg``) is copied as its ``pyvenv.cfg``
+only: it stays visible, but its installed packages are not task evidence.
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from pathlib import Path
 HASH_CHUNK_BYTES = 1024 * 1024
 PREVIEW_SAMPLE_BYTES = 64 * 1024
 PREVIEW_CHARACTERS = 12 * 1024
+VENV_MARKER = "pyvenv.cfg"
 
 
 def decode_object(response: str) -> dict:
@@ -185,18 +188,24 @@ def snapshot(source: Path, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".snapshot-", dir=destination.parent) as temporary:
         staged = Path(temporary) / "evidence"
-        shutil.copytree(source, staged, symlinks=True, ignore=_special_entries)
+        shutil.copytree(source, staged, symlinks=True, ignore=_ignored_entries)
         staged.rename(destination)
     return destination.resolve()
 
-def _special_entries(directory: str, names: list[str]) -> set[str]:
-    """Skip FIFOs, sockets and devices, which copytree cannot copy.
+def _ignored_entries(directory: str, names: list[str]) -> set[str]:
+    """Skip what copytree cannot copy and the contents of virtual environments.
 
-    The inventory of the source already lists them as visible gaps.
+    ``snapshot`` passes it to ``shutil.copytree``. FIFOs, sockets and devices
+    cannot be copied; the inventory of the source lists them as visible gaps.
+    A workspace venv (live case 2026-10-15: 48,573 files, 2.2 GB) made the
+    reconnaissance prompt exceed the provider's 8 MB limit, so only its
+    ``pyvenv.cfg`` marker is kept.
 
     Args: directory (str): Directory being copied; names (list[str]): Its entries.
-    Returns: set[str]: Entry names that are neither regular files, dirs, nor links.
+    Returns: set[str]: Entry names to leave out of the copy.
     """
+    if VENV_MARKER in names:
+        return {name for name in names if name != VENV_MARKER}
     skipped = set()
     for name in names:
         mode = os.lstat(os.path.join(directory, name)).st_mode

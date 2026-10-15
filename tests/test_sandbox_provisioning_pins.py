@@ -33,11 +33,13 @@ from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import sources.benchmark_evaluation.execution_sandbox as execution_sandbox
 from sources.benchmark_evaluation.execution_sandbox import (
     IMPORT_NAME_REMAP,
     PINNED_CONSTRAINTS,
     SPECIAL_CASE_INSTALLS,
     ExecutionSandbox,
+    grading_runtime,
 )
 
 # --- F2: IMPORT_NAME_REMAP entries -------------------------------------------
@@ -197,6 +199,70 @@ def test_subprocess_env_sets_legacy_keras(monkeypatch):
     env = sb._subprocess_env()
     assert env["TF_USE_LEGACY_KERAS"] == "1"
     assert env["CUDA_VISIBLE_DEVICES"] == ""
+
+
+def test_verifier_runtime_matches_what_graded_programs_get(monkeypatch):
+    # 2026-10-15: the Policy-BT rerun used host Python 3.11 without caps or
+    # TF_USE_LEGACY_KERAS, so deepchem==2.7.1 and deepchem 2.5 TF models failed
+    # there but not in grading. Its runtime must carry the grader's caps and
+    # every variable a graded program runs with.
+    monkeypatch.setattr(execution_sandbox, "resolve_sandbox_python", lambda: "/py3.10")
+    runtime = grading_runtime()
+    sb = object.__new__(ExecutionSandbox)
+    sb.venv_path = Path("/nonexistent-venv")
+    sb.cpu_only = True
+    graded_env = sb._subprocess_env()
+    assert runtime["python"] == "/py3.10"
+    assert runtime["constraints"] == PINNED_CONSTRAINTS
+    assert {k: graded_env[k] for k in runtime["env"]} == runtime["env"]
+
+
+def test_resolver_returns_real_interpreter_not_a_shim(tmp_path, monkeypatch):
+    # 2026-10-15 live rerun: the pyenv shim ~/.pyenv/shims/python3.10 printed
+    # "pyenv: python3.10: command not found" in the verifier's clean env, so
+    # every Policy-BT venv creation failed. The resolver must hand out the
+    # binary the shim runs.
+    shim = tmp_path / "python-shim"
+    shim.write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n')
+    shim.chmod(0o755)
+    version = f"{sys.version_info.major}.{sys.version_info.minor}"
+    monkeypatch.setattr(execution_sandbox, "SANDBOX_PYTHON_VERSION", version)
+    monkeypatch.setenv("MIMOSA_SANDBOX_PYTHON", str(shim))
+    assert execution_sandbox.resolve_sandbox_python() == sys.executable
+
+
+def _virtualenv(path: Path) -> None:
+    """Create a minimal venv-like directory holding site-packages code."""
+    (path / "lib").mkdir(parents=True)
+    (path / "pyvenv.cfg").write_text("home = /opt/venv310/bin\nversion = 3.10.20\n")
+    (path / "lib" / "shim.py").write_text("import skgstat\n")
+
+
+def test_dependency_scan_skips_workspace_virtualenv(tmp_path):
+    # 2026-10-15: an agent built a 2.2 GB .venv (26,694 .py files) in the
+    # workspace; its site-packages must not reach pipreqs or the AST fallback.
+    cap = tmp_path / "capsule"
+    _virtualenv(cap / ".venv")
+    (cap / "workers").mkdir()
+    (cap / "workers" / "job.py").write_text("import osgeo\n")
+    (cap / "main.py").write_text("import os\n")
+    sb = _bare_sandbox(cap)
+    found = [p.relative_to(cap).as_posix() for p in sb._capsule_python_files()]
+    assert found == ["main.py", "workers/job.py"]
+    assert sb._remapped_imports_pipreqs_missed([]) == ["gdal"]
+
+
+def test_grading_copies_leave_out_virtualenvs(tmp_path):
+    cap = tmp_path / "capsule"
+    _virtualenv(cap / ".venv")
+    _virtualenv(cap / "data" / "env")
+    (cap / "data" / "input.csv").write_text("a\n1\n")
+    (cap / "main.py").write_text("print(1)\n")
+    sb = _bare_sandbox(cap)
+    dest = tmp_path / "execution"
+    sb._copy_capsule_contents_to_temp(dest)
+    copied = sorted(p.relative_to(dest).as_posix() for p in dest.rglob("*") if p.is_file())
+    assert copied == ["data/input.csv", "main.py"]
 
 
 # --- E37 R6: deepchem provisioning regression (clintox) ------------------------
