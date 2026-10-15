@@ -83,6 +83,11 @@ grader accepts. A failed or output-less rerun gets one LLM root-cause
 diagnosis from bounded evidence (runtime, script, requirements, stderr
 head and tail), added to the reason before the raw stderr tail; if that
 call fails, `diagnosis_error` records why and the tail alone remains.
+The diagnosis must quote the log line behind every cause it states
+(missing-module messages first) and may not infer a version
+incompatibility from installed version numbers alone. A declared output
+counts as regenerated when its path exists again after the rerun, an
+empty directory included (outputs are moved aside before the run).
 A workspace virtual environment (a directory holding `pyvenv.cfg`) is
 snapshotted as its `pyvenv.cfg` only.
 

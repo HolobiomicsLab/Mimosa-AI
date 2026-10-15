@@ -9,6 +9,7 @@ this host whenever a workflow is executed or re-executed.
 """
 
 import asyncio
+import codecs
 import fcntl
 import logging
 import os
@@ -20,6 +21,34 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from typing import Any
+
+# Bytes per stderr read. Line reads use asyncio's 64 KiB line limit, and one
+# longer stderr line killed a whole workflow run on 2026-10-15 ("Separator is
+# not found, and chunk exceed the limit").
+STREAM_CHUNK_BYTES = 64 * 1024
+
+
+async def _drain_stream(stream: asyncio.StreamReader) -> str:
+    """Read a child pipe to EOF in fixed chunks, with no line-length limit.
+
+    ``WorkflowRunner`` drains child stderr with it on both the PTY and the
+    pipe path. An incremental decoder keeps multi-byte UTF-8 characters that
+    straddle a chunk boundary intact.
+
+    Args:
+        stream (asyncio.StreamReader): Child stderr pipe from
+            ``asyncio.create_subprocess_exec``.
+
+    Returns:
+        str: Full decoded text; undecodable bytes become U+FFFD.
+    """
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")
+    parts: list[str] = []
+    while chunk := await stream.read(STREAM_CHUNK_BYTES):
+        parts.append(decoder.decode(chunk))
+    parts.append(decoder.decode(b"", final=True))
+    return "".join(parts)
+
 
 
 class ExecutionStatus(Enum):
@@ -585,7 +614,6 @@ class WorkflowRunner:
         """
         loop = asyncio.get_event_loop()
         stdout_chunks: list[str] = []
-        stderr_lines: list[str] = []
         stdout_done = asyncio.Event()
 
         # Make the master fd non-blocking so we can use add_reader.
@@ -621,22 +649,10 @@ class WorkflowRunner:
 
         loop.add_reader(master_fd, _on_master_readable)
 
-        async def _read_stderr() -> None:
-            """Drain the child stderr pipe into the captured lines.
-
-            ``_stream_output_pty`` schedules it next to the PTY reader. It decodes
-            each stderr chunk as UTF-8 and appends it.
-
-            Returns:
-                None. Captured text accumulates in the enclosing list.
-            """
-            async for raw_line in process.stderr:
-                stderr_lines.append(raw_line.decode("utf-8", errors="replace"))
-
         # Wait for both stdout (PTY) and stderr (pipe) to finish.
-        await asyncio.gather(stdout_done.wait(), _read_stderr())
+        _, stderr_text = await asyncio.gather(stdout_done.wait(), _drain_stream(process.stderr))
 
-        return "".join(stdout_chunks), "".join(stderr_lines)
+        return "".join(stdout_chunks), stderr_text
 
     async def _stream_output_pipe(
         self,
@@ -659,7 +675,6 @@ class WorkflowRunner:
             both streams.
         """
         stdout_lines: list[str] = []
-        stderr_lines: list[str] = []
 
         async def read_stdout() -> None:
             """Collect the child stdout pipe line by line.
@@ -676,21 +691,9 @@ class WorkflowRunner:
                 if progress_callback:
                     progress_callback(line_str.rstrip())
 
-        async def read_stderr() -> None:
-            """Collect the child stderr pipe line by line.
+        _, stderr_text = await asyncio.gather(read_stdout(), _drain_stream(process.stderr))
 
-            ``_stream_output_pipe`` schedules it next to the stdout reader. It
-            decodes each line as UTF-8 and appends it.
-
-            Returns:
-                None. Captured lines accumulate in the enclosing list.
-            """
-            async for line in process.stderr:
-                stderr_lines.append(line.decode("utf-8", errors="replace"))
-
-        await asyncio.gather(read_stdout(), read_stderr())
-
-        return "".join(stdout_lines), "".join(stderr_lines)
+        return "".join(stdout_lines), stderr_text
 
     async def cancel_execution(self, execution_id: str) -> bool:
         """Terminate one running execution chosen by the caller.

@@ -231,6 +231,31 @@ def test_zero_exit_without_regeneration_does_not_pass_on_old_outputs(tmp_path):
     assert (source / "result.data").read_text() == "old result"
 
 
+def test_recreated_empty_output_folder_counts_as_regenerated(tmp_path):
+    """2026-10-15: an empty ``model_checkpoints/`` (training with
+    checkpoint_interval=0) made a correct ClinTox rerun "outputs_missing"."""
+    body = "mkdir -p model_checkpoints\nprintf regenerated > result.data\n"
+    source = _workspace(tmp_path / "source", body)
+    (source / "model_checkpoints").mkdir()
+    owned = snapshot(source, tmp_path / "owned")
+    answer = _answer(outputs=["model_checkpoints", "result.data"])
+    result = reproduce(owned, {"policy_bt_reexec_timeout_s": 60}, lambda _: answer)
+    assert result["eligible"], result["reason"]
+    assert result["files"]["missing_outputs"] == []
+
+
+def test_output_folder_not_recreated_is_still_missing(tmp_path):
+    """The gate stays strict: a declared folder the rerun never makes fails."""
+    source = _workspace(tmp_path / "source", "printf regenerated > result.data\n")
+    (source / "model_checkpoints").mkdir()
+    owned = snapshot(source, tmp_path / "owned")
+    answer = _answer(outputs=["model_checkpoints", "result.data"])
+    result = reproduce(owned, {"policy_bt_reexec_timeout_s": 60}, lambda _: answer)
+    assert result["status"] == "outputs_missing"
+    assert result["files"]["missing_outputs"] == ["model_checkpoints"]
+
+
+
 def test_rerun_applies_configured_runtime_without_breaking_isolation(tmp_path):
     """SAB runtime: caps reach every pip call, variables reach the script, and a
     configured variable can never replace the venv-first PATH."""
