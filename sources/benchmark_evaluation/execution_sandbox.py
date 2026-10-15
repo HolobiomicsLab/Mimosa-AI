@@ -460,15 +460,14 @@ class ExecutionSandbox:
     def _discover_capsule_dependencies(self) -> tuple[list[str], list[str]]:
         """Return (per-program packages, present names) via pipreqs + SAB rules.
 
-        A capsule-provided requirements.txt wins: it is installed as-is (still
-        constraint-capped) and discovery stops there.
+        The grading venv follows the ScienceAgentBench protocol: deps come
+        from the program's imports, never from a capsule ``requirements.txt``.
+        Mimosa capsules ship one for the Policy-BT reproduction gate, often
+        pinned to post-era versions (``pandas==2.2.2``, ``deepchem==2.8.0``,
+        ``numpy==2.2.6``) that cannot co-resolve with PINNED_CONSTRAINTS —
+        installing it excluded 7 of 12 generations as infra on 2026-10-14
+        and skipped the EXTRA_DEPS / SPECIAL_CASE_INSTALLS rules.
         """
-        # A capsule-provided requirements.txt wins (still constraint-capped).
-        capsule_reqs = self.capsule_path / "requirements.txt"
-        if capsule_reqs.exists():
-            self._pip_install_requirements(capsule_reqs)
-            return [], []
-
         if not list(self.capsule_path.glob("*.py")):
             self.logger.info("[SANDBOX] No Python files in capsule")
             return [], []
@@ -601,20 +600,6 @@ class ExecutionSandbox:
                     f"for [{pkg}]: {result.stderr[:500]}"
                 )
             self.logger.info(f"[SANDBOX] Installed: {pkg}")
-
-    def _pip_install_requirements(self, req_file: Path) -> None:
-        """pip install -r req_file, capped by the shared constraints file."""
-        cmd = [str(self.pip_exe), "install", "-r", str(req_file)]
-        if self._constraints_file:
-            cmd += ["-c", self._constraints_file]
-        result = self._run_process(cmd, timeout=900)
-        if result.returncode == 0:
-            self.logger.info(f"[SANDBOX] Installed deps from {req_file.name}")
-        else:
-            raise EvalInfraError(
-                f"Required dep install from {req_file.name} failed "
-                f"(exit {result.returncode}): {result.stderr[:500]}"
-            )
 
     def _copy_py_sources_for_analysis(self, dest: Path) -> None:
         """Copy every capsule Python file (recursively) into *dest*.
