@@ -22,6 +22,25 @@ from sources.core.llm_provider import LLMConfig, LLMProvider
 
 from .workflow_info import WorkflowInfo
 
+# Synthetic diagnoses: placeholders when no evidence exists (not logs).
+NO_FEEDBACK_DIAGNOSIS = (
+    "FAILURE:Last run likely failed with no feedback captured. "
+    "Focus on fixing syntax errors or langraph patterns."
+)
+FRESH_ATTEMPT_DIAGNOSIS = (
+    "This is a fresh attempt, no execution feedback is available yet. "
+    "Create the first workflow based on the goal alone."
+)
+NO_VERIFIER_DIAGNOSIS_NOTE = "No verifier diagnosis is available for the previous run."
+CROSSOVER_RAW_LOG_TAIL_CHARS = 1024
+CROSSOVER_RAW_LOG_RULE = (
+    "4. A <raw_log> block is UNVERIFIED raw execution output of a previous run "
+    "(it may contain the agent's own mistakes, guessed paths or transient tool "
+    "errors, and it is truncated): read it for recurring symptoms only, never "
+    "turn one error into an environment-wide rule, never hard-code absolute "
+    "paths, and never move work or outputs outside the relative workspace."
+)
+
 
 def frontier_target(
     value: float,
@@ -518,6 +537,92 @@ class VariationEngine:
             f"Build the minimal workflow for the task with maximum {n_agents} agents.\n"
         )
 
+    @staticmethod
+    def _split_directive_evidence(
+        textual_gradient: str, run_stdout: str
+    ) -> tuple[str, str]:
+        """Split mutation evidence into a diagnosis and an unverified raw log.
+
+        The directive LLM must not take a raw run log for verified evidence.
+        ``mutation_prompt`` calls it with the parent's textual gradient and
+        the parent's own run stdout. The verifier gradient wins; else a
+        non-empty stdout becomes the raw log; else a synthetic note is the
+        diagnosis.
+
+        Args:
+            textual_gradient: str — parent's abstracted verifier gradient
+                from ``WorkflowInfo.abstracted_textual_gradient``; may be
+                empty.
+            run_stdout: str — stdout or error text of the parent run, from
+                ``WorkflowInfo.run_stdout``; may be empty.
+
+        Returns:
+            tuple[str, str] — ``(diagnosis, raw_log)``. Exactly one is
+            non-empty. Both are stripped but otherwise verbatim: the
+            gradient can name exact identifiers (column names, paths) that
+            the next workflow must reproduce character for character.
+        """
+        if textual_gradient and textual_gradient.strip():
+            return textual_gradient.strip(), ""
+        raw_log = (run_stdout or "").strip()
+        if raw_log:
+            return "", raw_log
+        # Whitespace-only stdout means a run without output.
+        return (FRESH_ATTEMPT_DIAGNOSIS if run_stdout else NO_FEEDBACK_DIAGNOSIS), ""
+
+    @staticmethod
+    def _render_directive_evidence(diagnosis: str, raw_log: str) -> list[str]:
+        """Render the evidence lines of the directive user prompt.
+
+        The directive LLM must see which evidence the verifier measured.
+        ``llm_think_mutation_directive`` calls it with the output of
+        ``_split_directive_evidence``. It puts the diagnosis in
+        ``<diagnosis>`` tags, or states that no verifier diagnosis exists,
+        and puts a raw log in ``<raw_log>`` tags.
+
+        Args:
+            diagnosis: str — verifier diagnosis or synthetic note; empty
+                when no diagnosis exists.
+            raw_log: str — unverified run stdout; empty when absent.
+
+        Returns:
+            list[str] — prompt lines, joined with newlines by the caller.
+        """
+        lines = [
+            "<diagnosis>",
+            diagnosis,
+            "</diagnosis>",
+            "The diagnosis contains fail/pass assertions with details, never report passing claims, never leak the exact claim being checked. Only diagnose the failure and suggest a pragmatic switch in approach for the fix.",
+        ] if diagnosis else [NO_VERIFIER_DIAGNOSIS_NOTE]
+        if raw_log:
+            lines += ["<raw_log>", raw_log, "</raw_log>"]
+        return lines
+
+    @staticmethod
+    def _render_parent_evidence(textual_gradient: str, raw_log: str) -> list[str]:
+        """Render the evidence lines of one crossover parent.
+
+        The crossover LLM must see which parent evidence the verifier
+        measured. ``crossover_prompt`` calls it per parent with the parent
+        gradient and the stdout tail. It puts the gradient in
+        ``<error_diagnosis>`` tags, or states that no verifier diagnosis
+        exists and puts the stdout tail in ``<raw_log>`` tags.
+
+        Args:
+            textual_gradient: str — parent's stripped verifier gradient;
+                empty when absent.
+            raw_log: str — unverified stdout tail; empty when absent.
+
+        Returns:
+            list[str] — prompt lines, joined with newlines by the caller.
+        """
+        if textual_gradient:
+            return ["<error_diagnosis>", textual_gradient, "</error_diagnosis>"]
+        lines = ["No verifier diagnosis is available for this parent."]
+        if raw_log:
+            lines += ["<raw_log>", raw_log, "</raw_log>"]
+        return lines
+
     def llm_think_mutation_directive(
         self,
         agent_answers: str,
@@ -525,25 +630,32 @@ class VariationEngine:
         search_state: str,
         goal: str,
         exploration_block: str = "",
+        raw_log: str = "",
     ) -> str:
         """Ask the directive LLM for the next mutation directive.
 
         ``mutation_prompt`` calls it with the parent evidence; the system
         prompt tells the LLM to judge the change magnitude itself from the
-        deterministic search state. Degenerate output (shorter than 20
-        characters) triggers one retry, then a deterministic fallback
-        directive.
+        deterministic search state. The verifier diagnosis and the
+        unverified raw log go in separate blocks. Degenerate output
+        (shorter than 20 characters) triggers one retry, then a
+        deterministic fallback directive.
 
         Args:
             agent_answers: str — flattened parent answers from
                 ``_extract_agent_answers``.
-            textual_gradient_block: str — rubric-blind diagnosis from the
-                verifier's textual gradient.
+            textual_gradient_block: str — rubric-blind verifier diagnosis
+                (or a synthetic no-feedback note) from
+                ``_split_directive_evidence``; empty when no diagnosis
+                exists.
             search_state: str — read-only ``<search_state>`` payload from
                 ``_search_state_block``.
             goal: str — task description for the session.
             exploration_block: str — rendered ``<exploration>`` block;
                 empty when no probe fired.
+            raw_log: str — unverified stdout of the parent workflow run
+                from ``_split_directive_evidence``; empty when a verifier
+                diagnosis exists.
 
         Returns:
             str — directive text of at most three sentences naming one
@@ -553,40 +665,40 @@ class VariationEngine:
 You are an expert at pinpointing the root cause of failures in multi-agent workflows.
 Your task is to analyze these inputs and provide a clear, concise directive for the next mutation step.
 Focus on identifying what worked, what didn't, and why. Suggest specific changes to improve the next workflow's performance.
-You will be given the previous workflow's agent answers (agents_answers) and a textual gradient block (diagnosis) that summarizes the failure.
-The diagnosis is a summary of  deterministic ground truth verification using rubric-based scoring, and may include hints about what went wrong.
-The diagnosis is trusted and should be used to inform your directive.
-An <exploration> block, when present, is a search-policy request, not a measured fact; the <diagnosis> remains the only measured evidence.
-The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the diagnosis.
+You will be given the previous workflow's agent answers (<agents_answers>) and its execution evidence: a <diagnosis> block, a <raw_log> block, or a note that no verifier diagnosis is available.
+The <diagnosis>, when present, is the verifier's measured evidence: a summary of deterministic ground truth verification using rubric-based scoring, and may include hints about what went wrong. It is trusted and should be used to inform your directive.
+The <raw_log>, when present, is UNVERIFIED raw execution output of a previous run. It can contain the agent's own mistakes, guessed paths, transient or tool-specific errors, and it may be truncated. Rules for using it:
+- Identify recurring behavioral patterns (for example repeated failing tool usage, step budget exhaustion, unfinished deliverables), not single error lines.
+- Never turn one error into an environment-wide rule: a permission or missing-file error on a path the agent chose is evidence that the agent used a wrong path, not that the workspace is read-only. Do not restate such an error as a property of the environment.
+- Never prescribe specific absolute paths, directories or file locations, and never tell agents to move work or outputs outside their current relative workspace. The orchestrator runs agents in the right workspace and collects only that workspace.
+- Phrase log-derived points as observed symptoms, not as verified facts.
+An <exploration> block, when present, is a search-policy request, not a measured fact; only the <diagnosis> is measured evidence.
+The agent cannot be fully trusted and may have provided misleading or incomplete answers. Use your judgment to weigh the agent's answers against the evidence.
 You will also be given a read-only <search_state> block with deterministic search statistics: parent score, iteration progress, iterations since the last improvement, recent success rate, and the recent score trajectory.
 You decide yourself how bold the next change should be, justified by the search state: recent improvements and a rising score trajectory call for small incremental tweaks; a long plateau, a 0% success rate, or repeated identical failures call for bolder restructuring (such as adding agents, pressure to use another approach or algorithm, rewriting prompt, changing prompt persona, etc...).
 Do not add or remove more than 1 agent at a time. Ask to add an agent whenever decomposition of the problem might help.
-Most of the time, suggest small, incremental changes to the workflow. Suggest large change if the diagnosis and the search state indicate that the current approach is flawed.
+Most of the time, suggest small, incremental changes to the workflow. Suggest large change if the evidence and the search state indicate that the current approach is flawed.
 If 'no agent answers' were captured, or that you see a python/syntax error, simply instruct to carefully craft the syntax for workflow creation, select tools correctly, and respect the generation guidelines (you do not make guidelines, the system reading your directive will know what it is; never specify what to fix, just give a general hint at fixing the syntax)
 """
-        prompt = ''.join([
+        prompt = "\n".join([
             "## GOAL:",
             goal,
             "## EXECUTION RESULTS:",
             "<agents_answers>",
             agent_answers,
             "</agents_answers>",
-            "<diagnosis>",
-            "",
-            textual_gradient_block,
-            "</diagnosis>",
+            *self._render_directive_evidence(textual_gradient_block, raw_log),
             *([exploration_block] if exploration_block else []),
-            "The diagnosis contains fail/pass assertions with details, never report passing claims, never leak the exact claim being checked. only  diagnosis the failure and suggest pragmatic switch in approach for fix."
             "<search_state>",
             search_state,
             "</search_state>",
-            "Suggest a mutation directive for the next workflow iteration"
-            "Example directive:"
-            "- 'Focus on improving the data preprocessing step, as the agent answers indicate that the current approach is causing data leakage. Consider adding a validation step to check for data integrity before proceeding to the next agent.'"
-            "- Add a agent X that will ..."
-            "- Tweak the prompt of agent X to be more domain-specific, to avoid them to be stuck in the same reasoning pattern."
-            "Keep it short and focused on one issue, no more than 3 sentences. Do not include any code or workflow structure in your directive."
-            "Specify the kind of mutation you are suggesting (e.g., prompt tweak, agent persona change, topology change), its intended magnitude (small tweak, component rewrite, or structural redesign), and the rationale behind it justified by the search state."
+            "Suggest a mutation directive for the next workflow iteration.",
+            "Example directive:",
+            "- 'Focus on improving the data preprocessing step, as the agent answers indicate that the current approach is causing data leakage. Consider adding a validation step to check for data integrity before proceeding to the next agent.'",
+            "- Add a agent X that will ...",
+            "- Tweak the prompt of agent X to be more domain-specific, to avoid them to be stuck in the same reasoning pattern.",
+            "Keep it short and focused on one issue, no more than 3 sentences. Do not include any code or workflow structure in your directive.",
+            "Specify the kind of mutation you are suggesting (e.g., prompt tweak, agent persona change, topology change), its intended magnitude (small tweak, component rewrite, or structural redesign), and the rationale behind it justified by the search state.",
         ])
         provider = LLMProvider(
             system_msg=sys_msg,
@@ -621,7 +733,6 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         goal: str,
         wf_info: WorkflowInfo | None,
         genotype: str | None,
-        run_stderr: str,
         iteration_count: int,
         max_iterations: int = 10,
         exploration_probe: dict | None = None,
@@ -629,8 +740,9 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         """Build the full mutation prompt for one offspring.
 
         The evolution engine calls it per iteration with the parent's
-        record. It assembles execution evidence (agent answers, textual
-        gradient or stderr fallback), the search-state block and the
+        record. It assembles execution evidence (agent answers, the
+        verifier's textual gradient, or else the parent's own unverified
+        run stdout as a separate raw log), the search-state block and the
         exploration block, asks the directive LLM for a mutation directive
         (or a fixed syntax-fix directive when ``genotype`` is None), and
         appends the hard mutation instructions.
@@ -638,12 +750,11 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         Args:
             goal: str — task description for the mutated workflow.
             wf_info: WorkflowInfo | None — parent info supplying score,
-                abstracted textual gradient and state; ``None`` on a cold
-                start.
+                abstracted textual gradient, state and run stdout (shown
+                as an unverified raw log only when no textual gradient
+                exists); ``None`` on a cold start.
             genotype: str | None — parent source code; ``None`` means the
                 previous attempt produced no code.
-            run_stderr: str — stderr tail used as fallback gradient when
-                no textual gradient exists.
             iteration_count: int — zero-based index of the current
                 attempt.
             max_iterations: int — total planned attempts (prompt context).
@@ -656,17 +767,14 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         """
         score      = wf_info.overall_score        if wf_info else 0.0
         textual_gradient  = wf_info.abstracted_textual_gradient if wf_info else ""
+        run_stdout = wf_info.run_stdout           if wf_info else ""
         wf_state   = wf_info.state_result         if wf_info else None
 
         # ── Execution evidence ───────────────────────────────────────────────
         agent_answers = self._extract_agent_answers(wf_state)
-        fail_msg = "FAILURE:Last run likely failed with no feedback captured. Focus on fixing syntax errors or langraph patterns."
-        textual_gradient_block = (
-            textual_gradient.strip()
-            if textual_gradient and textual_gradient.strip()
-            else (run_stderr or fail_msg).strip()
-            or "This is a fresh attempt, no execution feedback is available yet. Create the first workflow based on the goal alone."
-        ).replace('_', ' ')
+        textual_gradient_block, raw_log = self._split_directive_evidence(
+            textual_gradient, run_stdout
+        )
         # Deterministic search-state observer (no controller arithmetic).
         search_state = self._search_state_block(
             parent_score=score,
@@ -699,6 +807,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
                 search_state=search_state,
                 goal=goal,
                 exploration_block=exploration_block,
+                raw_log=raw_log,
             )
         return "\n".join([
             f"Attempt {iteration_count + 1} of workflow generation.",
@@ -728,7 +837,6 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         goal: str,
         wf_infos: list[WorkflowInfo],
         genotypes: list[str],
-        run_stderrs: list[str],
         iteration_count: int,
         max_iterations: int = 10,
         exploration_probe: dict | None = None,
@@ -741,11 +849,12 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
 
         Args:
             goal: str — task description for the recombined workflow.
-            wf_infos: list[WorkflowInfo] — parent infos, one per genotype.
+            wf_infos: list[WorkflowInfo] — parent infos, one per genotype;
+                each parent's own run stdout tail is shown as an
+                unverified ``<raw_log>`` only when it has no textual
+                gradient.
             genotypes: list[str] — parent source code strings, parallel to
                 ``wf_infos``.
-            run_stderrs: list[str] — parent stderr tails used as fallback
-                gradients.
             iteration_count: int — zero-based index of the current
                 attempt.
             max_iterations: int — total planned attempts (prompt context).
@@ -758,20 +867,24 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
         """
         # ── Assemble parent records ──────────────────────────────────────────
         parents = []
-        for i, (wf_info, genotype, stderr) in enumerate(
-            zip(wf_infos, genotypes, run_stderrs, strict=False)
+        for i, (wf_info, genotype) in enumerate(
+            zip(wf_infos, genotypes, strict=False)
         ):
             score     = wf_info.overall_score        if wf_info else 0.0
-            textual_gradient = wf_info.abstracted_textual_gradient if wf_info else ""
             # Layer 1: rubric-blind textual_gradient instead of raw judge log.
-            # Fall back to stderr tail only when no textual_gradient exists.
-            textual_gradient = textual_gradient.strip() or (stderr or "").strip()[-1024:]
+            textual_gradient = (wf_info.abstracted_textual_gradient if wf_info else "").strip()
+            # Parent's own stdout tail only when no textual_gradient exists.
+            run_stdout = wf_info.run_stdout if wf_info else ""
+            raw_log = "" if textual_gradient else (
+                run_stdout.strip()[-CROSSOVER_RAW_LOG_TAIL_CHARS:]
+            )
             answers   = self._extract_agent_answers(wf_info.state_result if wf_info else None)
             parents.append({
                 "index":     i + 1,
                 "score":     score,
                 "code":      genotype,
                 "textual_gradient": textual_gradient,
+                "raw_log":   raw_log,
                 "answers":   answers,
             })
 
@@ -785,10 +898,9 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
                 "<python>",
                 p["code"] or "(construction failed)",
                 "</python>",
-                "<error_diagnosis>",
-                p["textual_gradient"],
-                "</error_diagnosis>"
+                *self._render_parent_evidence(p["textual_gradient"], p["raw_log"]),
             ]))
+        has_raw_log = any(p["raw_log"] for p in parents)
 
         return "\n".join([
             f"Attempt {iteration_count + 1}: CROSSOVER — synthesize from {len(parents)} parent workflows.",
@@ -804,6 +916,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             "2. Identify which decisions failed and why.",
             "3. Build a new workflow that inherits the strongest sub-structures across parents",
             "   and discards the weakest, even if that means a topology none of the parents used.",
+            *([CROSSOVER_RAW_LOG_RULE] if has_raw_log else []),
         ])
 
 

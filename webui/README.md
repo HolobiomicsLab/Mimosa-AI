@@ -22,8 +22,16 @@ webui/
 
 For every evolution run under `sources/workflows/<uuid>/`:
 
-- **Overview** — the task, the verifier evaluation (claim pass/fail), the
-  textual gradient that steers the next mutation, and the evolution prompt.
+- **Verification** — the Policy-BT verifier verdict, read from the run's
+  `evaluation.txt` (`Policy-BT verifier` header + JSON): the current
+  Bradley–Terry reward (refreshed from `state_result.json`), arrival reward and
+  rank in the task session; the textual gradient that steers the next
+  mutation; the reproduction contract (`.sh` script, rerun exit code, declared
+  outputs missing/regenerated, stdout/stderr tails); every pair verdict seen
+  from this run (win/loss/tie, deciding stage and criterion, channel —
+  execution gate, comparison policy or visual tie-break — normalized values of
+  both sides and decisive evidence); and the frozen criteria ladder from
+  `.policy_bt/<hash>/tournament.json`. Runs from other verifiers have no tab.
 - **Workflow** — the executed LangGraph diagram (`workflow_<uuid>.png`) next to
   the generated genotype source.
 - **Lineage** — the evolution family as an interactive tree (reconstructed from

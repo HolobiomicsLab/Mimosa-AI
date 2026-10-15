@@ -879,10 +879,46 @@ class EvolutionEngine:
         """
         if wf:
             return self.variation.mutation_prompt(
-                goal, wf, wf.code, "", 0, max_iterations=max_iterations
+                goal, wf, wf.code, 0, max_iterations=max_iterations
             )
         else:
             return self.variation.seed_genome_prompt(goal)
+
+    def _mutation_parent_or_last_child(
+        self, parent_workflows: list[WorkflowInfo], child_uuid: str | None
+    ) -> WorkflowInfo | None:
+        """Choose the workflow that the next mutation changes.
+
+        ``evolve_generation`` calls it on the mutation branch with the
+        selected parents and the UUID of the generation that just ran.
+        It returns the first selected parent. When no parent qualified,
+        it returns the just-finished generation, so its code, verifier
+        gradient and run log all describe the same run. A generation
+        without a genotype on disk gives ``None`` (parentless mutation).
+
+        Args:
+            parent_workflows (list[WorkflowInfo]): Parents from
+                :meth:`select_parent_workflow`; may be empty.
+            child_uuid (str | None): UUID of the just-finished generation
+                from ``orchestrate_workflow``; ``None`` or ``""`` when the
+                run got no UUID.
+
+        Returns:
+            WorkflowInfo | None: The first parent, else a fresh accessor
+            for the just-finished generation (read after its evaluation),
+            else ``None``.
+        """
+        if parent_workflows:
+            return parent_workflows[0]
+        if not child_uuid:
+            return None
+        child = WorkflowInfo(child_uuid, Path(self.workflow_dir) / child_uuid)
+        if not child.code:
+            return None
+        print_info(
+            f"No parent qualified; mutating the last generation {child_uuid}."
+        )
+        return child
 
     async def start_workflow_evolution(
         self,
@@ -957,12 +993,11 @@ class EvolutionEngine:
         assertion_history = []  # Track [passed, total] per iteration
         self.viz_utils.create_rewards_curve_plot(goal)
 
+        goal += """
+        The computational pipeline should be reproducible. Make sure to include proper requirements files and a run.sh script to install dependencies and run end-to-end.
+        """
+
         # ── Stop control (stop-condition plan 2026-10-08) ─────────────
-        # Resolved once per session: relative-reward verifiers (hybrid,
-        # policy_bt) must not stop on an absolute score threshold — their
-        # overall_score is a pairwise win-rate/BT rating, so 0.9 means
-        # "first clean sweep" or "never". They get the champion-plateau
-        # rule instead (sources/core/stopping.py).
         stop_controller = StopController(
             mode=self.config.early_stop_mode,
             min_iter=self.config.min_learning_evolve_iterations,
@@ -1303,7 +1338,6 @@ class EvolutionEngine:
                 goal=task_goal,
                 wf_infos=parent_workflows,
                 genotypes=[pw.code or "" for pw in parent_workflows],
-                run_stderrs=[run_stdout] * len(parent_workflows),
                 iteration_count=runs[-1].iteration_count,
                 max_iterations=runs[-1].max_depth,
                 exploration_probe=exploration_probe,
@@ -1313,10 +1347,12 @@ class EvolutionEngine:
         elif len(runs) >= self.initial_population:
             # MUTATION — perturb the single best parent
             print_phase("MUTATION VARIATION", color=YELLOW)
-            primary_parent = parent_workflows[0] if parent_workflows else None
+            primary_parent = self._mutation_parent_or_last_child(
+                parent_workflows, uuid
+            )
             code = primary_parent.code if primary_parent else ""
             runs[-1].prompt = self.variation.mutation_prompt(
-                task_goal, primary_parent, code, run_stdout,
+                task_goal, primary_parent, code,
                 runs[-1].iteration_count, max_iterations=runs[-1].max_depth,
                 exploration_probe=exploration_probe,
             )
@@ -1896,8 +1932,9 @@ class EvolutionEngine:
     def _persist_run_stdout(self, uuid: str, run_stdout: str) -> None:
         """Write the raw workflow output to ``run_stdout.log``.
 
-        Auditors use this file to see the exact text that the directive
-        model gets as its fallback diagnosis when no parent gradient exists.
+        The variation engine reads this file through
+        ``WorkflowInfo.run_stdout`` as the unverified raw log of this
+        generation when it is a parent without a verifier gradient.
         ``evolve_generation`` calls this right after ``orchestrate_workflow``
         returns, also for failed runs. This method writes the text verbatim
         (ANSI escapes kept) in UTF-8 into the workflow folder.

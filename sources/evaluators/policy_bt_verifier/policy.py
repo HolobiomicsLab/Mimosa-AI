@@ -263,7 +263,9 @@ class ArtifactReader:
         """Read and parse one CSV artifact into row dictionaries.
 
         Called by generated adapter code for tabular deliverables. The first
-        row supplies the keys; all values are strings.
+        row supplies the keys; all values are strings. A UTF-8 byte-order mark
+        is dropped, so a header key is the real column name ("SMILES", not
+        "\\ufeffSMILES") when adapters compare output names with input names.
 
         Args:
             name (str): Relative artifact path.
@@ -272,7 +274,8 @@ class ArtifactReader:
         Returns:
             list[dict]: One dictionary per data row, keys from the header.
         """
-        return list(csv.DictReader(io.StringIO(self.read_text(name)), delimiter=delimiter))
+        text = self.read_bytes(name).decode("utf-8-sig")
+        return list(csv.DictReader(io.StringIO(text), delimiter=delimiter))
 
     def exists(self, name: str) -> bool:
         """Check one path for existence and record the check as evidence.

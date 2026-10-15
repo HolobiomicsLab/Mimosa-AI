@@ -99,6 +99,14 @@ parent_threshold_similarity` — default `0.8` — on MiniLM embeddings of
 `original_task`, `score ≥ parent_threshold_score` — default `0.01`) — this
 lets useful workflows transfer across tasks.
 
+When this scan also finds no parent (for example every reward is 0, so
+the archive stays empty), the mutation branch mutates the generation that
+just ran, if it left a genotype on disk: lineage `kind="mutation"`,
+`parents=[<that uuid>]`, and its code, verifier gradient and run log all
+describe the same run. A generation without a genotype (failed run)
+still gives a parentless mutation (lineage `kind="seed"`, no parents).
+Crossover selection and the cold-start thresholds are unchanged.
+
 ### Behaviour descriptor: genotype embedding
 
 The novelty signal compares candidates in **genotype-embedding** space.
@@ -211,6 +219,12 @@ call reads:
 - the parent's per-agent answers (`<agents_answers>`),
 - the textual gradient from the verifier
   (`<diagnosis>` — trusted as ground truth),
+- when the parent has no verifier gradient, the parent's own run log
+  (`run_stdout.log`, read through `WorkflowInfo.run_stdout`) instead
+  (`<raw_log>` — **unverified**, sent verbatim, never as a
+  `<diagnosis>`; the prompt then says that no verifier diagnosis is
+  available); with no parent there is no log, and a fixed no-feedback
+  note is the diagnosis,
 - the read-only search-state block produced by `_search_state_block`
   (`<search_state>` — plain search statistics: parent score, iteration
   progress, plateau streak, success rate, score trajectory),
@@ -221,10 +235,22 @@ the kind of mutation it implies (prompt tweak, persona change, agent
 add/remove, topology change), the **intended magnitude** (small tweak,
 component rewrite, structural redesign) justified by the search state,
 and the rationale. The system prompt is explicit about trust ranks —
-the verifier diagnosis is trusted; agent self-reports may mislead —
-and about action limits — add or remove at most one agent per step,
-and prefer small incremental changes unless the diagnosis and search
-state say the approach is fundamentally flawed.
+the verifier diagnosis is trusted; agent self-reports may mislead; the
+raw log is unverified and may hold the agent's own mistakes, guessed
+paths and transient tool errors — and about action limits — add or
+remove at most one agent per step, and prefer small incremental
+changes unless the evidence and search state say the approach is
+fundamentally flawed. For the raw log it adds four rules: look for
+recurring patterns, not single error lines; never turn one error into
+an environment-wide rule (a permission error on a path the agent chose
+means a wrong path, not a read-only workspace); never prescribe
+absolute paths or move work outside the relative workspace (only that
+workspace is collected); phrase log-derived points as symptoms.
+
+Crossover has no directive LLM: a parent without a verifier gradient
+gets the last 1024 characters of the run stdout in a `<raw_log>` block
+(instead of `<error_diagnosis>`), and the task list gains the same
+"unverified, symptoms only, stay in the relative workspace" rule.
 
 The orchestrator then receives only the parent code and that single
 directive, wrapped in `<directive>...</directive>` with hard
@@ -311,9 +337,10 @@ Each iteration also writes structured metrics for post-hoc analysis:
 - `sources/workflows/<uuid>/run_stdout.log` — the raw workflow execution
   output returned by the orchestrator, stored verbatim (UTF-8, ANSI
   escapes kept), written right after execution and before evaluation.
-  Failed runs store the error text instead. When a generation has no
-  parent gradient, this is the text the directive LLM receives as its
-  fallback diagnosis.
+  Failed runs store the error text instead. When this generation is a
+  parent without a verifier gradient, the directive LLM (mutation) or
+  the crossover prompt (last 1024 characters) receives this text as an
+  unverified `<raw_log>`.
 - `sources/workflows/qd_archive.jsonl` — append-only, one line per
   `validate_survivor` call. Records the candidate's descriptor,
   `qd_score`, `novelty_score`, admission verdict, and the `evicted_uuid`

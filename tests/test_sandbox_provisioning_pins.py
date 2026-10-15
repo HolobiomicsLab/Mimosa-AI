@@ -257,3 +257,21 @@ def test_discovery_rules_provision_deepchem_chain_end_to_end():
     assert packages == ["deepchem", "pyyaml"]
     assert present == ["deepchem"]
     assert "deepchem" in SPECIAL_CASE_INSTALLS
+
+
+def test_capsule_requirements_txt_is_ignored_for_grading(tmp_path):
+    # 2026-10-14 campaign: Policy-BT capsules ship requirements.txt pinned to
+    # post-era versions (deepchem==2.8.0 vs the deepchem<=2.7.1 cap); installing
+    # it made pip's resolution impossible and excluded 7/12 generations. Grading
+    # deps must come from the program's imports, with the deepchem chain rules.
+    cap = tmp_path / "capsule"
+    cap.mkdir()
+    (cap / "clintox_nn.py").write_text("import deepchem\n")
+    (cap / "requirements.txt").write_text("deepchem==2.8.0\npandas==2.2.2\n")
+    sb = _bare_sandbox(cap)
+    req_in = tmp_path / "requirements.in"
+    req_in.write_text("deepchem\n")  # what pipreqs reports for the import
+    sb._run_pipreqs = lambda: req_in
+    packages, present = sb._discover_capsule_dependencies()
+    assert packages == ["deepchem", "pyyaml"]
+    assert present == ["deepchem"]

@@ -386,6 +386,26 @@ class WorkflowInfo:
                 return ""
         return ""
 
+    @property
+    def run_stdout(self) -> str:
+        """Return the raw execution output saved for this generation.
+
+        The variation engine shows it to the directive LLM as an
+        unverified raw log when this workflow is a parent without a
+        verifier gradient. It reads ``run_stdout.log``, which the
+        evolution engine writes once, right after execution. The text is
+        read on each access and not cached.
+
+        Returns:
+            str: The log text (UTF-8, verbatim), or ``""`` when the file
+            is missing or unreadable.
+        """
+        log_file = self.workflow_folder / "run_stdout.log"
+        try:
+            return log_file.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return ""
+
     def load_state_result(self) -> dict:
         """Load and parse ``state_result.json`` from disk.
 

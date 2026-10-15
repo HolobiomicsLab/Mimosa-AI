@@ -187,6 +187,17 @@ def test_reader_confines_paths_and_records_reads(tmp_path):
     assert reader.list_files() == ["data.csv"]
 
 
+def test_reader_csv_header_drops_byte_order_mark(tmp_path):
+    """Live case: ScienceAgentBench hits.csv starts with a BOM; the input column
+    must read as "SMILES" so name-conformance checks compare real names."""
+    root = tmp_path / "side"
+    root.mkdir()
+    (root / "hits.csv").write_bytes("\ufeffSMILES,LIBRARY\nCCO,BROAD\n".encode())
+    reader = ArtifactReader(root)
+    assert reader.read_csv("hits.csv") == [{"SMILES": "CCO", "LIBRARY": "BROAD"}]
+    assert reader.observed == {"hits.csv"}
+
+
 def test_worker_picks_higher_score_in_both_orders(tmp_path):
     forward = run_pair(_payload(_pair(tmp_path / "f", 0.9, 0.5)), WORKER_TIMEOUT)
     backward = run_pair(_payload(_pair(tmp_path / "b", 0.5, 0.9)), WORKER_TIMEOUT)

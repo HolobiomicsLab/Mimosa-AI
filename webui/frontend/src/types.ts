@@ -25,26 +25,103 @@ export interface Artifact {
   empty: boolean
 }
 
-export type ClaimStatus = 'pass' | 'fail' | 'error' | 'unsure'
+// Policy-BT verifier verdict (webui/backend/app/verification.py). Pair sides
+// are relabeled `self` (the viewed run) / `opponent` by the backend.
+export type PairOutcome = 'win' | 'loss' | 'tie'
+export type PairChannel = 'execution' | 'code' | 'visual'
 
-export interface EvaluationClaim {
+export interface PolicyCriterion {
   id: string
-  importance: number
-  rationale: string
-  description: string
-  relevant_files: string[]
-  kind: string | null
-  status: ClaimStatus | null
-  score: number | null
-  details: string | null
+  stage: number
+  description?: string
+  direction: 'higher' | 'lower' | 'satisfy'
+}
+
+/** One adapter/visual evidence entry; `detail` (code) or `observation` (visual). */
+export interface PairEvidence {
+  side: 'self' | 'opponent'
+  criterion?: string
+  path?: string
+  value?: unknown
+  detail?: string
+  observation?: string
+}
+
+export interface PolicyPair {
+  opponent: string
+  opponent_reward: number | null
+  outcome: PairOutcome
+  stage: number
+  channel: PairChannel | null
+  policy_version: string | null
+  feedback: string | null
+  opponent_feedback: string | null
+  evidence: PairEvidence[]
+  values: { self: Record<string, unknown>; opponent: Record<string, unknown> } | null
+}
+
+export interface ProcessRecord {
+  argv: string[] | null
+  returncode: number | null
+  timed_out: boolean | null
+  error: string | null
+  duration_s: number | null
+  stdout: string | null
+  stderr: string | null
+}
+
+export interface ReproductionContract {
+  script?: string
+  installs_requirements?: boolean
+  regenerates_outputs?: boolean
+  generated_outputs?: string[]
+  reason?: string
+}
+
+export interface ExecutionRecord {
+  eligible: boolean | null
+  status: string | null
+  reason: string | null
+  enabled: boolean | null
+  attempted: boolean | null
+  script: string | null
+  returncode: number | null
+  timed_out: boolean | null
+  duration_s: number | null
+  preserved_outputs: string[] | null
+  symlink_gaps: string[] | null
+  contract: ReproductionContract | null
+  files: RerunFileDiff | null
+  provision: ProcessRecord | null
+  run: ProcessRecord | null
+}
+
+/** Workspace diff of the rerun; path lists, `unchanged` collapsed to a count. */
+export interface RerunFileDiff {
+  created?: string[]
+  changed?: string[]
+  removed?: string[]
+  regenerated?: string[]
+  missing_outputs?: string[]
+  inventory_errors?: Record<string, unknown>[]
+  unchanged_count: number
+}
+
+export interface PolicyBTVerification {
+  reward: number | null
+  arrival_reward: number | null
+  tournament_version: number | null
+  ratings: Record<string, number>
+  execution: ExecutionRecord
+  pairs: PolicyPair[]
+  criteria: PolicyCriterion[] | null
 }
 
 export interface RunDetail extends RunSummary {
   original_task: string | null
   textual_gradient: string | null
   evaluation_text: string | null
-  evaluation_scores: Record<string, unknown> | null
-  evaluation_claims: EvaluationClaim[] | null
+  verification: PolicyBTVerification | null
   genotype: string | null
   evolution_prompt: string | null
   metrics: Record<string, unknown> | null

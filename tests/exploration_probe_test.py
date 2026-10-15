@@ -286,6 +286,7 @@ class _FakeWorkflowInfo:
     def __init__(self, score=0.7, gradient="VERIFIER DIAGNOSIS: all pairs tied."):
         self.overall_score = score
         self.abstracted_textual_gradient = gradient
+        self.run_stdout = ""
         self.state_result = {
             "step_name": ["solver", "verifier"],
             "answers": ["did x", "did y"],
@@ -300,7 +301,7 @@ def test_mutation_prompt_injects_probe_after_directive(monkeypatch):
     ve = VariationEngine(_FakeConfig())
     prompt = ve.mutation_prompt(
         goal="solve the task", wf_info=_FakeWorkflowInfo(), genotype="# parent",
-        run_stderr="", iteration_count=2, max_iterations=8,
+        iteration_count=2, max_iterations=8,
         exploration_probe=_PROBE,
     )
     i_directive_end = prompt.index("</directive>")
@@ -326,7 +327,7 @@ def test_mutation_prompt_without_probe_untouched(monkeypatch):
     ve = VariationEngine(_FakeConfig())
     prompt = ve.mutation_prompt(
         goal="g", wf_info=_FakeWorkflowInfo(), genotype="code",
-        run_stderr="", iteration_count=1, max_iterations=8,
+        iteration_count=1, max_iterations=8,
     )
     assert "<exploration>" not in prompt
     assert "<exploration>" not in _FakeProvider.last.prompt
@@ -342,7 +343,7 @@ def test_crossover_prompt_carries_probe_beside_parent_diagnoses(monkeypatch):
     prompt = ve.crossover_prompt(
         goal="g",
         wf_infos=[_FakeWorkflowInfo(score=0.7), _FakeWorkflowInfo(score=0.4)],
-        genotypes=["code1", "code2"], run_stderrs=["", ""],
+        genotypes=["code1", "code2"],
         iteration_count=3, max_iterations=8,
         exploration_probe=_PROBE,
     )

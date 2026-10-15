@@ -1,6 +1,6 @@
 """Versioned instructions for task understanding and deterministic policy code."""
 
-PROMPT_VERSION = "policy-bt-separated-5"
+PROMPT_VERSION = "policy-bt-separated-6"
 
 BOUNDARY = """
 You are a scientific verification instrument, not a workspace assistant.
@@ -37,6 +37,27 @@ Criteria must describe the RESULT the goal requires (required outputs present,
 validity of the reported solution, consistency between reported values, quality
 metrics) — never the method or program one generation happens to use: no
 "script X runs/completes/prints Y" criteria, no algorithm names.
+OUTPUT CONFORMANCE. Strict graders read outputs by exact path, field name and
+record identity, so a correct result in a different shape still fails. When the
+goal asks to save outputs, add one "satisfy" criterion with id "output_conformance",
+staged after output presence and before every quality measure. Keep it separate
+from presence, so feedback names the real defect. It holds when all of these hold:
+- Paths and file names are exactly those the goal states.
+- Names the goal gives (columns, keys, labels) are used exactly. A field the goal
+  does not name that holds an input quantity, or a prediction or estimate of one,
+  uses the exact input name: same spelling and case, no added prefix or suffix
+  such as "_pred", "_prob" or "predicted_". Only a quantity absent from both the
+  goal and the inputs can take a new name.
+- Record identifiers (SMILES, IDs, names) are copied verbatim from the input: no
+  canonicalization, reformatting or whitespace change.
+- A per-record output (for example test-set predictions) has exactly one record
+  per input record, in input order, duplicates included. A selection from an input
+  (filter, subset) holds only input records and adds none.
+- A plain list holds only the requested values: no header, index or blank lines
+  unless the goal asks for them.
+Task inputs are the files the goal names or provides, never another generation's
+outputs and never reference answers. The plan names the input and output files
+the adapter compares.
 When frozen_task is supplied, the criteria are fixed: you may omit
 task_representation, criteria and representation. Extend schema adapters only.
 If EVIDENCE_JSON has "previous_answer_error", your last answer was rejected for
@@ -90,6 +111,14 @@ RULES for these:
 - Different generations may express the same information in different file
   layouts. Parse every layout shown in the evidence, not just the first
   generation's. Null is only for information that is truly absent.
+- For "output_conformance", read the task input and the output with read_csv or
+  read_text and compare them directly; never trust a report or log that claims
+  conformance. Compare record identifiers as ordered lists, duplicates included;
+  never require a uniqueness the input does not have. The value is true when every
+  rule holds, false when any rule fails, and null only when the output or the input
+  cannot be read. The evidence detail names each mismatch with the found and the
+  expected form, for example: column "label_prob" should be "label" as in the
+  input; 3 output identifiers are not in the input verbatim.
 The evidence lists every file with its preview; base the parser on those real
 contents, not on the plan's description alone.
 """
@@ -112,6 +141,10 @@ Return {"winner":"a|b|tie","stage":0,"feedback_a":"...",
 Evidence entries MUST copy an entry from a['evidence'] or b['evidence'] unchanged,
 adding only 'side':'a' or 'side':'b'. A win needs decisive evidence. Explain the
 measured difference and actionable correction without adding new task criteria.
+Feedback on a failed or deciding criterion MUST state what that side's evidence
+detail measured (the found and the expected form), never only the criterion id:
+'Your output column "label_prob" should be "label", as in the input' is actionable;
+'Your run does not satisfy output_conformance' is not.
 feedback_a is addressed to the first argument's author, feedback_b to the second's:
 write each in the second person ("Your run reports energy -9; ...") and NEVER name
 sides ("a", "b", "candidate A") in feedback text, so swapping the arguments swaps

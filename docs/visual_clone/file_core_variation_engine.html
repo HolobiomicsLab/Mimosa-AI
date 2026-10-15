@@ -36,7 +36,7 @@
     <rect x="20" y="40" width="170" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
     <text class="box-label" x="105" y="64" text-anchor="middle">inputs</text>
     <text class="box-sub" x="105" y="84" text-anchor="middle">goal, genotype</text>
-    <text class="box-sub" x="105" y="100" text-anchor="middle">run_stderr</text>
+    <text class="box-sub" x="105" y="100" text-anchor="middle">parent run_stdout.log</text>
     <text class="box-sub" x="105" y="116" text-anchor="middle">WorkflowInfo fields</text>
     <text class="box-sub" x="105" y="132" text-anchor="middle">config</text>
   </g>
@@ -199,18 +199,18 @@
   <g class="box" id="t3">
     <title>Before commit ca72107 the block was cut to [:2048].</title>
     <rect x="280" y="150" width="250" height="110" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
-    <text class="box-label" x="405" y="172" text-anchor="middle">textual_gradient_block</text>
-    <text class="box-sub" x="405" y="190" text-anchor="middle">lines 402-407, mutation_prompt</text>
-    <text class="box-sub" x="405" y="206" text-anchor="middle">gradient, else run_stderr,</text>
-    <text class="box-sub" x="405" y="222" text-anchor="middle">else fail_msg; _ becomes space</text>
+    <text class="box-label" x="405" y="172" text-anchor="middle">_split_directive_evidence</text>
+    <text class="box-sub" x="405" y="190" text-anchor="middle">gradient (_ becomes space),</text>
+    <text class="box-sub" x="405" y="206" text-anchor="middle">else parent's own log as raw_log,</text>
+    <text class="box-sub" x="405" y="222" text-anchor="middle">else fixed failure sentence</text>
     <text class="box-sub" x="405" y="238" text-anchor="middle">no length cut</text>
   </g>
   <g class="box" id="t4">
     <title>One LLM call (line 363) returns the directive text.</title>
     <rect x="600" y="20" width="240" height="100" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="720" y="42" text-anchor="middle">llm_think_mutation_directive()</text>
-    <text class="box-sub" x="720" y="60" text-anchor="middle">block inside &lt;diagnosis&gt;</text>
-    <text class="box-sub" x="720" y="76" text-anchor="middle">lines 343-346</text>
+    <text class="box-sub" x="720" y="60" text-anchor="middle">&lt;diagnosis&gt; or &lt;raw_log&gt;</text>
+    <text class="box-sub" x="720" y="76" text-anchor="middle">raw log marked unverified</text>
     <text class="box-sub" x="720" y="92" text-anchor="middle">+ agent answers, + search_state</text>
   </g>
   <g class="box" id="t5">
@@ -233,7 +233,7 @@
     <rect x="280" y="310" width="250" height="90" rx="18" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
     <text class="box-label" x="405" y="332" text-anchor="middle">crossover_prompt()</text>
     <text class="box-sub" x="405" y="350" text-anchor="middle">gradient per parent, else</text>
-    <text class="box-sub" x="405" y="366" text-anchor="middle">stderr tail [-1024:], line 489</text>
+    <text class="box-sub" x="405" y="366" text-anchor="middle">own log tail [-1024:] as raw_log</text>
     <text class="box-sub" x="405" y="382" text-anchor="middle">no cut on the gradient</text>
   </g>
   <g class="box" id="t8">
@@ -282,7 +282,7 @@
   <text class="edge-label" x="70" y="280" text-anchor="start">engine call</text>
 </svg>
 </div>
-<p class="figcap">Diagram 1b - 10 boxes. The 2048-character cut on the gradient is gone (<code class="path">variation_engine.py:407</code>, <code>git diff 336fe19</code>): in mutation the full gradient reaches the directive LLM only, in crossover it reaches the mutator directly. Two cuts remain: each agent answer at 2048 characters (line 274) and the crossover stderr fallback at the last 1024 (line 489).</p>
+<p class="figcap">Diagram 1b - 10 boxes. The 2048-character cut on the gradient is gone (<code>git diff 336fe19</code>): in mutation the full gradient reaches the directive LLM only, in crossover it reaches the mutator directly. Two cuts remain: each agent answer at 2048 characters and the crossover stdout fallback at the last 1024 (<code>CROSSOVER_RAW_LOG_TAIL_CHARS</code>). Since 2026-10-14 the run stdout is never shown as a diagnosis: it goes verbatim into a separate, unverified <code>&lt;raw_log&gt;</code> block (no underscore replacement).</p>
 <p class="note say">A mutation child never sees the raw gradient: <code>mutation_prompt</code> embeds only the directive text, so the gradient length changes the directive LLM input, not the mutator input.</p>
 </div>
 <div class="panel"><span class="br"></span>
@@ -522,13 +522,15 @@
   seed_genome_prompt(self, goal: str) -&gt; str                       # line 281 - prompt for generation zero
   llm_think_mutation_directive(self, agent_answers: str,
       textual_gradient_block: str, search_state: str,
-      goal: str) -&gt; str                                            # line 297 - one LLM call, directive text
+      goal: str, exploration_block: str = "",
+      raw_log: str = "") -&gt; str                                    # one LLM call, directive text
   mutation_prompt(self, goal: str, wf_info: WorkflowInfo | None,
-      genotype: str | None, run_stderr: str, iteration_count: int,
-      max_iterations: int = 10) -&gt; str                             # line 366 - full mutation prompt
+      genotype: str | None, iteration_count: int,
+      max_iterations: int = 10, exploration_probe: dict | None = None) -&gt; str  # full mutation prompt
   crossover_prompt(self, goal: str, wf_infos: list[WorkflowInfo],
-      genotypes: list[str], run_stderrs: list[str],
-      iteration_count: int, max_iterations: int = 10) -&gt; str       # line 456 - recombination prompt
+      genotypes: list[str],
+      iteration_count: int, max_iterations: int = 10,
+      exploration_probe: dict | None = None) -&gt; str                 # recombination prompt
 
   _PLATEAU_PATIENCE = 6                                            # line 158 - divisor of the plateau level
 
