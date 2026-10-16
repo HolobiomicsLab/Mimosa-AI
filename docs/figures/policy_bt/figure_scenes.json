@@ -2702,5 +2702,1035 @@
       }
     ],
     "caption": "Presentation overview. Preserved workspace evidence is admitted and normalized, compared by one task-specific deterministic policy, and optionally judged visually after code ties. The full pair-verdict history feeds a regularized Bradley–Terry fit. All current generation rewards refresh; evidence-grounded feedback guides subsequent mutation. Neither raw win rate nor hidden benchmark labels define the reward. Admission verdicts precede the two artifact-evidence channels and also enter the tournament."
+  },
+  {
+    "name": "04_mimosa_evolution_loop",
+    "width": 1600,
+    "height": 1000,
+    "title": "Mimosa-AI: evolving scientific workflows with Policy-BT",
+    "subtitle": "Code is the genotype. Workspace artifacts are the evidence. Selection and feedback drive the next generation.",
+    "items": [
+      {
+        "type": "text",
+        "x": 48,
+        "y": 30,
+        "text": "Mimosa-AI: evolving scientific workflows with Policy-BT",
+        "size": 38,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 48,
+        "y": 84,
+        "text": "Code is the genotype. Workspace artifacts are the evidence. Selection and feedback drive the next generation.",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 137,
+        "w": 932,
+        "h": 68,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 70,
+        "y": 149,
+        "text": "Task goal + input data",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 402,
+        "y": 151,
+        "text": "Scientific tools via MCP · optional literature grounding",
+        "size": 21,
+        "color": "#087F82",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            263,
+            205
+          ],
+          [
+            263,
+            238
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            765,
+            205
+          ],
+          [
+            765,
+            238
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 238,
+        "w": 430,
+        "h": 235,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 62,
+        "y": 253,
+        "w": 30,
+        "h": 30,
+        "fill": "#2463A5",
+        "stroke": "#2463A5"
+      },
+      {
+        "type": "text",
+        "x": 69,
+        "y": 256,
+        "text": "1",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 102,
+        "y": 252,
+        "text": "Synthesize a workflow",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 302,
+        "text": "LLM → executable Python",
+        "size": 27,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 345,
+        "text": "Agents, prompts, tools and control flow",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 377,
+        "text": "Seed / template during initialization",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "ellipse",
+        "x": 78,
+        "y": 418,
+        "w": 28,
+        "h": 28,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5"
+      },
+      {
+        "type": "ellipse",
+        "x": 181,
+        "y": 418,
+        "w": 28,
+        "h": 28,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5"
+      },
+      {
+        "type": "ellipse",
+        "x": 284,
+        "y": 418,
+        "w": 28,
+        "h": 28,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5"
+      },
+      {
+        "type": "ellipse",
+        "x": 388,
+        "y": 418,
+        "w": 28,
+        "h": 28,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5"
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            106,
+            432
+          ],
+          [
+            181,
+            432
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            209,
+            432
+          ],
+          [
+            284,
+            432
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            312,
+            432
+          ],
+          [
+            387,
+            432
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2
+      },
+      {
+        "type": "text",
+        "x": 82,
+        "y": 420,
+        "text": "A",
+        "size": 18,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 185,
+        "y": 420,
+        "text": "B",
+        "size": 18,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 288,
+        "y": 420,
+        "text": "C",
+        "size": 18,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 392,
+        "y": 420,
+        "text": "D",
+        "size": 18,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 550,
+        "y": 238,
+        "w": 430,
+        "h": 235,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 564,
+        "y": 253,
+        "w": 30,
+        "h": 30,
+        "fill": "#087F82",
+        "stroke": "#087F82"
+      },
+      {
+        "type": "text",
+        "x": 571,
+        "y": 256,
+        "text": "2",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 604,
+        "y": 252,
+        "text": "Execute the workflow",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 574,
+        "y": 302,
+        "text": "Sandboxed workflow runner",
+        "size": 26,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 574,
+        "y": 346,
+        "text": "Reset workspace to the initial inputs",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 574,
+        "y": 380,
+        "text": "Run agents and scientific tools",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 574,
+        "y": 414,
+        "text": "Save scripts, logs, tables and figures",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            478,
+            355
+          ],
+          [
+            550,
+            355
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 3
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            980,
+            355
+          ],
+          [
+            1016,
+            355
+          ],
+          [
+            1016,
+            258
+          ],
+          [
+            1076,
+            258
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 3
+      },
+      {
+        "type": "rect",
+        "x": 1052,
+        "y": 137,
+        "w": 500,
+        "h": 599,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 1066,
+        "y": 152,
+        "w": 30,
+        "h": 30,
+        "fill": "#AF6425",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1073,
+        "y": 155,
+        "text": "3",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1106,
+        "y": 151,
+        "text": "Policy-BT verifier",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 1076,
+        "y": 202,
+        "w": 452,
+        "h": 112,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 217,
+        "text": "Preserve + reproduce",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 256,
+        "text": "Owned snapshots; required .sh contract",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 287,
+        "text": "Fresh-venv rerun enabled by default",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1302,
+            316
+          ],
+          [
+            1302,
+            338
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 1076,
+        "y": 341,
+        "w": 452,
+        "h": 144,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 356,
+        "text": "Code-first pairwise comparison",
+        "size": 25,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 395,
+        "text": "Goal → fixed criteria + schema adapters",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 426,
+        "text": "One cached deterministic Python policy",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 457,
+        "text": "Relevant images may resolve code ties",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1302,
+            487
+          ],
+          [
+            1302,
+            510
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 1076,
+        "y": 513,
+        "w": 452,
+        "h": 111,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 528,
+        "text": "Bradley–Terry tournament",
+        "size": 25,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 567,
+        "text": "All generation pairs in the task session",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1096,
+        "y": 592,
+        "text": "Refit every generation’s current reward",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 1076,
+        "y": 649,
+        "w": 452,
+        "h": 34,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 1087,
+        "y": 654,
+        "text": "Numeric rewards + evidence-grounded diagnoses",
+        "size": 18,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1076,
+        "y": 698,
+        "text": "Reproduction failure → published reward 0",
+        "size": 19,
+        "color": "#A84943",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 550,
+        "y": 574,
+        "w": 430,
+        "h": 162,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 564,
+        "y": 589,
+        "w": 30,
+        "h": 30,
+        "fill": "#AF6425",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 571,
+        "y": 592,
+        "text": "4",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 604,
+        "y": 588,
+        "text": "QD archive + parent selection",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 574,
+        "y": 631,
+        "text": "Refresh quality from current BT ratings",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 574,
+        "y": 659,
+        "text": "Quality + code novelty − length penalty",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 574,
+        "y": 687,
+        "text": "Retain survivors; select parent workflow(s)",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 574,
+        "w": 430,
+        "h": 162,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 62,
+        "y": 589,
+        "w": 30,
+        "h": 30,
+        "fill": "#7752A6",
+        "stroke": "#7752A6"
+      },
+      {
+        "type": "text",
+        "x": 69,
+        "y": 592,
+        "text": "5",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 102,
+        "y": 588,
+        "text": "Mutation or crossover",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 631,
+        "text": "Mutation: parent diagnosis → LLM directive",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 659,
+        "text": "Crossover: recombine selected parent code",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 687,
+        "text": "Use the selected parents’ own feedback",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1052,
+            665
+          ],
+          [
+            980,
+            665
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": true,
+        "width": 3
+      },
+      {
+        "type": "text",
+        "x": 984,
+        "y": 626,
+        "text": "ratings",
+        "size": 17,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            550,
+            665
+          ],
+          [
+            478,
+            665
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": true,
+        "width": 3
+      },
+      {
+        "type": "text",
+        "x": 483,
+        "y": 626,
+        "text": "parents",
+        "size": 17,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            263,
+            574
+          ],
+          [
+            263,
+            473
+          ]
+        ],
+        "color": "#7752A6",
+        "dash": false,
+        "head": true,
+        "width": 3
+      },
+      {
+        "type": "text",
+        "x": 75,
+        "y": 500,
+        "text": "Next-generation",
+        "size": 20,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            420,
+            473
+          ],
+          [
+            420,
+            530
+          ],
+          [
+            765,
+            530
+          ],
+          [
+            765,
+            574
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": true,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 454,
+        "y": 507,
+        "w": 273,
+        "h": 37,
+        "fill": "#FFFFFF",
+        "stroke": "#FFFFFF",
+        "radius": 0
+      },
+      {
+        "type": "text",
+        "x": 466,
+        "y": 514,
+        "text": "Code embedding → novelty",
+        "size": 19,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1302,
+            736
+          ],
+          [
+            1302,
+            787
+          ],
+          [
+            263,
+            787
+          ],
+          [
+            263,
+            736
+          ]
+        ],
+        "color": "#087F82",
+        "dash": true,
+        "head": true,
+        "width": 3
+      },
+      {
+        "type": "rect",
+        "x": 410,
+        "y": 767,
+        "w": 508,
+        "h": 41,
+        "fill": "#FFFFFF",
+        "stroke": "#FFFFFF",
+        "radius": 0
+      },
+      {
+        "type": "text",
+        "x": 426,
+        "y": 774,
+        "text": "Selected-parent textual feedback → variation",
+        "size": 22,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 846,
+        "w": 932,
+        "h": 89,
+        "fill": "#EFF5FC",
+        "stroke": "#D5DEE5",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 70,
+        "y": 861,
+        "text": "Repeat until the configured stop condition or generation limit",
+        "size": 23,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 70,
+        "y": 899,
+        "text": "Policy-BT auto mode: champion plateau, after the minimum number of generations.",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 1052,
+        "y": 835,
+        "w": 500,
+        "h": 100,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1072,
+        "y": 850,
+        "text": "Restore the best workspace",
+        "size": 25,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1072,
+        "y": 889,
+        "text": "Highest current BT rating—not the latest run",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            980,
+            891
+          ],
+          [
+            1052,
+            891
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": true,
+        "width": 3
+      },
+      {
+        "type": "text",
+        "x": 48,
+        "y": 962,
+        "text": "QD = quality–diversity.  Numeric rewards guide selection; textual diagnoses guide changes.  Benchmark grading is separate.",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 75,
+        "y": 526,
+        "text": "prompt",
+        "size": 20,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1528,
+            665
+          ],
+          [
+            1571,
+            665
+          ],
+          [
+            1571,
+            885
+          ],
+          [
+            1552,
+            885
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": true,
+        "head": true,
+        "width": 2
+      },
+      {
+        "type": "text",
+        "x": 992,
+        "y": 861,
+        "text": "stop",
+        "size": 17,
+        "color": "#AF6425",
+        "bold": true
+      }
+    ],
+    "caption": "Mimosa-AI evolution loop with the Policy-BT verifier. A task goal, input data and available scientific tools condition LLM synthesis of a custom multi-agent workflow as executable Python (the genotype). Initialization can include multiple seed generations before parent-driven variation. The runner resets the workspace to its initial state, executes the workflow through the sandboxed runner and saves the produced artifacts. Policy-BT takes owned snapshots, assesses a mandatory reproduction script and, by default, reruns it in a fresh virtual environment. Goal-grounded reconnaissance fixes the comparison criteria and builds schema adapters. A cached deterministic Python policy compares each pair of generation workspaces; relevant images can resolve code ties only with agreement across both presentation orders. A regularized Bradley–Terry fit over all pair outcomes refreshes the current rewards of every generation. The default quality–diversity search combines those rewards with genotype-embedding novelty and a code-length penalty, admits survivors and selects parents. Mutation converts the selected parent’s diagnosis and search state into a directive for the code-generating LLM; crossover recombines selected parent workflows and their feedback without a separate mutation-directive call. Thus the next candidate need not descend from the most recent generation. The loop continues until the configured stopping rule or generation limit. With Policy-BT auto stopping, the rule is a head-to-head champion plateau after the minimum iteration count. The final workspace is restored from the generation with the highest current Bradley–Terry rating, not necessarily the last generation or the stopping controller’s champion. The diagram shows the successful generation path: generation/execution failures and verifier instrument errors are unscored and excluded from QD admission; reproduction-ineligible generations receive a published reward of zero and still contribute admission pair outcomes to the tournament. Verifier reruns are trusted local shell execution, not the workflow sandbox. Planner mode supplies task goals to this per-task loop; the planner is optional and outside the loop. The mini agent graph is schematic, not a fixed agent count or topology."
   }
 ]
