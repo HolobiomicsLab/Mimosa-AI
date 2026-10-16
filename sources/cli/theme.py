@@ -212,6 +212,37 @@ def ask(prompt: str, default: str = "") -> str:
     return answer if answer else default
 
 
+def ask_multiline(prompt: str) -> str:
+    """Print an amber ``»`` prompt and return multi-line input.
+
+    Lines accumulate until an empty line is submitted (Enter on a blank
+    line), which makes copy-pasting long multi-line text possible — a
+    paste is consumed line by line until it runs out. Ctrl-D also
+    submits whatever has been typed. Single-line input still works:
+    type the text, press Enter, then Enter again on the blank line.
+    Exits cleanly on Ctrl-C, or on Ctrl-D before any input.
+    """
+    hint = f"{GREY}(multi-line OK — submit with an empty line){RESET}"
+    print(f"\n  {AMBER}»{RESET} {WHITE}{prompt}{RESET}{AMBER}:{RESET} {hint}")
+    lines: list[str] = []
+    while True:
+        try:
+            line = input(f"  {EMBER}…{RESET} " if lines else "    ")
+        except KeyboardInterrupt:
+            print()
+            sys.exit(0)
+        except EOFError:
+            # Ctrl-D: submit what we have (or exit if nothing was typed)
+            print()
+            if not lines:
+                sys.exit(0)
+            break
+        if not line.strip():
+            break
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
 def ask_yn(prompt: str, default: bool = True) -> bool:
     """Ask a yes/no question and return the answer as a boolean."""
     hint = "Y/n" if default else "y/N"

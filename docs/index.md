@@ -80,7 +80,7 @@ cluster separation and edge weights.
 
 Evaluated on **ScienceAgentBench** (102 tasks, `task` mode):
 
-| Mode                                    | Success Rate | Code-BLEU | Cost / task |
+| Mode                                    | Success Rate | CBS | Cost / task |
 | --------------------------------------- | ------------ | --------- | ----------- |
 | DeepSeek-V3.2 single-agent              | 38.2 %       | 0.898     | $0.05       |
 | DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
