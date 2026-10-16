@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import tempfile
 import threading
@@ -80,6 +81,16 @@ PINNED_CONSTRAINTS = [
     # 2026-09-06: "requires TensorFlow version >= 2.18 ... Detected 2.17.0").
     # 0.24.0 is the last release compatible with TF 2.17.
     "tensorflow-probability<=0.24.0",
+    # scikit-learn: the SAB authors never pinned it (config_conda_env.py has
+    # no entry); at submission (2024-10-07) the newest release was 1.5.2.
+    # Unpinned, it resolved to 1.7.2, which removed TSNE(n_iter=) — 4 of 6
+    # drugex generations crashed on 2026-10-16. 1.5.x is the only line that
+    # accepts both TSNE n_iter and max_iter and still has
+    # mean_squared_error(squared=); every sklearn-using gold/eval program of
+    # the 102 tasks needs >= 1.4 (root_mean_squared_error) and runs the same
+    # on 1.5.2 (SklearnCapStudy, 2026-10-16). No lower bound: qsprpred's
+    # ml2json needs scikit-learn<=1.4.0.
+    "scikit-learn<1.6",
 ]
 
 # pipreqs import name -> PyPI package name (authors' handcrafted remaps).
@@ -220,13 +231,36 @@ def grading_runtime() -> dict:
     value in ``config.policy_bt_reexec_runtime`` when SAB mode starts.
 
     Returns:
-        dict: ``{"python": str, "constraints": list[str], "env": dict[str, str]}``
-        — the verified Python 3.10 interpreter, PINNED_CONSTRAINTS and the
-        variables every graded program runs with.
+        dict: ``{"python": str, "constraints": list[str], "env": dict[str, str],
+        "provisioner": str}`` — the verified Python 3.10 interpreter,
+        PINNED_CONSTRAINTS, the variables every graded program runs with,
+        and the dotted path of ``provision_capsule_venv``, which installs the
+        grader's own package set into the rerun venv.
     """
     return {"python": resolve_sandbox_python(),
             "constraints": list(PINNED_CONSTRAINTS),
-            "env": {**GRADING_ENV, **CPU_ONLY_ENV}}
+            "env": {**GRADING_ENV, **CPU_ONLY_ENV},
+            "provisioner": f"{__name__}:provision_capsule_venv"}
+
+
+def _set_tree_writable(root: Path, writable: bool) -> None:
+    """Add or remove the owner's write permission on a whole directory tree.
+
+    The base layer is made read-only once built, so no program or rerun can
+    uninstall or overwrite its packages (a ``run.sh`` could call its real pip
+    by absolute path); ``cleanup_shared_venv`` restores write permission
+    before deleting it.
+
+    Args:
+        root (Path): Directory to change, including itself.
+        writable (bool): True restores ``u+w``; False removes all write bits.
+    """
+    for directory, _, files in os.walk(root):
+        for path in [directory, *(os.path.join(directory, f) for f in files)]:
+            if os.path.islink(path):
+                continue
+            mode = os.stat(path).st_mode
+            os.chmod(path, (mode | stat.S_IWUSR) if writable else (mode & ~(stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH)))
 
 
 def _is_virtualenv(directory: Path) -> bool:
@@ -286,7 +320,7 @@ class ExecutionSandbox:
         "scipy<1.14.0",
         "pandas<=1.5.3",
         "matplotlib<3.8.0",
-        "scikit-learn",
+        "scikit-learn<1.6",
         "torch<=2.3.0",
         "tensorflow<=2.17.0",
         "tf_keras<=2.17.0",
@@ -327,6 +361,7 @@ class ExecutionSandbox:
         capsule_path: Path,
         cpu_only: bool = True,
         base_packages: list[str] | None = None,
+        venv_path: Path | None = None,
     ):
         """
         Initialize execution sandbox and set up its Python environment.
@@ -345,12 +380,17 @@ class ExecutionSandbox:
                 machines with a partial CUDA install.
             base_packages: Packages of the shared base layer. Defaults to
                 BASIC_PACKAGES; pass a lighter set for fast, targeted runs.
+            venv_path: Where to create the capsule venv; the caller then owns
+                it (``provision_capsule_venv`` passes the verifier's rerun
+                venv). ``None`` puts it in the sandbox temp dir, removed by
+                ``cleanup``.
         """
         self.capsule_path = Path(capsule_path)
         self.cpu_only = cpu_only
         self.base_packages = list(base_packages) if base_packages is not None else list(self.BASIC_PACKAGES)
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self._constraints_file: str | None = None  # set by _create_or_reuse_base_venv
+        self.per_program_packages: list[str] = []  # set by _setup_environment
 
         # Per-instance temp dir: capsule venv plus execution/eval working copies.
         self._temp_dir_context = tempfile.TemporaryDirectory(prefix="mimosa_sandbox_")
@@ -358,7 +398,7 @@ class ExecutionSandbox:
 
         base = self._create_or_reuse_base_venv()
         self.base_venv_path = base["venv_path"]
-        self.venv_path = self._create_capsule_venv(base)
+        self.venv_path = self._create_capsule_venv(base, Path(venv_path) if venv_path else self.temp_dir / "venv")
         self.python_exe = self.venv_path / "bin" / "python"
         self.pip_exe = self.venv_path / "bin" / "pip"
 
@@ -456,6 +496,7 @@ class ExecutionSandbox:
             except BaseException:
                 shutil.rmtree(base_dir, ignore_errors=True)
                 raise
+            _set_tree_writable(venv_path, False)  # base layer is immutable from now on
             cls._shared_venvs[fingerprint] = entry
             atexit.register(cls.cleanup_shared_venv)
             self.logger.info(f"[SANDBOX] Base layer ready at {venv_path}")
@@ -502,7 +543,7 @@ class ExecutionSandbox:
         out = subprocess.run([str(python_exe), "-c", probe], capture_output=True, text=True, timeout=30, check=True)
         return list(dict.fromkeys(out.stdout.split()))
 
-    def _create_capsule_venv(self, base: dict) -> Path:
+    def _create_capsule_venv(self, base: dict, venv_path: Path) -> Path:
         """Create this capsule's fresh venv layered over the immutable base layer.
 
         ``__init__`` calls it once per sandbox. A ``.pth`` file appends the
@@ -510,16 +551,15 @@ class ExecutionSandbox:
         packages import without reinstalling; pip then reports them as
         satisfied, and a capsule that needs another version installs it into
         its own venv, which shadows the base copy ("Not uninstalling ...
-        outside environment"). The venv lives in the sandbox temp dir and is
-        removed by ``cleanup``.
+        outside environment").
 
         Args:
             base (dict): Base-layer entry from ``_create_or_reuse_base_venv``.
+            venv_path (Path): Directory to create; must not exist yet.
 
         Returns:
             Path: The capsule venv directory.
         """
-        venv_path = self.temp_dir / "venv"
         self._make_venv(base["python"], venv_path)
         own = self._site_packages(venv_path / "bin" / "python")
         (Path(own[0]) / "_mimosa_base_layer.pth").write_text("\n".join(base["site_packages"]) + "\n")
@@ -532,6 +572,7 @@ class ExecutionSandbox:
             for entry in cls._shared_venvs.values():
                 base_dir = entry["base_dir"]
                 if base_dir and Path(base_dir).exists():
+                    _set_tree_writable(Path(base_dir), True)
                     shutil.rmtree(base_dir, ignore_errors=True)
             cls._shared_venvs.clear()
 
@@ -547,6 +588,7 @@ class ExecutionSandbox:
         """
         try:
             per_task, present = self._discover_capsule_dependencies()
+            self.per_program_packages = list(per_task)
 
             rest = list(self.base_packages)
             # Drop per-task entries already covered (pinned) by the base set —
@@ -1263,6 +1305,41 @@ class ExecutionSandbox:
         except (ValueError, TypeError):
             success = bool(parsed[0])
         return success, str(parsed[1])
+
+
+def provision_capsule_venv(capsule: Path, venv: Path) -> dict:
+    """Install the grader's exact package set for one capsule into ``venv``.
+
+    The Policy-BT verifier reruns a ScienceAgentBench workspace and must see
+    the packages the grader would install, not the agent's requirements.txt
+    pins (2026-10-16: drugex gen 0 pinned scikit-learn==1.3.2, passed the
+    verifier and failed grading on 1.7.2). ``reexec._execute`` calls it
+    through ``grading_runtime()["provisioner"]`` with the owned snapshot and
+    its rerun venv path. It runs the grader's own code path: same base
+    layer, pipreqs discovery, SAB rules, caps and capsule-venv overlay.
+
+    Args:
+        capsule (Path): Workspace copy whose imports decide the packages.
+        venv (Path): Rerun venv to create; must not exist. The caller owns it.
+
+    Returns:
+        dict: ``{"path": list[str]}`` bin directories to put first on PATH
+        (capsule venv, then base layer), ``"per_program": list[str]``
+        pipreqs-derived packages, and ``"versions": list[str]`` resolved
+        ``name==version`` lines as the program will see them.
+
+    Raises:
+        EvalInfraError: When an install fails (the grader would exclude the task).
+    """
+    sandbox = ExecutionSandbox(capsule, venv_path=venv)
+    try:
+        frozen = subprocess.run([str(sandbox.python_exe), "-m", "pip", "list", "--format=freeze"],
+                                capture_output=True, text=True, timeout=120)
+        return {"path": [str(sandbox.venv_path / "bin"), str(sandbox.base_venv_path / "bin")],
+                "per_program": sandbox.per_program_packages,
+                "versions": frozen.stdout.split()}
+    finally:
+        sandbox.cleanup()
 
 
 if __name__ == "__main__":

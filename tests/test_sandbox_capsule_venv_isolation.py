@@ -98,3 +98,20 @@ def test_capsule_install_stays_in_its_own_venv(tmp_path, monkeypatch, offline_wh
     first.cleanup()
     assert not first.venv_path.exists()
     assert _version(second.python_exe) == "2.0"
+
+
+def test_verifier_provisioner_installs_exactly_what_the_grader_installs(tmp_path, monkeypatch, offline_wheels):
+    # The Policy-BT rerun calls provision_capsule_venv; it must give the
+    # same per-program plan and the same resolved versions as grading.
+    monkeypatch.setattr(ExecutionSandbox, "_discover_capsule_dependencies", lambda self: (["mimosadep"], []))
+    (tmp_path / "cap").mkdir()
+    monkeypatch.setattr(ExecutionSandbox, "BASIC_PACKAGES", ["mimosaprobe<3"])
+    grader = ExecutionSandbox(tmp_path / "cap")
+    rerun_venv = tmp_path / "rerun" / "venv"
+    rerun_venv.parent.mkdir()
+    provisioned = execution_sandbox.provision_capsule_venv(tmp_path / "cap", rerun_venv)
+    assert provisioned["per_program"] == grader.per_program_packages == ["mimosadep"]
+    assert _version(rerun_venv / "bin" / "python") == _version(grader.python_exe) == "1.0"
+    assert {"mimosaprobe==1.0", "mimosadep==1.0"} <= set(provisioned["versions"])
+    assert provisioned["path"] == [str(rerun_venv / "bin"), str(grader.base_venv_path / "bin")]
+    assert rerun_venv.exists()  # caller-owned: survives the provisioner's cleanup

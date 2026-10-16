@@ -321,6 +321,71 @@ def test_snapshot_keeps_only_the_marker_of_a_workspace_virtualenv(tmp_path):
     assert sorted(item["path"] for item in inventory(copy)) == [".venv/pyvenv.cfg", "task.py"]
 
 
+def _fake_provisioner(monkeypatch, behaviour=None) -> dict:
+    """Register an importable provisioner that builds a plain venv.
+
+    Stands in for execution_sandbox.provision_capsule_venv (the real one needs
+    the full ScienceAgentBench base stack). Returns the runtime config value.
+    """
+    import subprocess
+    import types
+
+    def provision(capsule, venv):
+        if behaviour:
+            behaviour()
+        subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
+        return {"path": [str(venv / "bin")], "per_program": ["numpy"], "versions": ["numpy==1.26.4"]}
+
+    module = types.ModuleType("policy_bt_fake_provisioner")
+    module.provision = provision
+    monkeypatch.setitem(sys.modules, module.__name__, module)
+    return {"provisioner": f"{module.__name__}:provision"}
+
+
+def test_provisioned_rerun_ignores_pip_like_the_grader(tmp_path, monkeypatch):
+    """2026-10-16 drugex gen 0: run.sh's `pip install -r requirements.txt`
+    gave the verifier scikit-learn 1.3.2 while the grader, which ignores
+    requirements.txt, used 1.7.2. With the grader's package set provisioned,
+    every pip spelling in run.sh must be a no-op and no install step is
+    required by the contract."""
+    body = ("pip install scikit-learn==1.3.2\npip3 install numpy\n"
+            "python -m pip install -r requirements.txt\n"
+            "python -c \"import os; open('result.data','w').write(os.environ['PIP_NO_INDEX'])\"\n")
+    owned = snapshot(_workspace(tmp_path / "source", body), tmp_path / "owned")
+    no_install = json.loads(_answer())
+    no_install["installs_requirements"] = False
+    config = {"policy_bt_reexec_timeout_s": 60, "policy_bt_reexec_runtime": _fake_provisioner(monkeypatch)}
+    result = reproduce(owned, config, lambda _: json.dumps(no_install))
+    assert result["eligible"], result["reason"]
+    assert (owned / "result.data").read_text() == "1"
+    stderr = (owned / ".policy_bt_reexec" / "stderr.log").read_text()
+    assert stderr.count("[verifier] pip is disabled") == 4  # reproduce.sh line + 3 above
+    assert "scikit-learn==1.3.2" in stderr
+    assert result["runtime"]["provisioned"]["per_program"] == ["numpy"]
+
+
+def test_generic_rerun_still_requires_an_install_step(tmp_path):
+    """Without a provisioner (non-benchmark tasks) nothing installs packages
+    for run.sh, so the install step stays mandatory."""
+    owned = snapshot(_workspace(tmp_path / "source", "true\n"), tmp_path / "owned")
+    no_install = json.loads(_answer())
+    no_install["installs_requirements"] = False
+    result = reproduce(owned, {"policy_bt_reexecute": False}, lambda _: json.dumps(no_install))
+    assert result["status"] == "invalid_contract"
+
+
+def test_provisioning_failure_is_an_instrument_error(tmp_path, monkeypatch):
+    """The grader excludes a task whose packages cannot be installed; the
+    verifier must not score it 0 either."""
+    def fail():
+        raise RuntimeError("Required package install failed (exit 1) for ['qsprpred']")
+
+    owned = snapshot(_workspace(tmp_path / "source", "true\n"), tmp_path / "owned")
+    config = {"policy_bt_reexec_timeout_s": 60, "policy_bt_reexec_runtime": _fake_provisioner(monkeypatch, fail)}
+    with pytest.raises(ReproductionInstrumentError, match="qsprpred"):
+        reproduce(owned, config, lambda _: _answer())
+
+
 def test_timeout_kills_descendants_before_they_write(tmp_path):
     """The timeout stops a descendant, not just its waiting parent shell."""
     script = tmp_path / "wait.sh"

@@ -37,8 +37,9 @@ below; it remains reachable via `verifier_kind = "legacy"`.
 The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/DESIGN.md#2-how-it-would-work):
 
 1. **Reproduction contract.** Each generation must contain a shell
-   (`.sh`) script that installs its requirements and regenerates its
-   outputs. A missing or invalid script makes the generation ineligible:
+   (`.sh`) script that regenerates its outputs and, unless the runtime
+   provisions packages (ScienceAgentBench), installs its requirements
+   first. A missing or invalid script makes the generation ineligible:
    reward is zero and feedback states the required correction.
 2. **Owned artifact copies.** The verifier inspects copies of saved
    generation workspaces, never changes the original artifacts, and
@@ -74,12 +75,21 @@ adapters can read stdout-only metrics.
 
 The rerun runtime is `policy_bt_reexec_runtime`: `python` (venv
 interpreter), `constraints` (pip caps, applied to every install through
-`PIP_CONSTRAINT`) and `env` (extra variables that cannot override the
-isolation variables). Empty means the host interpreter with no caps.
-ScienceAgentBench mode fills it with the grader's own runtime
+`PIP_CONSTRAINT`), `env` (extra variables that cannot override the
+isolation variables) and `provisioner` (`module:function`). Empty means
+the host interpreter with no caps and an empty venv that `run.sh` fills
+itself. ScienceAgentBench mode fills it with the grader's own runtime
 (`execution_sandbox.grading_runtime()`: Python 3.10, `PINNED_CONSTRAINTS`,
-`TF_USE_LEGACY_KERAS=1`), so the verifier accepts exactly the installs the
-grader accepts. A failed or output-less rerun gets one LLM root-cause
+`TF_USE_LEGACY_KERAS=1`, provisioner `provision_capsule_venv`). The
+provisioner builds the rerun venv with the grader's exact install path —
+same base layer, pipreqs over the workspace's imports, SAB rules and caps
+— then pip in the venv is replaced by a no-op that prints a notice, and
+`PIP_NO_INDEX=1` is set, so `pip install -r requirements.txt` in `run.sh`
+has no effect, as in grading. In that mode the contract needs no install
+step, the goal tells agents not to install
+(`reexec.reproduction_goal_note`), the resolved versions are recorded in
+`execution.runtime.provisioned`, and a provisioning failure is an
+instrument error (the grader would exclude the task). A failed or output-less rerun gets one LLM root-cause
 diagnosis from bounded evidence (runtime, script, requirements, stderr
 head and tail), added to the reason before the raw stderr tail; if that
 call fails, `diagnosis_error` records why and the tail alone remains.

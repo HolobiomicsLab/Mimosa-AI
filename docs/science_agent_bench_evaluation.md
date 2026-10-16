@@ -110,16 +110,22 @@ version drift:
   generations as infra on 2026-10-14.
 - **The agent is told this environment.** Every SAB goal carries an
   `EXECUTION ENVIRONMENT (reproduction check and grading)` section built
-  from `SANDBOX_PYTHON_VERSION`, `PINNED_CONSTRAINTS` and `GRADING_ENV`
-  (`csv_mode.sab_environment_block`): code within those versions, a
-  `requirements.txt` without newer pins, and a `run.sh` using plain
-  `pip`/`python` with no workspace venv.
-- **The Policy-BT verifier reruns in the same environment.** SAB mode sets
-  `config.policy_bt_reexec_runtime = grading_runtime()`, so `run.sh` is
-  re-executed with the same Python 3.10 binary (resolved past any pyenv
-  shim), caps and `TF_USE_LEGACY_KERAS=1` as graded programs (2026-10-15:
-  on host Python 3.11 the verifier failed `deepchem==2.7.1`, which only
-  exists for Python < 3.11).
+  from `SANDBOX_PYTHON_VERSION`, `BASIC_PACKAGES`, `PINNED_CONSTRAINTS` and
+  `GRADING_ENV` (`csv_mode.sab_environment_block`): packages are installed
+  from the program's imports, `requirements.txt` and pip commands in
+  `run.sh` are ignored, and `run.sh` only runs the pipeline with plain
+  `python`.
+- **The Policy-BT verifier installs exactly what the grader installs.** SAB
+  mode sets `config.policy_bt_reexec_runtime = grading_runtime()`. Its
+  `provisioner` (`provision_capsule_venv`) builds the rerun venv through the
+  grader's own `ExecutionSandbox` path (same base layer, pipreqs, rules,
+  caps), then disables pip, so agent pins cannot change versions on either
+  side (2026-10-16: drugex gen 0 pinned scikit-learn==1.3.2, passed the
+  verifier and failed grading on 1.7.2).
+- **scikit-learn is capped `<1.6`.** Unpinned it resolved to 1.7.2, which
+  removed `TSNE(n_iter=)`. 1.5.x accepts both `n_iter` and `max_iter` and
+  keeps `mean_squared_error(squared=)`; all sklearn-using gold and eval
+  programs of the 102 tasks run the same on 1.5.2.
 - **Virtual environments are never graded.** A capsule directory holding
   `pyvenv.cfg` is left out of the pipreqs scan, the AST fallback and the
   execution/eval copies.

@@ -23,6 +23,7 @@ from sources.benchmark_evaluation.execution_sandbox import (
     GRADING_ENV,
     PINNED_CONSTRAINTS,
     SANDBOX_PYTHON_VERSION,
+    ExecutionSandbox,
     grading_runtime,
 )
 from sources.benchmark_evaluation.science_agent_bench import ScienceAgentBenchLoader
@@ -48,28 +49,31 @@ EVAL_LOG_BACKUP_COUNT = 5
 def sab_environment_block() -> str:
     """Describe the ScienceAgentBench grading environment for the agent goal.
 
-    Agents must write code, a requirements.txt and a run.sh that both the
-    Policy-BT reproduction check and the grader can install and run.
+    Agents must write code that runs on the packages the grader installs.
+    Both the Policy-BT reproduction check and the grader install them from
+    the program's imports (pipreqs + SAB rules), on the same base stack and
+    caps, and ignore requirements.txt (the verifier disables pip in run.sh).
     ``CsvEvaluationMode._generate_task_science_agent_bench`` calls it for every
-    SAB task. It builds the text from the sandbox's own Python version, caps
-    and variables, so the goal and both environments cannot drift apart.
+    SAB task. It builds the text from the sandbox's own Python version, base
+    stack, caps and variables, so the goal and both environments cannot drift.
 
     Returns:
         str: Multi-line ``EXECUTION ENVIRONMENT`` section for the task prompt.
     """
     caps = ", ".join(PINNED_CONSTRAINTS)
+    base = ", ".join(p for p in ExecutionSandbox.BASIC_PACKAGES if p not in ("pipreqs", "pip-tools"))
     env = ", ".join(f"{key}={value}" for key, value in GRADING_ENV.items())
     return (
         "EXECUTION ENVIRONMENT (reproduction check and grading):\n"
-        f"run.sh and your final script are re-run with Python {SANDBOX_PYTHON_VERSION} "
-        "in a fresh virtual environment, with every pip install capped at these "
-        f"versions: {caps}. {env} is set.\n"
-        "Write code that works with these versions (for example pandas 1.5 and "
-        "numpy 1.x APIs; with TensorFlow/Keras code, list tf_keras). In "
-        "requirements.txt, list package names without pins or with pins inside "
-        "these caps: a newer pin such as pandas==2.2.2, numpy>=2 or "
-        "deepchem==2.8.0 cannot be installed there. In run.sh, use plain `pip` "
-        "and `python`: do not create a virtual environment in the workspace and "
+        f"run.sh and your final script are re-run with Python {SANDBOX_PYTHON_VERSION} in a "
+        "fresh virtual environment. Packages are installed for you from your program's "
+        f"imports, on top of this base stack: {base}; every install is capped at: {caps}. "
+        f"{env} is set.\n"
+        "Write code that works with these versions (for example pandas 1.5, numpy 1.x and "
+        "scikit-learn 1.5 APIs). requirements.txt and any pip command in run.sh are "
+        "ignored in the reproduction check and in grading: keep requirements.txt as a "
+        "plain list of the packages you import, and make run.sh only run the pipeline "
+        "with plain `python`. Do not create a virtual environment in the workspace and "
         "do not call an interpreter by absolute path."
     )
 

@@ -160,6 +160,9 @@ third-party packages, a `requirements.txt`:
 1. **Install**: `run.sh` starts with a requirements-install step
    (e.g. `pip install -r requirements.txt`). Standard-library-only
    tasks still include the install step with an empty requirements.txt.
+   Exception: when the goal says packages are installed for you from
+   your imports, `run.sh` must NOT install anything; it only runs the
+   pipeline, and requirements.txt is a plain list of imported packages.
 2. **Regenerate**: `run.sh` then executes the workflow's code and
    regenerates EVERY deliverable file (predictions, results, reports,
    figures) at its original relative path.

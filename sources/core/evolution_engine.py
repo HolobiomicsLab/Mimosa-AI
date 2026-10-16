@@ -993,9 +993,8 @@ class EvolutionEngine:
         assertion_history = []  # Track [passed, total] per iteration
         self.viz_utils.create_rewards_curve_plot(goal)
 
-        goal += """
-        The computational pipeline should be reproducible. Make sure to include proper requirements files and a run.sh script to install dependencies and run end-to-end.
-        """
+        from sources.evaluators.policy_bt_verifier.reexec import reproduction_goal_note
+        goal += "\n" + reproduction_goal_note(self.config) + "\n"
 
         # ── Stop control (stop-condition plan 2026-10-08) ─────────────
         stop_controller = StopController(
