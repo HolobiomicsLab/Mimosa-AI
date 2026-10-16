@@ -1,0 +1,2706 @@
+[
+  {
+    "name": "01_publication_overview",
+    "width": 1600,
+    "height": 900,
+    "title": "Policy-BT: from workspace evidence to evolutionary feedback",
+    "subtitle": "One task, one fixed comparison contract; a growing tournament of generation workspaces.",
+    "items": [
+      {
+        "type": "text",
+        "x": 48,
+        "y": 30,
+        "text": "Policy-BT: from workspace evidence to evolutionary feedback",
+        "size": 38,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 48,
+        "y": 84,
+        "text": "One task, one fixed comparison contract; a growing tournament of generation workspaces.",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 142,
+        "w": 420,
+        "h": 590,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 62,
+        "y": 157,
+        "w": 30,
+        "h": 30,
+        "fill": "#087F82",
+        "stroke": "#087F82"
+      },
+      {
+        "type": "text",
+        "x": 69,
+        "y": 160,
+        "text": "A",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 102,
+        "y": 156,
+        "text": "Admit and normalize",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 84,
+        "y": 207,
+        "w": 62,
+        "h": 72,
+        "fill": "#FFFFFF",
+        "stroke": "#087F82",
+        "radius": 4
+      },
+      {
+        "type": "rect",
+        "x": 75,
+        "y": 217,
+        "w": 62,
+        "h": 72,
+        "fill": "#FFFFFF",
+        "stroke": "#087F82",
+        "radius": 4
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            87,
+            235
+          ],
+          [
+            123,
+            235
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            87,
+            249
+          ],
+          [
+            123,
+            249
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            87,
+            263
+          ],
+          [
+            111,
+            263
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "text",
+        "x": 165,
+        "y": 210,
+        "text": "Generation workspace",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 165,
+        "y": 249,
+        "text": "Scripts · logs · tables",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 165,
+        "y": 280,
+        "text": "Goal-relevant figures",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            258,
+            304
+          ],
+          [
+            258,
+            330
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 74,
+        "y": 332,
+        "w": 368,
+        "h": 130,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 94,
+        "y": 347,
+        "text": "Snapshot + reproduction",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 94,
+        "y": 386,
+        "text": "Required shell-script contract",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 94,
+        "y": 417,
+        "text": "Fresh-venv rerun by default",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 94,
+        "y": 476,
+        "w": 290,
+        "h": 34,
+        "fill": "#FCEFED",
+        "stroke": "#A84943",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 105,
+        "y": 481,
+        "text": "Ineligible → reward 0",
+        "size": 17,
+        "color": "#A84943",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 74,
+        "y": 545,
+        "w": 368,
+        "h": 158,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 94,
+        "y": 560,
+        "text": "Reconnaissance + adapters",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 94,
+        "y": 599,
+        "text": "Goal → fixed, ordered criteria",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 94,
+        "y": 630,
+        "text": "Artifact schemas → shared values",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 94,
+        "y": 661,
+        "text": "Measured values; unknown = null",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 498,
+        "y": 142,
+        "w": 555,
+        "h": 590,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 512,
+        "y": 157,
+        "w": 30,
+        "h": 30,
+        "fill": "#2463A5",
+        "stroke": "#2463A5"
+      },
+      {
+        "type": "text",
+        "x": 519,
+        "y": 160,
+        "text": "B",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 552,
+        "y": 156,
+        "text": "Decide each workspace pair",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 525,
+        "y": 204,
+        "w": 211,
+        "h": 34,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 536,
+        "y": 209,
+        "text": "Workspace A values",
+        "size": 18,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 810,
+        "y": 204,
+        "w": 216,
+        "h": 34,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 821,
+        "y": 209,
+        "text": "Workspace B values",
+        "size": 18,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            630,
+            240
+          ],
+          [
+            630,
+            265
+          ],
+          [
+            775,
+            265
+          ],
+          [
+            775,
+            285
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            915,
+            240
+          ],
+          [
+            915,
+            265
+          ],
+          [
+            775,
+            265
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": false,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 525,
+        "y": 288,
+        "w": 501,
+        "h": 139,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 545,
+        "y": 303,
+        "text": "Cached Python comparison policy",
+        "size": 25,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 545,
+        "y": 342,
+        "text": "Same task criteria for both workspaces",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 545,
+        "y": 373,
+        "text": "Earliest decisive stage determines the verdict",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 545,
+        "y": 399,
+        "text": "Reverse-order, self-tie + determinism checks",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            775,
+            429
+          ],
+          [
+            775,
+            484
+          ]
+        ],
+        "color": "#7752A6",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "text",
+        "x": 793,
+        "y": 441,
+        "text": "Only if code ties",
+        "size": 20,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 525,
+        "y": 486,
+        "w": 501,
+        "h": 142,
+        "fill": "#F5F0FA",
+        "stroke": "#7752A6",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 545,
+        "y": 501,
+        "text": "Image-based tie resolution",
+        "size": 25,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 545,
+        "y": 540,
+        "text": "Requires relevant images on both sides",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 545,
+        "y": 571,
+        "text": "Judge A/B and B/A; winners must agree",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 545,
+        "y": 597,
+        "text": "Absent, unclear or inconsistent → keep tie",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            775,
+            630
+          ],
+          [
+            775,
+            655
+          ]
+        ],
+        "color": "#7752A6",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 583,
+        "y": 662,
+        "w": 383,
+        "h": 34,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 594,
+        "y": 667,
+        "text": "A wins  /  B wins  /  tie + evidence",
+        "size": 18,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 1083,
+        "y": 142,
+        "w": 469,
+        "h": 590,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 1097,
+        "y": 157,
+        "w": 30,
+        "h": 30,
+        "fill": "#AF6425",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1104,
+        "y": 160,
+        "text": "C",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1137,
+        "y": 156,
+        "text": "Rate and guide evolution",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1170,
+            235
+          ],
+          [
+            1280,
+            235
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1170,
+            235
+          ],
+          [
+            1225,
+            320
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1280,
+            235
+          ],
+          [
+            1225,
+            320
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "ellipse",
+        "x": 1146,
+        "y": 211,
+        "w": 48,
+        "h": 48,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1156,
+        "y": 222,
+        "text": "G₁",
+        "size": 21,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "ellipse",
+        "x": 1256,
+        "y": 211,
+        "w": 48,
+        "h": 48,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1266,
+        "y": 222,
+        "text": "G₂",
+        "size": 21,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "ellipse",
+        "x": 1201,
+        "y": 296,
+        "w": 48,
+        "h": 48,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1211,
+        "y": 307,
+        "text": "G₃",
+        "size": 21,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1320,
+        "y": 211,
+        "text": "All pairs",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1320,
+        "y": 242,
+        "text": "in the task",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1320,
+        "y": 273,
+        "text": "session",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1240,
+            348
+          ],
+          [
+            1240,
+            371
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 1109,
+        "y": 375,
+        "w": 417,
+        "h": 137,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1129,
+        "y": 390,
+        "text": "Regularized Bradley–Terry fit",
+        "size": 25,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1129,
+        "y": 429,
+        "text": "Pair outcomes → latent strengths θ",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1129,
+        "y": 460,
+        "text": "P(i beats j) = σ(θᵢ − θⱼ)",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1129,
+        "y": 485,
+        "text": "Current reward: rᵢ = σ(θᵢ) if eligible",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1129,
+        "y": 530,
+        "text": "Refit every generation’s current reward",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1129,
+        "y": 561,
+        "text": "after each new evaluation.",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 1109,
+        "y": 617,
+        "w": 417,
+        "h": 86,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1129,
+        "y": 632,
+        "text": "Evidence-grounded feedback",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1129,
+        "y": 671,
+        "text": "Earliest losses first; no scores or code",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1318,
+            733
+          ],
+          [
+            1318,
+            786
+          ],
+          [
+            258,
+            786
+          ],
+          [
+            258,
+            733
+          ]
+        ],
+        "color": "#087F82",
+        "dash": true,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 533,
+        "y": 765,
+        "w": 507,
+        "h": 43,
+        "fill": "#FFFFFF",
+        "stroke": "#FFFFFF",
+        "radius": 0
+      },
+      {
+        "type": "text",
+        "x": 548,
+        "y": 771,
+        "text": "Selection + mutation → next generation",
+        "size": 23,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 48,
+        "y": 840,
+        "text": "Evolutionary pressure, not a benchmark grade.  σ = logistic function.  Admission verdicts also enter the tournament.",
+        "size": 19,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1026,
+            352
+          ],
+          [
+            1038,
+            352
+          ],
+          [
+            1038,
+            646
+          ],
+          [
+            965,
+            646
+          ],
+          [
+            965,
+            662
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "text",
+        "x": 829,
+        "y": 638,
+        "text": "Code decides",
+        "size": 16,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            966,
+            679
+          ],
+          [
+            1068,
+            679
+          ],
+          [
+            1068,
+            235
+          ],
+          [
+            1146,
+            235
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1068,
+            679
+          ],
+          [
+            1109,
+            679
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            422,
+            463
+          ],
+          [
+            422,
+            545
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "text",
+        "x": 381,
+        "y": 519,
+        "text": "pass",
+        "size": 16,
+        "color": "#087F82",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            442,
+            615
+          ],
+          [
+            481,
+            615
+          ],
+          [
+            481,
+            221
+          ],
+          [
+            525,
+            221
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1526,
+            450
+          ],
+          [
+            1568,
+            450
+          ],
+          [
+            1568,
+            786
+          ],
+          [
+            1318,
+            786
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": true,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            481,
+            221
+          ],
+          [
+            481,
+            188
+          ],
+          [
+            918,
+            188
+          ],
+          [
+            918,
+            204
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      }
+    ],
+    "caption": "Policy-BT workspace evaluation. (A) The verifier preserves generation artifacts, checks a required reproduction contract and, by default, reruns the submitted shell script in a fresh virtual environment. Goal-grounded reconnaissance establishes fixed, ordered criteria and schema adapters that read actual artifacts. (B) A shared deterministic Python policy compares normalized evidence at the earliest decisive stage. A code tie may be resolved using relevant images from both sides, but only when judgments in both presentation orders agree. Each pair yields a winner or tie, a stage, evidence and side-specific feedback. (C) A regularized Bradley–Terry model fits all pair outcomes and updates each generation’s current reward. Numeric rewards support selection; evidence-grounded diagnoses guide mutation. Ineligible generations receive zero; the verifier does not supply a benchmark grade."
+  },
+  {
+    "name": "02_methods_detail",
+    "width": 1600,
+    "height": 1050,
+    "title": "Policy-BT: comparison contract and tournament mathematics",
+    "subtitle": "Implementation-level view • task criteria remain fixed while artifact-schema adapters can expand.",
+    "items": [
+      {
+        "type": "text",
+        "x": 48,
+        "y": 30,
+        "text": "Policy-BT: comparison contract and tournament mathematics",
+        "size": 38,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 48,
+        "y": 84,
+        "text": "Implementation-level view • task criteria remain fixed while artifact-schema adapters can expand.",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 140,
+        "w": 464,
+        "h": 653,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 62,
+        "y": 155,
+        "w": 30,
+        "h": 30,
+        "fill": "#087F82",
+        "stroke": "#087F82"
+      },
+      {
+        "type": "text",
+        "x": 69,
+        "y": 158,
+        "text": "A",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 102,
+        "y": 154,
+        "text": "Evidence and task contract",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 72,
+        "y": 201,
+        "w": 416,
+        "h": 113,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 216,
+        "text": "Owned workspace snapshot",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 255,
+        "text": "Original artifacts remain untouched",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 286,
+        "text": "Required .sh reproduction contract",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            280,
+            315
+          ],
+          [
+            280,
+            337
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 72,
+        "y": 340,
+        "w": 416,
+        "h": 111,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 355,
+        "text": "Re-execution gate",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 394,
+        "text": "Clean venv; move old outputs aside",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 418,
+        "text": "Rerun optional; contract required",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 72,
+        "y": 467,
+        "w": 374,
+        "h": 34,
+        "fill": "#FCEFED",
+        "stroke": "#A84943",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 83,
+        "y": 472,
+        "text": "Fail → admission verdict; reward 0",
+        "size": 17,
+        "color": "#A84943",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 72,
+        "y": 528,
+        "w": 416,
+        "h": 117,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 543,
+        "text": "LLM reconnaissance",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 582,
+        "text": "Goal + inventory + inspected previews",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 613,
+        "text": "Fix criteria, stage order and value types",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            280,
+            646
+          ],
+          [
+            280,
+            667
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 72,
+        "y": 670,
+        "w": 416,
+        "h": 97,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 685,
+        "text": "Schema-specific adapters",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 92,
+        "y": 724,
+        "text": "Artifacts → values + path evidence",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 542,
+        "y": 140,
+        "w": 506,
+        "h": 653,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 556,
+        "y": 155,
+        "w": 30,
+        "h": 30,
+        "fill": "#2463A5",
+        "stroke": "#2463A5"
+      },
+      {
+        "type": "text",
+        "x": 563,
+        "y": 158,
+        "text": "B",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 596,
+        "y": 154,
+        "text": "Code first; images on ties",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 566,
+        "y": 201,
+        "w": 458,
+        "h": 148,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 216,
+        "text": "One cached comparison policy",
+        "size": 25,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 255,
+        "text": "Validity / output conformance → quality",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 286,
+        "text": "Earliest decisive criterion wins",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 317,
+        "text": "Unknown values do not imply failure",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 566,
+        "y": 366,
+        "w": 458,
+        "h": 34,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 577,
+        "y": 371,
+        "text": "Restricted interpreter + bounded repairs",
+        "size": 18,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 581,
+        "y": 414,
+        "text": "Check both orders, both self-ties",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 581,
+        "y": 445,
+        "text": "and repeated forward execution.",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            795,
+            478
+          ],
+          [
+            795,
+            503
+          ]
+        ],
+        "color": "#7752A6",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "text",
+        "x": 810,
+        "y": 478,
+        "text": "Code tie only",
+        "size": 19,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 566,
+        "y": 510,
+        "w": 458,
+        "h": 164,
+        "fill": "#F5F0FA",
+        "stroke": "#7752A6",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 525,
+        "text": "Relevant visual evidence",
+        "size": 25,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 560,
+        "text": "Recon-selected images from both sides",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 588,
+        "text": "Vision model uses the same goal + criteria",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 616,
+        "text": "Accept only order-consistent outcomes",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 644,
+        "text": "Unresolved → pair stays tied",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            795,
+            676
+          ],
+          [
+            795,
+            698
+          ]
+        ],
+        "color": "#7752A6",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 566,
+        "y": 702,
+        "w": 458,
+        "h": 65,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 586,
+        "y": 717,
+        "text": "Verdict · stage · evidence · feedback",
+        "size": 23,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 1078,
+        "y": 140,
+        "w": 474,
+        "h": 653,
+        "fill": "#FFFFFF",
+        "stroke": "#D5DEE5",
+        "radius": 16
+      },
+      {
+        "type": "ellipse",
+        "x": 1092,
+        "y": 155,
+        "w": 30,
+        "h": 30,
+        "fill": "#AF6425",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1099,
+        "y": 158,
+        "text": "C",
+        "size": 19,
+        "color": "#FFFFFF",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1132,
+        "y": 154,
+        "text": "Persistent task tournament",
+        "size": 25,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 1102,
+        "y": 201,
+        "w": 426,
+        "h": 147,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 216,
+        "text": "Every unordered pair",
+        "size": 25,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 255,
+        "text": "Artifact + admission verdicts",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 286,
+        "text": "Pair ledger keyed by bundle version",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 317,
+        "text": "Bundle change → recompute all pairs",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1315,
+            350
+          ],
+          [
+            1315,
+            376
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 1102,
+        "y": 379,
+        "w": 426,
+        "h": 113,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 394,
+        "text": "Regularized strength estimation",
+        "size": 25,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 433,
+        "text": "All pairs, including admission verdicts",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 464,
+        "text": "Fit latent θ; publish eligible σ(θ)",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1315,
+            494
+          ],
+          [
+            1315,
+            518
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 1102,
+        "y": 521,
+        "w": 426,
+        "h": 100,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 536,
+        "text": "Refresh all current rewards",
+        "size": 25,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 575,
+        "text": "Selection uses the refreshed ratings",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 1102,
+        "y": 650,
+        "w": 426,
+        "h": 117,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 665,
+        "text": "Separate textual gradient",
+        "size": 25,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 704,
+        "text": "Order losses first, then earliest stage",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1122,
+        "y": 735,
+        "text": "Retain diagnoses; omit scores / code",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 821,
+        "w": 1504,
+        "h": 172,
+        "fill": "#EFF5FC",
+        "stroke": "#D5DEE5",
+        "radius": 12
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 839,
+        "text": "BRADLEY–TERRY MODEL",
+        "size": 19,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 876,
+        "text": "pᵢⱼ = σ(θᵢ − θⱼ)",
+        "size": 29,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 72,
+        "y": 925,
+        "text": "yᵢⱼ = 1 (win), ½ (tie), 0 (loss)",
+        "size": 21,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 580,
+        "y": 839,
+        "text": "REGULARIZED OBJECTIVE",
+        "size": 19,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 580,
+        "y": 876,
+        "text": "min over θ:  −Σ [yᵢⱼ log pᵢⱼ + (1−yᵢⱼ) log(1−pᵢⱼ)] + ½ Σ θᵢ²",
+        "size": 23,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 580,
+        "y": 925,
+        "text": "Unit Gaussian prior • rᵢ = σ(θᵢ) versus a neutral-strength opponent; ineligible rᵢ = 0.",
+        "size": 20,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 48,
+        "y": 1010,
+        "text": "No-pair eligible baseline: 0.5.  Instrument error: unscored, not reward 0.  Reruns are trusted local shell execution, not an OS sandbox.",
+        "size": 18,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1024,
+            735
+          ],
+          [
+            1063,
+            735
+          ],
+          [
+            1063,
+            265
+          ],
+          [
+            1102,
+            265
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1063,
+            735
+          ],
+          [
+            1102,
+            735
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1024,
+            275
+          ],
+          [
+            1035,
+            275
+          ],
+          [
+            1035,
+            689
+          ],
+          [
+            980,
+            689
+          ],
+          [
+            980,
+            702
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            471,
+            452
+          ],
+          [
+            471,
+            528
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "text",
+        "x": 432,
+        "y": 505,
+        "text": "pass",
+        "size": 16,
+        "color": "#087F82",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            488,
+            720
+          ],
+          [
+            527,
+            720
+          ],
+          [
+            527,
+            275
+          ],
+          [
+            566,
+            275
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "text",
+        "x": 859,
+        "y": 678,
+        "text": "Code decides",
+        "size": 16,
+        "color": "#2463A5",
+        "bold": true
+      }
+    ],
+    "caption": "Implementation and scoring details. Snapshot admission precedes artifact comparison. Task criteria, order and representation remain fixed; schema adapters can expand and instrument code can be repaired without changing the success definition. The restricted interpreter checks reverse-order consistency, self-ties and repeated execution. Vision is conditional on a deterministic tie and relevant images from both sides. The tournament contains every unordered generation pair, including execution-admission outcomes. For each ordered representation (i,j) of an unordered pair, y is 1, 1/2 or 0 for an i win, tie or loss. A unit-precision zero-mean Gaussian prior regularizes the Bradley–Terry strengths. The published reward is the logistic probability of beating a neutral-strength opponent, except ineligible generations are forced to zero. Instrument failures are unscored. Pair results are keyed by bundle version. A bundle-version change recomputes every pair; in the current implementation, a new eligible generation changes that version through its schema assignment and visual selection. Current ratings refresh while historical arrival scores and previously emitted gradients are preserved. The first sum runs once over each unordered pair; minimization is over the full strength vector θ. An eligible generation beats an ineligible one; two ineligible generations tie."
+  },
+  {
+    "name": "03_presentation",
+    "width": 1600,
+    "height": 900,
+    "title": "One policy. Two evidence channels. A tournament reward.",
+    "subtitle": "Policy-BT evaluates scientific outputs across workflow generations—not against hidden benchmark answers.",
+    "items": [
+      {
+        "type": "text",
+        "x": 48,
+        "y": 30,
+        "text": "One policy. Two evidence channels. A tournament reward.",
+        "size": 38,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 48,
+        "y": 84,
+        "text": "Policy-BT evaluates scientific outputs across workflow generations—not against hidden benchmark answers.",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 144,
+        "w": 335,
+        "h": 34,
+        "fill": "#EDF8F6",
+        "stroke": "#087F82",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 59,
+        "y": 149,
+        "text": "01   PRESERVE THE EVIDENCE",
+        "size": 18,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 580,
+        "y": 144,
+        "w": 440,
+        "h": 34,
+        "fill": "#EFF5FC",
+        "stroke": "#2463A5",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 591,
+        "y": 149,
+        "text": "02   COMPARE UNDER ONE CONTRACT",
+        "size": 18,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 1144,
+        "y": 144,
+        "w": 408,
+        "h": 34,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 1155,
+        "y": 149,
+        "text": "03   UPDATE THE EVOLUTION SIGNAL",
+        "size": 18,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 48,
+        "y": 204,
+        "w": 440,
+        "h": 449,
+        "fill": "#FFFFFF",
+        "stroke": "#087F82",
+        "radius": 18
+      },
+      {
+        "type": "rect",
+        "x": 96,
+        "y": 241,
+        "w": 62,
+        "h": 72,
+        "fill": "#FFFFFF",
+        "stroke": "#087F82",
+        "radius": 4
+      },
+      {
+        "type": "rect",
+        "x": 87,
+        "y": 251,
+        "w": 62,
+        "h": 72,
+        "fill": "#FFFFFF",
+        "stroke": "#087F82",
+        "radius": 4
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            99,
+            269
+          ],
+          [
+            135,
+            269
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            99,
+            283
+          ],
+          [
+            135,
+            283
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            99,
+            297
+          ],
+          [
+            123,
+            297
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "text",
+        "x": 186,
+        "y": 243,
+        "text": "Workspace snapshots",
+        "size": 26,
+        "color": "#182C40",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 186,
+        "y": 287,
+        "text": "Code, logs, tables",
+        "size": 23,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 186,
+        "y": 318,
+        "text": "and visual artifacts",
+        "size": 23,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            268,
+            342
+          ],
+          [
+            268,
+            372
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "text",
+        "x": 84,
+        "y": 390,
+        "text": "Reproduce → normalize",
+        "size": 29,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 84,
+        "y": 442,
+        "text": "Required reproduction contract",
+        "size": 24,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 84,
+        "y": 480,
+        "text": "Fresh-venv rerun by default",
+        "size": 24,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 84,
+        "y": 518,
+        "text": "Schema adapters read real outputs",
+        "size": 24,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 84,
+        "y": 580,
+        "w": 367,
+        "h": 34,
+        "fill": "#FCEFED",
+        "stroke": "#A84943",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 95,
+        "y": 585,
+        "text": "Ineligible generations receive 0",
+        "size": 18,
+        "color": "#A84943",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            489,
+            421
+          ],
+          [
+            549,
+            421
+          ]
+        ],
+        "color": "#087F82",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 550,
+        "y": 204,
+        "w": 500,
+        "h": 449,
+        "fill": "#FFFFFF",
+        "stroke": "#2463A5",
+        "radius": 18
+      },
+      {
+        "type": "text",
+        "x": 580,
+        "y": 236,
+        "text": "Deterministic Python policy",
+        "size": 29,
+        "color": "#2463A5",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 580,
+        "y": 286,
+        "text": "Goal-defined criteria, fixed across the task",
+        "size": 23,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 580,
+        "y": 323,
+        "text": "Earliest decisive stage → win / loss / tie",
+        "size": 23,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            800,
+            370
+          ],
+          [
+            800,
+            421
+          ]
+        ],
+        "color": "#7752A6",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "text",
+        "x": 818,
+        "y": 383,
+        "text": "Only on a tie",
+        "size": 22,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "rect",
+        "x": 581,
+        "y": 449,
+        "w": 104,
+        "h": 72,
+        "fill": "#FFFFFF",
+        "stroke": "#7752A6",
+        "radius": 4
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            595,
+            461
+          ],
+          [
+            595,
+            506
+          ],
+          [
+            671,
+            506
+          ]
+        ],
+        "color": "#7752A6",
+        "dash": false,
+        "head": false,
+        "width": 1.5
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            600,
+            498
+          ],
+          [
+            616,
+            488
+          ],
+          [
+            629,
+            493
+          ],
+          [
+            648,
+            472
+          ],
+          [
+            669,
+            467
+          ]
+        ],
+        "color": "#7752A6",
+        "dash": false,
+        "head": false,
+        "width": 3
+      },
+      {
+        "type": "text",
+        "x": 714,
+        "y": 447,
+        "text": "Image-based judge",
+        "size": 27,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 714,
+        "y": 493,
+        "text": "Relevant images on both sides",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 714,
+        "y": 526,
+        "text": "Agreement in both orders",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 581,
+        "y": 580,
+        "w": 437,
+        "h": 34,
+        "fill": "#F5F0FA",
+        "stroke": "#7752A6",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 592,
+        "y": 585,
+        "text": "Unresolved visual comparison remains tied",
+        "size": 18,
+        "color": "#7752A6",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1051,
+            421
+          ],
+          [
+            1113,
+            421
+          ]
+        ],
+        "color": "#2463A5",
+        "dash": false,
+        "head": true,
+        "width": 2.5
+      },
+      {
+        "type": "rect",
+        "x": 1114,
+        "y": 204,
+        "w": 438,
+        "h": 449,
+        "fill": "#FFFFFF",
+        "stroke": "#AF6425",
+        "radius": 18
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1179,
+            261
+          ],
+          [
+            1289,
+            261
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1179,
+            261
+          ],
+          [
+            1234,
+            346
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1289,
+            261
+          ],
+          [
+            1234,
+            346
+          ]
+        ],
+        "color": "#AF6425",
+        "dash": false,
+        "head": false,
+        "width": 2
+      },
+      {
+        "type": "ellipse",
+        "x": 1155,
+        "y": 237,
+        "w": 48,
+        "h": 48,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1165,
+        "y": 248,
+        "text": "G₁",
+        "size": 21,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "ellipse",
+        "x": 1265,
+        "y": 237,
+        "w": 48,
+        "h": 48,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1275,
+        "y": 248,
+        "text": "G₂",
+        "size": 21,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "ellipse",
+        "x": 1210,
+        "y": 322,
+        "w": 48,
+        "h": 48,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425"
+      },
+      {
+        "type": "text",
+        "x": 1220,
+        "y": 333,
+        "text": "G₃",
+        "size": 21,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1340,
+        "y": 239,
+        "text": "All-pairs",
+        "size": 26,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1340,
+        "y": 278,
+        "text": "tournament",
+        "size": 26,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1144,
+        "y": 390,
+        "text": "Bradley–Terry rewards",
+        "size": 29,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 1144,
+        "y": 442,
+        "text": "Fit strengths from pair outcomes",
+        "size": 24,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1144,
+        "y": 480,
+        "text": "Refresh every current rating",
+        "size": 24,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 1144,
+        "y": 518,
+        "text": "Evidence → actionable feedback",
+        "size": 24,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "rect",
+        "x": 1144,
+        "y": 580,
+        "w": 378,
+        "h": 34,
+        "fill": "#FFF5E9",
+        "stroke": "#AF6425",
+        "radius": 6
+      },
+      {
+        "type": "text",
+        "x": 1155,
+        "y": 585,
+        "text": "Reward ≠ raw win rate ≠ benchmark grade",
+        "size": 16,
+        "color": "#AF6425",
+        "bold": true
+      },
+      {
+        "type": "line",
+        "points": [
+          [
+            1333,
+            656
+          ],
+          [
+            1333,
+            741
+          ],
+          [
+            268,
+            741
+          ],
+          [
+            268,
+            656
+          ]
+        ],
+        "color": "#087F82",
+        "dash": true,
+        "head": true,
+        "width": 3
+      },
+      {
+        "type": "rect",
+        "x": 438,
+        "y": 707,
+        "w": 706,
+        "h": 88,
+        "fill": "#FFFFFF",
+        "stroke": "#FFFFFF",
+        "radius": 0
+      },
+      {
+        "type": "text",
+        "x": 457,
+        "y": 716,
+        "text": "Selection + evidence-grounded mutation",
+        "size": 29,
+        "color": "#087F82",
+        "bold": true
+      },
+      {
+        "type": "text",
+        "x": 590,
+        "y": 758,
+        "text": "Generate the next workspace",
+        "size": 23,
+        "color": "#526779",
+        "bold": false
+      },
+      {
+        "type": "text",
+        "x": 48,
+        "y": 842,
+        "text": "Code decides first. Images can break a tie. Bradley–Terry converts the verdict history into a current reward.",
+        "size": 22,
+        "color": "#526779",
+        "bold": false
+      }
+    ],
+    "caption": "Presentation overview. Preserved workspace evidence is admitted and normalized, compared by one task-specific deterministic policy, and optionally judged visually after code ties. The full pair-verdict history feeds a regularized Bradley–Terry fit. All current generation rewards refresh; evidence-grounded feedback guides subsequent mutation. Neither raw win rate nor hidden benchmark labels define the reward. Admission verdicts precede the two artifact-evidence channels and also enter the tournament."
+  }
+]
