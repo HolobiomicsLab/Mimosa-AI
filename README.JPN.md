@@ -42,7 +42,7 @@ https://github.com/user-attachments/assets/744d2c34-4ac3-415c-bd8c-3454cd502271
 
 Mimosa-AI は **自律的科学研究のためのオープンソース Python フレームワーク** です。**タスクごとにカスタムのマルチエージェントワークフローを記述**し、サンドボックスで実行し、エージェントが実際に行った内容を独立した視点で検証し、**Quality-Diversity** に着想を得た探索によって世代を超えてワークフローを進化させ、そのタスクに最適なワークフローを見つけ出します。
 
-ワークフローはプレーンな Python として出力されます — DSL なし、YAML なし — そのため、どの世代も検査・差分比較・単独での再実行が可能です。verifier は、エージェントが生成した成果物に対して、文献グラウンディング、非自明性、品質メトリクスを検証する決定論的 Python チェックを実行することでワークフローを採点します。各世代は系譜とそのコードを生成した正確な LLM プロンプトと共にディスクに保存されます。
+ワークフローはプレーンな Python として出力されます — DSL なし、YAML なし — そのため、どの世代も検査・差分比較・単独での再実行が可能です。Policy/BT verifier は、各実行のワークスペース成果物を過去のすべての世代と比較します。必須の再現スクリプトが出力を再生成し、キャッシュされた単一の決定論的 Python 比較ポリシーが各ペアを判定し（目標に関連する画像が同点を解決することもあります）、蓄積されたペア判定は正則化 Bradley–Terry トーナメントに適合され、全世代の報酬が常に最新に保たれます。各世代は系譜とそのコードを生成した正確な LLM プロンプトと共にディスクに保存されます。
 
 ## 自動インストール
 
@@ -93,7 +93,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 5 つのレイヤーが小さな dataclass スキーマで配線されています。詳細は [`docs/concepts/architecture.md`](./docs/concepts/architecture.md) を参照してください。
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, policy-BT verifier" width="90%">
 </p>
 
 | レイヤー | コンポーネント | 役割 |
@@ -102,7 +102,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 1 | **ToolManager + Perspicacité** | 設定されたアドレス/ポート範囲で MCP ツールを検出し、必要に応じて文献スニペットを取得します。 |
 | 2 | **EvolutionEngine** | ワークフローを合成し、世代を超えて進化させます（後述）。 |
 | 3 | **WorkflowRunner** | 合成された Python ワークフローを Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)（`LocalPythonExecutor` と AST 許可リスト方式）のサンドボックスで実行し、LangGraph の状態を共有します。 |
-| 4 | **VerifierEvaluator** | マルチソース・クレーム単位の verifier。次の変異を駆動します。 |
+| 4 | **PolicyBTVerifierEvaluator** | Policy/BT verifier：再現ゲート → LLM 偵察とスキーマアダプタ → キャッシュ済みの単一決定論的比較ポリシー（視覚による同点決定）→ 正則化 Bradley–Terry 報酬。次の変異を駆動します。 |
 
 ### 進化ループ — 実際に進化しているもの
 
@@ -116,20 +116,14 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ### verifier — スコアが実際に意味するもの
 
-各実行後、6 つの独立したクレームソースがワークスペースを参照し、成功極性を持つクレームを発行します:
+各実行後、**Policy/BT verifier**（`sources/evaluators/policy_bt_verifier/`、`verifier_kind = "policy_bt"`）がワークスペースを評価します：
 
-| ソース | 視点 |
-|--------|---------|
-| **A** | 査読された実践（Perspicacité による文献グラウンディング経由） |
-| **B** | 目標テキストそのもの — エージェントは依頼通りに成果を出したか？ |
-| **C** | エージェントのナラレーション — 主張された数値・成果物はディスクから再現できるか？ |
-| **D** | 数学的不変量 — 確率は [0,1] の範囲、形状の一貫性、NaN なし、保存則 |
-| **E** | 計算再現性 — 宣言された依存関係が使用された import を網羅、絶対パスなし、確率的操作のシード |
-| **F** | 統計的フィンガープリント — ベースラインを上回り、退化した予測がなく、漏洩シグネチャがない |
+1. **再現契約** — 各世代は出力を再生成するシェルスクリプト（依存関係のインストールを含む）を必ず提供しなければなりません。スクリプトが欠落または無効な世代は不適格となり、報酬は 0、フィードバックに必要な修正が示されます。既定で有効な再実行では、verifier が所有するコピー上で、API キーのない新しい venv 内でスクリプトを再実行します（既存の出力は事前に退避）。
+2. **偵察とアダプタ** — 1 回の LLM 偵察が成果物を棚卸しし、目標だけから比較基準とそのステージ順を固定します。スキーマごとのアダプタが各ワークスペースを共通表現に正規化します（不明は `null`。偽の敗北に置き換えません）。
+3. **ペアワイズ比較ポリシー** — キャッシュされた単一の決定論的 Python ポリシーが制限付きインタプリタで各ペアを比較し、逆順・自己比較・決定論性の検査を行います。最も早い決定的基準ステージが勝ちます。同点のとき、両側に目標に関連する画像があれば視覚モデルが裁きます。両方の提示順序が一致する場合のみ採用し、そうでなければ同点のままです。
+4. **Bradley–Terry 報酬** — すべてのペア判定がタスクセッション全体の正則化 Bradley–Terry フィットに入り、報酬は中立強度の相手に勝つ現在の確率です。**評価のたびに全世代の評価値が更新されます。**最初の適格世代は 0.5 から始まります。
 
-各クレームは、judge がワークスペースに対して記述する **Python プログラム** によって検証されます — LLM にエージェントを信じるかどうかを再質問することはしません。
-
-**ルーブリック盲変異 (rubric-blind mutation) — mutator はルーブリックを決して見ません。** フィードバックされる唯一のシグナルは `abstracted_prompt_gradient` です。これはクレーム、スコア、ソースの名前を含まない、コードネーム化された失敗モードの診断です。構造上、探索は決して見ないルーブリック語彙に過適合できません。
+mutator は**証拠に基づくテキスト勾配**に導かれます — 敗北を先頭に、この世代が最も早く後れを取ったステージ順に並べ、実測の証拠を添え、スコアやポリシーコードは含みません。以前のハイブリッド時系列ラダー方式（`verifier_kind = "hybrid"`）と非推奨のマルチソース・クレーム単位 verifier（`"legacy"`）も選択できますが、実行の既定は `policy_bt` です。
 
 完全なパイプライン: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md)。
 
@@ -241,9 +235,9 @@ Mimosa-AI は LLM 駆動のプログラム探索と自律研究システムの�
 |---------|--------------|--------------------|
 | [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | ML におけるエンドツーエンドの論文生成 | Mimosa は **タスクごとのワークフロー合成** を QD + verifier で最適化するもので、論文全体の生成ではありません |
 | [DiscoPOP](https://github.com/SakanaAI/DiscoPOP)（Lange et al. 2024） | LLM 駆動による選好最適化アルゴリズムの発見 | 同じ「コードに対する変異オペレータとしての LLM」パラダイム。Mimosa はこれを損失関数ではなくマルチエージェントワークフローコードに適用します |
-| [FunSearch](https://github.com/google-deepmind/funsearch)（Romera-Paredes et al. 2024） | LLM 誘導による Python 関数の進化的探索 | Mimosa はマルチエージェントプログラム全体を進化させ、単一の適応度関数の代わりにマルチソース・クレーム単位 verifier を追加します |
+| [FunSearch](https://github.com/google-deepmind/funsearch)（Romera-Paredes et al. 2024） | LLM 誘導による Python 関数の進化的探索 | Mimosa はマルチエージェントプログラム全体を進化させ、単一の適応度関数の代わりに監査可能な決定論的 verifier（Policy/BT トーナメント）を追加します |
 | [ELM](https://github.com/CarperAI/OpenELM)（Lehman et al. 2022） | LLM を介したコード上の Quality-Diversity | 最も近い QD 祖先。Mimosa の行動記述子はドメイン固有の手設計記述子ではなく、ワークフローコードのドメイン非依存な埋め込みです |
-| AIDE | Kaggle ライクなタスクでの自動 ML パイプライン | Mimosa はより広範な科学的再現（ScienceAgentBench、PaperBench、実験室データ）を対象とし、監査可能なクレーム単位 verifier を提供します |
+| AIDE | Kaggle ライクなタスクでの自動 ML パイプライン | Mimosa はより広範な科学的再現（ScienceAgentBench、PaperBench、実験室データ）を対象とし、監査可能な決定論的 verifier を提供します |
 
 比較研究を出版する場合、詳細な位置付けは[論文](https://arxiv.org/abs/2603.28986)に記載されています。
 

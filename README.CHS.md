@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/744d2c34-4ac3-415c-bd8c-3454cd502271
 
 Mimosa-AI 是一个**面向自主科学研究的开源 Python 框架**:它为**每个任务编写定制的多智能体工作流**,在沙箱中运行它,并对照多个独立视角核查智能体的实际行为;并且当你要求它学习时,它会以**质量-多样性 (Quality-Diversity)** 搜索跨代进化工作流,以找到该任务的最优工作流。
 
-工作流以纯 Python 形式输出 —— 无 DSL、无 YAML —— 因此任何一代都可以被检视、对比或独立重新执行。验证器通过运行确定性 Python 检查,验证文献接地性、非平凡性以及针对智能体产出物的质量指标来为工作流评分。每一代都连同其谱系和生成它的精确 LLM 提示一并落盘。
+工作流以纯 Python 形式输出 —— 无 DSL、无 YAML —— 因此任何一代都可以被检视、对比或独立重新执行。Policy/BT 验证器将每次运行的工作空间产物与之前所有世代进行比较:必需的复现脚本须能重新生成输出,一个缓存的确定性 Python 比较策略裁决每一对(目标相关的图像可化解平局),累积的成对判定汇入正则化 Bradley–Terry 锦标赛,使所有世代的奖励保持最新。每一代都连同其谱系和生成它的精确 LLM 提示一并落盘。
 
 ## 自动安装
 
@@ -92,7 +92,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 五层架构,通过小型 dataclass 模式串联 —— 完整细节见 [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)。
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, policy-BT verifier" width="90%">
 </p>
 
 | 层级 | 组件 | 作用 |
@@ -101,7 +101,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 1 | **ToolManager + Perspicacité** | 在配置的地址/端口范围内发现 MCP 工具;可选地拉取文献片段。 |
 | 2 | **EvolutionEngine** | 合成工作流并跨代进化它(见下文)。 |
 | 3 | **WorkflowRunner** | 在沙箱中运行所合成的 Python 工作流,使用 Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)(`LocalPythonExecutor` 配合 AST 白名单),并共享 LangGraph 状态。 |
-| 4 | **VerifierEvaluator** | 多源逐声明验证器。驱动下一次变异。 |
+| 4 | **PolicyBTVerifierEvaluator** | Policy/BT 验证器:复现门控 → LLM 侦察与模式适配器 → 单一缓存确定性比较策略(视觉平局裁决)→ 正则化 Bradley–Terry 奖励。驱动下一次变异。 |
 
 ### 进化循环 —— 真正在进化的是什么
 
@@ -115,20 +115,14 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ### 验证器 —— 分数究竟意味着什么
 
-每次运行后,六个独立的声明源会查看工作空间并发出成功极性的声明:
+每次运行后,**Policy/BT 验证器**(`sources/evaluators/policy_bt_verifier/`,`verifier_kind = "policy_bt"`)评估工作空间:
 
-| 源 | 视角 |
-|--------|---------|
-| **A** | 同行评审的实践(通过 Perspicacité 文献接地) |
-| **B** | 字面意义上的目标文本 —— 智能体是否交付了所要求的内容? |
-| **C** | 智能体叙述 —— 所声称的数字 / 产物能否从磁盘上重新复算出来? |
-| **D** | 数学不变量 —— 概率位于 [0,1] 内、形状一致、无 NaN、守恒律 |
-| **E** | 计算可复现性 —— 声明的依赖覆盖了实际使用的导入、无绝对路径、随机操作上有种子 |
-| **F** | 统计指纹 —— 超过基线、无退化预测、无泄漏特征 |
+1. **复现契约** —— 每个世代必须提供能重新生成其输出的 shell 脚本(并安装依赖)。脚本缺失或无效的世代不合格:奖励为 0,反馈会指出所需的修正。默认开启的重新执行会在验证器持有的副本上、在无 API 密钥的全新虚拟环境中重跑该脚本,并先把旧输出移开。
+2. **侦察与适配器** —— 一次 LLM 侦察盘点产物,并仅依据目标确定比较判据及其阶段顺序;逐模式适配器把每个工作空间归一化为共同表示(未知 → `null`,绝不伪造失败)。
+3. **成对比较策略** —— 一个缓存的确定性 Python 策略在受限解释器中比较每对世代,并进行逆序、自比较与确定性检查;最早的决胜判据阶段获胜。平局时,若两侧都有目标相关图像,则交由视觉模型裁决——仅当两种呈现顺序一致时才采纳,否则维持平局。
+4. **Bradley–Terry 奖励** —— 全部成对判定汇入整个任务会话的正则化 Bradley–Terry 拟合;奖励是当前击败中立强度对手的概率,**每次评估后所有世代的评分都会刷新**。首个合格世代从 0.5 起步。
 
-每个声明都由裁判针对工作空间编写的 **Python 程序**进行验证 —— 而不是再去问 LLM 它是否相信智能体。
-
-**评分细则盲变异 (rubric-blind mutation) —— 变异器从不接触评分细则。**唯一反馈回流的信号是 `abstracted_prompt_gradient` —— 一种用代号表述的失效模式诊断,不会指明声明、分数或源。从结构上讲,搜索无法对从未见过的评分词汇过拟合。
+变异器由**基于证据的文本梯度**驱动——失败优先,按本世代最早落后的阶段排序,附实测证据,不含分数或策略代码。此前的混合时序阶梯通道(`verifier_kind = "hybrid"`)与已弃用的多源逐声明验证器(`"legacy"`)仍可通过配置选择,但运行默认使用 `policy_bt`。
 
 完整流水线:[`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md)。
 
@@ -245,9 +239,9 @@ Mimosa-AI 处于一条规模虽小但活跃的 LLM 驱动程序搜索与自主�
 |---------|--------------|--------------------|
 | [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | 机器学习领域的端到端论文生成 | Mimosa 以 QD + 验证器对**每任务的工作流合成**进行优化,而非完整论文生成 |
 | [DiscoPOP](https://github.com/SakanaAI/DiscoPOP) (Lange et al. 2024) | LLM 驱动的偏好优化算法发现 | 同样的"LLM 作为代码变异算子"范式;Mimosa 将其应用于多智能体工作流代码,而非损失函数 |
-| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | 在 LLM 指导下对 Python 函数进行的进化搜索 | Mimosa 进化的是完整的多智能体程序,并以多源逐声明验证器替代单一适应度函数 |
+| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | 在 LLM 指导下对 Python 函数进行的进化搜索 | Mimosa 进化的是完整的多智能体程序,并以可审计的确定性验证器(Policy/BT 锦标赛)替代单一适应度函数 |
 | [ELM](https://github.com/CarperAI/OpenELM) (Lehman et al. 2022) | 由 LLM 中介的代码质量-多样性 | 最接近的 QD 祖先;Mimosa 的行为描述符是工作流代码的领域无关嵌入,而非手工设计的领域特定描述符 |
-| AIDE | 在类 Kaggle 任务上的自动化 ML 流水线 | Mimosa 面向更广泛的科学复现(ScienceAgentBench、PaperBench、实验室数据),并提供可审计的逐声明验证器 |
+| AIDE | 在类 Kaggle 任务上的自动化 ML 流水线 | Mimosa 面向更广泛的科学复现(ScienceAgentBench、PaperBench、实验室数据),并提供可审计的确定性验证器 |
 
 若你在发表对比性工作,[手稿](https://arxiv.org/abs/2603.28986)中包含详细的定位说明。
 

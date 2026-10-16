@@ -36,9 +36,9 @@
 
 ## TL;DR
 
-Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, scores what the agents actually produced with deterministic Python policy scorers, and evolves the workflow across generations with a **Quality-Diversity** inspired search to find the optimal workflow for the task.
+Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, scores what the agents actually produced with a deterministic artifact-comparison policy, and evolves the workflow across generations with a **Quality-Diversity** inspired search to find the optimal workflow for the task.
 
-The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The hybrid verifier scores each run by executing deterministic Python **policy scorers** against the artifacts the agents produced (code → logs → deliverables, as a temporal ladder), and the reward is a pairwise win-rate over the task's previous generations. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
+The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The policy/BT verifier scores each run by comparing its workspace artifacts with every previous generation's: a required reproduction script must regenerate the outputs, one cached deterministic Python comparison policy decides each pair (goal-relevant images can resolve ties), and the accumulated pair verdicts fit a regularized Bradley–Terry tournament that keeps every generation's reward current. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
 
 ## Automatic Installation
 
@@ -87,7 +87,7 @@ The reproduced network matches the topology reported in the paper at the cluster
 Five layers, wired through small dataclass schemas — full details in [`docs/concepts/architecture.md`](./docs/concepts/architecture.md).
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, hybrid temporal-ladder verifier" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, policy-BT verifier" width="90%">
 </p>
 
 | Layer | Component | What it does |
@@ -96,7 +96,7 @@ Five layers, wired through small dataclass schemas — full details in [`docs/co
 | 1 | **ToolManager + Perspicacité** | Discovers MCP tools on the configured address/port range; optionally pulls literature snippets. |
 | 2 | **EvolutionEngine** | Synthesizes the workflow and evolves it across generations (see below). |
 | 3 | **WorkflowRunner** | Runs the synthesized Python workflow in a sandbox using Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) (`LocalPythonExecutor` with AST allow-list) and shared LangGraph state. |
-| 4 | **HybridVerifierEvaluator** | Hybrid temporal-ladder verifier (deterministic policy scorers + pairwise reward). Drives the next mutation. |
+| 4 | **PolicyBTVerifierEvaluator** | Policy/BT verifier: reproduction gate → LLM recon + schema adapters → one cached deterministic comparison policy (vision tie-break) → regularized Bradley–Terry reward. Drives the next mutation. |
 
 ### The evolution loop — what's actually evolving
 
@@ -112,13 +112,14 @@ Full mechanics: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-
 
 ### The verifier — what scores actually mean
 
-After each run, the **hybrid temporal-ladder verifier** (`sources/evaluators/hybrid_verifier/`) scores the workspace:
+After each run, the **policy/BT verifier** (`sources/evaluators/policy_bt_verifier/`, `verifier_kind = "policy_bt"`) evaluates the workspace:
 
-1. **Temporal claim ladder** — one LLM call per task extracts 8–12 stage-tagged key claims in temporal order: `script` (delivered code exists, is valid, reads the goal's inputs), `log` (training dynamics parsed from logs — loss decreasing, no NaN), `result` (artifact fidelity — prediction-CSV columns match the ORIGINAL input columns exactly, completeness, prediction sanity).
-2. **Python policy scorers** — one LLM call per claim writes a self-contained deterministic scorer that grades any workspace of the task 0–1 (subprocess, cached and re-run for every generation; write/network APIs banned).
-3. **Pairwise reward** — the score is the win-rate against the task's previous generations, each pair decided at the **earliest ladder stage where the two differ**: a script-stage failure loses regardless of result-stage quality.
+1. **Reproduction contract** — every generation must ship a shell script that regenerates its outputs (and installs its requirements). Missing or invalid → the generation is ineligible: reward 0, and the feedback names the required fix. Re-execution (on by default) reruns that script on a verifier-owned copy in a fresh venv with no API keys, after moving existing outputs aside.
+2. **Reconnaissance + adapters** — one LLM pass inventories the artifacts and fixes, from the goal alone, the comparison criteria and their stage order; per-schema adapters normalize every workspace to a common representation (unknown → `null`, never a fabricated loss).
+3. **Pairwise policy** — ONE cached deterministic Python policy compares each pair of generations inside a restricted interpreter, with reverse-order, self-tie and determinism checks; the **earliest decisive criterion stage** wins. On a tie, goal-relevant images from both sides go to the vision model — accepted only if both presentation orders agree, otherwise the tie stands.
+4. **Bradley–Terry reward** — every pair verdict feeds a regularized Bradley–Terry fit over the whole task session; the reward is the current probability of beating a neutral-strength opponent, and **every generation's rating is refreshed after each evaluation**. The first eligible generation starts at 0.5.
 
-The mutator is steered by an **elimination-point-first textual gradient** — it leads with the earliest stage/claim where this generation lost, with measured evidence.
+The mutator is steered by an **evidence-grounded textual gradient** — losses first, ordered by the earliest stage where this generation fell behind, with measured evidence and no scores or policy code. The previous hybrid temporal-ladder channel (`verifier_kind = "hybrid"`) and the deprecated multi-source claim verifier (`"legacy"`) remain selectable, but runs default to `policy_bt`.
 
 Full pipeline: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
 

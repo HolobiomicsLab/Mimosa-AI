@@ -43,7 +43,7 @@ https://github.com/user-attachments/assets/744d2c34-4ac3-415c-bd8c-3454cd502271
 
 Mimosa-AI 是一個**用於自主科學研究的開源 Python 框架**：它會**為每一項任務撰寫一套客製化的多智能體工作流程**，於沙箱中執行，並以獨立視角檢核智能體實際完成的內容，再透過**品質-多樣性 (Quality-Diversity)** 啟發式搜尋，跨世代演化工作流程，以找出該任務的最佳工作流程。
 
-工作流程以純 Python 程式碼產出 —— 無 DSL、無 YAML —— 因此任何世代都可以被檢視、比對或獨立重新執行。驗證器透過執行確定性的 Python 檢核程式來評分工作流程，驗證文獻基礎、非平凡性與品質指標是否與智能體產出的成品一致。每個世代都連同其譜系及產生該世代的確切 LLM 提示一併保存在磁碟上。
+工作流程以純 Python 程式碼產出 —— 無 DSL、無 YAML —— 因此任何世代都可以被檢視、比對或獨立重新執行。Policy/BT 驗證器將每次執行的工作區成品與之前所有世代進行比較：必需的再現腳本須能重新產生輸出，單一快取的確定性 Python 比較策略裁決每一對（與目標相關的圖像可化解平手），累積的成對判定擬合為正則化 Bradley–Terry 錦標賽，使所有世代的獎勵保持最新。每個世代都連同其譜系及產生該世代的確切 LLM 提示一併保存在磁碟上。
 
 ## 自動安裝
 
@@ -94,7 +94,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 五個層級透過小型的 dataclass 結構互相串接——完整細節請見 [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)。
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, policy-BT verifier" width="90%">
 </p>
 
 | 層級 | 元件 | 功能 |
@@ -103,7 +103,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 1 | **ToolManager + Perspicacité** | 於設定的位址/連接埠範圍上探索 MCP 工具；選擇性地擷取文獻片段。 |
 | 2 | **EvolutionEngine** | 合成工作流程並於世代之間進行演化（詳見下文）。 |
 | 3 | **WorkflowRunner** | 於沙箱中執行所合成的 Python 工作流程，使用 Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)（`LocalPythonExecutor` 搭配 AST 白名單），並透過共享的 LangGraph 狀態運作。 |
-| 4 | **VerifierEvaluator** | 多來源逐項聲明驗證器，驅動下一次的突變。 |
+| 4 | **PolicyBTVerifierEvaluator** | Policy/BT 驗證器：再現閘門 → LLM 偵察與綱要適配器 → 單一快取的確定性比較策略（視覺平手裁決）→ 正則化 Bradley–Terry 獎勵。驅動下一次突變。 |
 
 ### 演化迴圈——實際在演化的是什麼
 
@@ -117,20 +117,14 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ### 驗證器——分數實際代表的意義
 
-每一次執行後，六個獨立的聲明來源會檢視工作區並產生成功極性的聲明：
+每一次執行後，**Policy/BT 驗證器**（`sources/evaluators/policy_bt_verifier/`，`verifier_kind = "policy_bt"`）會評估工作區：
 
-| 來源 | 觀察視角 |
-|--------|---------|
-| **A** | 經同儕審閱的實作實務（透過 Perspicacité 文獻接地） |
-| **B** | 字面上的目標文本——智能體是否交付了所要求的內容？ |
-| **C** | 智能體敘述——所聲明的數字/產物能否從磁碟重現？ |
-| **D** | 數學不變量——機率落於 [0,1]、形狀一致、無 NaN、守恆性 |
-| **E** | 計算可重現性——已宣告的相依套件涵蓋實際使用的 import、無絕對路徑、隨機操作皆有種子 |
-| **F** | 統計指紋——優於基線、無退化預測、無洩漏特徵 |
+1. **再現契約** —— 每個世代必須附上能重新產生其輸出的 shell 腳本（並安裝依賴）。腳本缺失或無效的世代不合格：獎勵為 0，回饋會指出所需的修正。預設開啟的重新執行會在驗證器持有的副本上、於無 API 金鑰的全新虛擬環境中重跑該腳本，並先把舊輸出移開。
+2. **偵察與適配器** —— 一次 LLM 偵察盤點成品，並僅依據目標固定比較判據及其階段順序；逐綱要適配器將每個工作區正規化為共同表示（未知 → `null`，絕不偽造失敗）。
+3. **成對比較策略** —— 單一快取的確定性 Python 策略在受限直譜器中比較每一對世代，並執行逆序、自比較與確定性檢查；最早的決勝判據階段獲勝。平手時，若兩側都有與目標相關的圖像，則交由視覺模型裁決——僅當兩種呈現順序一致時才採納，否則維持平手。
+4. **Bradley–Terry 獎勵** —— 全部成對判定擬合為整個任務工作階段的正則化 Bradley–Terry 模型；獎勵是當前擊敗中立強度對手的機率，**每次評估後所有世代的評分都會更新**。首個合格世代從 0.5 起步。
 
-每一項聲明皆由評審針對工作區所撰寫的 **Python 程式**來驗證——而非再次詢問 LLM 是否相信該智能體。
-
-**評分準則盲突變 (rubric-blind mutation) —— 突變器永遠看不到評分準則。** 唯一回流的訊號是 `abstracted_prompt_gradient`——一份以代號描述失效模式的診斷，當中不會點名任何聲明、分數或來源。就架構而言，搜尋無法對其從未看到的評分詞彙過度擬合。
+突變器由**以證據為基礎的文字梯度**驅動——失敗優先，依本世代最早落後的階段排序，附實測證據，不含分數或策略程式碼。先前的混合時序階梯通道（`verifier_kind = "hybrid"`）與已棄用的多來源逐項聲明驗證器（`"legacy"`）仍可透過組態選用，但執行預設為 `policy_bt`。
 
 完整管線：[`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md)。
 
@@ -247,9 +241,9 @@ Mimosa-AI 屬於 LLM 驅動之程式碼搜尋與自主研究系統中一條規�
 |---------|--------------|--------------------|
 | [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | 端到端的機器學習論文生成 | Mimosa 以 QD + 驗證器最佳化**逐任務的工作流程合成**，而非整篇論文的生成 |
 | [DiscoPOP](https://github.com/SakanaAI/DiscoPOP) (Lange 等人，2024) | LLM 驅動的偏好最佳化演算法探索 | 同屬「LLM 作為對程式碼的變異運算子」典範；Mimosa 將其應用於多智能體工作流程程式碼，而非損失函數 |
-| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes 等人，2024) | 由 LLM 引導的 Python 函數演化搜尋 | Mimosa 演化的是完整的多智能體程式，並以多來源逐項聲明驗證器取代單一適應度函數 |
+| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes 等人，2024) | 由 LLM 引導的 Python 函數演化搜尋 | Mimosa 演化的是完整的多智能體程式，並以可稽核的確定性驗證器（Policy/BT 錦標賽）取代單一適應度函數 |
 | [ELM](https://github.com/CarperAI/OpenELM) (Lehman 等人，2022) | 由 LLM 媒介的程式碼品質-多樣性搜尋 | 最接近的 QD 前身；Mimosa 的行為描述子採用與領域無關的工作流程程式碼嵌入，而非針對特定領域手工設計的描述子 |
-| AIDE | 針對 Kaggle 風格任務的自動化 ML 管線 | Mimosa 鎖定更廣泛的科學重現工作（ScienceAgentBench、PaperBench、實驗室資料），並附帶可稽核的逐項聲明驗證器 |
+| AIDE | 針對 Kaggle 風格任務的自動化 ML 管線 | Mimosa 鎖定更廣泛的科學重現工作（ScienceAgentBench、PaperBench、實驗室資料），並附帶可稽核的確定性驗證器 |
 
 若您正在發表比較性研究，[論文](https://arxiv.org/abs/2603.28986)中有更詳盡的定位說明。
 
