@@ -42,7 +42,7 @@ https://github.com/user-attachments/assets/744d2c34-4ac3-415c-bd8c-3454cd502271
 
 Mimosa-AI는 **자율 과학 연구를 위한 오픈소스 Python 프레임워크**입니다. **태스크마다 맞춤형 멀티에이전트 워크플로우를 작성**하고 이를 샌드박스에서 실행한 뒤, 에이전트가 실제로 수행한 작업을 독립적인 관점들에 비추어 검증하고, **Quality-Diversity** 기반 탐색을 통해 세대를 거쳐 워크플로우를 진화시켜 해당 태스크에 최적인 워크플로우를 찾아냅니다.
 
-워크플로우는 순수 Python으로 출력됩니다 — DSL 없이, YAML 없이 — 그래서 어떤 세대든 검사하거나 비교하거나 단독으로 다시 실행할 수 있습니다. 검증기는 에이전트가 생성한 산출물에 대해 문헌 그라운딩, 비자명성, 품질 메트릭을 확인하는 결정론적 Python 검사를 실행하여 워크플로우를 평가합니다. 모든 세대는 그 계보와 해당 코드를 생성한 정확한 LLM 프롬프트와 함께 디스크에 저장됩니다.
+워크플로우는 순수 Python으로 출력됩니다 — DSL 없이, YAML 없이 — 그래서 어떤 세대든 검사하거나 비교하거나 단독으로 다시 실행할 수 있습니다. Policy/BT 검증기는 각 실행의 워크스페이스 산출물을 이전의 모든 세대와 비교합니다. 필수 재현 스크립트가 출력을 재생성하고, 캐시된 단일 결정론적 Python 비교 정책이 각 쌍을 판정하며(목표 관련 이미지가 동점을 가리기도 함), 누적된 쌍 판정은 정규화된 Bradley–Terry 토너먼트에 피팅되어 모든 세대의 보상을 항상 최신으로 유지합니다. 모든 세대는 그 계보와 해당 코드를 생성한 정확한 LLM 프롬프트와 함께 디스크에 저장됩니다.
 
 ## 자동 설치
 
@@ -93,7 +93,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 다섯 개의 레이어가 작은 dataclass 스키마로 연결됩니다 — 전체 세부 사항은 [`docs/concepts/architecture.md`](./docs/concepts/architecture.md)를 참조하세요.
 
 <p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, multi-source per-claim verifier" width="90%">
+  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, policy-BT verifier" width="90%">
 </p>
 
 | 레이어 | 컴포넌트 | 역할 |
@@ -102,7 +102,7 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 | 1 | **ToolManager + Perspicacité** | 설정된 주소/포트 범위에서 MCP 도구를 탐색하고, 선택적으로 문헌 스니펫을 가져옵니다. |
 | 2 | **EvolutionEngine** | 워크플로우를 합성하고 세대를 거쳐 진화시킵니다(아래 참조). |
 | 3 | **WorkflowRunner** | 합성된 Python 워크플로우를 Hugging Face [SmolAgents](https://github.com/huggingface/smolagents)(`LocalPythonExecutor` + AST 허용 리스트 방식) 샌드박스에서 실행하며, LangGraph 상태를 공유합니다. |
-| 4 | **VerifierEvaluator** | 다중 소스 클레임별 검증기. 다음 변이를 추동합니다. |
+| 4 | **PolicyBTVerifierEvaluator** | Policy/BT 검증기: 재현 게이트 → LLM 정찰 및 스키마 어댑터 → 캐시된 단일 결정론적 비교 정책(시각 동점 결정) → 정규화된 Bradley–Terry 보상. 다음 변이를 추동합니다. |
 
 ### 진화 루프 — 실제로 무엇이 진화하는가
 
@@ -116,20 +116,14 @@ https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
 
 ### 검증기 — 점수가 실제로 의미하는 것
 
-각 실행 후, 여섯 개의 독립적인 클레임 소스가 워크스페이스를 살펴보고 성공-극성(success-polarity) 클레임을 산출합니다:
+각 실행 후, **Policy/BT 검증기**(`sources/evaluators/policy_bt_verifier/`, `verifier_kind = "policy_bt"`)가 워크스페이스를 평가합니다:
 
-| 소스 | 관점 |
-|--------|---------|
-| **A** | 동료 평가된 관행(Perspicacité 문헌 그라운딩 경유) |
-| **B** | 목표 텍스트 그 자체 — 에이전트가 요청받은 것을 전달했는가? |
-| **C** | 에이전트 내레이션 — 주장된 수치/산출물을 디스크에서 재현할 수 있는가? |
-| **D** | 수학적 불변량 — 확률은 [0,1] 범위, 형상 일관성, NaN 없음, 보존 |
-| **E** | 계산 재현성 — 선언된 의존성이 사용된 import를 포함, 절대 경로 없음, 확률적 연산에 시드 설정 |
-| **F** | 통계적 핑거프린트 — 베이스라인 초과, 퇴화된 예측 없음, 누출 시그니처 없음 |
+1. **재현 계약** — 각 세대는 출력을 재생성하는 셸 스크립트(의존성 설치 포함)를 반드시 제공해야 합니다. 스크립트가 없거나 유효하지 않은 세대는 부적격이며 보상은 0이고 피드백에 필요한 수정이 명시됩니다. 기본값으로 켜져 있는 재실행은 검증기가 소유한 복사본에서 API 키 없는 새 venv 안에서 스크립트를 다시 실행합니다(기존 출력은 사전에 치워둠).
+2. **정찰과 어댑터** — 한 번의 LLM 정찰이 산출물을 목록화하고 목표만으로 비교 기준과 단계 순서를 고정합니다. 스키마별 어댑터가 각 워크스페이스를 공통 표현으로 정규화합니다(알 수 없음은 `null`. 조작된 패배가 아님).
+3. **쌍별 비교 정책** — 캐시된 단일 결정론적 Python 정책이 제한된 인터프리터에서 각 쌍을 비교하며, 역순·자기 비교·결정론성 검사를 수행합니다. 가장 이른 결정적 기준 단계가 승리합니다. 동점일 때 양쪽에 목표 관련 이미지가 있으면 시각 모델이 판정합니다. 두 제시 순서가 일치할 때만 채택하고, 그렇지 않으면 동점이 유지됩니다.
+4. **Bradley–Terry 보상** — 모든 쌍 판정이 태스크 세션 전체의 정규화된 Bradley–Terry 피팅에 들어가고, 보상은 중립 강도 상대를 이길 현재 확률입니다. **평가할 때마다 모든 세대의 평점이 갱신됩니다.** 첫 적격 세대는 0.5에서 시작합니다.
 
-각 클레임은 심판(judge)이 워크스페이스에 대해 작성하는 **Python 프로그램**으로 검증됩니다 — 에이전트를 믿느냐고 LLM에 다시 묻는 방식이 아닙니다.
-
-**평가 기준 비공개 변이 (rubric-blind mutation) — 변이기는 평가 기준(rubric)을 결코 보지 않습니다.** 되돌아 흐르는 유일한 신호는 `abstracted_prompt_gradient` — 클레임, 점수, 소스를 명명하지 않는 실패 모드의 암호화된 진단입니다. 구조적으로, 탐색은 결코 보지 않는 평가 기준의 어휘에 과적합할 수 없습니다.
+변이기는 **증거 기반 텍스트 그래디언트**에 의해 조종됩니다 — 패배를 먼저, 이 세대가 가장 이르게 뒤처진 단계 순으로 정렬하고, 실측 증거를 붙이며, 점수나 정책 코드는 담지 않습니다. 이전의 하이브리드 시간 사다리 방식(`verifier_kind = "hybrid"`)과 폐기된 다중 소스 클레임별 검증기(`"legacy"`)도 여전히 선택할 수 있지만, 실행 기본값은 `policy_bt`입니다.
 
 전체 파이프라인: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
 
@@ -242,9 +236,9 @@ Mimosa-AI는 LLM 기반 프로그램 탐색 및 자율 연구 시스템의 작�
 |---------|--------------|--------------------|
 | [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | ML 분야의 종단 간 논문 생성 | Mimosa는 전체 논문 생성이 아니라 QD+검증기를 사용한 **태스크별 워크플로우 합성**을 최적화합니다 |
 | [DiscoPOP](https://github.com/SakanaAI/DiscoPOP) (Lange et al. 2024) | LLM 기반 선호 최적화 알고리즘의 발견 | 동일한 "코드에 대한 변이 연산자로서의 LLM" 패러다임. Mimosa는 이를 손실 함수가 아니라 멀티에이전트 워크플로우 코드에 적용합니다 |
-| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | LLM이 안내하는 Python 함수에 대한 진화적 탐색 | Mimosa는 멀티에이전트 프로그램 전체를 진화시키며, 단일 적합도 함수 대신 다중 소스 클레임별 검증기를 추가합니다 |
+| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | LLM이 안내하는 Python 함수에 대한 진화적 탐색 | Mimosa는 멀티에이전트 프로그램 전체를 진화시키며, 단일 적합도 함수 대신 감사 가능한 결정론적 검증기(Policy/BT 토너먼트)를 추가합니다 |
 | [ELM](https://github.com/CarperAI/OpenELM) (Lehman et al. 2022) | LLM 매개 코드에 대한 quality-diversity | 가장 가까운 QD 조상. Mimosa의 행동 기술자는 도메인 특화 핸드디자인 대신 워크플로우 코드 자체의 도메인 독립적 임베딩입니다 |
-| AIDE | Kaggle 유사 태스크에 대한 자동화된 ML 파이프라인 | Mimosa는 더 광범위한 과학적 재현(ScienceAgentBench, PaperBench, 실험실 데이터)을 대상으로 하며, 감사 가능한 클레임별 검증기를 함께 제공합니다 |
+| AIDE | Kaggle 유사 태스크에 대한 자동화된 ML 파이프라인 | Mimosa는 더 광범위한 과학적 재현(ScienceAgentBench, PaperBench, 실험실 데이터)을 대상으로 하며, 감사 가능한 결정론적 검증기를 함께 제공합니다 |
 
 비교 연구를 출판하는 경우, [논문](https://arxiv.org/abs/2603.28986)에 상세한 포지셔닝이 있습니다.
 
