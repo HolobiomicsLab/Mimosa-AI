@@ -99,6 +99,18 @@ but none of them serves the model you asked for. Either:
 - Widen the whitelist (the default includes 25+ providers), or
 - Switch to a model with broader provider support.
 
+### `No endpoints found that can handle the requested parameters` (404)
+
+With `require_parameters: true`, OpenRouter drops every endpoint that does
+not list each sent parameter. Generated agents send `temperature` and, with
+`save_logprobs`, `logprobs`/`top_logprobs`. Models whose endpoints list none
+of these (OpenRouter's Claude endpoints) end up with no endpoint at all.
+Mimosa therefore sends `require_parameters: false` for `openrouter/anthropic/*`
+models. Those models return no logprobs, so the run prints
+`logprobs requested but none returned`. For other models that hit this 404,
+switch `smolagent_model_id` or set `save_logprobs: false`. The agent failure
+banner in `run_stdout.log` shows the exact error.
+
 ## Runtime / execution
 
 ### Sandbox hits `runner_default_timeout`
@@ -135,17 +147,24 @@ If you *did* set them, check Langfuse is actually running
 
 A few likely causes:
 
-- **Verifier hard fails.** If every generation has a refuted hard claim,
-  `hard_fail_capped` flips `true` and `overall_score` is capped at
-  `_HARD_FAIL_CAP` (currently `0.99`, kept permissive on purpose).
-  `reward_uncapped` (`overall_score_uncapped` in the JSON) still drives
-  selection, but you may have a structural mismatch between the task
-  description and what the workflow can actually verify against.
-- **Recurring failure code.** The `abstracted_prompt_gradient` is
-  prefixed with a short code name (e.g. `FALLBACK_ECFP_CLASSIFIER`).
-  If the same code recurs across generations, the loop is re-discovering
-  the same failure mode — inspect `evaluation.txt` for the per-claim
-  detail behind it.
+- **Script-stage failures dominate.** Under the hybrid temporal-ladder
+  verifier, a pair is decided at the earliest ladder stage where the
+  generations differ — a generation that keeps failing `script`-stage
+  claims (code missing/invalid, inputs not read) loses every pairwise
+  comparison regardless of its deliverables. Inspect
+  `evaluation.txt`'s stage headers: if the earliest failing stage never
+  changes across generations, the loop is re-discovering the same
+  structural failure — check the goal's named inputs against what the
+  workflow actually opens. *(Legacy runs, pre-2026-09-24: the
+  multi-source verifier capped `overall_score` at
+  `_HARD_FAIL_CAP = 0.89` whenever a claim rated importance ≥ 8 was
+  refuted — capped runs ranked below uncapped improvements for the same
+  reason: one refuted hard claim dominated the rest.)*
+- **Recurring failure code.** The `abstracted_textual_gradient` leads
+  with the elimination point (earliest stage/claim where this generation
+  lost). If the same claim/stage recurs across generations, the loop is
+  re-discovering the same failure mode — inspect `evaluation.txt` for
+  the per-claim detail behind it.
 - **Tool gap.** The agents may need a tool that Toolomics doesn't expose.
   Use `--manual` mode to confirm the tool you need is actually
   discoverable.

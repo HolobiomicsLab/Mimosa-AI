@@ -1,0 +1,557 @@
+Title,URLS,Prompt,Challenge,TaskID,Difficulty,Skills,Tools
+[q_haffner] Random forest identification of differential fecal metabolite features across industrialization gradient,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_haffner/_input_package/haffner.pdf,"[ASB Metabolomics — challenge: q_haffner, task: task_001]
+TITLE: Random forest identification of differential fecal metabolite features across industrialization gradient
+
+RESEARCH QUESTION: Which metabolite features are most differential across industrialization levels when applying a variable importance threshold to random forest classification results?
+
+OBJECTIVE: Apply variable importance filtering (>1.3) to random forest output on 1,000 abundant metabolite features to identify 377 differential features and annotate compound identities.
+
+DOMAIN KNOWLEDGE:
+- Random forest out-of-bag (OOB) error plateaus when the number of trees becomes sufficient (typically 200 trees for metabolomic feature sets); increasing trees beyond this point yields no improvement in variable importance stability.
+- Variable importance threshold of >1.3 (as applied in this study) represents a statistical cutoff specific to the authors' feature count and sample size; this cutoff is not universal and must be justified by the data distribution.
+- SIRIUS and CANOPUS operate on high-resolution MS/MS spectra to infer molecular fragmentation patterns and predict compound classes; they require m/z values and fragment ion spectra as input.
+- Random forest importance scores are calculated from decrease in mean squared error or Gini impurity; features with higher importance distinguish metabolite profiles across industrialization groups more reliably. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: principal-coordinate analysis (PCoA), random forest, SIRIUS, ClassyFire, CANOPUS, R
+
+SKILLS NEEDED: metabolite-feature-importance-ranking, random-forest-classification-tuning, variable-importance-threshold-filtering, mass-spectrometry-compound-annotation, chemical-class-prediction-from-ms-data, machine-learning-hyperparameter-selection
+
+EXPECTED OUTPUTS:
+- List of 377 differential metabolite features with variable importance scores >1.3, ranked by importance
+- Class-level compound annotations (via SIRIUS/CANOPUS/ClassyFire) for the 377 differential features
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_haffner,task_001,type-checked,metabolite-feature-importance-ranking; random-forest-classification-tuning; variable-importance-threshold-filtering; mass-spectrometry-compound-annotation; chemical-class-prediction-from-ms-data,principal-coordinate analysis (PCoA); random forest; SIRIUS; ClassyFire; CANOPUS
+[q_haffner] Filter: feature abundance threshold (3× blank) applied to LC-MS/MS metabolite features,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_haffner/_input_package/haffner.pdf,"[ASB Metabolomics — challenge: q_haffner, task: task_002]
+TITLE: Filter: feature abundance threshold (3× blank) applied to LC-MS/MS metabolite features
+
+RESEARCH QUESTION: What filtering threshold effectively removes background contamination from metabolomic feature tables while retaining true biological signals?
+
+OBJECTIVE: Apply a 3-fold abundance threshold relative to extraction blanks to filter the raw metabolomic feature table and eliminate contaminant signals.
+
+DOMAIN KNOWLEDGE:
+- Blank controls must be analyzed identically to samples during LC-MS/MS to capture method-derived contamination and background signals from solvents, tubes, and reagents.
+- A 3-fold signal threshold filters features detected only in blanks or at very low abundance relative to blanks, minimizing false metabolite calls while retaining true sample-specific signals.
+- Feature abundance in LC-MS/MS is measured as peak intensity (TIC-normalized); blank samples should contain minimal endogenous metabolites and serve as a baseline for each method batch.
+- Gap-filling (MZmine interpolation of missing values) must be applied consistently after blank filtering to preserve feature presence/absence patterns needed for downstream multivariate analysis.
+
+REQUIRED TOOLS/LIBRARIES: principal-coordinate analysis (PCoA), MZmine v2.33
+
+SKILLS NEEDED: metabolite-feature-abundance-filtering, blank-control-subtraction-and-thresholding, mass-spectrometry-feature-quality-control, signal-to-noise-ratio-assessment
+
+EXPECTED OUTPUTS:
+- Blank-filtered feature table containing only metabolite features with abundance ≥3× blank control signal
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_haffner,task_002,type-checked,metabolite-feature-abundance-filtering; blank-control-subtraction-and-thresholding; mass-spectrometry-feature-quality-control; signal-to-noise-ratio-assessment,principal-coordinate analysis (PCoA); MZmine v2.33
+"[q_haffner] Filter: minimum-peaks-in-a-row filtering at three thresholds (6, 45, 90) on metabolite feature table",/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_haffner/_input_package/haffner.pdf,"[ASB Metabolomics — challenge: q_haffner, task: task_003]
+TITLE: Filter: minimum-peaks-in-a-row filtering at three thresholds (6, 45, 90) on metabolite feature table
+
+RESEARCH QUESTION: What are the quantitative outcomes of applying sequential occurrence-based filters (6, 45, and 90 minimum peaks-in-a-row) to metabolite features, with gap-filling applied after each filtering step?
+
+OBJECTIVE: Apply three sequential occurrence-based filters (6, 45, 90 minimum peaks-in-a-row per population) to the metabolite feature table with gap-filling after each step, producing occurrence-filtered feature sets at each threshold.
+
+DOMAIN KNOWLEDGE:
+- Minimum peaks in a row filtering is a data quality criterion in mass spectrometry metabolomics that ensures features are detected across a specified number of consecutive samples, reducing spurious peaks and noise.
+- Gap-filling in MZmine detects peaks that were not algorithmically identified in the initial peak detection by examining the raw chromatographic data, increasing metabolite detection completeness.
+- The three sequential thresholds (6, 45, 90) represent increasing stringency levels: 6 is half the smallest population size (~12 samples), 45 is half the total cohort (90 samples), and 90 requires detection in every sample.
+- Population-stratified filtering ensures that features validated in the 6-sample workflow are truly present across each study population rather than concentrated in a single group, critical for cross-population metabolomic studies. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: principal-coordinate analysis (PCoA), MZmine v2.33, R programming language
+
+SKILLS NEEDED: metabolite-feature-occurrence-filtering, gap-filling-in-untargeted-metabolomics, mzmine-feature-table-processing, population-stratified-feature-validation, sequential-filtering-workflow-design
+
+EXPECTED OUTPUTS:
+- Feature table filtered by 6 minimum peaks in a row with gap-filling applied
+- Feature table filtered by 45 minimum peaks in a row with gap-filling applied
+- Feature table filtered by 90 minimum peaks in a row with gap-filling applied
+- Processed 6-sample filter output with population-level occurrence validation performed in R
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_haffner,task_003,type-checked,metabolite-feature-occurrence-filtering; gap-filling-in-untargeted-metabolomics; mzmine-feature-table-processing; population-stratified-feature-validation; sequential-filtering-workflow-design,principal-coordinate analysis (PCoA); MZmine v2.33; R programming language
+[q_haffner] mmvec microbe-metabolite co-occurrence analysis on shared annotated metabolites and ASVs,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_haffner/_input_package/haffner.pdf,"[ASB Metabolomics — challenge: q_haffner, task: task_004]
+TITLE: mmvec microbe-metabolite co-occurrence analysis on shared annotated metabolites and ASVs
+
+RESEARCH QUESTION: Which microbial taxa and metabolite features show the strongest predicted co-occurrence patterns when analyzed using the mmvec neural network platform on filtered microbiome and metabolomics data?
+
+OBJECTIVE: Execute mmvec analysis on ASVs (>0.5% relative frequency) and metabolite features to identify and rank microbe-metabolite conditional probability associations among 67 shared annotated metabolites and 27 major predictive taxa.
+
+DOMAIN KNOWLEDGE:
+- mmvec uses neural network embeddings to model conditional co-occurrence probabilities between microbial taxa and metabolites, capturing non-linear relationships that differ from correlation-based approaches.
+- ASV relative frequency threshold of >0.5% is applied before mmvec to reduce noise from rare taxa while retaining biologically relevant low-abundance members.
+- Conditional probability subsetting requires defining thresholds for 'major' predictive taxa; in this work, taxa meeting high conditional probability cutoffs with the 67 shared annotated metabolites were retained (27 total).
+- The mmvec output is a rectangular matrix of conditional probabilities P(metabolite | taxon) and P(taxon | metabolite), not correlation or abundance counts, requiring distinct downstream interpretation. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: principal-coordinate analysis (PCoA), mmvec, QIIME2, R programming language
+
+SKILLS NEEDED: microbe-metabolite-association-inference, neural-network-embedding-computation, conditional-probability-matrix-filtering, asv-abundance-threshold-selection, feature-table-integration-across-omics-layers
+
+EXPECTED OUTPUTS:
+- Microbe-metabolite conditional probability matrix subset to 67 shared annotated metabolites and 27 major predictive taxa
+- CSV table of filtered conditional probabilities for input to PCA
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_haffner,task_004,type-checked,microbe-metabolite-association-inference; neural-network-embedding-computation; conditional-probability-matrix-filtering; asv-abundance-threshold-selection; feature-table-integration-across-omics-layers,principal-coordinate analysis (PCoA); mmvec; QIIME2; R programming language
+[q_jeong] Reproduce feature-based molecular networking of fungal biotransformation LC-MS/MS data via GNPS,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_jeong/_input_package/jeong.pdf,"[ASB Metabolomics — challenge: q_jeong, task: task_001]
+TITLE: Reproduce feature-based molecular networking of fungal biotransformation LC-MS/MS data via GNPS
+
+RESEARCH QUESTION: What is the molecular network structure produced by feature-based molecular networking on GNPS when applied to LC-MS/MS data from 22 fungal species cultured with 12 plant phenolic compounds, and how does this network enable annotation of enzymatic reactivities?
+
+OBJECTIVE: Reproduce the feature-based molecular networking workflow on GNPS using deposited LC-MS/MS data (MSV000090841) and generate a spectral network annotated with enzymatic reactivity classifications for the 22 fungal species and 12 phytochemicals tested.
+
+DOMAIN KNOWLEDGE:
+- Feature-based molecular networking identifies spectral nodes as consensus MS/MS spectra from co-ionizing precursors and connects nodes via cosine similarity >0.6 to reveal structural relationships among detected metabolites.
+- GNPS maintains a comprehensive MS/MS reference library enabling automated spectral matching and structural annotation of nodes; unmatched nodes require manual curation or targeted NMR validation.
+- Neutral loss filtering via MassQL detects sugar conjugation signatures (pentose = 132.0423 Da, hexose = 162.0528 Da) enabling rapid enzymatic reactivity phenotyping without full structure elucidation.
+- Molecular network topology encodes substrate promiscuity and regioselective enzymatic transformations through branched node clusters; multiple disconnected nodes from one precursor indicate multiple product regioisomers. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: GNPS, MassQL, LC-MS/MS
+
+SKILLS NEEDED: molecular-networking-construction, spectral-library-matching-and-annotation, metabolite-neutral-loss-filtering, network-visualization-and-interpretation, enzymatic-reactivity-phenotyping-from-spectral-data, fungal-metabolomics-data-integration
+
+EXPECTED OUTPUTS:
+- Feature-based molecular network in graphml format with spectral nodes and cosine similarity edges
+- Node attribute table mapping spectral nodes to compound identities, fungal species, and enzymatic reactivities
+- Network visualization image showing molecular connections and annotated enzymatic transformations across fungal species
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_jeong,task_001,type-checked,molecular-networking-construction; spectral-library-matching-and-annotation; metabolite-neutral-loss-filtering; network-visualization-and-interpretation; enzymatic-reactivity-phenotyping-from-spectral-data,GNPS; MassQL; LC-MS/MS
+[q_jeong] Filter: apply MassQL neutral-loss query to detect pentosylation (132.0423 Da) events in MS/MS spectra,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_jeong/_input_package/jeong.pdf,"[ASB Metabolomics — challenge: q_jeong, task: task_002]
+TITLE: Filter: apply MassQL neutral-loss query to detect pentosylation (132.0423 Da) events in MS/MS spectra
+
+RESEARCH QUESTION: Can MassQL efficiently retrieve all pentosylated metabolites from a feature-based molecular network by filtering spectral nodes with a neutral loss of 132.0423 Da?
+
+OBJECTIVE: Execute a MassQL neutral loss query (132.0423 Da) on preprocessed GNPS feature-based molecular network spectral data to produce a filtered hit table of pentosylated metabolite nodes.
+
+DOMAIN KNOWLEDGE:
+- Neutral loss of 132.0423 Da corresponds to the loss of a pentose sugar (xylose or arabinose) from a conjugated aglycone in positive-ion MS/MS, enabling rapid detection of O-glycosylated metabolites.
+- MassQL is a mass spectrometry query language that enables rapid filtering of spectral libraries by characteristic fragment patterns or neutral losses without manual spectral interpretation.
+- The GNPS feature-based molecular network preprocesses raw MS/MS data into aligned spectral nodes with cosine similarity clustering, enabling batch query operations across thousands of spectra.
+- Pentosylation (five-carbon sugar conjugation) is distinct from hexosylation (six-carbon sugars like glucose), with hexosylation showing a characteristic neutral loss of 162.0528 Da. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: LC-MS/MS, MassQL, GNPS
+
+SKILLS NEEDED: mass-spectrometry-query-language-formulation, neutral-loss-filtering-for-sugar-conjugates, spectral-feature-table-export, gnps-molecular-network-data-retrieval, pentosylation-signature-annotation
+
+EXPECTED OUTPUTS:
+- Filtered hit table containing all spectral nodes with neutral loss of 132.0423 Da (pentosylation), including spectral node IDs, m/z values, retention times, precursor masses, and library matches
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_jeong,task_002,type-checked,mass-spectrometry-query-language-formulation; neutral-loss-filtering-for-sugar-conjugates; spectral-feature-table-export; gnps-molecular-network-data-retrieval; pentosylation-signature-annotation,LC-MS/MS; MassQL; GNPS
+"[q_metaboanalyst] Auto-optimized LC-MS1 spectral processing: peak picking, alignment, and gap filling using MetaboAnalystR 4.0",/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metaboanalyst/_input_package/metaboanalyst.pdf,"[ASB Metabolomics — challenge: q_metaboanalyst, task: task_001]
+TITLE: Auto-optimized LC-MS1 spectral processing: peak picking, alignment, and gap filling using MetaboAnalystR 4.0
+
+RESEARCH QUESTION: How many MS1 features are detected by MetaboAnalystR 4.0's auto-optimized LC-MS1 processing pipeline across blood samples analyzed in different ionization modes?
+
+OBJECTIVE: Generate and report the quantitative count of MS1 features (generic and unique) detected by MetaboAnalystR 4.0 across blood samples in each ionization mode.
+
+DOMAIN KNOWLEDGE:
+- Auto-optimized parameter selection in MetaboAnalystR 4.0 uses sample-specific characteristics to determine optimal peakwidth, ppm tolerance, and noise thresholds without manual intervention.
+- The gap-filling step replaces missing intensity values (features present in some but not all samples) with detected or imputed values to enable downstream statistical analysis on a complete matrix.
+- MS1 feature consistency is evaluated by comparing generic features (detected across all blood sample types) versus unique features (sample-type-specific), which may indicate biological variation or instrument sensitivity artifacts.
+- C18 and HILIC chromatography modes require different retention-time alignment windows; auto-optimization adjusts these thresholds per mode to maximize feature correspondence. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: MetaboAnalystR 4.0
+
+SKILLS NEEDED: lc-ms-peak-picking-parameter-optimization, chromatographic-peak-alignment-across-cohorts, metabolomics-feature-table-gap-filling, ms1-intensity-normalization-and-quantification, multi-sample-feature-consistency-evaluation
+
+EXPECTED OUTPUTS:
+- MS1 feature table with m/z, retention time, and normalized intensity values across all blood samples
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metaboanalyst,task_001,type-checked,lc-ms-peak-picking-parameter-optimization; chromatographic-peak-alignment-across-cohorts; metabolomics-feature-table-gap-filling; ms1-intensity-normalization-and-quantification; multi-sample-feature-consistency-evaluation,MetaboAnalystR 4.0
+[q_metaboanalyst] DDA chimeric spectrum deconvolution using MetaboAnalystR 4.0's penalized elastic-net regression module,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metaboanalyst/_input_package/metaboanalyst.pdf,"[ASB Metabolomics — challenge: q_metaboanalyst, task: task_002]
+TITLE: DDA chimeric spectrum deconvolution using MetaboAnalystR 4.0's penalized elastic-net regression module
+
+RESEARCH QUESTION: Does applying MetaboAnalystR 4.0's PerformDDADeconvolution function to DDA MS2 spectra from complex standards mixture data improve spectral matching scores compared to non-deconvolved spectra?
+
+OBJECTIVE: Implement and validate the PerformDDADeconvolution function on MTBLS2207 DDA spectra and quantify the statistical improvement in matching scores between deconvolved and non-deconvolved results.
+
+DOMAIN KNOWLEDGE:
+- DDA (data-dependent acquisition) MS2 spectra often contain chimeric ions from multiple precursors co-isolated in the same m/z window; deconvolution aims to decompose these mixed signals into individual component spectra to improve spectral matching accuracy.
+- Clean vs. chimeric spectrum classification is based on MS1 scan signals: spectra are evaluated against reference ions (A, B, C) within the isolation window and above intensity threshold to determine if multiple precursors are present.
+- Regression analysis in the deconvolution context fits multiple reference spectra as linear combinations of observed signal intensities to separate overlapping spectral components.
+- MS2 reference library sources (HMDB, MassBank, METLIN) vary in instrument types and ionization conditions, which can affect matching score distributions and statistical power to detect deconvolution benefits. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: MetaboAnalystR 4.0, HMDB
+
+SKILLS NEEDED: spectral-deconvolution-dda-ms2, ms2-reference-library-matching, chimeric-spectra-classification, regression-analysis-spectral-decomposition, statistical-significance-testing-metabolomics
+
+EXPECTED OUTPUTS:
+- Table of spectral matching scores comparing deconvolved and non-deconvolved MS2 spectra with statistical significance test results
+- Visualization comparing matching score distributions (box plot or violin plot) for deconvolved vs. non-deconvolved spectra
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metaboanalyst,task_002,type-checked,spectral-deconvolution-dda-ms2; ms2-reference-library-matching; chimeric-spectra-classification; regression-analysis-spectral-decomposition; statistical-significance-testing-metabolomics,MetaboAnalystR 4.0; HMDB
+[q_metaboanalyst] MS2 reference library SQLite database construction and compound identification via PerformDBSearchingBatch,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metaboanalyst/_input_package/metaboanalyst.pdf,"[ASB Metabolomics — challenge: q_metaboanalyst, task: task_003]
+TITLE: MS2 reference library SQLite database construction and compound identification via PerformDBSearchingBatch
+
+RESEARCH QUESTION: What is the compound identification rate achieved by MetaboAnalystR 4.0 when performing MS2 database searching on deconvolved spectra from the MTBLS1311 standards mixture dataset?
+
+OBJECTIVE: Curate nine public MS2 databases into a unified SQLite schema and execute batch MS2 database searching on MTBLS1311 deconvolved spectra to reproduce the compound identification percentage reported in Figure 4b.
+
+DOMAIN KNOWLEDGE:
+- MS2 spectral libraries from different instruments and experimental conditions exhibit variable quality due to differences in ionization efficiency, fragmentation patterns, and collision energy settings; the Complete library schema must normalize these variations.
+- DDA deconvolution requires classification of spectra as 'clean' (single precursor) or 'chimeric' (multiple precursors) before database searching to avoid ambiguous fragment assignments.
+- Spectral similarity metrics (e.g., cosine similarity) are sensitive to noise, peak intensity normalization, and m/z alignment tolerance; threshold selection directly impacts identification sensitivity and specificity.
+- The MTBLS1311 dataset contains medium-complexity standards with known compound identities, making it suitable for validation of identification accuracy and reproducibility of reported benchmarks. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: MetaboAnalystR 4.0
+
+SKILLS NEEDED: spectral-library-curation-and-standardization, dda-spectra-deconvolution, spectral-similarity-searching-and-matching, database-schema-design-and-sqlite-implementation, compound-identification-benchmark-evaluation
+
+EXPECTED OUTPUTS:
+- SQLite Complete library containing curated and standardized MS2 reference spectra from nine databases
+- Compound identification results table with percentage of identified features matching Figure 4b
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metaboanalyst,task_003,type-checked,spectral-library-curation-and-standardization; dda-spectra-deconvolution; spectral-similarity-searching-and-matching; database-schema-design-and-sqlite-implementation; compound-identification-benchmark-evaluation,MetaboAnalystR 4.0
+[q_metabolites11] Reproduce LC-HRMS metabolite annotation and filtering pipeline for P. aeruginosa CF isolates,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metabolites11/_input_package/metabolites11.pdf,"[ASB Metabolomics — challenge: q_metabolites11, task: task_001]
+TITLE: Reproduce LC-HRMS metabolite annotation and filtering pipeline for P. aeruginosa CF isolates
+
+RESEARCH QUESTION: What are the quantitative quality-control thresholds and filtering criteria required to process raw LC-HRMS data and obtain a reproducible set of annotated metabolites?
+
+OBJECTIVE: Apply three sequential LC-HRMS quality-control filters (correlation >0.7, blank-to-sample <0.33, QC variation <30%) to MassIVE raw data and reproduce the 271-metabolite annotated dataset.
+
+DOMAIN KNOWLEDGE:
+- LC-HRMS quality control requires filtering on three independent metrics: correlation between dilution series and peak intensity (>0.7), blank-to-sample contamination ratio (<0.33), and intra-QC reproducibility via coefficient of variation (<30%) to ensure features are genuine and reproducible.
+- Dual chromatographic separation (C18 reversed-phase for hydrophobic metabolites and HILIC for polar metabolites) provides complementary chemical space coverage; features must be detected separately per method and annotation confidence depends on orthogonal criteria (accurate mass, retention time, MS/MS fragmentation pattern).
+- Putative annotation of metabolites using accurate mass alone is lower-confidence than identity confirmed by MS/MS matching to authenticated standards under identical conditions; the study reports 30 metabolites with full identification (mass + RT + MS/MS + standard), 3 with MS/MS only, 20 with mass + RT only, and 17 with mass alone.
+- ProteoWizard's MSConvert centroid mode reduces raw profile-mode spectra to centroid peaks; the 0.01 step size and 10 ppm m/z tolerance are critical to avoid peak merging and false negatives in complex mixtures typical of bacterial metabolomes. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: Liquid Chromatography coupled with High Resolution Mass Spectrometry (LC/HRMS), ProteoWizard (release 3.0.9393), XCMS package (version 3.0.2), centWave algorithm (XCMS), CAMERA package, R software version 3.3.2
+
+SKILLS NEEDED: lc-hrms-raw-data-conversion-and-preprocessing, chromatographic-peak-detection-and-centroiding, spectral-adduct-isotope-annotation, metabolite-feature-quality-filtering-and-thresholding, spectral-library-matching-and-metabolite-annotation, untargeted-metabolomics-data-normalization
+
+EXPECTED OUTPUTS:
+- Feature intensity table after XCMS peak detection and CAMERA annotation (pre-filtering)
+- Filtered feature table retaining only features passing all three quality-control criteria (correlation >0.7, blank-to-sample ratio <0.33, QC CV <30%)
+- Annotated metabolite table with 271 putatively identified metabolites, including accurate mass, retention time, database match, and annotation confidence level
+- PQN-normalized peak intensity matrix (271 metabolites × 198 samples) ready for downstream statistical analysis
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metabolites11,task_001,type-checked,lc-hrms-raw-data-conversion-and-preprocessing; chromatographic-peak-detection-and-centroiding; spectral-adduct-isotope-annotation; metabolite-feature-quality-filtering-and-thresholding; spectral-library-matching-and-metabolite-annotation,Liquid Chromatography coupled with High Resolution Mass Spectrometry (LC/HRMS); ProteoWizard (release 3.0.9393); XCMS package (version 3.0.2); centWave algorithm (XCMS); CAMERA package
+[q_metabolites11] Filter: Select 151 differentially expressed metabolites by variation coefficient threshold (>0.5) from the 271-metabolite annotated set,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metabolites11/_input_package/metabolites11.pdf,"[ASB Metabolomics — challenge: q_metabolites11, task: task_002]
+TITLE: Filter: Select 151 differentially expressed metabolites by variation coefficient threshold (>0.5) from the 271-metabolite annotated set
+
+RESEARCH QUESTION: What is the variation coefficient threshold used to filter the 271 annotated metabolites down to a 151-metabolite feature set for HCPC clustering analysis?
+
+OBJECTIVE: Apply variation coefficient filtering (VC > 0.5) to reduce 271 annotated metabolites to 151 features and validate this reduced set's use in HCPC metabotype clustering.
+
+DOMAIN KNOWLEDGE:
+- Variation coefficient (CV = standard deviation / mean) is a normalized measure of dispersion used to identify metabolites with consistent differential expression across a population of isolates; a CV >0.5 indicates substantial intra-population heterogeneity suitable for phenotype association.
+- Untargeted LC-HRMS metabolomics typically yields thousands of features; filtering by CV retains only the biologically informative subset with sufficient within-group variability to correlate with phenotypic or genotypic states.
+- Metabolite intensity normalization by CFU/OD ratio accounts for variable bacterial cell density across culture replicates, ensuring that downstream CV calculations reflect true metabolic differences rather than biomass artifacts.
+- Two complementary chromatographic methods (C18 reversed-phase and HILIC hydrophilic-interaction) are used to maximize metabolite coverage; the combined filtered set represents both hydrophobic and polar metabolites suitable for multidimensional phenotype clustering.
+
+REQUIRED TOOLS/LIBRARIES: Liquid Chromatography coupled with High Resolution Mass Spectrometry (LC/HRMS), R software version 3.3.2, FactoMineR R package
+
+SKILLS NEEDED: metabolite-feature-filtering-by-variance, variation-coefficient-calculation-and-thresholding, mass-spectrometry-data-matrix-manipulation, quality-metric-interpretation-for-metabolomic-features, sample-normalization-and-abundance-standardization
+
+EXPECTED OUTPUTS:
+- Filtered feature table (151 metabolites × 198 samples) with variation coefficient >0.5, retaining metabolite identifiers, normalized intensities, and sample annotations (isolate ID, biological replicate, phenotype metadata)
+- List of 120 excluded metabolites (those with VC ≤0.5) with their original identifiers and variation coefficient values
+- Summary statistics table reporting variation coefficient distribution (min, max, mean, median, quartiles) for all 271 metabolites and the 151 retained metabolites
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metabolites11,task_002,type-checked,metabolite-feature-filtering-by-variance; variation-coefficient-calculation-and-thresholding; mass-spectrometry-data-matrix-manipulation; quality-metric-interpretation-for-metabolomic-features; sample-normalization-and-abundance-standardization,Liquid Chromatography coupled with High Resolution Mass Spectrometry (LC/HRMS); R software version 3.3.2; FactoMineR R package
+[q_metabolites11] Reproduce HCPC metabotype clustering and association with antibiotic resistance from the 151-metabolite feature matrix,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metabolites11/_input_package/metabolites11.pdf,"[ASB Metabolomics — challenge: q_metabolites11, task: task_003]
+TITLE: Reproduce HCPC metabotype clustering and association with antibiotic resistance from the 151-metabolite feature matrix
+
+RESEARCH QUESTION: Can Multiple Factor Analysis (MFA) integrated with Hierarchical Clustering on Principal Components (HCPC) identify distinct metabolic clusters (metabotypes) from a filtered 151-metabolite matrix, and does Cluster 1 demonstrate a significant association with beta-lactam antibiotic resistance?
+
+OBJECTIVE: Apply MFA and HCPC to the 151-metabolite filtered matrix combined with antibiotic resistance data to reproduce the three metabotype clusters and verify Cluster 1's association with beta-lactam resistance in 11/14 antibiotics.
+
+DOMAIN KNOWLEDGE:
+- MFA jointly extracts information from two data blocks (metabolite intensities and antibiotic resistances) by balancing the influence of each block via normalization, enabling discovery of multivariate patterns linking metabolic and phenotypic adaptation.
+- HCPC combines HCA on PCA/MFA scores with k-means stabilization to produce stable, interpretable clusters; inertia gain analysis determines the optimal number of clusters by evaluating the homogeneity gain when adding a new group.
+- Beta-lactam antibiotics (9/9 in this study) inhibit peptidoglycan cross-linking; P. aeruginosa resistance often involves upregulation of AmpC beta-lactamase and altered cell wall recycling pathways, which should correlate with specific metabolomic signatures.
+- Metabolite variation coefficient >0.5 filters for metabolites with high relative abundance differences across isolates, enriching for those associated with phenotypic divergence during chronic CF infection rather than constitutive baseline metabolism. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: Liquid Chromatography coupled with High Resolution Mass Spectrometry (LC/HRMS), multiple factor analysis (MFA), hierarchical clustering on principal components (HCPC), hierarchical cluster analysis (HCA), R software version 3.3.2, FactoMineR R package
+
+SKILLS NEEDED: metabolite-intensity-matrix-preparation-from-lchrms, multiblock-factorial-analysis-integration, hierarchical-cluster-analysis-dendrogram-interpretation, principal-component-biplot-visualization, antibiotic-resistance-phenotype-association-analysis, optimal-cluster-number-selection-by-inertia-gain
+
+EXPECTED OUTPUTS:
+- MFA biplot showing first two principal components (PCs) with isolate projections colored by cluster assignment, indicating 3 HCPC clusters with centroids marked
+- Cluster membership table (isolate ID, cluster number, antibiotic resistance phenotypes) with quantitative validation of Cluster 1 association with beta-lactam resistance (11/14 antibiotics, 9/9 beta-lactams)
+- Dendrogram from Hierarchical Cluster Analysis on MFA components showing three clusters and inertia gain analysis for cluster number optimization
+- MFA variable loadings (metabolites and antibiotic resistances) on first two PCs, identifying key metabolites and resistances defining each metabotype cluster
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metabolites11,task_003,type-checked,metabolite-intensity-matrix-preparation-from-lchrms; multiblock-factorial-analysis-integration; hierarchical-cluster-analysis-dendrogram-interpretation; principal-component-biplot-visualization; antibiotic-resistance-phenotype-association-analysis,Liquid Chromatography coupled with High Resolution Mass Spectrometry (LC/HRMS); multiple factor analysis (MFA); hierarchical clustering on principal components (HCPC); hierarchical cluster analysis (HCA); R software version 3.3.2
+[q_metabolites11] Reproduce PFGE-based clonal line identification and Hamming distance calculation for 34 CF patients,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metabolites11/_input_package/metabolites11.pdf,"[ASB Metabolomics — challenge: q_metabolites11, task: task_004]
+TITLE: Reproduce PFGE-based clonal line identification and Hamming distance calculation for 34 CF patients
+
+RESEARCH QUESTION: Can PFGE band-pattern data processed through BioNumerics 7.1 and analyzed via Hamming distance calculations in R reproduce the identification of clonal evolutionary lines and inter-patient clonal complexes observed in the study?
+
+OBJECTIVE: Reproduce PFGE-based clonal line identification by computing Hamming distances from BioNumerics-processed band patterns and validate recovery of 32/34 evolutionary lines and 3 inter-patient clonal complexes.
+
+DOMAIN KNOWLEDGE:
+- Hamming distance quantifies the number of differing band positions between two PFGE pulsotypes; identical pulsotypes have distance 0, and each band difference contributes +1 to the distance.
+- The Römling et al. (1995) PFGE clustering criterion classifies two pulsotypes as the same clonal complex if they differ in fewer than 7 bands, operationally defining recent common ancestry in Pseudomonas aeruginosa.
+- Clonal evolutionary lines within a single patient represent sequential isolates (early, middle, late) from the same chronic infection, validated by low Hamming distances (<7 bands) linking them into a continuous temporal lineage.
+- Inter-patient clonal complexes (CC1, CC2, CC3) arise when isolates from different patients share identical or nearly identical pulsotypes, indicating potential nosocomial transmission or environmental persistence. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: Liquid Chromatography coupled with High Resolution Mass Spectrometry (LC/HRMS), R software version 3.3.2, BioNumerics software version 7.1, hierarchical cluster analysis (HCA)
+
+SKILLS NEEDED: pfge-band-pattern-alignment-and-banding, hamming-distance-calculation-from-discrete-matrices, clonal-complex-definition-by-threshold-criteria, hierarchical-clustering-on-distance-matrices, patient-exclusion-assessment-and-documentation, temporal-evolutionary-line-tracking-in-longitudinal-samples
+
+EXPECTED OUTPUTS:
+- Pairwise Hamming distance matrix for all PFGE pulsotypes
+- Clonal evolutionary line assignments for 32 CF patients with temporal groupings (early, middle, late isolates)
+- Three inter-patient clonal complexes (CC1, CC2, CC3) with member pulsotypes and patient affiliations
+- List of excluded patients (17, 86) with justification (no evolutive clonal line detected)
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metabolites11,task_004,type-checked,pfge-band-pattern-alignment-and-banding; hamming-distance-calculation-from-discrete-matrices; clonal-complex-definition-by-threshold-criteria; hierarchical-clustering-on-distance-matrices; patient-exclusion-assessment-and-documentation,Liquid Chromatography coupled with High Resolution Mass Spectrometry (LC/HRMS); R software version 3.3.2; BioNumerics software version 7.1; hierarchical cluster analysis (HCA)
+[q_metlinkr] Map input metabolite identifiers to standardized names using MetLinkR,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metlinkr/_input_package/metlinkr.pdf,"[ASB Metabolomics — challenge: q_metlinkr, task: task_001]
+TITLE: Map input metabolite identifiers to standardized names using MetLinkR
+
+RESEARCH QUESTION: What are the mapping rates achieved when running MetLinkR on metabolite identifier lists from multiple datasets, and how many standardized metabolite names are successfully generated?
+
+OBJECTIVE: Execute MetLinkR on metabolite identifier cohorts and quantify mapping success rates and standardized name outputs per dataset.
+
+DOMAIN KNOWLEDGE:
+- MetLinkR queries RefMet first by priority order, then falls back to RaMP-DB synonym search only if RefMet lookup fails, establishing a deterministic matching hierarchy.
+- Mapping rate is defined as the percentage of input identifiers successfully linked to a standardized name across all reference databases (HMDB, KEGG, ChEBI, PubChem, LIPID MAPS, RefMet).
+- Cross-dataset presence is tracked to identify metabolites appearing in two or more input datasets, enabling meta-analysis coverage assessment.
+- The vignette provides benchmark datasets (5-dataset and 13-dataset cohorts) with known composition and expected mapping outcomes for validation. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: MetLinkR, R, RefMet API, RaMP-DB, HMDB, KEGG
+
+SKILLS NEEDED: metabolite-identifier-standardization, cross-database-synonym-matching, metabolite-mapping-rate-computation, multi-dataset-metabolite-overlap-analysis, reference-database-query-prioritization
+
+EXPECTED OUTPUTS:
+- Standardized metabolite names table with mapping success flags and per-dataset mapping rates
+- Summary report of total standardized names generated and count present in multiple datasets
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metlinkr,task_001,type-checked,metabolite-identifier-standardization; cross-database-synonym-matching; metabolite-mapping-rate-computation; multi-dataset-metabolite-overlap-analysis; reference-database-query-prioritization,MetLinkR; R; RefMet API; RaMP-DB; HMDB
+[q_metlinkr] Identify metabolites present in two or more input datasets from MetLinkR standardized name output,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metlinkr/_input_package/metlinkr.pdf,"[ASB Metabolomics — challenge: q_metlinkr, task: task_002]
+TITLE: Identify metabolites present in two or more input datasets from MetLinkR standardized name output
+
+RESEARCH QUESTION: How many standardized metabolite names from the MetLinkR output appear in two or more input datasets across the 5-dataset and 13-dataset cohorts?
+
+OBJECTIVE: Filter the standardized metabolite name table to retain only entities appearing in ≥2 input datasets and verify counts match reported values (715/1813 for 5-dataset; 1377/2919 for 13-dataset cohorts).
+
+DOMAIN KNOWLEDGE:
+- Metabolite standardization consolidates synonym identifiers (HMDB, KEGG, ChEBI, PubChem, LIPID MAPS) into canonical RefMet names to enable cross-dataset comparison.
+- Cross-dataset presence is defined as a metabolite appearing with the same standardized name in two or more independent input datasets, enabling meta-analysis pooling.
+- The 5-dataset benchmark (715/1813 = 39.4% overlap) and 13-dataset benchmark (1377/2919 = 47.2% overlap) represent expected retention rates after filtering for dataset-spanning entities.
+- Metabolite mapping success depends on identifier quality; unmappable or ambiguous identifiers may not contribute to multi-dataset overlap counts. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: R, MetLinkR
+
+SKILLS NEEDED: metabolite-identifier-filtering-by-dataset-overlap, cross-dataset-metabolite-frequency-counting, metabolite-table-aggregation-and-grouping, standardized-name-reproducibility-validation, metabolite-coverage-analysis-across-cohorts
+
+EXPECTED OUTPUTS:
+- Filtered metabolite table containing only cross-dataset entities (715 entries for 5-dataset cohort; 1377 entries for 13-dataset cohort)
+- Summary report with dataset overlap statistics and validation counts
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metlinkr,task_002,type-checked,metabolite-identifier-filtering-by-dataset-overlap; cross-dataset-metabolite-frequency-counting; metabolite-table-aggregation-and-grouping; standardized-name-reproducibility-validation; metabolite-coverage-analysis-across-cohorts,R; MetLinkR
+[q_metlinkr] Compute pairwise dataset coverage matrix from MetLinkR standardized metabolite output,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metlinkr/_input_package/metlinkr.pdf,"[ASB Metabolomics — challenge: q_metlinkr, task: task_003]
+TITLE: Compute pairwise dataset coverage matrix from MetLinkR standardized metabolite output
+
+RESEARCH QUESTION: What is the pairwise overlap in standardized metabolite identities across multiple input datasets, and how can this be visualized as a coverage matrix?
+
+OBJECTIVE: Compute and export a pairwise metabolite coverage matrix (or heatmap visualization) across input datasets using MetLinkR's standardized nomenclature to reproduce Supporting Information Figure S2b.
+
+DOMAIN KNOWLEDGE:
+- Standard metabolite names from MetLinkR represent unified identifiers that enable direct comparison across datasets with heterogeneous original nomenclature systems.
+- Pairwise coverage quantifies metabolite overlap between two datasets as the intersection of standardized names divided by the union or individual dataset sizes, depending on directionality.
+- The coverage matrix reveals dataset complementarity and redundancy critical for multi-study meta-analysis design, identifying which cohorts contribute unique metabolic signatures.
+- MetLinkR's mapping rate (proportion of input metabolites successfully linked to standard names) varies by dataset source quality and completeness, affecting coverage estimates.
+
+REQUIRED TOOLS/LIBRARIES: R, MetLinkR
+
+SKILLS NEEDED: metabolite-identifier-standardization-mapping, cross-dataset-overlap-calculation, pairwise-coverage-matrix-construction, metabolite-coverage-heatmap-visualization, metabolome-dataset-comparison
+
+EXPECTED OUTPUTS:
+- Pairwise coverage matrix (numeric table or data frame) with datasets × datasets dimensions
+- Heatmap visualization file (PNG or PDF) of pairwise metabolite coverage across datasets
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metlinkr,task_003,type-checked,metabolite-identifier-standardization-mapping; cross-dataset-overlap-calculation; pairwise-coverage-matrix-construction; metabolite-coverage-heatmap-visualization; metabolome-dataset-comparison,R; MetLinkR
+[q_metlinkr] Benchmark MetLinkR cross-dataset entity linking against manual curator annotations,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_metlinkr/_input_package/metlinkr.pdf,"[ASB Metabolomics — challenge: q_metlinkr, task: task_004]
+TITLE: Benchmark MetLinkR cross-dataset entity linking against manual curator annotations
+
+RESEARCH QUESTION: What is MetLinkR's accuracy in identifying cross-linked metabolite entities when compared to a manually curated reference set?
+
+OBJECTIVE: Validate MetLinkR's metabolite entity linking accuracy by comparing its automated assignments against a manually curated reference set and confirm the 85.3% identification rate.
+
+DOMAIN KNOWLEDGE:
+- MetLinkR maps mixed-format metabolite identifiers through a prioritized lookup chain: RefMet API first, then RaMP-DB synonym search if RefMet returns no match.
+- Manual curator assignment of 'cross-linked metabolite entities' represents ground truth for entities that appear across multiple input datasets; this is the gold standard against which MetLinkR's automated linking is evaluated.
+- The 85.3% identification rate reflects MetLinkR's recall: of all entities the curator identified as cross-linked, MetLinkR successfully recovered 85.3%; unmapped identifiers (those MetLinkR cannot standardize) are typically excluded from this denominator.
+- Metabolite entity linking requires handling synonymy across chemical databases (HMDB, KEGG, ChEBI, PubChem, LIPID MAPS); a single chemical may have multiple canonical identifiers depending on the source database. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: MetLinkR, R, RefMet, RaMP-DB 2.0
+
+SKILLS NEEDED: metabolite-identifier-mapping, cross-dataset-entity-linking, benchmark-validation-against-reference-curation, metabolite-identifier-standardization, entity-matching-and-comparison
+
+EXPECTED OUTPUTS:
+- Performance metrics report including overall identification rate (85.3%), entity-level precision/recall, and breakdown by dataset
+- Comparison table mapping each curator entity to MetLinkR-identified match status (matched/unmatched)
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_metlinkr,task_004,type-checked,metabolite-identifier-mapping; cross-dataset-entity-linking; benchmark-validation-against-reference-curation; metabolite-identifier-standardization; entity-matching-and-comparison,MetLinkR; R; RefMet; RaMP-DB 2.0
+[q_nihms1820569] Build context-specific ionic formula database from molecular formula lists (HMDB/ChEBI/NORMAN),/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_nihms1820569/_input_package/nihms1820569.pdf,"[ASB Metabolomics — challenge: q_nihms1820569, task: task_001]
+TITLE: Build context-specific ionic formula database from molecular formula lists (HMDB/ChEBI/NORMAN)
+
+RESEARCH QUESTION: How does HERMES generate the complete set of ionic formulas from a neutral molecular formula database by incorporating MS adducts and isotopologues to create the m/z lookup table for SOI interrogation?
+
+OBJECTIVE: Generate the complete ionic formula lookup table by systematically expanding neutral molecular formulas with all relevant MS adducts and isotopologues for m/z matching.
+
+DOMAIN KNOWLEDGE:
+- MS adducts are charged molecular species formed during ionization (e.g., [M+H]+, [M+Na]+, [M-H]−); selection must match the ionization mode (positive or negative) and chemical context of the sample.
+- Isotopologue m/z values depend on the naturally abundant isotopes of constituent elements (e.g., ¹³C, ¹⁵N, ³⁴S, ³⁷Cl) and follow a Poisson-like distribution; at high mass resolution, isotopologues can be resolved and discriminated by their characteristic isotopic patterns.
+- Mass resolution R = m/z / Δm directly determines which isotopologues are distinguishable; local resolution must be calculated for each m/z value because Orbitrap and other instruments exhibit mass-dependent resolution changes.
+- The theoretical isotopic envelope is a deterministic prediction that depends on elemental composition and experimental resolution; it is used as a template to match and validate experimental LC/MS1 data points against ionic formulas. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: RHermes, Envipat, R
+
+SKILLS NEEDED: molecular-formula-database-selection, ms-adduct-annotation, isotopic-pattern-calculation, mass-resolution-dependent-isotopologue-discrimination, m-z-lookup-table-compilation
+
+EXPECTED OUTPUTS:
+- m/z lookup table (CSV or data frame) containing monoisotopic m/z, ionic formula, adduct type, and isotopologue m/z values for all molecular formulas and adducts
+- Theoretical isotopic envelope profiles (relative intensities and m/z deltas) for each ionic formula at the specified mass resolution
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_nihms1820569,task_001,type-checked,molecular-formula-database-selection; ms-adduct-annotation; isotopic-pattern-calculation; mass-resolution-dependent-isotopologue-discrimination; m-z-lookup-table-compilation,RHermes; Envipat; R
+[q_nihms1820569] Filter: blank subtraction of SOIs using artificial neural network,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_nihms1820569/_input_package/nihms1820569.pdf,"[ASB Metabolomics — challenge: q_nihms1820569, task: task_002]
+TITLE: Filter: blank subtraction of SOIs using artificial neural network
+
+RESEARCH QUESTION: How effectively does the HERMES artificial neural network blank subtraction module distinguish sample-specific scans of interest (SOIs) from blank-derived signals?
+
+OBJECTIVE: Classify raw SOIs from a sample and paired blank using an ANN model and output only those SOIs whose intensity/chromatographic profile signature indicates sample-specific origin rather than blank carryover.
+
+DOMAIN KNOWLEDGE:
+- Blank subtraction in untargeted metabolomics requires paired sample and blank LC–MS analysis to distinguish true metabolite signals from contamination and instrument artifacts introduced during sample preparation and MS acquisition.
+- Elution profile shape similarity (measured by cosine similarity or Pearson correlation) is a superior discriminant for blank subtraction compared to intensity alone, because true metabolites show correlated chromatographic behavior across adducts while blank contaminants often appear at different retention times or with different shapes.
+- The heuristic prefilter (sample-to-blank intensity ratio >3) reduces computational cost by excluding obvious sample-specific signals before ANN evaluation, which reserves the model for borderline cases.
+- ANN model training requires >3,000 manually curated sample–blank SOI pairs from representative biological matrices to achieve ≥96% test accuracy; models trained on insufficient or biased training data may fail on novel sample types. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: RHermes, Keras, R
+
+SKILLS NEEDED: metabolite-blank-artifact-discrimination, chromatographic-profile-shape-similarity-scoring, artificial-neural-network-model-training-and-deployment, mass-spectrometry-data-filtering-and-quality-control, sample-blank-pair-feature-extraction, binary-classification-model-evaluation
+
+EXPECTED OUTPUTS:
+- Filtered SOI list containing only sample-specific SOIs (m/z, retention time, intensity, ANN classification score ≥0.5)
+- ANN model performance metrics on test set (accuracy, precision, recall, or F1-score)
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_nihms1820569,task_002,type-checked,metabolite-blank-artifact-discrimination; chromatographic-profile-shape-similarity-scoring; artificial-neural-network-model-training-and-deployment; mass-spectrometry-data-filtering-and-quality-control; sample-blank-pair-feature-extraction,RHermes; Keras; R
+[q_nihms1820569] Filter: in-source fragment (ISF) annotation and removal using low-energy MS2 spectral database,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_nihms1820569/_input_package/nihms1820569.pdf,"[ASB Metabolomics — challenge: q_nihms1820569, task: task_003]
+TITLE: Filter: in-source fragment (ISF) annotation and removal using low-energy MS2 spectral database
+
+RESEARCH QUESTION: How can in-source fragments be systematically identified and removed from a blank-subtracted SOI list using low-energy MS2 spectral reference data?
+
+OBJECTIVE: Flag and remove in-source fragment SOIs using MS2 spectral matching and co-elution pattern analysis, outputting the cleaned SOI list with ISF annotations.
+
+DOMAIN KNOWLEDGE:
+- In-source fragments are neutral losses or low-energy cleavage products generated in the ESI source and share the same m/z as their precursor; they are distinguished from true precursor ions by comparing elution profiles across retention time using cosine similarity.
+- Low-energy MS2 spectra (<20% HCD, <10 eV CID) preserve in-source fragments as intense peaks (>20% of max intensity) and are essential for ISF annotation; without these low-energy spectra, ISFs cannot be reliably identified.
+- Cosine similarity threshold >0.8 is the standard cutoff for grouping features by chromatographic shape in HERMES; ISFs must exhibit near-identical elution profiles to their precursor SOIs to be flagged as dependent fragments.
+- The in-house reference database (MassBankEU, MoNA, Riken, NIST14) is pre-filtered by SOI formula annotations during ISF detection to reduce false-positive fragment assignments from unrelated compounds.
+
+REQUIRED TOOLS/LIBRARIES: RHermes, R, philentropy
+
+SKILLS NEEDED: in-source-fragment-detection-and-annotation, spectral-library-matching-and-similarity-scoring, metabolite-feature-elution-profile-alignment, mass-spectrometry-database-cross-referencing, chromatographic-peak-shape-comparison
+
+EXPECTED OUTPUTS:
+- Filtered SOI list with in-source fragment (ISF) status labels
+- Cosine similarity scores between ISF and precursor SOI elution profiles
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_nihms1820569,task_003,type-checked,in-source-fragment-detection-and-annotation; spectral-library-matching-and-similarity-scoring; metabolite-feature-elution-profile-alignment; mass-spectrometry-database-cross-referencing; chromatographic-peak-shape-comparison,RHermes; R; philentropy
+[q_nihms1820569] Reproduce MS2 identification rate comparison: HERMES inclusion-list acquisition vs. iterative DDA on E. coli / human plasma extracts,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_nihms1820569/_input_package/nihms1820569.pdf,"[ASB Metabolomics — challenge: q_nihms1820569, task: task_004]
+TITLE: Reproduce MS2 identification rate comparison: HERMES inclusion-list acquisition vs. iterative DDA on E. coli / human plasma extracts
+
+RESEARCH QUESTION: Does HERMES produce higher mass spectral similarity scores and identification rates compared to iterative DDA when analyzing the same LC/MS datasets?
+
+OBJECTIVE: Reproduce the spectral similarity scoring pipeline and confirm the reported 2-fold improvement in confident metabolite identifications (Fig. 5a) comparing HERMES vs. iterative DDA using RHermes and reference databases.
+
+DOMAIN KNOWLEDGE:
+- MS1 resolution (120,000 in this work) determines isotopic envelope peak width and distinguishability of isotopologues via local resolution scaling (mz_ref reference mz); lower resolution broadens envelopes and reduces isotopic fidelity discrimination capability (pdf_p12_i1).
+- Blank subtraction via ANN requires >3,000 manually labeled sample/blank SOI pairs annotated by elution shape and intensity similarity; the reported model achieved 96.75% test accuracy, indicating that blank suppression depends critically on training data quality and sample-specific contamination profiles.
+- Cosine similarity >0.8 threshold for adduct/isotopologue grouping is chosen because cosine shape similarity has superior discriminatory power vs. Pearson correlation for resolving co-eluting metabolites from different formulas with identical m/z (evidence in methods text).
+- In-source fragments (ISF) from metabolites absent in MS2 databases or lacking low-energy spectra cannot be annotated; annotation uses only spectra acquired at <20% HCD or <10 eV collision-induced dissociation to preserve molecular ion signal (methods text). (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: RHermes, R, Keras, igraph, philentropy, ggplot2
+
+SKILLS NEEDED: spectral-similarity-scoring-cosine, mass-spectrometry-adduct-and-isotopologue-grouping, metabolite-identification-spectral-matching, ion-intensity-binning-and-comparison, neural-network-blank-sample-discrimination, ms2-deconvolution-fragment-clustering
+
+EXPECTED OUTPUTS:
+- CSV or tabular file listing identified inclusion list entries with precursor m/z, retention time, MS2 cosine similarity score (≥0.8), and compound name/formula match for each sample (environmental water, E. coli unlabeled, E. coli labeled, human plasma)
+- Comparison table binned by precursor intensity (5 Da × 5 second bins) showing HERMES vs. iterative DDA scan acquisition counts and identification overlap for positive and negative ionization modes
+- Summary statistics: total number of identified inclusion list entries per sample, percentage identified by precursor intensity tier, cosine similarity score distribution histogram, and count of identified entries unique to HERMES vs. DDA
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_nihms1820569,task_004,type-checked,spectral-similarity-scoring-cosine; mass-spectrometry-adduct-and-isotopologue-grouping; metabolite-identification-spectral-matching; ion-intensity-binning-and-comparison; neural-network-blank-sample-discrimination,RHermes; R; Keras; igraph; philentropy
+[q_s41592] Execute a MassQL query against a public mass spectrometry dataset and retrieve matching spectra,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_s41592/_input_package/s41592.pdf,"[ASB Metabolomics — challenge: q_s41592, task: task_001]
+TITLE: Execute a MassQL query against a public mass spectrometry dataset and retrieve matching spectra
+
+RESEARCH QUESTION: Can MassQL queries be executed programmatically against mass spectrometry data files deposited in public repositories to retrieve matching spectra?
+
+OBJECTIVE: Execute a MassQL query against mzML/mzXML files from MassIVE using the Python API to retrieve and output matched spectra.
+
+DOMAIN KNOWLEDGE:
+- MassQL is a declarative query language that encodes MS/MS fragmentation patterns as searchable predicates on m/z, intensity, and mass loss.
+- Precursor mass and fragment ion m/z are the primary spectral dimensions used to define matching criteria in MassQL queries.
+- mzML and mzXML are standardized XML-based formats for storing raw and processed mass spectrometry data, requiring parser libraries to extract spectral arrays.
+- Spectrum matching in MassQL returns scan identifiers and spectral metadata that enable downstream annotation and structural inference. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: Python, Pyteomics
+
+SKILLS NEEDED: mass-spectrometry-query-language-design, spectral-data-filtering-and-retrieval, fragment-ion-pattern-matching, mass-spectrum-metadata-extraction, mzml-mzxml-file-parsing
+
+EXPECTED OUTPUTS:
+- Table of matched spectra including scan identifier, precursor m/z, retention time, and matching fragment ions
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_s41592,task_001,type-checked,mass-spectrometry-query-language-design; spectral-data-filtering-and-retrieval; fragment-ion-pattern-matching; mass-spectrum-metadata-extraction; mzml-mzxml-file-parsing,Python; Pyteomics
+[q_s41592] Parse and validate MassQL query syntax using the formal grammar (lark-parser),/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_s41592/_input_package/s41592.pdf,"[ASB Metabolomics — challenge: q_s41592, task: task_002]
+TITLE: Parse and validate MassQL query syntax using the formal grammar (lark-parser)
+
+RESEARCH QUESTION: Does the Lark-based formal grammar parser correctly parse valid MassQL query strings into well-formed parse trees and appropriately reject invalid queries with informative error messages?
+
+OBJECTIVE: Validate that the Lark parser correctly generates parse trees for syntactically valid MassQL queries and produces well-formed error messages for invalid input.
+
+DOMAIN KNOWLEDGE:
+- MassQL is a domain-specific language for mass spectrometry data retrieval based on spectral patterns, implemented as a formal grammar parseable by lark.
+- Lark generates parse trees from EBNF grammars; valid queries must conform to the grammar's terminal and non-terminal rules.
+- Parser errors should include location information (line and column) and descriptive messages to enable query debugging.
+- The MassQL grammar defines operators for mass tolerance (ppm, Da), intensity thresholds, neutral loss patterns, and fragmentation relationships between m/z peaks. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: lark-parser/lark, Python
+
+SKILLS NEEDED: formal-grammar-parsing-and-validation, parse-tree-construction-and-inspection, parser-error-handling-and-diagnostics, massql-query-language-syntax-rules, test-case-design-for-language-parsing
+
+EXPECTED OUTPUTS:
+- Parse tree / abstract syntax tree (AST) objects for each valid query
+- Parser error report documenting invalid queries with error message details
+- Validation summary report with pass/fail counts and per-query results
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_s41592,task_002,type-checked,formal-grammar-parsing-and-validation; parse-tree-construction-and-inspection; parser-error-handling-and-diagnostics; massql-query-language-syntax-rules; test-case-design-for-language-parsing,lark-parser/lark; Python
+[q_s41592] Filter: apply MS2 fragment ion presence filter in MassQL query engine,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_s41592/_input_package/s41592.pdf,"[ASB Metabolomics — challenge: q_s41592, task: task_003]
+TITLE: Filter: apply MS2 fragment ion presence filter in MassQL query engine
+
+RESEARCH QUESTION: How does the MassQL fragment-ion filter identify and select MS2 spectra containing a peak at a specified m/z value within a defined mass tolerance?
+
+OBJECTIVE: Implement and validate a fragment-ion filter that applies a single MassQL m/z condition to a set of MS2 spectra and outputs which spectra pass the filter criterion.
+
+DOMAIN KNOWLEDGE:
+- Mass tolerance (ppm or Da) defines the acceptable window around a theoretical m/z; fragments within this window pass the filter criterion.
+- MS2 spectra contain multiple fragment ions with distinct m/z and intensity values; only one fragment needs to match the filter for a spectrum to pass.
+- MassQL filters are compositional logic expressions that can be combined; this sub-task isolates a single fragment-ion condition without complex Boolean operations.
+- mzML is a standardized XML-based format for mass spectrometry data that encodes scan metadata, precursor ion m/z, and product ion peak lists. (+ 1 more)
+
+REQUIRED TOOLS/LIBRARIES: Python, Pyteomics, lark-parser/lark
+
+SKILLS NEEDED: ms2-spectra-parsing-and-loading, fragment-ion-m-z-tolerance-matching, massql-filter-condition-parsing, spectrum-level-classification-logic, mzml-format-interpretation
+
+EXPECTED OUTPUTS:
+- CSV table mapping spectrum identifiers to filter results (pass/fail) with observed fragment ion m/z values and tolerance window match details
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_s41592,task_003,type-checked,ms2-spectra-parsing-and-loading; fragment-ion-m-z-tolerance-matching; massql-filter-condition-parsing; spectrum-level-classification-logic; mzml-format-interpretation,Python; Pyteomics; lark-parser/lark
+[q_s41592] Filter: apply precursor m/z range filter in MassQL query engine,/Users/nothiasl/git/asb_benchmark_metabolomics_v1/q_s41592/_input_package/s41592.pdf,"[ASB Metabolomics — challenge: q_s41592, task: task_004]
+TITLE: Filter: apply precursor m/z range filter in MassQL query engine
+
+RESEARCH QUESTION: How does the MassQL PREC condition filter spectra based on precursor m/z value ranges?
+
+OBJECTIVE: Implement a precursor m/z filtering function that accepts an mzML file and a MassQL PREC condition with min/max bounds, returning spectra matching the m/z range.
+
+DOMAIN KNOWLEDGE:
+- The PREC condition in MassQL filters spectra based on precursor m/z value, a fundamental ion property in tandem MS workflows that identifies the mass of the peptide/metabolite being fragmented.
+- mzML is the standard open XML-based format for storing mass spectrometry data; precursor m/z is stored in the precursorMz element of MS2 spectra and represents the parent ion selected for fragmentation.
+- Precursor m/z filtering is a fast pre-screening operation that reduces downstream computational burden in high-throughput spectral library searching and molecular networking.
+- The min/max bounds in a PREC filter are inclusive numerical thresholds; spectra with precursor m/z exactly equal to either bound should be retained.
+
+REQUIRED TOOLS/LIBRARIES: Python, Pyteomics, OpenMS
+
+SKILLS NEEDED: spectral-precursor-filtering, mzml-file-parsing, massql-condition-evaluation, spectrum-metadata-extraction
+
+EXPECTED OUTPUTS:
+- List of spectrum identifiers and precursor m/z values for spectra that pass the PREC filter
+
+Use Perspicacité to retrieve relevant scientific context before writing code. Ground your methodology in the literature. Save all outputs to the workspace under a clearly named subfolder.",q_s41592,task_004,type-checked,spectral-precursor-filtering; mzml-file-parsing; massql-condition-evaluation; spectrum-metadata-extraction,Python; Pyteomics; OpenMS

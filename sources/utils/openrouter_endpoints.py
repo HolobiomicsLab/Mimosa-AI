@@ -34,7 +34,7 @@ _QUANT_RANK: dict[str, int] = {
 FIRST_PARTY_SLUGS: frozenset[str] = frozenset({
     "anthropic", "openai", "google-vertex", "google-ai-studio",
     "xai", "deepseek", "mistral", "cohere", "moonshotai",
-    "z-ai", "alibaba", "minimax", "perplexity",
+    "z-ai", "alibaba", "minimax", "perplexity", "sakana"
 })
 
 # Mapping from model-slug author (the segment before '/') to the OpenRouter
@@ -56,6 +56,7 @@ _MODEL_AUTHOR_PROVIDERS: dict[str, frozenset[str]] = {
     "perplexity":  frozenset({"perplexity"}),
     "qwen":        frozenset({"alibaba"}),
     "x-ai":        frozenset({"xai"}),
+    "sakana":        frozenset({"sakana"})
 }
 
 logger = logging.getLogger(__name__)

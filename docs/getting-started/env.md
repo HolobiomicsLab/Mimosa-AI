@@ -39,7 +39,7 @@ provider, but it's often cheaper and faster to mix.
 | ---- | --------------- | ----------------- |
 | `workflow_llm_model` | High — designs the whole multi-agent topology. | `anthropic/claude-opus-4-5` |
 | `smolagent_model_id` | Low/medium — executes a single subtask. | `openrouter/deepseek/deepseek-v3.2` |
-| `judge_model` | Medium — soft-claim verdicts. | `openai/gpt-5.5` |
+| `judge_model` | Medium — verifier: claim ladder, digests, policy-scorer code. | `openai/gpt-5.5` |
 | `planner_llm_model` | Medium — task decomposition (`--goal` mode). | `deepseek/deepseek-chat` |
 
 !!! tip "Reasoning effort"

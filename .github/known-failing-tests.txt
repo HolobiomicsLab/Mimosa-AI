@@ -1,0 +1,32 @@
+# Tests that fail on mimosa_v2 as of ff41764 (2026-09-02) in a fresh
+# `uv sync --group dev` environment without API keys, one pytest node id
+# per line. The CI workflow deselects them so that it can flag regressions in
+# the rest of the suite. Each entry is a code/test drift, not an environment
+# issue except the last one; remove the line when the test passes again.
+#
+# csv_mode.EVAL_LOG_FILE is logs/evaluation_csv_mode.log; the test expects
+# logs/evaluation._csv_mode.log.
+tests/csv_mode_logging_test.py::test_log_file_lives_in_logs_directory
+# EvaluationCLI._validate_queue was removed in 2d480dc; the tests still call it.
+tests/evaluation_cli_test.py::test_validate_queue_allows_overlapping_ports
+tests/evaluation_cli_test.py::test_validate_queue_rejects_shared_workspace
+# _setup_connectivity returns [''] where the tests expect [].
+tests/evaluation_cli_test.py::test_setup_connectivity_reuses_previous_runs_port_range
+tests/evaluation_cli_test.py::test_setup_connectivity_empty_ip_keeps_current_range
+tests/evaluation_cli_test.py::test_setup_connectivity_accepts_overlapping_range_without_constraint
+# The failure fingerprint has seven dimensions; the tests pin six.
+tests/failure_fingerprint_test.py::test_dimension_is_six
+tests/failure_fingerprint_test.py::test_absent_source_uses_neutral_and_mask
+tests/failure_fingerprint_test.py::test_source_label_normalisation
+tests/failure_fingerprint_test.py::test_unknown_source_is_ignored
+# Default pricing changed (0.0105 per call where the tests expect 0.00082).
+tests/pricing_test.py::test_calculate_cost_handles_scalar_and_list_model_id
+tests/pricing_test.py::test_single_agent_memory_is_priced
+# Generated save_memories code and SmolAgentFactory.model_id drifted from the tests.
+tests/single_agent_factory_logprobs_test.py::test_generated_save_memories_writes_logprobs_and_strips_raw
+tests/single_agent_factory_logprobs_test.py::test_generated_save_memories_warns_only_when_logprobs_all_missing
+tests/smolagent_factory_logprobs_test.py::test_save_memories_writes_logprobs_and_strips_raw
+tests/smolagent_factory_logprobs_test.py::test_save_memories_warns_only_when_logprobs_all_missing
+# Calls the live LLM provider through VariationEngine.mutation_prompt; fails
+# with an AuthenticationError wherever no API key is configured, CI included.
+tests/variation_engine_test.py::test_mutation_prompt_does_not_touch_gradient_history

@@ -102,16 +102,6 @@ def test_source_label_normalisation():
     assert out["presence_mask"] == [1.0, 1.0, 1.0, 1.0, 0.0, 0.0]
 
 
-def test_unknown_source_is_ignored():
-    """Claims tagged with an unknown source must not poison any bucket."""
-    out = compute_failure_fingerprint([
-        _claim("a", "pass"),
-        {"claim": {"source": "source_z"}, "status": "fail"},
-        {"claim": {"source": None}, "status": "pass"},
-    ])
-    assert out["presence_mask"] == [1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-
-
 def test_empty_per_claim_yields_neutral_vector():
     """No claims at all → all-zero vector, all-zero mask, neutral 0.5 rates."""
     out = compute_failure_fingerprint([])

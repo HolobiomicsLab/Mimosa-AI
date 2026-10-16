@@ -38,15 +38,28 @@ evaluation).
 
 #### 3. Verifier-driven evaluation
 
-The judge that produces the evolutionary pressure signal is a
-multi-source, per-claim verifier. It writes **deterministic Python
-programs** that recompute the agent's claims from the workspace across
-six vantages (literature, user goal, agent narration, math invariants,
-computational reproducibility, statistical fingerprint), and falls back
-to LLM verdicts only when no executable check is possible. The single
-output handed to the mutator is a short **prompt gradient** describing
-what to change next — it does not name the verified claims back, so the
-mutator cannot turn the rubric vocabulary into an over-fitting target.
+The judge that produces the evolutionary pressure signal is the
+**policy-based Bradley–Terry verifier**
+([`sources/evaluators/policy_bt_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/),
+the default). Per task session it keeps one tournament registry: each
+generation's workspace is snapshotted and must carry a **reproduction
+contract** — a `.sh` script that installs requirements and regenerates
+every output (missing or invalid → reward 0 and a gradient naming the
+fix). An LLM reconnaissance builds a complete artifact inventory with
+bounded previews; per-schema **adapters** normalize differing artifact
+layouts, and ONE cached **deterministic comparison policy** decides
+every pair — both argument orders plus self-tie checks, run in a
+restricted interpreter subprocess. A vision model can break
+deterministic ties when both sides have relevant images. The reward is
+a **regularized Bradley–Terry fit** over all pair verdicts, refreshed
+for every generation after each evaluation. The single output handed to
+the mutator is the **textual gradient**, which leads with the earliest
+decisive loss, with measured evidence.
+
+The previous production channel (2026-09-24 to 2026-10) was the hybrid
+temporal-ladder verifier
+([`sources/evaluators/hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/)),
+still available via `verifier_kind = "hybrid"`.
 
 > Note — this verifier is **not** the ScienceAgentBench or PaperBench
 > grader. Those benchmarks compare workflow outputs against author-
@@ -82,9 +95,10 @@ Source: [diagrams/architecture_overall.mermaid](diagrams/architecture_overall.me
   via the `EvolutionEngine` (QD selection over a session archive).
 - Layer `3` executes those workflows in a sandboxed runner with
   SmolAgents.
-- Layer `4` runs the multi-source per-claim verifier and reports
-  `overall_score`, `reward_uncapped`, and `abstracted_prompt_gradient`
-  back into the loop.
+- Layer `4` runs the policy-based Bradley–Terry verifier and reports
+  `overall_score` (the current tournament rating) and the
+  `abstracted_textual_gradient` back into the loop; QD selection ranks
+  on `overall_score`.
 
 ---
 
@@ -97,7 +111,6 @@ mimosa-ai/
 ├── pyproject.toml                         # Project metadata + deps
 ├── cleanup.sh                             # Reset workflows + capsules
 ├── memory_explorer.py                     # Interactive trace replay
-├── memory_timelapse.py                    # Memory growth visualisation
 │
 ├── sources/
 │   ├── core/
@@ -105,8 +118,9 @@ mimosa-ai/
 │   │   ├── selection.py                   # SelectionPressure (greedy/tournament/novelty/QD)
 │   │   ├── variation_engine.py            # Mutation/crossover prompt assembly + annealing
 │   │   ├── workflow_selection.py          # Parent retrieval (archive draw / disk scan)
-│   │   ├── failure_fingerprint.py         # Verifier verdicts → QD behaviour descriptor (6-D, centered)
-│   │   ├── code_features.py               # Legacy structural descriptor (offline analysis only)
+│   │   ├── genotype_embedding.py          # Code-genotype embedding backend → QD behaviour descriptor
+│   │   ├── code_features.py               # genotype_embedding_descriptor shim (QD novelty)
+│   │   ├── failure_fingerprint.py         # Legacy verifier failure fingerprint (deprecated; hybrid writes a neutral placeholder)
 │   │   ├── lineage.py                     # parent → child sidecar records
 │   │   ├── orchestrator.py                # Grounding → factory → sandbox pipeline
 │   │   ├── workflow_factory.py            # Multi-agent workflow synthesis
@@ -118,10 +132,14 @@ mimosa-ai/
 │   │   ├── llm_provider.py                # Multi-provider LLM abstraction
 │   │   ├── planner.py                     # Goal → Task decomposition (Layer 0)
 │   │   ├── schema.py                      # IndividualRun, Plan, Task, SelectionLog
-│   │   └── evaluators/
+│   │       ├── evaluators/
 │   │       ├── evaluator.py               # WorkflowEvaluator facade (routes to backends)
-│   │       ├── verifier.py                # Multi-source per-claim verifier (default)
-│   │       ├── grounding.py               # Perspicacite literature-grounding adapter
+│   │       ├── policy_bt_verifier/        # Policy/BT verifier (default): reexec, artifacts,
+│   │       │                              # recon, policy, visual, tournament, registry, results
+│   │       ├── hybrid_verifier/           # Hybrid temporal-ladder verifier (previous default): claims, digest,
+│   │       │                              # scorers, registry, aggregation, gradient, layers
+│   │       ├── verifier.py                # Legacy multi-source per-claim verifier (deprecated)
+│   │       ├── grounding.py               # Perspicacite literature-grounding adapter (legacy verifier / generic)
 │   │       ├── generic.py                 # Legacy LLM judge (4-criterion)
 │   │       ├── scenario.py                # Rubric-based evaluation
 │   │       ├── bs_detection.py            # BullshitDetector penalty
@@ -188,6 +206,7 @@ mimosa-ai/
 │           ├── workflow_genotype_<uuid>.py
 │           ├── state_result.json
 │           ├── evolution_prompt_<uuid>.md
+│           ├── run_stdout.log
 │           ├── lineage_<uuid>.json
 │           ├── reward_progress.png
 │           └── memory/
@@ -242,7 +261,7 @@ Key collaborators (instantiated in `__init__`):
 - `WorkflowSelector` — parent retrieval.
 - `WorkflowOrchestrator` — grounding → factory → sandbox.
 - `VariationEngine` — mutation / crossover prompt assembly.
-- `WorkflowEvaluator` — multi-source per-claim verifier (default).
+- `WorkflowEvaluator` — policy/BT verifier (default).
 - `SelectionPressure` — QD archive (population_size=50, k=15,
   novelty_weight=0.25).
 
@@ -250,9 +269,9 @@ Each recursive step:
 1. resets the workspace to the initial state,
 2. orchestrates a workflow run (LLM → sandbox),
 3. snapshots the workspace,
-4. evaluates → `overall_score` / `reward_uncapped`,
-5. calls `validate_survivor()` and admits to the archive if non-dominated
-   on `(reward_uncapped, novelty)`,
+4. evaluates → `overall_score` (surfaced as `reward` on the run),
+5. calls `validate_survivor()` and admits to the archive on improvement
+   or `qd_score > admit_threshold` (quality term from the capped `reward`),
 6. selects the next parent(s) and chooses mutation vs crossover,
 7. recurses.
 
@@ -266,61 +285,100 @@ Termination: `overall_score >= learned_score_threshold` (default 0.9) in
 Four strategies: `greedy`, `tournament`, `novelty`, `qd` (default). In
 QD mode it maintains a session archive of up to `population_size`
 members, weighted by `qd_score = (1-w)·quality_norm + w·novelty_norm`
-(`w = novelty_weight = 0.25`). Quality is sourced from `reward_uncapped`
-so the hard-fail cap (`_HARD_FAIL_CAP`, currently `0.99`) doesn't
-flatten rank ordering. Admission is
-gated by the validity check (improvement over baseline or
-`qd_score > admit_threshold`); when capacity is hit, the lowest-
+(`w = novelty_weight = 0.25`). Quality is sourced from `reward` (the
+verifier's `overall_score` — under the policy/BT verifier, the current
+regularized Bradley–Terry rating over the task's previous generations),
+and admission is gated by the validity check (improvement over baseline
+or `qd_score > admit_threshold`); when capacity is hit, the lowest-
 `qd_score` member is evicted. Parent draw applies an inverse-child-count
 penalty `÷(1 + n_children_already)` and a hard
 `MAX_CHILDREN_PER_PARENT = 2` cap to spread offspring.
 
 ### 3. `VariationEngine` — [`sources/core/variation_engine.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
 
-Prompt assembly for mutation and crossover. Mutation boldness is a
-continuous function of two evidence signals — an
-`iters_since_improvement` plateau counter *and* the Rechenberg 1/5
-success rate of recent offspring — not a fixed phase schedule.
+Prompt assembly for mutation and crossover. There is no step-size
+controller: mutation magnitude is **directive-implicit** — the
+directive LLM judges how bold the next change should be from a
+deterministic, read-only `<search_state>` block; hard guardrails stay
+in code.
 
-- `_iters_since_improvement()` — length of the trailing run of scored
-  offspring that did not strictly beat best-so-far (failures and
-  unscored entries skipped). Normalised as
+- `_iters_since_improvement()` — observer: length of the trailing run
+  of scored offspring that did not strictly beat best-so-far (failures
+  and unscored entries skipped). Normalised as
   `plateau = min(1, iters / _PLATEAU_PATIENCE)` with
   `_PLATEAU_PATIENCE = 6`.
-- `_compute_success_rate(window=5)` — fraction of the last 5 scored
-  offspring that strictly beat the running best at production time.
-  The Rechenberg 1/5 success rule threshold is `0.20`.
-- `_get_prompt_step_size(parent_score)` — combines the two:
-    * cold start (fewer than two comparable scored offspring) —
-      `effective = 0.3 · plateau` (capped ramp),
-    * `success_rate < 0.20` — `effective = 0.5 · deficit + 0.5 · plateau`
-       with `deficit = (0.20 − success_rate) / 0.20` (escalate),
-    * `success_rate ≥ 0.20` — `effective = plateau · (1 − progress)`
-       with `progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))`
-       (damp boldness in proportion to real progress),
-    * near-finish floor: when `parent_score > 0.95`, multiply by
-       `(1 − 0.5 · (parent_score − 0.95) / 0.05)` so a 0.96 parent isn't
-       gambled away one generation before early-stop,
-    * RE-SPECIATION gate: unless `iters_since_improvement ≥ 8` *and*
-      `success_rate ∈ {None, 0.0}`, `effective` is clamped to
-      `_RESPECIATION_CLAMP = 0.89`, just below the EXPLORATION/
-      RE-SPECIATION boundary at `0.90`.
-  Then it grows the agent budget from the previous generation's count
-  toward `max_possible_agents = 7` proportionally to `effective`, and
-  samples the actual agent count with a Beta-Binomial biased upward by
-  `effective`.
+- `_compute_success_rate(window=5)` — observer: fraction of the last 5
+  scored offspring that strictly beat the running best at production
+  time (`None` with fewer than two comparable scored offspring).
+- `_search_state_block(parent_score, iteration_count, max_iterations)`
+  — assembles the `<search_state>` payload from those signals plus the
+  parent score, iteration progress and a last-5 score trajectory
+  (score-only, no rubric text). Also refreshes
+  `last_variation_state` telemetry (`iters_since_improvement`,
+  `plateau`, `success_rate`, `parent_score`, `agent_budget`).
+- `_sample_mutation_agent_budget(parent_agents)` — parent-centered
+  budget: uniform draw in `[max(1, parent_agents − 1),
+  min(max_possible_agents = 7, parent_agents + 1)]`. The parent's
+  agent count comes from the distinct `step_name` entries of its
+  `state_result` (retry-loop repeats collapsed), falling back to the
+  last sampled budget. Seed generation keeps its `[1, 4]` draw.
 
-| Effective boldness | Mutation scope (advisory)                                                   |
-|--------------------|-----------------------------------------------------------------------------|
-| < 0.35             | `EXPLOITATION` — point mutation: minor phrasing / prompt-adjective tweaks   |
-| < 0.50             | `ALIGNMENT` — interface optimization: refine handoff prompts, IO contracts  |
-| < 0.65             | `ADAPTATION` — component overhaul: rewrite lagging agent prompts, swap tools |
-| < 0.90             | `EXPLORATION` — macro structural mutation: add/merge agents, change routing |
-| ≥ 0.90             | `RE-SPECIATION` — clean-slate redesign of the multi-agent architecture      |
+The former step-size arithmetic (`_get_prompt_step_size`, effective
+boldness, five scope bands, RE-SPECIATION hysteresis gate) was
+removed: it never actuated a real knob (temperature is sampled
+randomly at the workflow factory) and measured behaviour was
+noise-dominated — the directive wording predicted realised edit size
+far better than the scalar.
 
-Scope is an advisory line injected into the mutation prompt; the LLM
-may still pick any topology. The hard control is the agent-count
-budget carried in the same block.
+`llm_think_mutation_directive(agent_answers, textual_gradient_block,
+search_state, goal, exploration_block="", raw_log="")` runs a dedicated
+LLM call before the orchestrator. It consumes the parent's per-agent
+answers, the verifier's textual gradient (`<diagnosis>`), and the
+search-state block, and emits
+a **≤ 3-sentence directive** naming exactly one issue, the kind of
+mutation it implies (prompt tweak, persona change, agent add/remove,
+topology change), the intended magnitude (small tweak, component
+rewrite, structural redesign) justified by the search state, and the
+rationale. The system prompt fixes trust ranks (verifier diagnosis
+trusted, agent self-reports not, raw log unverified), and hard limits
+(one agent add/remove per step, default to small incremental changes).
+
+Evidence precedence is set by `_split_directive_evidence(textual_gradient,
+run_stdout)`: the verifier gradient wins and is passed verbatim (exact
+identifiers such as `FDA_APPROVED` must survive); else a non-empty `run_stdout` goes
+**verbatim** into a separate `<raw_log>` block and the prompt states
+that no verifier diagnosis is available; else a synthetic no-feedback
+note is the diagnosis. `run_stdout` is always the parent's own log
+(`WorkflowInfo.run_stdout`, read from `<uuid>/run_stdout.log`; empty
+without a parent), so the evidence describes the code being mutated.
+The raw log rules forbid turning one error into an environment rule,
+prescribing absolute paths, or moving outputs outside the relative
+workspace. `crossover_prompt(...)` applies the same split per parent,
+each with its own log (stdout tail, last 1024 characters, in
+`<raw_log>`).
+
+When parent selection returns no parent on the mutation branch,
+`EvolutionEngine._mutation_parent_or_last_child` uses the generation
+that just ran as the parent (fresh `WorkflowInfo`, read after its
+evaluation) if its genotype is on disk; lineage is then
+`kind="mutation"`, `parents=[<uuid>]`. Without a genotype the mutation
+stays parentless (`kind="seed"`).
+
+`mutation_prompt(...)` is therefore now a thin wrapper: it passes the
+parent code plus that one directive to the orchestrator inside a
+`<directive>...</directive>` block, with explicit instructions to
+**follow the directive exactly**, **add/remove at most one agent per
+step**, **not change topology** unless the directive says so, **not
+edit prompts outside the directive's scope**, and **keep ≥ 90 % of the
+previous code and prompts unchanged**. The verifier diagnosis and raw
+agent answers are no longer injected into the orchestrator's
+context — they were only ever needed to *decide* the change, and that
+decision is now made upstream. This split keeps orchestrator
+cognitive load on synthesis (write valid LangGraph + agent code), not
+on diagnosis. If the previous attempt failed to produce code at all
+(`genotype is None`), the directive-LLM is skipped and a fixed
+"Previous attempt failed completely. Fix syntax errors." directive is
+substituted.
 
 ### 4. `WorkflowSelector` — [`sources/core/workflow_selection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
 
@@ -363,18 +421,22 @@ MCP server auto-discovery on the configured `discovery_addresses` port
 range. Generates the tool-binding code injected into each workflow
 genotype.
 
-### 8. Evaluation backends — [`sources/core/evaluators/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/)
+### 8. Evaluation backends — [`sources/evaluators/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/)
 
 | Backend          | File              | Use                                   |
 |------------------|-------------------|---------------------------------------|
-| `VerifierEvaluator` | `verifier.py`     | **Default**: multi-source per-claim verifier |
+| `PolicyBTVerifierEvaluator` | `policy_bt_verifier/` | **Default**: reproduction contract → LLM recon → adapters + one comparison policy → regularized Bradley–Terry tournament reward |
+| `HybridVerifierEvaluator` | `hybrid_verifier/` | Previous default: hybrid temporal-ladder verifier (claims → policy scorers → pairwise win-rate reward; `verifier_kind="hybrid"`) |
+| `VerifierEvaluator` | `verifier.py`     | Legacy multi-source per-claim verifier (deprecated; `verifier_kind="legacy"`) |
+| `GoldFeedbackEvaluator` | `gold_feedback/` | ORACLE / BENCHMARK-LEAKING research control (`verifier_kind="gold"`): hybrid reward + benchmark-grader gradient; never report its scores |
 | `GenericEvaluator`  | `generic.py`     | Legacy 4-criterion LLM judge          |
 | `ScenarioEvaluator` | `scenario.py`    | Rubric / assertion-based scoring      |
-| `Perspicacite grounding` | `grounding.py` | Adapter used by verifier |
+| `Perspicacite grounding` | `grounding.py` | Adapter used by the legacy verifier and `GenericEvaluator` |
 | `BullshitDetector` | `bs_detection.py` | Numerical-fraud penalty               |
 
 The facade is `WorkflowEvaluator` (`evaluator.py`); the evolution engine
-calls it with `evaluator_type="verifier"`.
+calls it with `evaluator_type="verifier"`, and the backend is chosen by
+`config.verifier_kind` (`policy_bt` default | `hybrid` | `legacy` | `gold`; unknown values fall back to `hybrid`).
 
 ### 9. Benchmark evaluation — [`sources/evaluation/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluation/)
 
@@ -445,52 +507,129 @@ main.py --evaluation_cli      # guided model/workspace/mode picker (EvaluationCL
 
 ---
 
-## Evaluation & the multi-source per-claim verifier
+## Evaluation & the policy-based Bradley–Terry verifier
 
-![Evaluation pipeline](images/evaluation_pipeline.png)
+For each generation (`sources/evaluators/policy_bt_verifier/`):
 
-Source diagram: [`docs/diagrams/verifiers_judge.mermaid`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/docs/diagrams/verifiers_judge.mermaid).
+1. **Reproduction gate.** The workspace is snapshotted into the
+   per-task-session registry
+   (`<workflow_dir>/.policy_bt/<sha256(goal, session)>/snapshots/<uuid>/`).
+   An LLM assesses the generation's `.sh` reproduction contract: the
+   script must install requirements and regenerate every output. A
+   missing or invalid script gives reward 0 and a gradient naming the
+   fix — this applies even when re-execution is off. With
+   `policy_bt_reexecute` (default) the script reruns with bash on the
+   copy, in a fresh venv with no API keys, after existing outputs are
+   moved aside — stale outputs cannot pass. This is trusted local shell
+   execution, **not** an OS security sandbox; run logs are copied to
+   `.policy_bt_reexec/` inside the snapshot so adapters can read
+   stdout-only metrics.
+2. **Reconnaissance.** One LLM call produces a complete artifact
+   inventory with bounded previews and explicit byte-page inspection,
+   then freezes the task criteria. New artifact schemas extend
+   **adapters**; the criteria never change.
+3. **One comparison policy.** One cached deterministic Python policy
+   compares pairs through the adapters, in a restricted interpreter
+   subprocess (stdlib `json`/`math`/`struct` calls plus harness-provided
+   read capabilities only — no `numpy`/`pandas`/binary readers; formats
+   outside the subset stay "unknown", never a fabricated loss). Both
+   argument orders and self-tie checks must agree; a static screen, a
+   runtime smoke, and ≤ `policy_bt_repair_rounds` repairs protect the
+   accepted policy. On a policy tie, relevant images on both sides go
+   to the configured vision model (`policy_bt_visual_channel`).
+4. **Tournament reward.** All pair verdicts fit a regularized
+   Bradley–Terry model; after each evaluation EVERY generation of the
+   task session gets a new current rating (`arrival_reward` keeps the
+   rating at arrival time). The policy-BT capsule is the argmax of the
+   current ratings. The only allowed `policy_bt_reward` value is
+   `"bradley_terry"`; `"win_rate"` raises an error.
+5. **Evidence-checked gradient.** The **textual gradient**
+   (`abstracted_textual_gradient` + the `textual_gradient.txt`
+   sidecar) folds the pair diagnoses, earliest decisive losses first,
+   quoting measured evidence. It is the **only** verifier signal the
+   mutator sees.
+6. **Artifacts.** Per generation: `evaluation.txt` (reward, tournament
+   version, execution record, PAIR VERDICTS), `textual_gradient.txt`,
+   `policy_bt_evidence.json`, `verifier_policy_bt.log`. If the
+   verifier itself fails (bad LLM answer, policy/adapter error, venv
+   creation failure), the generation is NOT scored:
+   `state_result.json` carries
+   `skipped_reason = "verifier_instrument_error"` and the engine keeps
+   it out of the QD archive.
 
-For each generation:
+Verifier LLM calls are saved per generation under
+`memory/<uuid>/verifier_policy_bt_<channel>_<n>.json` and counted in
+the run cost. The workflow-creator prompt
+(`sources/prompts/workflow_v15.md`) instructs agents to leave a `run.sh`
+reproduction script; generations built from older prompt versions
+without one score 0.
 
-1. **Multi-source claim extraction**: six independent prompts emit
-   success-polarity claims from different vantage points — `A` literature
-   (Perspicacité), `B` user goal, `C` agent narration (anti-hallucination),
-   `D` math invariants, `E` non-negotiable computational reproducibility
-   (deps manifest covers used imports, no absolute paths, seeds on
-   stochastic ops; **explicitly forbids** README / docs / tests / style /
-   type-hint claims), `F` statistical fingerprint (baseline, degeneracy,
-   leakage). Claims are tagged `hard` or `soft`; bare file-existence is
-   never `hard`.
-2. **Per-claim verification**: each claim is classified as executable or
-   soft. Executable claims get an LLM-written verifier script that opens
-   workspace files and recomputes the asserted value; anti-tautology
-   tripwires (literal/output overlap ≥ 80 chars, I/O markers presence)
-   reject scripts that parse the agent's answer back to itself. The
-   verifier runner has `numpy`, `pandas`, `scipy`, and `scikit-learn`
-   pre-installed (lazy one-shot install per process). Soft claims get a
-   `pass/unsure/fail` LLM verdict against workspace previews + literature
-   grounding (mapped to `1.0 / 0.5 / 0.0`).
-3. **Behavioral pressure against shortcut workflows** comes from Source
-   C's recompute-from-disk verifiers, the inverted-score "Used fallback"
-   claim type, and the anti-tautology tripwires.
-4. **Aggregation**:
-   ```
-   overall = clamp(base_mean, 0, 1)
-   if any hard claim refuted:
-       overall = min(overall, 0.99)        # _HARD_FAIL_CAP (soft, for now)
-   ```
-   `base_mean` is the importance-weighted mean of per-claim scores.
-5. **Prompt gradient** — plain-language single-sentence diagnosis
-   prefixed with a short code name (e.g. `FALLBACK_ECFP_CLASSIFIER`). It
-   is the **only** verifier signal the mutator sees, and recent history
-   is included so recurring failure modes reuse the same code names
-   across generations. The gradient deliberately does not name the
-   verified claims, scores, or which of the six sources raised them — so
-   the mutator can correct the workflow without being handed a rubric to
-   over-fit against.
+### The hybrid temporal-ladder verifier (previous default)
 
-Detail: [Evaluation pipeline](concepts/evaluation-pipeline.md).
+The previous production channel (2026-09-24 to 2026-10,
+`sources/evaluators/hybrid_verifier/`, still available via
+`verifier_kind = "hybrid"`) evaluated one generation as:
+
+1. **Temporal-ladder claim extraction**: ONE judge call per task (cached
+   in the per-task registry) turns the goal + a workspace inventory
+   into 8–12 stage-tagged claims in temporal order — `script` (delivered
+   code exists, is structurally valid, reads the goal's inputs),
+   `log` (execution/training dynamics parsed from logs: loss decreasing,
+   best/final loss, accuracy at step X, no NaN), `result` (artifact
+   fidelity: prediction-CSV columns match the ORIGINAL input column
+   names exactly — no spurious `_pred` suffixes — completeness vs input
+   rows, prediction sanity). Generic claims are dropped at validation.
+2. **Format digests**: ONE cached judge call per task samples
+   deterministic head/middle/tail slices of the deliverable files and
+   writes short format digests (columns, log-line grammar, value
+   formats), injected into every policy-writer prompt.
+3. **Policy scorers**: ONE judge call per claim writes a
+   self-contained deterministic Python script that scores a single
+   workspace 0..1 on that claim, printing one JSON line
+   (`claim_id`, `score`, `evidence` with measured numbers). Imports are
+   screened to stdlib + `numpy` + `pandas` + `PIL`; write/network APIs
+   are statically banned. Scorers run as plain subprocesses of the
+   **host interpreter** (`sys.executable`, cwd = the agents' workspace,
+   60 s timeout knob) — the SmolAgents AST sandbox applies to workflow
+   agents only, not to verifier checks — and are repaired at most twice
+   from stderr feedback. The accepted script is cached and re-run
+   verbatim for every later generation of the task.
+4. **Registry + variance filter**: a per-task JSON registry
+   (`sha256(goal + version)` keying, like the legacy rubric cache)
+   stores the claim set, scorer scripts, digests, and every
+   generation's score vector. Claims with zero variance across all
+   scored workspaces are non-discriminative — dropped and replaced by
+   refined claims (≤ `hybrid_verifier_refinement_rounds` per
+   generation).
+5. **Pairwise reward (temporal elimination)**: `overall_score` is the
+   win-rate of this generation against every previous generation of the
+   task (ties = 0.5); each pair is decided at the EARLIEST ladder stage
+   where the two differ (higher pass-count, score ≥ 0.5; tie → stage
+   mean score-diff), so a script-stage failure dominates any
+   result-stage advantage. The first generation of a task falls back to
+   the mean claim score. Modes: `temporal` (default), `temporal_strict`,
+   `sign_sum`, `mean_diff`, `escalation`.
+6. **Textual gradient** — elimination-point-first: leads with the
+   earliest stage/claim where this generation lost to a rival (both
+   scores, measured evidence, goal-anchored requirement), then the
+   remaining stages in temporal order and the dead-claim report. It is
+   the **only** verifier signal the mutator sees
+   (`abstracted_textual_gradient` + the `textual_gradient.txt` sidecar;
+   `evaluation.txt` renders the stage headers).
+
+New evidence channels (e.g. clean-room re-execution / verifier-owned
+holdout) plug in via the `EvidenceLayer` protocol (`layers.py`) without
+touching aggregation, registry, reward, or gradient code.
+
+Detail — including the deprecated multi-source per-claim verifier
+(pre-2026-09-24 default) — in
+[Evaluation pipeline](concepts/evaluation-pipeline.md).
+
+![Evaluation pipeline — legacy multi-source verifier](images/evaluation_pipeline.png)
+
+*(The figure depicts the deprecated legacy verifier; the mermaid source
+diagram `docs/diagrams/verifiers_judge.mermaid` depicts the hybrid
+flow, while the policy/BT flow is described above.)*
 
 ---
 
@@ -531,7 +670,7 @@ uv run main.py --science_agent_bench --csv_runs_limit 7 --config my_config.json 
 # Generated workflow code (genotype)
 cat sources/workflows/<uuid>/workflow_genotype_<uuid>.py
 
-# Execution state & per-claim scores
+# Execution state & verifier scores (evaluation.verifier.*)
 cat sources/workflows/<uuid>/state_result.json
 
 # Variation prompt that produced this run

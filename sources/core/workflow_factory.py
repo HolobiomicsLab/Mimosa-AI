@@ -1,5 +1,14 @@
-"""
-This class handles the creation and assembly of Langraph-SmolAgent workflow generation.
+"""LLM-driven synthesis of LangGraph + SmolAgents workflow source code.
+
+This file owns code generation for workflows: it prompts the workflow LLM,
+extracts and cleans the generated Python, checks the LangGraph structure,
+and assembles a runnable script that wires in the MCP tools, the state
+schema, and the SmolAgents factory. ``WorkflowOrchestrator`` constructs
+one factory per campaign and awaits
+:meth:`WorkflowFactory.craft_workflow` for each new candidate; the
+produced source is what the Layer 3 runner (``workflow_runner.py``)
+executes. It runs during evolution whenever a new workflow genotype is
+needed.
 """
 
 import logging
@@ -25,18 +34,28 @@ from sources.cli.pretty_print import (
 
 
 class WorkflowFactory(Factory):
-    """Build executable LangGraph + SmolAgent workflow scripts.
+    """Build executable LangGraph + SmolAgents workflow scripts.
 
     Drives the LLM to author the workflow ``StateGraph`` body, validates the
     resulting code, then assembles a runnable Python module that wires in the
-    state schema, MCP tool clients, and the SmolAgent factory.
+    state schema, MCP tool clients, and the SmolAgents factory.
+    ``WorkflowOrchestrator`` constructs one factory per campaign and awaits
+    :meth:`craft_workflow` for each new candidate. Key invariant: nothing is
+    returned to the caller before the generated body and the assembled script
+    both compile.
     """
 
     def __init__(self, config: "Config") -> None:
-        """Initialize the workflow crafting system.
+        """Copy the config paths this factory reads and writes.
+
+        The orchestrator calls it once at campaign startup, passing the shared
+        :class:`Config` built from the campaign config file. It only stores
+        references; all slow work happens in :meth:`craft_workflow`.
 
         Args:
-            config: Configuration object containing paths and settings.
+            config: Live :class:`Config` object providing the workflow and memory
+                directories, the schema and SmolAgents factory code file paths,
+                the workflow-creator prompt path, and the LLM settings.
         """
         self.workflow_dir = config.workflow_dir
         self.memory_dir = config.memory_dir
@@ -47,13 +66,17 @@ class WorkflowFactory(Factory):
         self.logger = logging.getLogger(__name__)
 
     def get_system_prompt(self) -> str:
-        """Load the system prompt used to drive workflow generation.
+        """Load the system prompt that steers the workflow-creator LLM.
+
+        ``create_workflow_genotype_code`` calls it before every generation
+        request. It reads the prompt file named by
+        ``config.prompt_workflow_creator`` from disk.
 
         Returns:
-            The system-prompt content read from disk.
+            str: Full text of the system prompt file.
 
         Raises:
-            ValueError: If the prompt file cannot be read.
+            ValueError: If the prompt file cannot be read from disk.
         """
         try:
             with open(self.prompt_workflow_creator) as f:
@@ -63,16 +86,19 @@ class WorkflowFactory(Factory):
 
     @staticmethod
     def extract_python_code(code: str) -> str:
-        """Extract Python code blocks from arbitrary LLM-produced text.
+        """Collect the Python code blocks from raw LLM output.
 
-        Joins the content of every ```` ```python ... ``` ```` fence into a
-        single string, preserving line order.
+        ``create_workflow_genotype_code`` calls it on every LLM completion; the
+        input is model text that may mix commentary with ```python fences. It
+        scans the text line by line and keeps only lines inside fenced Python
+        blocks.
 
         Args:
-            code: Text potentially containing Python code blocks.
+            code: Raw LLM output text, straight from the provider response.
 
         Returns:
-            The concatenated Python code (empty string when no fences exist).
+            str: All fenced Python lines joined with newlines, in file order;
+            empty string when the output contains no Python fence.
         """
         code_blocks = []
         in_code_block = False
@@ -88,14 +114,18 @@ class WorkflowFactory(Factory):
         return "\n".join(code_blocks)
 
     def remove_imports(self, code: str) -> str:
-        """Strip ``import``/``from ... import`` lines from LLM-generated code.
+        """Remove import lines from generated workflow code.
+
+        ``create_workflow_genotype_code`` calls it right after code extraction;
+        the assembled script already provides the needed imports. It drops every
+        line whose stripped form starts with ``import `` or ``from ``.
 
         Args:
-            code: Source code potentially containing import statements.
+            code: Generated workflow source, already extracted from the LLM
+                reply.
 
         Returns:
-            The code with every line whose stripped form starts with
-            ``import`` or ``from`` removed.
+            str: The code with every import line removed.
         """
         lines = code.splitlines()
         return "\n".join(
@@ -114,20 +144,28 @@ class WorkflowFactory(Factory):
         path: str,
         allow_cache: bool,
     ) -> str:
-        """Ask the LLM to generate a workflow body.
+        """Send one workflow-generation request to the LLM.
+
+        ``create_workflow_genotype_code`` calls it with the system prompt, the
+        current instructions, and the tool catalogue. It builds the user prompt,
+        picks a random temperature for diversity (capped at 1.0 for Anthropic and
+        Claude models), and lets the provider cache the response.
 
         Args:
-            system_prompt: System prompt that steers the workflow-creator LLM.
-            craft_instructions: User-level instructions / goal for the workflow.
-            existing_tool_prompt: Pre-formatted description of available MCP tools.
-            path: Directory used by ``LLMProvider`` to persist cache/log artefacts.
-            allow_cache: When True, allow the provider to reuse a cached response.
+            system_prompt: Workflow-creator system prompt loaded from disk.
+            craft_instructions: Goal-level crafting instructions for this
+                candidate, produced by the evolution layer.
+            existing_tool_prompt: Pre-formatted description of the available MCP
+                tools, built by the tool manager.
+            path: Directory context passed to ``LLMProvider`` for its cache and
+                log files; the workflow's memory directory.
+            allow_cache: When True, the provider may return a cached response for
+                identical prompts.
 
         Returns:
-            The raw LLM completion (typically containing one or more
-            ```` ```python ``` ```` blocks).
+            str: Raw LLM completion text, normally containing one or more
+            ```python fences.
         """
-
         prompt = f"""
 # INSTRUCTIONS:
 
@@ -159,23 +197,28 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
     def create_workflow_genotype_code(
         self, craft_instructions: str, existing_tool_prompt: str, path: str, allow_cache: bool
     ) -> str:
-        """Generate, clean, and syntax-validate a workflow genotype.
+        """Produce a cleaned, syntax-checked workflow genotype from the LLM.
 
-        Runs the LLM, extracts the Python code block, strips imports, and
-        compiles the result to surface syntax errors early.
+        ``craft_workflow`` calls it once per candidate; inputs are the current
+        crafting instructions and the tool catalogue, plus the memory directory
+        for provider files. It runs :meth:`llm_make_workflow`, extracts the
+        Python fences, strips imports, prints the LLM design commentary, and
+        compiles the result to catch syntax errors early.
 
         Args:
-            craft_instructions: The goal description / instructions.
-            existing_tool_prompt: Description of available MCP tools.
-            path: Directory passed to ``llm_make_workflow`` for caching.
-            allow_cache: When True, allow the LLM provider to use its cache.
+            craft_instructions: Goal-level instructions for the new workflow.
+            existing_tool_prompt: Description of the available MCP tools.
+            path: Directory passed to ``llm_make_workflow`` for provider cache
+                and log files.
+            allow_cache: When True, the provider may reuse a cached completion.
 
         Returns:
-            The validated workflow code (Python source).
+            str: The validated workflow body, that is Python source with no
+            import lines.
 
         Raises:
-            ValueError: If the LLM produces no code, returns invalid syntax,
-                or extraction otherwise fails.
+            ValueError: If the LLM call fails, produces no usable code, or the
+                extracted code does not compile.
         """
         self.logger.info("Generating workflow code with LLM...")
         system_prompt = self.get_system_prompt()
@@ -209,19 +252,22 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         return workflow_genotype_code
 
     def validate_workflow_structure(self, workflow_genotype_code: str) -> None:
-        """Validate the LangGraph workflow structure before execution.
+        """Check the generated code for required LangGraph structure.
 
-        Checks the generated source for required boilerplate (StateGraph
-        initialisation, conditional edges, SmolAgentFactory and
-        WorkflowNodeFactory usage, START edge, and at least one node), and
-        confirms the START edge target exists.
+        ``craft_workflow`` calls it after generation and before assembly, so a
+        malformed genotype fails fast with a clear message. It regex-checks the
+        source for the required elements: ``StateGraph(WorkflowState)``
+        initialization, conditional edges, SmolAgentFactory and
+        WorkflowNodeFactory usage, a START edge, and at least one node with a
+        valid Python name, and it confirms the START target exists.
 
         Args:
-            workflow_genotype_code: Workflow source code to validate.
+            workflow_genotype_code: Generated workflow source to check.
 
         Raises:
-            ValueError: If any required structural element is missing or the
-                START edge points to a non-existent node.
+            ValueError: If any required element is missing, a node name is a
+                keyword or not a valid identifier, or the START edge points to a
+                non-existent node.
         """
         self.logger.info("Validating workflow structure...")
 
@@ -265,6 +311,12 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
         nodes = set(re.findall(patterns["nodes"], workflow_genotype_code))
         if not nodes:
             raise ValueError("No workflow nodes found")
+        import keyword as _keyword
+        invalid_ids = {n for n in nodes if _keyword.iskeyword(n) or not n.isidentifier()}
+        if invalid_ids:
+            raise ValueError(
+                f"Workflow node names are Python keywords or invalid identifiers: {sorted(invalid_ids)}"
+            )
         self.logger.debug(f"Workflow nodes discovered: {', '.join(sorted(nodes))}")
 
         # Validate START edge target exists
@@ -289,36 +341,50 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
     ) -> str:
         """Assemble the complete, runnable workflow script.
 
-        Splices together the MCP client code, the workflow state schema, the
-        SmolAgent factory, and the LLM-generated workflow body into a single
-        Python module. The resulting script compiles the LangGraph workflow,
-        attempts to render its PNG diagram, then invokes it on an initial
-        state derived from ``state_schema.WorkflowState``.
+        ``craft_workflow`` calls it after structural validation passes, passing
+        the four code parts plus the target paths. It resolves repo-relative
+        paths, picks the default model id from config, and returns one f-string
+        module that wires in the tools, the state schema, and the SmolAgents
+        factory, embeds config-derived constants (model, engine, timeouts, goal,
+        prompts), compiles the LangGraph, tries to render a PNG diagram, invokes
+        the graph on an initial state built from the schema fields, and saves
+        ``state_result.json``.
 
         Args:
-            tools_code: Code for all MCP clients.
-            state_code: Code for the workflow state schema.
-            smolagent_factory_code: Code for the SmolAgent factory.
-            workflow_genotype_code: Generated workflow code by the LLM.
-            workflow_path: Path to save the workflow artefacts.
-            memory_path: Path to save the workflow memory.
-            uuid_str: Unique identifier for the workflow.
-            goal: The goal for the workflow.
-            smolagent_system_prompt: Optional system prompt embedded in the
-                generated script as ``SYSTEM_PROMPT``.
+            tools_code: Source that defines all MCP tool clients; loaded from
+                disk.
+            state_code: Source that defines the workflow state schema; loaded
+                from the configured schema file.
+            smolagent_factory_code: Source that defines the SmolAgents factory;
+                loaded from the configured factory file.
+            workflow_genotype_code: LLM-generated workflow body, already
+                validated.
+            workflow_path: Directory for workflow artifacts such as the PNG and
+                the state JSON; resolved relative to the repo root.
+            memory_path: Directory for memory artifacts; resolved relative to the
+                repo root.
+            uuid_str: Unique workflow identifier stamped into file names and the
+                initial state.
+            goal: Campaign goal string embedded as ``GOAL`` in the script.
+            smolagent_system_prompt: Optional system prompt embedded as
+                ``SYSTEM_PROMPT``; ``None`` leaves the field unset in the script.
 
         Returns:
-            Complete workflow code ready for execution.
+            str: Complete Python source of the runnable workflow script.
         """
         from pathlib import Path
         script_dir = Path(__file__).resolve().parent.parent.parent
         memory_path = str((script_dir / memory_path).resolve())
         workflow_path = str((script_dir / workflow_path).resolve())
+        default_model = self.config.smolagent_model_id[0] if isinstance(self.config.smolagent_model_id, list) else self.config.smolagent_model_id
+        # `WorkflowState.model_id` is a single string and is persisted to
+        # `state_result.json`, where cost accounting reads it back; store the
+        # resolved default rather than the raw (possibly list) config value.
         initial_state = {
             key: (
                 uuid_str
                 if key == "workflow_uuid"
-                else self.config.smolagent_model_id
+                else default_model
                 if key == "model_id"
                 else goal
                 if key == "goal"
@@ -326,6 +392,8 @@ Proceed to generate the workflow in Python code using the LangGraph library. Fol
             )
             for key in state_schema.WorkflowState.__annotations__
         }
+        providers = self.config.openrouter_provider_for(default_model) if self.config.orchestrator_choose_model == False else None
+        engine = "mlx" if "mlx-community/" in default_model else self.config.engine_name
         return f"""
 import os
 import sys
@@ -342,10 +410,11 @@ from typing import Annotated
 
 MEMORY_PATH = {memory_path!r}
 WORKFLOW_PATH = {workflow_path!r}
-MODEL_ID = {self.config.smolagent_model_id!r}
-ENGINE_NAME = {self.config.engine_name!r}
-OPENROUTER_PROVIDER = {self.config.openrouter_provider_for(self.config.smolagent_model_id)!r}
+MODEL_ID = {default_model!r}
+ENGINE_NAME = {engine!r}
+OPENROUTER_PROVIDER = {providers!r}
 AGENT_EXECUTION_TIMEOUT = {self.config.agent_execution_timeout!r}
+SAVE_LOGPROBS = {self.config.save_logprobs!r}
 GOAL = {goal!r}
 SYSTEM_PROMPT = {smolagent_system_prompt!r}
 
@@ -388,8 +457,11 @@ print("workflow run: workflow execution completed for UUID:", "{uuid_str}")
 if WORKFLOW_PATH:
     print("workflow run: saving workflow state JSON at :", WORKFLOW_PATH)
     try:
-        with open(os.path.join(WORKFLOW_PATH, "state_result.json"), "w") as f:
+        _state_path = os.path.join(WORKFLOW_PATH, "state_result.json")
+        _tmp_path = _state_path + ".tmp"
+        with open(_tmp_path, "w") as f:
             json.dump(result_state, f, indent=2)
+        os.replace(_tmp_path, _state_path)
     except Exception as e:
         raise(Exception(f"Could not save workflow data:" + str(e)))
 """
@@ -401,28 +473,37 @@ if WORKFLOW_PATH:
         save_workflow: bool = True,
         original_task: str | None = None,
     ) -> tuple[str, str, str]:
-        """Craft a complete workflow end-to-end.
+        """Craft one complete workflow from a goal, end to end.
 
-        Generates a chronologically sortable UUID, loads MCP tools, prepares
-        directories, asks the LLM for a workflow body, validates and assembles
-        it, then optionally persists artefacts to disk.
+        The orchestrator awaits it for every new candidate, passing the possibly
+        knowledge-wrapped goal and the crafting instructions from the evolution
+        layer. It makes a sortable id, loads tool code and template files, asks
+        the LLM for the genotype, saves the genotype early, validates and
+        assembles the full script, and compiles the final code before returning.
 
         Args:
-            goal: The goal description (may be knowledge-wrapped).
-            craft_instructions: The instructions for crafting the workflow.
-            save_workflow: Whether to save the workflow artefacts to disk.
-            original_task: The original unwrapped task for similarity matching.
+            goal: The task goal; may be wrapped with retrieved knowledge.
+            craft_instructions: Instructions for the LLM. When equal to
+                ``goal``, the previous attempt did not fail, so the provider
+                cache is allowed.
+            save_workflow: When True, persist workflow and memory artifacts under
+                fresh per-UUID directories; when False, artifacts are not written
+                and only default paths are computed.
+            original_task: The unwrapped original task, stored with the workflow
+                files for similarity checks; ``None`` when not available.
 
         Returns:
-            Tuple ``(complete_code, workflow_genotype_code, uuid_str)`` where
-            ``complete_code`` is the assembled executable script,
-            ``workflow_genotype_code`` is the LLM-produced workflow body, and
+            tuple[str, str, str]: ``(complete_code, workflow_genotype_code,
+            uuid_str)``, where ``complete_code`` is the assembled runnable
+            script, ``workflow_genotype_code`` is the LLM-produced body, and
             ``uuid_str`` is the workflow identifier.
 
         Raises:
-            RuntimeError: If loading tools, building directories, or reading
-                template code files fails.
-            ValueError: If workflow generation or structural validation fails.
+            RuntimeError: If loading tool code, creating directories, or reading
+                the template code files fails.
+            ValueError: If generation, structural validation, or final
+                compilation fails; validation and compile errors carry the
+                workflow UUID prefix.
         """
         # Generate chronologically sortable workflow ID: YYYYMMDD_HHMMSS_shortUUID
         timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -485,6 +566,11 @@ if WORKFLOW_PATH:
             goal,
             smolagent_system_prompt
         )
+
+        try:
+            compile(complete_code, "<assembled_workflow>", "exec")
+        except SyntaxError as e:
+            raise ValueError(f"UUID:{uuid_str}|Assembled workflow has invalid syntax: {e}") from e
 
         self.logger.info("Workflow generation completed")
 

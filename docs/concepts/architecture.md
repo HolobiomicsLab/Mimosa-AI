@@ -30,8 +30,9 @@ Two components live here:
   workflow. Tools have no tags — every discovered tool is made
   available to every agent in the generated workflow.
 - **Perspicacité client** ([`perspicacite_client.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/utils/perspicacite_client.py))
-  fetches literature snippets that ground both workflow synthesis and the
-  judge's soft-claim verdicts. See [Scientific grounding](grounding.md).
+  fetches literature snippets that ground workflow synthesis (and, under
+  the deprecated legacy verifier, soft-claim verdicts). See
+  [Scientific grounding](grounding.md).
 
 ### Layer 2 — Meta-orchestration
 
@@ -44,14 +45,23 @@ recursively evolves workflows, with help from:
   `k=15`, `novelty_weight=0.25`). Admission is gated by the validity check
   (improvement over baseline or `qd_score > admit_threshold`); capacity is
   curated by lowest-`qd_score` eviction.
-- **VariationEngine** — assembles mutation or crossover prompts, with an
-  evidence-driven mutation scope: boldness grows with an
-  `iters_since_improvement` plateau counter (patience `6`) *and* as the
-  Rechenberg 1/5 success rate of the last 5 scored offspring drops below
-  20 %. A near-finish floor only damps boldness once the parent score is
-  above 0.95, so near-winners aren't gambled away one generation before
-  early-stop. The top `RE-SPECIATION` band is hysteresis-gated and only
-  opens after `iters_since_improvement ≥ 8` with a zero success rate.
+- **VariationEngine** — assembles mutation or crossover prompts with a
+  directive-implicit mutation scope: no step-size controller decides
+  "how bold" a mutation should be. Instead the engine assembles a
+  deterministic, read-only `<search_state>` block (parent score,
+  iteration progress, `iters_since_improvement` plateau streak with
+  patience `6`, success rate of the last 5 scored offspring, and a
+  short score trajectory), and the `llm_think_mutation_directive` call
+  judges the intended magnitude itself — small tweak vs component
+  rewrite vs structural redesign — justified by that state. Hard
+  guardrails stay in code: the mutation agent budget is sampled
+  parent-centered (within ±1 agent of the parent's count, capped at
+  `[1, 7]`), and the mutation prompt mandates at most one agent
+  add/remove, no topology change unless the directive suggests it, and
+  90 % of the previous workflow kept unchanged. The pre-digested
+  ≤ 3-sentence directive means the orchestrator LLM only synthesises
+  code against one named change instead of re-reasoning over the raw
+  evidence.
 - **WorkflowOrchestrator** — wraps "grounding → factory → sandbox" into one
   callable per generation.
 
@@ -72,14 +82,23 @@ Once execution finishes, the **WorkflowEvaluator** facade
 ([`evaluators/evaluator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/evaluator.py))
 routes to one of:
 
-- **VerifierEvaluator** (default) — the multi-source per-claim verifier
+- **PolicyBTVerifierEvaluator** (default) — the policy-based
+  Bradley–Terry verifier: reproduction contract (`.sh` rerun in a clean
+  venv), LLM reconnaissance, per-schema adapters and one cached
+  comparison policy, regularized Bradley–Terry tournament reward
   ([Evaluation pipeline](evaluation-pipeline.md)).
+- **HybridVerifierEvaluator** — the previous default: hybrid
+  temporal-ladder verifier (`verifier_kind="hybrid"`); key claims
+  (`script` → `log` → `result`), deterministic Python policy scorers,
+  pairwise win-rate reward.
+- **VerifierEvaluator** — deprecated multi-source per-claim verifier
+  (`verifier_kind="legacy"`).
 - **GenericEvaluator** — legacy 4-criterion LLM judge.
 - **ScenarioEvaluator** — rubric/assertion-based scoring for benchmarks.
 
 The evaluator returns `(overall_score, overall_score_uncapped,
-abstracted_prompt_gradient)`. Only the prompt gradient feeds back into the
-mutator — the raw rubric never does.
+abstracted_textual_gradient)`. Only the textual gradient feeds back into
+the mutator — the raw scorer scripts stay inside the verifier.
 
 ## Persistent storage
 

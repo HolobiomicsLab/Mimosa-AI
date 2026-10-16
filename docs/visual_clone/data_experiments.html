@@ -1,0 +1,1186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Experiments (verifier + diversity) - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="Overview &gt; data &gt; experiments" data-built="7da1f5e+wt" data-built-date="2026-10-10">
+<div class="wrap">
+
+<h1 class="hud">Experiment trees</h1>
+<p class="intro">The verifier program now spans <code>E1&ndash;E48</code> (cycles 1&ndash;5): cycle 1 (E1&ndash;E11) proved the legacy reward anti-correlates with benchmark success, and cycles 2&ndash;5 built 10+ verification architectures, shipped a production replacement and audited the frozen arena's own labels. Cycle 5 closed with E44 KUMITE (2026-10-02), an honest-negative replay of a BT-over-policy-script verifier, then E45 SPARTAN (2026-10-02) verified it adversarially: the v2 relevance gain was a naming artifact; the v2b instrument and a quarantined holdout re-measured the content levers. E46 (2026-10-03) then added kimi-k3 figure scoring for the 6 visual-judge tasks onto the v3 policy behind the exec-crash rung; E47 REFINER (2026-10-03) refined those gradients with an evidence-checking LLM pass (verified issues, missing-file flags, corrections) &mdash; relevance-neutral under v2b, grounding real; E48 FIXES (2026-10-03) applied the audited 5-fix list and re-ran: coverage 17/19&rarr;19/19, non-visual pooled 0.7482, visual pairs 6/6. The shipped verifier is <code>sources/evaluators/hybrid_verifier/</code> and the ranked next steps are <a href="../../experiments_verifiers/HANDOFF.md">HANDOFF.md</a> &sect;5. Here is the folder map and the per-experiment evidence.</p>
+
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Tree: plan, harness, data, results, reports</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 335" role="img" aria-label="experiments_verifiers folder layout">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <a class="box" href="../../experiments_verifiers/">
+    <title>E1-E42 handoff (cycles 1-5) plus the ranked action plan.</title>
+    <rect x="20" y="40" width="150" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="95" y="62" text-anchor="middle">root docs, 6 md</text>
+    <text class="box-sub" x="95" y="78" text-anchor="middle">HANDOFF + improve_experiment</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/">
+    <title>One or more scripts per experiment, e1 to e41.</title>
+    <rect x="210" y="40" width="170" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="295" y="62" text-anchor="middle">harness, 68 scripts</text>
+    <text class="box-sub" x="295" y="78" text-anchor="middle">e1_*.py ... e41_*.py</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/">
+    <title>One JSON+MD pair per experiment, plus caches.</title>
+    <rect x="420" y="40" width="170" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="505" y="62" text-anchor="middle">results, 251 entries</text>
+    <text class="box-sub" x="505" y="78" text-anchor="middle">91 JSON + 65 JSONL + 53 MD</text>
+  </a>
+  
+    <title>Offline single-file reports rendering the same data.</title>
+    <rect x="630" y="40" width="230" height="52" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="745" y="62" text-anchor="middle">reports, 6 HTML</text>
+    <text class="box-sub" x="745" y="78" text-anchor="middle">REPORT_*.html, offline</text>
+  
+  <path class="edge" data-from="plan" data-to="harness" d="M170,66 H210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="190" y="58" text-anchor="middle">defines 68 scripts</text>
+  <path class="edge" data-from="harness" data-to="results" d="M380,66 H420" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="58" text-anchor="middle">writes result files</text>
+  <path class="edge" data-from="results" data-to="reports" d="M590,66 H630" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="610" y="58" text-anchor="middle">renders 6 HTML</text>
+
+  <a class="box" href="../../experiments_verifiers/scorers/">
+    <title>Candidate scorer modules used by the E1-E3 reruns.</title>
+    <rect x="20" y="150" width="170" height="52" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="105" y="172" text-anchor="middle">scorers, 3 modules</text>
+    <text class="box-sub" x="105" y="188" text-anchor="middle">static_grounding.py</text>
+  </a>
+  <path class="edge" data-from="scorers" data-to="harness" d="M105,150 V120 H295 V92" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="205" y="114" text-anchor="middle">used by E2, E3</text>
+
+  <a class="box" href="../../experiments_verifiers/ablations/">
+    <title>Copies of the run_notes ablation blocks, one per task.</title>
+    <rect x="20" y="252" width="170" height="52" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="105" y="274" text-anchor="middle">ablations, 462 notes</text>
+    <text class="box-sub" x="105" y="290" text-anchor="middle">campaign__task.json</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/data/">
+    <title>Labels joined to frozen workspaces.</title>
+    <rect x="250" y="252" width="170" height="52" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="335" y="274" text-anchor="middle">data, 4 files</text>
+    <text class="box-sub" x="335" y="290" text-anchor="middle">verifier_claims_sane.jsonl</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/workspace_artefacts/snapshots/">
+    <title>Frozen per-generation workspaces, chemistry and run_1 only.</title>
+    <rect x="480" y="252" width="290" height="52" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="625" y="274" text-anchor="middle">workspace snapshots, 148 dirs</text>
+    <text class="box-sub" x="625" y="290" text-anchor="middle">copied from /tmp/mimosa_run_*</text>
+  </a>
+  <path class="edge dashed-edge" data-from="ablations" data-to="data" d="M190,278 H250" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="220" y="270" text-anchor="middle">copies 462 notes</text>
+  <path class="edge dashed-edge" data-from="data" data-to="harness" d="M335,252 V92" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="415" y="176" text-anchor="middle">reads 1 104 rows</text>
+  <path class="edge dashed-edge" data-from="snapshots" data-to="data" d="M480,278 H420" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="450" y="296" text-anchor="middle">joined by uuid</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 - <code>experiments_verifiers/</code> layout. File counts and sizes are my computation (2026-09-28); <code>results/</code> holds 251 top-level entries (225 files incl. <code>.gitkeep</code>, 26 folders). Two folders are virtualenvs: <code>_e24_venv/</code> (2 889 MB, 77 242 files) and <code>_e41_venv/</code> (2 888 MB, left by the E41 CAGE re-grade). Dashed = reads/writes, dotted = import only.</p>
+
+<table>
+<thead><tr><th>Folder or file</th><th>Role</th><th class="size">Files</th><th class="size">Size</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/EXPERIMENTS.md">EXPERIMENTS.md</a></td><td>Plan text, locked constraints, data inventory.</td><td class="size">1</td><td class="size">6.8 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/HANDOFF.md">HANDOFF.md</a></td><td>E1-E42 handoff (cycles 1-5): results, label-noise finding, open bugs.</td><td class="size">1</td><td class="size">22 KiB</td></tr>
+<tr><td class="sym">improve_experiment.md</td><td>Ranked action plan: what to change next, in order.</td><td class="size">1</td><td class="size">15 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/README.md">README.md</a></td><td>Headline verdicts and the experiment table.</td><td class="size">1</td><td class="size">13 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/deprecated_verifier_how_it_worked.md">deprecated_verifier_how_it_worked.md</a></td><td>Legacy claims verifier anatomy, now deprecated.</td><td class="size">1</td><td class="size">80 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/verifier_sota_litterature_search.md">verifier_sota_litterature_search.md</a></td><td>Literature scan behind the verifier work.</td><td class="size">1</td><td class="size">44 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/">harness/</a></td><td>One or more scripts per experiment, E1 to E41.</td><td class="size">68</td><td class="size">4.9 MB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/data/">data/</a></td><td>Claim verdicts and manifest rows with VER/SR labels.</td><td class="size">4</td><td class="size">4.1 MB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/">results/</a></td><td>Top-level entries: per-experiment JSON, notes, ledgers, caches.</td><td class="size">251</td><td class="size">5.9 GB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/ablations/">ablations/</a></td><td>Copies of run_notes ablation blocks, one per task.</td><td class="size">462</td><td class="size">5.7 MB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/workspace_artefacts/">workspace_artefacts/</a></td><td>Frozen per-generation workspaces, chemistry and run_1 only.</td><td class="size">1 061</td><td class="size">2.0 GB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/scorers/">scorers/</a></td><td>Candidate scorer modules used by the E1-E3 reruns.</td><td class="size">5</td><td class="size">124 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/manifest.json">manifest.json</a></td><td>1 104 ablation rows joined to 148 snapshots.</td><td class="size">1</td><td class="size">525 KiB</td></tr>
+</tbody>
+</table>
+
+<p>Read the summary first. <a href="../../experiments_verifiers/HANDOFF.md">HANDOFF.md</a> &sect;3.4 (cycle-5 findings) and improve_experiment.md (the action plan) are the current state of the program: best ranker <code>e30_online</code> <b>0.759</b> pairs-correct (&sect;3.1), gradient instrument capped by the gold ceiling <b>0.695</b> relevance (&sect;3.2), and E41 CAGE shows the frozen SR labels are ~11% noisy with a fresh-regrade ceiling of <b>0.854</b> (&sect;3.4). <a href="../../experiments_verifiers/README.md">README.md</a> section 1 still holds the cycle-1 verdict (learned claim-importance <code>auc 0.753</code> does not work within tasks).</p>
+<p class="sub">Frozen arena: <a href="../../experiments_verifiers/HANDOFF.md">HANDOFF.md</a> &sect;4 gives 19 (campaign, task) groups, 148 generations, 667 workflow pairs. <a href="../../experiments_verifiers/EXPERIMENTS.md">EXPERIMENTS.md</a> section 3 gives the inventory (verified 2026-09-23): 1 104 manifest rows, 565 usable claim rows, 148 snapshot dirs.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Experiment lifecycle: arena, channels, instrument, audits</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 270" role="img" aria-label="experiment lifecycle: frozen arena feeds channels, the instrument judges feedback, audits re-grade and write the action plan">
+  <defs>
+    <marker id="arw11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arw12" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/></marker>
+    <marker id="arw13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+    <marker id="arw14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#B79CFF"/></marker>
+  </defs>
+
+  <a class="box" href="../../experiments_verifiers/HANDOFF.md">
+    <title>148 frozen generations across 19 campaign-task groups.</title>
+    <rect x="20" y="26" width="180" height="70" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="110" y="52" text-anchor="middle">frozen arena</text>
+    <text class="box-sub" x="110" y="72" text-anchor="middle">19 groups, 148 gens</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/">
+    <title>Ten verification architectures scored on the arena.</title>
+    <rect x="230" y="26" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="330" y="52" text-anchor="middle">channels</text>
+    <text class="box-sub" x="330" y="70" text-anchor="middle">10 architectures</text>
+    <text class="box-sub" x="330" y="84" text-anchor="middle">e30_online 0.759</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/">
+    <title>E16v2 instrument measures gradient relevance and hallucination.</title>
+    <rect x="460" y="26" width="200" height="70" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="560" y="52" text-anchor="middle">instrument</text>
+    <text class="box-sub" x="560" y="70" text-anchor="middle">E16v2 gradient duel</text>
+    <text class="box-sub" x="560" y="84" text-anchor="middle">gold ceil 0.695</text>
+  </a>
+  <a class="box" href="data_audits.html">
+    <title>E37-E42 audits and the E41 CAGE re-grade found bugs and label noise.</title>
+    <rect x="690" y="26" width="170" height="70" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="775" y="52" text-anchor="middle">audits</text>
+    <text class="box-sub" x="775" y="70" text-anchor="middle">E41 CAGE noise</text>
+    <text class="box-sub" x="775" y="84" text-anchor="middle">ceil 0.854</text>
+  </a>
+
+  <a class="box" href="mod_evaluators_hybrid_verifier.html">
+    <title>The best channel design; default 2026-09-24, now the previous channel.</title>
+    <rect x="20" y="190" width="400" height="66" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="220" y="216" text-anchor="middle">previous verifier</text>
+    <text class="box-sub" x="220" y="232" text-anchor="middle">sources/evaluators/hybrid_verifier/</text>
+  </a>
+  
+    <title>Ranked next steps distilled from the audits and the label-noise finding.</title>
+    <rect x="470" y="190" width="390" height="66" rx="12" fill="rgba(183,156,255,0.08)" stroke="#B79CFF"/>
+    <text class="box-label" x="665" y="216" text-anchor="middle">action plan</text>
+    <text class="box-sub" x="665" y="232" text-anchor="middle">improve_experiment.md</text>
+  
+
+  <path class="edge dashed-edge" d="M200,61 H230" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw12)"/>
+  <text class="edge-label" x="215" y="52" text-anchor="middle">reads 148 gens</text>
+  <path class="edge" d="M430,61 H460" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw11)"/>
+  <text class="edge-label" x="445" y="52" text-anchor="middle">feeds pairs</text>
+  <path class="edge" d="M660,61 H690" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw11)"/>
+  <text class="edge-label" x="675" y="52" text-anchor="middle">surfaces gaps</text>
+  <path class="edge dotted-edge" d="M330,96 V190" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arw13)"/>
+  <text class="edge-label" x="338" y="140" text-anchor="start">ports design</text>
+  <path class="edge dashed-edge" d="M775,96 V190" fill="none" stroke="#B79CFF" stroke-width="1.5" marker-end="url(#arw14)"/>
+  <text class="edge-label" x="783" y="140" text-anchor="start">writes plan</text>
+</svg>
+</div>
+<p class="figcap">Lifecycle - one reading in six boxes. Mint = data and the previous verifier channel; cyan = the experiment channels and the instrument; arc blue = the audits; ultraviolet = the plan. The cycle-5 audits re-graded the arena (<code>HANDOFF.md &sect;3.4</code>) and fed <code>improve_experiment.md</code>.</p>
+
+<p class="sub">Key numbers, source in <code>experiments_verifiers/HANDOFF.md</code>: best ranker <code>e30_online</code> <b>0.759</b> pairs-correct (&sect;3.1); gold gradient ceiling <b>0.695</b> relevance (&sect;3.2); E41 CAGE label noise 0.108 flip &rarr; <b>0.854</b> fresh-regrade ceiling (&sect;3.4). Previous verifier channel, default 2026-09-24 &rarr; 2026-10-13: <code>sources/evaluators/hybrid_verifier/</code> (&sect;2).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Where the disk goes</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 325" role="img" aria-label="bar chart of disk size per top-level item">
+  <text class="box-label" x="8" y="18">top-level item</text>
+  <text class="box-label" x="870" y="18" text-anchor="end">size on disk</text>
+  <text class="box-sub" x="8" y="43">experiments_verifiers/results</text>
+  <rect x="240" y="33" width="600" height="11" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="43" text-anchor="end">6,040.1 MB</text>
+  <text class="box-sub" x="8" y="64">experiments_verifiers/workspace_artefacts</text>
+  <rect x="240" y="54" width="345" height="11" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="64" text-anchor="end">1,997.0 MB</text>
+  <text class="box-sub" x="8" y="85">diversity_experiments/data</text>
+  <rect x="240" y="75" width="76" height="11" fill="#7DF9C7" fill-opacity="0.22" stroke="#7DF9C7" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="85" text-anchor="end">96.3 MB</text>
+  <text class="box-sub" x="8" y="106">diversity_experiments/results</text>
+  <rect x="240" y="96" width="30" height="11" fill="#7DF9C7" fill-opacity="0.22" stroke="#7DF9C7" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="106" text-anchor="end">14.8 MB</text>
+  <text class="box-sub" x="8" y="127">experiments_verifiers/ablations</text>
+  <rect x="240" y="117" width="18" height="11" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="127" text-anchor="end">5.7 MB</text>
+  <text class="box-sub" x="8" y="148">diversity_experiments/report.html</text>
+  <rect x="240" y="138" width="18" height="11" fill="#7DF9C7" fill-opacity="0.22" stroke="#7DF9C7" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="148" text-anchor="end">5.6 MB</text>
+  <text class="box-sub" x="8" y="169">experiments_verifiers/harness</text>
+  <rect x="240" y="159" width="17" height="11" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="169" text-anchor="end">4.9 MB</text>
+  <text class="box-sub" x="8" y="190">experiments_verifiers/data</text>
+  <rect x="240" y="180" width="16" height="11" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="190" text-anchor="end">4.1 MB</text>
+  <text class="box-sub" x="8" y="211">experiments_verifiers root files</text>
+  <rect x="240" y="201" width="10" height="11" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="211" text-anchor="end">1.7 MB</text>
+  <text class="box-sub" x="8" y="232">experiments_verifiers/scorers</text>
+  <rect x="240" y="222" width="3" height="11" fill="#00E5FF" fill-opacity="0.22" stroke="#00E5FF" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="232" text-anchor="end">124 KiB</text>
+  <text class="box-sub" x="8" y="253">diversity_experiments/scripts</text>
+  <rect x="240" y="243" width="2" height="11" fill="#7DF9C7" fill-opacity="0.22" stroke="#7DF9C7" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="253" text-anchor="end">92 KiB</text>
+  <text class="box-sub" x="8" y="274">diversity_experiments/code_reference</text>
+  <rect x="240" y="264" width="2" height="11" fill="#7DF9C7" fill-opacity="0.22" stroke="#7DF9C7" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="274" text-anchor="end">76 KiB</text>
+  <text class="box-sub" x="8" y="295">diversity_experiments/README.md</text>
+  <rect x="240" y="285" width="1" height="11" fill="#7DF9C7" fill-opacity="0.22" stroke="#7DF9C7" stroke-width="1.25"/>
+  <text class="box-sub" x="870" y="295" text-anchor="end">4 KiB</text>
+  <text class="box-sub" x="8" y="318">cyan = experiments_verifiers, mint = diversity_experiments. bar length &#8733; square root of MB, so 0.004 MB stays visible next to 6 040 MB.</text>
+</svg>
+</div>
+<p class="figcap">Chart 1 - disk size per top-level item of both trees, my computation (<code>du -sk</code>, 2026-09-28 17:27 CEST). The results bar almost doubled since 2026-09-26 (3,147.2 MB to 6,040.1 MB): E41 added a second virtualenv, <code class="path">experiments_verifiers/results/_e41_venv/</code> (2 888 MB), next to <code>_e24_venv/</code> (2 889 MB). The other big folder is the 148 frozen workspaces. E41 was still writing at this snapshot; it completed afterward (label-noise verdict, &sect;3.4).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Result schema, sampled</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 400" role="img" aria-label="key tree of one state_result.json">
+  <defs>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../diversity_experiments/data/run_1/20260920_235255_63eda586/state_result.json">
+    <title>One generation record of one run, copied from sources/workflows.</title>
+    <rect x="20" y="155" width="190" height="58" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="115" y="180" text-anchor="middle">state_result.json</text>
+    <text class="box-sub" x="115" y="196" text-anchor="middle">10 top-level keys</text>
+  </a>
+  <path class="edge" d="M210,184 H240" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+  <path class="edge" d="M240,46 V334" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+
+  <rect x="260" y="26" width="210" height="40" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="272" y="51">workflow_uuid, model_id</text>
+  <path class="edge" d="M240,46 H260" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+
+  <rect x="260" y="74" width="210" height="40" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="272" y="99">goal, task_prompt</text>
+  <path class="edge" d="M240,94 H260" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+
+  <rect x="260" y="122" width="210" height="40" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+  <text class="box-label" x="272" y="147">step_name[], success[]</text>
+  <path class="edge" d="M240,142 H260" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+
+  <rect x="260" y="170" width="210" height="40" rx="2" fill="rgba(60,240,210,0.08)" stroke="#3CF0D2"/>
+  <text class="box-label" x="272" y="195">actions[] tool calls</text>
+  <path class="edge" d="M240,190 H260" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+
+  <rect x="260" y="218" width="210" height="40" rx="2" fill="rgba(60,240,210,0.08)" stroke="#3CF0D2"/>
+  <text class="box-label" x="272" y="243">observations[] logs</text>
+  <path class="edge" d="M240,238 H260" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+
+  <rect x="260" y="266" width="210" height="40" rx="2" fill="rgba(60,240,210,0.08)" stroke="#3CF0D2"/>
+  <text class="box-label" x="272" y="291">answers[] status, message</text>
+  <path class="edge" d="M240,286 H260" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+
+  <a class="box" href="mod_evaluators_hybrid_verifier.html">
+    <title>Legacy claims-verifier scores stored in every run.</title>
+    <rect x="260" y="314" width="210" height="40" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="272" y="339">evaluation.verifier</text>
+  </a>
+  <path class="edge" d="M240,334 H260" fill="none" stroke="#5E8CA3" stroke-width="1.5"/>
+
+  <rect x="560" y="250" width="300" height="40" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+  <text class="box-label" x="572" y="275">overall_score, base_mean</text>
+  <path class="edge" data-from="v" data-to="s1" d="M470,334 H520 V270 H560" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="500" y="264" text-anchor="middle">score 0-1</text>
+
+  <rect x="560" y="300" width="300" height="40" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+  <text class="box-label" x="572" y="325">n_claims, n_pass, n_fail, n_unsure, n_error</text>
+  <path class="edge" data-from="v" data-to="s2" d="M470,334 H560" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="515" y="328" text-anchor="middle">counts</text>
+
+  <rect x="560" y="350" width="300" height="40" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+  <text class="box-label" x="572" y="375">failure_fingerprint.vector (7-D)</text>
+  <path class="edge" data-from="v" data-to="s3" d="M470,334 H520 V370 H560" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="500" y="382" text-anchor="middle">7-D vector</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 - keys quoted from <code class="path">diversity_experiments/data/run_1/20260920_235255_63eda586/state_result.json</code>. The verifier block groups 16 keys in that file; the 12-key version in the asb copy carries <code>abstractec_textual_gradient</code> and no visual counters.</p>
+
+<blockquote>{"workflow_uuid": "20260920_235255_63eda586", "model_id": "openrouter/deepseek/deepseek-v3.2", "goal": "&#92;nDOMAIN KNOWLEDGE:&#92;nThe lattice parameters should be deter", "step_name": [1], "task_prompt": [1], "actions": [1], "observations": [1], "answers": [1], "success": [1], "evaluation": {"verifier": {16}}}</blockquote>
+<p class="sub">Key list and list lengths read from the file above; <code>evaluation.verifier</code> holds <code>overall_score 0.7886</code>, <code>n_claims 19</code>, <code>hard_fail_capped true</code>, <code>n_recovery_attempts 8</code>, <code>failure_fingerprint.vector</code> (7 numbers) and <code>abstractec_textual_gradient</code> (spelled that way in the data). The writer of this block was the legacy claims verifier (<a href="area_evaluators_legacy.html">area_evaluators_legacy.html</a>).</p>
+
+<h3>Sampled result files, plus the schema check</h3>
+<table>
+<thead><tr><th>File</th><th>Sampled as</th><th>Top level</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E1_rubric_surgery_20260921.json">results/E1_rubric_surgery_20260921.json</a></td><td>Oldest cycle-1 result, 2026-09-21.</td><td class="sym">13 keys, per_example[607]</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E10_per_task_oracle_2026-09-22.json">results/E10_per_task_oracle_2026-09-22.json</a></td><td>Middle cycle-1 result, 2026-09-22.</td><td class="sym">population, part1, bottom_line</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E19c_scores_2026-09-25.jsonl">results/E19c_scores_2026-09-25.jsonl</a></td><td>Cycle-2 closeout row, 2026-09-25.</td><td class="sym">group, claim_id, score, rc</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E25_creED_autopsy_2026-09-25.json">results/E25_creED_autopsy_2026-09-25.json</a></td><td>Cycle-2 closeout autopsy, 2026-09-25.</td><td class="sym">12 keys, verdict, tie_anatomy</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_prime_2026-09-26.json">results/E35_prime_2026-09-26.json</a></td><td>E35 PRIME result row, 2026-09-26.</td><td class="sym">16 keys, verdict, bt_table</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_claims_2026-09-26.jsonl">results/E35_claims_2026-09-26.jsonl</a></td><td>E35 per-group claim extraction rows.</td><td class="sym">group, n_claims, claims, gate</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_gradient_duel_2026-09-26.json">results/E35_gradient_duel_2026-09-26.json</a></td><td>E35 gradient-judge duel output.</td><td class="sym">experiment, stats, pairs, calls</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E25_creED_judgments_2026-09-25.jsonl">results/E25_creED_judgments_2026-09-25.jsonl</a></td><td>E25 pilot judgments, 219 rows at the snapshot.</td><td class="sym">variant, phase, outcome, winner_ij</td></tr>
+<tr><td class="sym"><a href="../../diversity_experiments/data/run_1/20260920_235255_63eda586/state_result.json">.../run_1/20260920_235255_63eda586/state_result.json</a></td><td>The tree drawn above.</td><td class="sym">10 keys (Diagram 2)</td></tr>
+</tbody>
+</table>
+<details><summary>schema check on every copied run (cheap key test)</summary><div class="dbody">
+<p>719 <code>state_result.json</code> files under <code>diversity_experiments/data/*/</code> (my computation): 703 follow the 10-key schema of Diagram 2, 10 carry only 5 keys, 3 drop <code>evaluation</code>, 3 add <code>single_agent_mode</code>.</p>
+<p>Of the 719 verifier blocks: 516 hold the 12 base keys, 191 add <code>n_recovery_attempts</code>, <code>n_visual_error</code>, <code>n_error_scored_zero</code> and <code>visual_evidence_missing</code>, 6 add <code>skipped_reason</code>, 6 have none.</p>
+<p><code class="path">experiments_verifiers/data/verifier_claims_sane.jsonl</code> (my computation): 607 rows, 565 with the 7 keys <code>campaign, task, uuid, SR, VER, reward, claims</code>; 42 contamination-flagged rows add 4 keys and carry <code>claims: null</code>. All 13 937 claim objects share 5 keys: <code>name, imp, kind, status, score</code> (<code>pass</code> 11 009, <code>fail</code> 2 337, <code>unsure</code> 566; <code>executable</code> 12 079, <code>soft</code> 1 302, <code>visual</code> 531).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Code that ports the experiments</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 300" role="img" aria-label="harness files ported into the hybrid verifier">
+  <defs>
+    <marker id="arw5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../experiments_verifiers/harness/e19b_extract.py">
+    <title>E19b claim extraction and scorer template.</title>
+    <rect x="20" y="24" width="230" height="44" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="32" y="51">harness/e19b_extract.py</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e19_hybrid_bt.py">
+    <title>E19 hybrid: inventory, scorers and pairwise judging.</title>
+    <rect x="20" y="92" width="230" height="44" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="32" y="119">harness/e19_hybrid_bt.py</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e15_bt_eval.py">
+    <title>E15 Bradley-Terry evaluation, the ridge convention.</title>
+    <rect x="20" y="160" width="230" height="44" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="32" y="187">harness/e15_bt_eval.py</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md">
+    <title>The measured results behind the shipped scorer design.</title>
+    <rect x="20" y="228" width="230" height="44" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="32" y="255">E19b_hybrid_bt_v2.md</text>
+  </a>
+
+  <a class="box" href="mod_evaluators_hybrid_verifier.html">
+    <title>Previous channel; ports these conventions.</title>
+    <rect x="520" y="24" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="532" y="51">hybrid_verifier/scorers.py</text>
+  </a>
+  <a class="box" href="mod_evaluators_hybrid_verifier.html">
+    <title>Previous channel; ports these conventions.</title>
+    <rect x="520" y="92" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="532" y="119">hybrid_verifier/inventory.py</text>
+  </a>
+  <a class="box" href="mod_evaluators_hybrid_verifier.html">
+    <title>Previous channel; ports these conventions.</title>
+    <rect x="520" y="160" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="532" y="187">hybrid_verifier/aggregation.py</text>
+  </a>
+  <a class="box" href="mod_evaluators_hybrid_verifier.html">
+    <title>Previous channel; ports these conventions.</title>
+    <rect x="520" y="228" width="330" height="44" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="532" y="255">hybrid_verifier/__init__.py</text>
+  </a>
+
+  <path class="edge dotted-edge" d="M250,46 H520" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="385" y="40" text-anchor="middle">ports SCORER_TEMPLATE_V2</text>
+  <path class="edge dotted-edge" d="M250,114 H520" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="385" y="108" text-anchor="middle">ports union_inventory</text>
+  <path class="edge dotted-edge" d="M250,182 H520" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="385" y="176" text-anchor="middle">ridge = 1.0 convention</text>
+  <path class="edge dotted-edge" d="M250,250 H520" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw5)"/>
+  <text class="edge-label" x="385" y="244" text-anchor="middle">cites measured results</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 - the hybrid verifier (previous channel) cites the experiment files in its docstrings. Left boxes are the experiment side, right boxes the package side (<a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>).</p>
+
+<table>
+<thead><tr><th>Symbol in the package</th><th>Ports which experiment file</th><th>Quoted name</th></tr></thead>
+<tbody>
+<tr><td class="sym">sources/evaluators/hybrid_verifier/scorers.py</td><td><code class="path">harness/e19b_extract.py</code></td><td class="sym">SCORER_TEMPLATE_V2</td></tr>
+<tr><td class="sym">sources/evaluators/hybrid_verifier/inventory.py</td><td><code class="path">harness/e19_hybrid_bt.py</code></td><td class="sym">union_inventory</td></tr>
+<tr><td class="sym">sources/evaluators/hybrid_verifier/aggregation.py</td><td><code class="path">harness/e15_bt_eval.py</code></td><td class="sym">ridge 1.0</td></tr>
+<tr><td class="sym">sources/evaluators/hybrid_verifier/__init__.py</td><td><code class="path">results/E19b_hybrid_bt_v2_2026-09-24.md</code></td><td class="sym">gold-relevance 0.672</td></tr>
+</tbody>
+</table>
+<details><summary>verbatim docstring lines (file paths and line numbers)</summary><div class="dbody">
+<blockquote>Ports the measured E19b V4 scorer contract from ``experiments_verifiers/harness/e19b_extract.py`` (``SCORER_TEMPLATE_V2`` / ``REPAIR_TEMPLATE_V2``)</blockquote>
+<p>Source: <code class="path">sources/evaluators/hybrid_verifier/scorers.py</code> line 3.</p>
+<blockquote>Ports the measured conventions of ``experiments_verifiers/harness/e19_hybrid_bt.py`` (``union_inventory`` / ``deliverable_previews``) and the content signals of ``e14_bt_enabler.file_signal``</blockquote>
+<p>Source: <code class="path">sources/evaluators/hybrid_verifier/inventory.py</code> line 3.</p>
+<blockquote>The ridge (L2 on strengths, default 1.0) matches the measured experiment convention (``experiments_verifiers/harness/e15_bt_eval.py``)</blockquote>
+<p>Source: <code class="path">sources/evaluators/hybrid_verifier/aggregation.py</code> line 325.</p>
+<blockquote>Measured results behind this design (see ``experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md``)</blockquote>
+<p>Source: <code class="path">sources/evaluators/hybrid_verifier/__init__.py</code> line 25.</p>
+</div></details>
+<p class="sub">The rest of the tree stays research: <code class="path">harness/e19b_extract.py</code>, <code>e19_hybrid_bt.py</code>, <code>e15_bt_eval.py</code> have no caller in <code>sources/</code> (grep re-run, 2026-09-26).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diversity experiments</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 215" role="img" aria-label="diversity_experiments layout">
+  <defs>
+    <marker id="arw6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <marker id="arw7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../diversity_experiments/data/">
+    <title>Per-uuid copies of genotype, state_result and metrics.</title>
+    <rect x="20" y="40" width="190" height="58" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="115" y="64" text-anchor="middle">data, 1 127 run dirs</text>
+    <text class="box-sub" x="115" y="80" text-anchor="middle">5 campaigns + 2 jsonl</text>
+  </a>
+  <a class="box" href="../../diversity_experiments/scripts/">
+    <title>Extraction, analysis, PCA rendering, report build.</title>
+    <rect x="270" y="40" width="190" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="365" y="64" text-anchor="middle">scripts, 8 helpers</text>
+    <text class="box-sub" x="365" y="80" text-anchor="middle">extract + analysis + render</text>
+  </a>
+  <a class="box" href="../../diversity_experiments/results/">
+    <title>Descriptor vectors, distances, PCA images.</title>
+    <rect x="520" y="40" width="180" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="610" y="64" text-anchor="middle">results, 38 files</text>
+    <text class="box-sub" x="610" y="80" text-anchor="middle">descriptors + pcas</text>
+  </a>
+  <a class="box" href="../../diversity_experiments/report.html">
+    <title>Single-file findings report, images inline.</title>
+    <rect x="760" y="40" width="110" height="58" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="815" y="64" text-anchor="middle">report.html</text>
+    <text class="box-sub" x="815" y="80" text-anchor="middle">5.6 MB</text>
+  </a>
+  <a class="box" href="../../diversity_experiments/code_reference/">
+    <title>Byte-identical copies of the repo modules the scripts mirror.</title>
+    <rect x="270" y="145" width="190" height="52" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="365" y="167" text-anchor="middle">code_reference, 5 copies</text>
+    <text class="box-sub" x="365" y="183" text-anchor="middle">diff-identical to sources/</text>
+  </a>
+  <path class="edge dashed-edge" d="M210,69 H270" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw6)"/>
+  <text class="edge-label" x="240" y="60" text-anchor="middle">reads 719 records</text>
+  <path class="edge dashed-edge" d="M460,69 H520" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw6)"/>
+  <text class="edge-label" x="490" y="60" text-anchor="middle">writes 38 files</text>
+  <path class="edge dashed-edge" d="M700,69 H760" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw6)"/>
+  <text class="edge-label" x="730" y="60" text-anchor="middle">inlines images</text>
+  <path class="edge dotted-edge" d="M365,145 V98" fill="none" stroke="#5E8CA3" stroke-width="1.5" marker-end="url(#arw7)"/>
+  <text class="edge-label" x="430" y="126" text-anchor="middle">imports embed_genotype</text>
+</svg>
+</div>
+<p class="figcap">Diagram 4 - <code>diversity_experiments/</code> layout. Counts are my computation (2026-10-02); "runs" counts copied <code>state_result.json</code> files, not directories.</p>
+
+<p>The folder compares candidate behaviour descriptors for the QD archive, per campaign, against the descriptors Mimosa ships. <a href="../../diversity_experiments/README.md">README.md</a> lists the 5 metrics and the 4 scripts; the plan behind the current descriptor is <a href="mod_core_selection.html">mod_core_selection.html</a>, and the writer of the archive rows is <code>sources/core/evolution_engine.py::EvolutionEngine._persist_qd_archive</code>.</p>
+
+<table>
+<thead><tr><th>Metric key</th><th>What it embeds</th><th>Source field</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td class="sym">genotype</td><td>Workflow source, MiniLM chunks.</td><td class="sym">workflow_genotype_&lt;uuid&gt;.py</td><td>current descriptor</td></tr>
+<tr><td class="sym">fingerprint</td><td>7-D per-source pass-rate vector.</td><td class="sym">evaluation.verifier.failure_fingerprint</td><td><span class="tag dep">DEPRECATED</span></td></tr>
+<tr><td class="sym">actions</td><td>Per-agent tool-call strings.</td><td class="sym">state_result.actions</td><td>challenger, best</td></tr>
+<tr><td class="sym">answers</td><td>Per-agent answers and errors.</td><td class="sym">state_result.answers</td><td>challenger</td></tr>
+<tr><td class="sym">artefact</td><td>Produced .py files of the run.</td><td class="sym">/tmp/mimosa_run_*_&lt;uuid&gt;/</td><td><span class="chip warn">volatile</span></td></tr>
+</tbody>
+</table>
+
+<details><summary>numbers reused from diversity_experiments/report.html (with citation)</summary><div class="dbody">
+<p>From <code class="path">diversity_experiments/report.html</code>, TL;DR block: 5 descriptors x 5 campaigns, 1 141 workflow uuids, 23 computable metric x folder runs. Actions embedding reaches 2x the within-task resolution of genotype (pooled 0.132 vs 0.095) with a within/cross ratio of 0.44. The deprecated fingerprint shows 12.3% exact duplicate vectors on average (24% in <code>asb_iterative_1</code>) and admits almost every candidate (1-6 rejections, where genotype rejects 193/708). Genotype coverage is 0.77 mean and 0.4% duplicates.</p>
+<p>My count of the copied tree differs from the report: 1 127 uuid directories on disk, 956 of them non-empty; the report counts the source uuids before copying.</p>
+</div></details>
+<p class="sub">Archive rows come from <code>qd_archive.jsonl</code> (1 copied row, 14 keys incl. <code>qd_descriptor</code>, <code>qd_score</code>, <code>evicted_uuid</code>) and <code>variation_log.jsonl</code> (22 rows, 3 schema variants). Both are written by <code>sources/core/evolution_engine.py::EvolutionEngine._persist_qd_archive</code> and <code>::_persist_variation_log</code>; see <a href="data_runs.html">data_runs.html</a>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Reports and artifacts</h2>
+<p class="note">The E25 phase 2 pilot kept running after the first build: the judgments ledger held 219 rows then and 1 014 now, and the cost ledger grew from 394 to 1 249 rows (my computation, 2026-09-26). Every E25 count on this page is a dated snapshot, not a fixed result.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 290" role="img" aria-label="report files and what each one covers">
+  
+    <title>Cycle-1 report, E1 to E11.</title>
+    <rect x="20" y="30" width="560" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="32" y="55">REPORT_experiments.html</text>
+  
+  <text class="box-sub" x="600" y="55">cycle-1 report, E1-E11</text>
+  
+    <title>Cycle-2 report, E12 to E19 plus follow-ups.</title>
+    <rect x="20" y="80" width="560" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="32" y="105">REPORT_cycle2_E12-E19.html</text>
+  
+  <text class="box-sub" x="600" y="105">E12-E19 plus E19b, E24</text>
+  
+    <title>Per-task oracle weights against the recorded weights.</title>
+    <rect x="20" y="130" width="560" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="32" y="155">REPORT_e10_weights_visualization.html</text>
+  
+  <text class="box-sub" x="600" y="155">E10 oracle weights, per task</text>
+  
+    <title>Capacity theory, no experiments run.</title>
+    <rect x="20" y="180" width="560" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="32" y="205">REPORT_e11_theory.html</text>
+  
+  <text class="box-sub" x="600" y="205">E11 theory, zero experiments</text>
+  
+    <title>Bug cause, blast radius and the clean-data replay.</title>
+    <rect x="20" y="230" width="560" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="32" y="255">REPORT_excluded_task_bug_and_sane_replay.html</text>
+  
+  <text class="box-sub" x="600" y="255">bug root cause, sane replay</text>
+</svg>
+</div>
+<p class="figcap">Diagram 5 - 5 of the 6 <code>REPORT_*.html</code> files at the tree root, each linking to its title. The 6th is <code>REPORT_cycle2_E12-E19_BACKUP_2026-09-26.html</code>, a dated backup. All are single-file and offline.</p>
+
+<table>
+<thead><tr><th>Report or artifact</th><th>One line</th><th>Link</th></tr></thead>
+<tbody>
+<tr><td class="sym">REPORT_experiments.html</td><td>Cycle-1 hypotheses, results and verdicts.</td><td><span class="sub">gone from the repo</span></td></tr>
+<tr><td class="sym">REPORT_cycle2_E12-E19.html</td><td>Eight cycle-2 experiments plus two follow-ups.</td><td><span class="sub">gone from the repo</span></td></tr>
+<tr><td class="sym">REPORT_e10_weights_visualization.html</td><td>Recorded weights against the per-task oracle LP.</td><td><span class="sub">gone from the repo</span></td></tr>
+<tr><td class="sym">REPORT_e11_theory.html</td><td>What could beat the L3 learner, ranked.</td><td><span class="sub">gone from the repo</span></td></tr>
+<tr><td class="sym">REPORT_excluded_task_bug_and_sane_replay.html</td><td>Bug root cause, 84 nulled manifest rows.</td><td><span class="sub">gone from the repo</span></td></tr>
+<tr><td class="sym">results/E19b_hybrid_bt_v2_2026-09-24.md</td><td>v2 scorer feedback: relevance 0.672, hallucination 0.415.</td><td><a href="../../experiments_verifiers/results/E19b_hybrid_bt_v2_2026-09-24.md">open</a></td></tr>
+<tr><td class="sym">harness/e25_creed.py</td><td>E25 CREED harness, 2 039 lines, 92 KiB.</td><td><a href="../../experiments_verifiers/harness/e25_creed.py">open</a></td></tr>
+<tr><td class="sym">harness/e35_prime.py</td><td>E35 PRIME harness, 2 848 lines, 135 KiB (longest script).</td><td><a href="../../experiments_verifiers/harness/e35_prime.py">open</a></td></tr>
+<tr><td class="sym">results/E25_creED_autopsy_2026-09-25.md</td><td>Phase-1 autopsy of E18; verdict: decision-contract defect.</td><td><a href="../../experiments_verifiers/results/E25_creED_autopsy_2026-09-25.md">open</a></td></tr>
+<tr><td class="sym">results/E25_creED_judgments_2026-09-25.jsonl</td><td>E25 pilot judgments: 219 rows then, 1 014 now.</td><td><a href="../../experiments_verifiers/results/E25_creED_judgments_2026-09-25.jsonl">open</a></td></tr>
+<tr><td class="sym">results/E25_creED_bt_cost_ledger_2026-09-25.jsonl</td><td>Cost ledger: 1 249 rows now (394 at build).</td><td><a href="../../experiments_verifiers/results/E25_creED_bt_cost_ledger_2026-09-25.jsonl">open</a></td></tr>
+<tr><td class="sym">deprecated_verifier_how_it_worked.md</td><td>Legacy claims verifier anatomy, mapped to code.</td><td><a href="../../experiments_verifiers/deprecated_verifier_how_it_worked.md">open</a></td></tr>
+<tr><td class="sym">EXPERIMENTS.md</td><td>Plan text, hard rules and the verified data map.</td><td><a href="../../experiments_verifiers/EXPERIMENTS.md">open</a></td></tr>
+<tr><td class="sym">results/E35_prime_2026-09-26.md</td><td>E35 PRIME report: mixed ranking, best gradient relevance 0.690.</td><td><a href="../../experiments_verifiers/results/E35_prime_2026-09-26.md">open</a></td></tr>
+<tr><td class="sym">manifest.json</td><td>1 104 rows joined to 148 snapshots; <code>note_contaminated</code> flags.</td><td><a href="../../experiments_verifiers/manifest.json">open</a></td></tr>
+<tr><td class="sym">diversity_experiments/report.html</td><td>Diversity findings, images inlined as base64.</td><td><a href="../../diversity_experiments/report.html">open</a></td></tr>
+</tbody>
+</table>
+
+<details><summary>E25 ledger row counts, full text of the two rows above (my computation, 2026-09-26)</summary><div class="dbody">
+<p>judgments ledger: 219 rows at the first build, 1 014 at this snapshot. Cost ledger: 1 249 rows at this snapshot &mdash; 1 064 code + 111 depth + 74 repair &mdash; up from 394 rows at the first build.</p>
+</div></details>
+
+<p class="sub">E25 auxiliary files, all under <a href="../../experiments_verifiers/results/">results/</a>: <a href="../../experiments_verifiers/results/_e25_depth_sample_2026-09-25.jsonl">_e25_depth_sample_2026-09-25.jsonl</a> (44 rows), <a href="../../experiments_verifiers/results/_e25_depth_llm_2026-09-25.jsonl">_e25_depth_llm_2026-09-25.jsonl</a> (67 rows), <a href="../../experiments_verifiers/results/_e25_flip_cases_2026-09-25.json">_e25_flip_cases_2026-09-25.json</a> (9 cases). The experiment has its own pages: <a href="exp_e25_creed.html">exp_e25_creed.html</a> and <a href="file_harness_e25_creed.html">file_harness_e25_creed.html</a>.</p>
+<p class="note">Amber: <a href="../../experiments_verifiers/README.md">README.md</a> section 2 says 199 frozen workspaces; the disk holds 148, because <code>manifest.json</code> <code>provenance</code> records 51 empty skeletons deleted.</p>
+<p class="note">Amber: the diversity report counts 1 141 uuids; the copied tree holds 1 127 run directories, 956 non-empty (my computation).</p>
+<p class="note flag">Red: docs in the tree name files that are not on disk (2026-09-28). <a href="../../experiments_verifiers/README.md">README.md</a> links <code>EXPERIMENTS_PLAN.md</code> (line 139) and mentions <code>HANDOFF_V2.md</code> (line 106) and <code>VERIFIER_ARCHITECTURE.md</code> (line 135); <code>HANDOFF.md</code> (line 11) is present again since 2026-09-28. Details below.</p>
+<details><summary>doc versus disk mismatches (my computation, 2026-09-28)</summary><div class="dbody">
+<table>
+<thead><tr><th>Doc and line</th><th>Says</th><th>On disk</th></tr></thead>
+<tbody>
+<tr><td class="sym">README.md:106</td><td><code>HANDOFF_V2.md</code></td><td><span class="chip err">missing</span></td></tr>
+<tr><td class="sym">README.md:135</td><td><code>VERIFIER_ARCHITECTURE.md</code></td><td><span class="chip err">missing</span>; <code>deprecated_verifier_how_it_worked.md</code> exists</td></tr>
+<tr><td class="sym">README.md:139</td><td><code>EXPERIMENTS_PLAN.md</code></td><td><span class="chip err">missing</span>; <code>EXPERIMENTS.md</code> exists</td></tr>
+<tr><td class="sym">HANDOFF.md:108</td><td><code>data/manifest_sane.jsonl</code></td><td><span class="chip warn">name differs</span>: <code>data/manifest_sane.json</code></td></tr>
+<tr><td class="sym">HANDOFF.md:200-201</td><td><code>HANDOFF_V2.md</code>, <code>EXPERIMENTS_PLAN_V2.md</code></td><td><span class="chip err">missing</span></td></tr>
+<tr><td class="sym">HANDOFF.md:205</td><td>harness "e12-e40"</td><td><span class="chip warn">no e37-e40 script</span>; E41 script exists</td></tr>
+</tbody>
+</table>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>E35 PRIME result files</h2>
+<p class="intro">E35 is the only experiment from the E26-E36 range with a page. It left 16 files and 2 folders in <code class="path">experiments_verifiers/results/</code>.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 880 250" role="img" aria-label="E35 result file families written by e35_prime.py">
+  <defs>
+    <marker id="arw8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+  </defs>
+  <a class="box" href="../../experiments_verifiers/harness/e35_prime.py">
+    <title>The harness script that wrote every E35 file.</title>
+    <rect x="20" y="88" width="190" height="60" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="115" y="112" text-anchor="middle">harness/e35_prime.py</text>
+    <text class="box-sub" x="115" y="130" text-anchor="middle">2 848 lines</text>
+  </a>
+  <path class="edge dashed-edge" d="M210,118 H300" fill="none" stroke="#7DF9C7" stroke-width="1.5" marker-end="url(#arw8)"/>
+  <text class="edge-label" x="255" y="110" text-anchor="middle">writes</text>
+
+  <a class="box" href="../../experiments_verifiers/results/E35_prime_2026-09-26.json">
+    <title>Final verdict block and its markdown report.</title>
+    <rect x="300" y="16" width="270" height="44" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="312" y="35">E35_prime_2026-09-26 .json + .md</text>
+    <text class="box-sub" x="312" y="51">verdict + report, 326 KiB</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E35_claims_2026-09-26.jsonl">
+    <title>Three live ledgers plus three screen-v1 archives.</title>
+    <rect x="300" y="70" width="270" height="44" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="312" y="89">E35_claims / _scorers / _scores</text>
+    <text class="box-sub" x="312" y="105">3 ledgers + 3 archived, 2.0 MB</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E35_gradient_duel_2026-09-26.json">
+    <title>Gradient-judge duel output and the call ledger.</title>
+    <rect x="300" y="124" width="270" height="44" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="312" y="143">E35_gradient_duel + cost_ledger</text>
+    <text class="box-sub" x="312" y="159">duel 1.2 MB, ledger 154 KiB</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e35_preregistration_2026-09-26.json">
+    <title>Caches and the frozen pre-registration.</title>
+    <rect x="300" y="178" width="270" height="44" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="312" y="197">_e35_* caches and preregistration</text>
+    <text class="box-sub" x="312" y="213">5 files, 628 KiB</text>
+  </a>
+
+  <a class="box" href="../../experiments_verifiers/results/E35_registries/">
+    <title>Per-group claim registries and the visual cache.</title>
+    <rect x="610" y="70" width="250" height="44" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="622" y="89">E35_registries/</text>
+    <text class="box-sub" x="622" y="105">20 files, 0.5 MB</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E35_prime_gradients/">
+    <title>One gradient file per generation of the frozen arena.</title>
+    <rect x="610" y="124" width="250" height="44" rx="2" fill="rgba(94,140,163,0.10)" stroke="#5E8CA3"/>
+    <text class="box-label" x="622" y="143">E35_prime_gradients/</text>
+    <text class="box-sub" x="622" y="159">148 files, 1.5 MB</text>
+  </a>
+  <path class="edge dashed-edge" d="M570,146 H610" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw8)"/>
+  <text class="edge-label" x="590" y="138" text-anchor="middle">writes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 6 - the E35 file families and their sizes, my computation (2026-09-26). Sixteen files plus two folders; the 148 gradient files mirror the frozen E14 arena.</p>
+
+<table>
+<thead><tr><th>File or folder</th><th>What it holds</th><th class="size">Size</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_prime_2026-09-26.json">E35_prime_2026-09-26.json</a></td><td>16 keys: hypothesis, protocol, four readouts, verdict.</td><td class="size">312.0 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_prime_2026-09-26.md">E35_prime_2026-09-26.md</a></td><td>Report text, all numbers marked my computation.</td><td class="size">14.3 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_claims_2026-09-26.jsonl">E35_claims_2026-09-26.jsonl</a></td><td>Per-group claim rows after the T1 screen fix.</td><td class="size">140.5 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_claims_2026-09-26_screenv1_archived.jsonl">E35_claims_..._screenv1_archived.jsonl</a></td><td>Run-1 claims under the first screen.</td><td class="size">129.5 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_scorers_2026-09-26.jsonl">E35_scorers_2026-09-26.jsonl</a></td><td>One policy-scorer script per claim.</td><td class="size">902.0 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_scorers_2026-09-26_screenv1_archived.jsonl">E35_scorers_..._screenv1_archived.jsonl</a></td><td>Run-1 scorers, archived.</td><td class="size">277.6 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_scores_2026-09-26.jsonl">E35_scores_2026-09-26.jsonl</a></td><td>Per-claim scores over the workspaces.</td><td class="size">437.8 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_scores_2026-09-26_screenv1_archived.jsonl">E35_scores_..._screenv1_archived.jsonl</a></td><td>Run-1 scores, archived.</td><td class="size">129.6 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_gradient_duel_2026-09-26.json">E35_gradient_duel_2026-09-26.json</a></td><td>Gradient-judge duel: stats, pairs, calls.</td><td class="size">1 190.2 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_gradient_duel_2026-09-26.md">E35_gradient_duel_2026-09-26.md</a></td><td>Duel report text.</td><td class="size">2.8 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_cost_ledger_2026-09-26.jsonl">E35_cost_ledger_2026-09-26.jsonl</a></td><td>Per-call tokens, cost and latency.</td><td class="size">154.1 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/_e35_preregistration_2026-09-26.json">_e35_preregistration_2026-09-26.json</a></td><td>Prompt hash frozen before the full run.</td><td class="size">3.3 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/_e35_prompt_iterations_2026-09-26.json">_e35_prompt_iterations_2026-09-26.json</a></td><td>Label-free prompt iterations and gate verdicts.</td><td class="size">8.6 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/_e35_label_free_2026-09-26.json">_e35_label_free_2026-09-26.json</a></td><td>Label-free pilot gate results.</td><td class="size">411.7 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/_e35_pilot_claims_2026-09-26.jsonl">_e35_pilot_claims_2026-09-26.jsonl</a></td><td>Pilot claim rows.</td><td class="size">45.4 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/_e35_hallucination_audit_2026-09-26.json">_e35_hallucination_audit_2026-09-26.json</a></td><td>Gradient hallucination audit rows.</td><td class="size">159.1 KiB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_registries/">E35_registries/</a></td><td>Per-group registries plus the visual cache.</td><td class="size">0.5 MB</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/results/E35_prime_gradients/">E35_prime_gradients/</a></td><td>One gradient file per frozen generation.</td><td class="size">1.5 MB</td></tr>
+</tbody>
+</table>
+<p class="sub">E35 has its own pages: <a href="exp_e35_prime.html">exp_e35_prime.html</a> and <a href="file_harness_e35_prime.html">file_harness_e35_prime.html</a>. Headline readout: <code>e35_online</code> pairs-correct 0.7075 against <code>e30_online</code> 0.7585 and <code>e19c_online</code> 0.7415, with gradient relevance 0.690 (quoted from <code class="path">results/E35_prime_2026-09-26.md</code>).</p>
+<p class="note flag">Not yet covered: the results folder holds a result-file family for every experiment from E26 to E41, but only E35 and E37 have a page. The families with no page are E26 (bumblebee), E27 (arbiter), E28 (mirror), E29 (poirot), E30 (optimus), E31 (council), E32 (mirror_v2), E33 (truman), E34 (forensic), E36 (liar), E38, E39, E40 and E41 (cage).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>E36-E42 result files</h2>
+<p class="intro">Seven experiments landed after E35: one detector probe (E36), three campaign audits (E37-E39), one sandbox investigation (E40), one label re-grade (E41 CAGE, completed) and one gradient autopsy (E42). Only E36 and E41 have harness scripts; E37-E40 and E42 are offline with a JSON+MD pair each.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 580" role="img" aria-label="E36 to E41: scripts on the left, result files in the middle, code and campaign evidence on the right">
+  <defs>
+    <marker id="arw9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arw10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+    <filter id="glow9" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+
+  <a class="box" id="x-bs" href="file_eval_bs_detection.html">
+    <title>The module under test in E36; read, never changed.</title>
+    <rect x="20" y="20" width="230" height="50" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="32" y="42">generic/bs_detection.py</text>
+    <text class="box-sub" x="32" y="60">BullshitDetectorNumerical</text>
+  </a>
+  <a class="box" id="x-bsc" href="../../experiments_verifiers/harness/e36_liar_bs.py">
+    <title>Adapted copy of bs_detection: same prompts, new judge model, cost cap.</title>
+    <rect x="20" y="92" width="230" height="50" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="32" y="114">harness/e36_liar_bs.py</text>
+    <text class="box-sub" x="32" y="132">922 lines, adapted copy</text>
+  </a>
+  <a class="box" id="x-liar" href="../../experiments_verifiers/harness/e36_liar.py">
+    <title>E36 driver: phase1, repeat, phase2, report.</title>
+    <rect x="20" y="164" width="230" height="50" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="32" y="186">harness/e36_liar.py</text>
+    <text class="box-sub" x="32" y="204">781 lines, driver</text>
+  </a>
+  <a class="box" id="x-cage" href="../../experiments_verifiers/harness/e41_cage.py">
+    <title>E41 driver: prereg, pilot, full, analyze.</title>
+    <rect x="20" y="444" width="230" height="50" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="32" y="466">harness/e41_cage.py</text>
+    <text class="box-sub" x="32" y="484">1 299 lines, driver</text>
+  </a>
+
+  <a class="box" id="r36" href="../../experiments_verifiers/results/E36_liar_2026-09-26.md">
+    <title>Can bs_detection give a gradient or a score? Narrow gradient yes, ranking no.</title>
+    <rect x="330" y="166" width="290" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="342" y="185">E36 LIAR</text>
+    <text class="box-sub" x="342" y="202">detector signal; 3 files, 2 dirs</text>
+  </a>
+  <a class="box" id="r37" href="exp_e37_audit_run1.html">
+    <title>Audit of run_1 under E35 PRIME: 0/4 tasks pass.</title>
+    <rect x="330" y="222" width="290" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="342" y="241">E37 audit round 1</text>
+    <text class="box-sub" x="342" y="258">4 tasks, 4 causes; own page</text>
+  </a>
+  <a class="box" id="r38" href="../../experiments_verifiers/results/E38_audit_run1_round2_2026-09-27.md">
+    <title>Audit after the R1/R3/R4/R6 fixes: all 4 tasks still fail SR.</title>
+    <rect x="330" y="278" width="290" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="342" y="297">E38 audit round 2</text>
+    <text class="box-sub" x="342" y="314">fix check, bugs N1-N7; 2 files</text>
+  </a>
+  <a class="box" id="r39" href="../../experiments_verifiers/results/E39_audit_run1_round3_2026-09-28.md">
+    <title>Audit of 7 new failing tasks and 3 passing ones; bugs N8-N11.</title>
+    <rect x="330" y="334" width="290" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="342" y="353">E39 audit round 3</text>
+    <text class="box-sub" x="342" y="370">10 tasks, bugs N8-N11; 2 files</text>
+  </a>
+  <a class="box" id="r40" href="../../experiments_verifiers/results/E40_provisioning_investigation_2026-09-28.md">
+    <title>Why the eval venv misses runtime-only imports (N10), and the seekpath fix.</title>
+    <rect x="330" y="390" width="290" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="342" y="409">E40 provisioning (N10)</text>
+    <text class="box-sub" x="342" y="426">runtime-only imports; 2 files</text>
+  </a>
+  <a class="box" id="r41" href="../../experiments_verifiers/results/E41_cage_2026-09-28.md">
+    <title>Re-grades 148 arena generations: SR flips 0.108, fresh-regrade ceiling 0.854.</title>
+    <rect x="330" y="446" width="290" height="46" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="342" y="465">E41 CAGE</text>
+    <text class="box-sub" x="342" y="482">0.108 flip, ceiling 0.854</text>
+    <rect x="540" y="454" width="52" height="16" rx="8" fill="rgba(57,255,136,0.08)" stroke="#39FF88"/>
+    <text x="566" y="466" text-anchor="middle" font-size="9" fill="#39FF88">DONE</text>
+  </a>
+
+  <a class="box" id="x-ev" href="data_runs.html">
+    <title>Campaign records the audits read: run notes, capsules, workflow folders.</title>
+    <rect x="660" y="222" width="220" height="158" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="672" y="246">campaign evidence</text>
+    <text class="box-sub" x="672" y="266">run_notes/, runs_capsule/,</text>
+    <text class="box-sub" x="672" y="282">sources/workflows/</text>
+    <text class="box-sub" x="672" y="302">audited as "run_1"</text>
+  </a>
+  <a class="box" id="x-sb" href="area_benchmark_evaluation.html#f-execution-sandbox">
+    <title>Mimosa grading path: CapsuleEvaluator runs ExecutionSandbox.</title>
+    <rect x="660" y="396" width="220" height="96" rx="2" fill="rgba(77,159,255,0.08)" stroke="#4D9FFF"/>
+    <text class="box-label" x="672" y="420">benchmark_evaluation/</text>
+    <text class="box-sub" x="672" y="440">CapsuleEvaluator</text>
+    <text class="box-sub" x="672" y="456">ExecutionSandbox</text>
+    <text class="box-sub" x="672" y="476">EXTRA_DEPS phonopy</text>
+  </a>
+
+  <path class="edge dashed-edge" data-from="x-bs" data-to="x-bsc" d="M135,70 V92" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#arw10)"/>
+  <text class="edge-label" x="142" y="85">adapted copy</text>
+  <path class="edge dotted-edge" data-from="x-bsc" data-to="x-liar" d="M135,142 V164" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw10)"/>
+  <text class="edge-label" x="142" y="157">imported as BS</text>
+  <path class="edge" data-from="x-liar" data-to="r36" d="M250,189 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw9)"/>
+  <text class="edge-label" x="290" y="182" text-anchor="middle">writes</text>
+  <path class="edge" data-from="x-cage" data-to="r41" d="M250,469 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw9)"/>
+  <text class="edge-label" x="290" y="462" text-anchor="middle">writes</text>
+  <path class="edge dotted-edge" data-from="x-cage" data-to="x-sb" d="M135,494 V540 H770 V492" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw10)"/>
+  <text class="edge-label" x="450" y="534" text-anchor="middle">imports CapsuleEvaluator, ExecutionSandbox</text>
+  <path class="edge dashed-edge" data-from="r37" data-to="x-ev" d="M620,245 H660" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw10)"/>
+  <path class="edge dashed-edge" data-from="r38" data-to="x-ev" d="M620,301 H660" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw10)"/>
+  <path class="edge dashed-edge" data-from="r39" data-to="x-ev" d="M620,357 H660" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw10)"/>
+  <text class="edge-label" x="640" y="237" text-anchor="middle">reads</text>
+  <path class="edge dashed-edge" data-from="r40" data-to="x-sb" d="M620,413 H660" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw10)"/>
+  <text class="edge-label" x="640" y="406" text-anchor="middle">reads</text>
+
+  <text class="box-sub" x="20" y="570">cyan = harness script &middot; mint = result files or verifier-side module &middot; arc blue = grading sandbox &middot; steel = campaign data &middot; 12 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 7 - E36 to E41, my computation (<code>ls</code>, <code>wc -l</code>, 2026-09-28, refreshed 2026-09-30). Codenames are the ones the result files state (E36 <code>LIAR</code>, E41 <code>CAGE</code>); <a href="../../experiments_verifiers/HANDOFF.md">HANDOFF.md</a> section 9 lists E37-E40 only as "audits". E41 CAGE finished after the first build (verdict: SR flip 0.108, ceiling 0.854) and E42 (gradient autopsy) landed 2026-09-29 with a JSON+MD pair, not drawn (12-box limit).</p>
+
+<table>
+<thead><tr><th>Exp.</th><th>Codename</th><th>One-line purpose</th><th>Result files</th><th>Script</th></tr></thead>
+<tbody>
+<tr><td class="sym">E36</td><td>LIAR</td><td>Can <code>bs_detection</code> give a verifier gradient or score?</td><td><a href="../../experiments_verifiers/results/E36_liar_2026-09-26.md">.md</a> + .json + cost ledger (68 rows); <code>_e36_cache/</code> 26, <code>_e36_perturbed/</code> 37 files</td><td>e36_liar.py 781 + e36_liar_bs.py 922 lines</td></tr>
+<tr><td class="sym">E37</td><td>none stated</td><td>Audit run_1 under E35 PRIME: why tasks fail SR.</td><td><a href="exp_e37_audit_run1.html">page</a>, <a href="../../experiments_verifiers/results/E37_audit_run1_prime_2026-09-27.md">.md</a> 133 + .json 154 lines</td><td>none, offline</td></tr>
+<tr><td class="sym">E38</td><td>none stated</td><td>Audit round 2: are the E37 fixes working?</td><td><a href="../../experiments_verifiers/results/E38_audit_run1_round2_2026-09-27.md">.md</a> 135 lines + .json</td><td>none, offline</td></tr>
+<tr><td class="sym">E39</td><td>none stated</td><td>Audit round 3: 7 failing and 3 passing tasks.</td><td><a href="../../experiments_verifiers/results/E39_audit_run1_round3_2026-09-28.md">.md</a> 108 lines + .json</td><td>none, offline</td></tr>
+<tr><td class="sym">E40</td><td>none stated</td><td>Eval sandbox misses runtime-only imports (ticket N10).</td><td><a href="../../experiments_verifiers/results/E40_provisioning_investigation_2026-09-28.md">.md</a> 161 lines + .json</td><td>none, one local venv test</td></tr>
+<tr><td class="sym">E41</td><td>CAGE</td><td>Do SR/VER labels repeat? SR flips 0.108; ceiling 0.854.</td><td><a href="../../experiments_verifiers/results/E41_cage_2026-09-28.md">.md</a> + .json, runs ledger, cost ledger, guard, logs; <code>E41_cage_raw_2026-09-28/</code>, <code>_e41_venv/</code></td><td>e41_cage.py 1 299 lines</td></tr>
+<tr><td class="sym">E42</td><td>none stated</td><td>Gradient autopsy: the gradient never converges ($0).</td><td><a href="../../experiments_verifiers/results/E42_gradient_evolution_2026-09-29.md">.md</a> + .json</td><td>none, offline</td></tr>
+</tbody>
+</table>
+<details><summary>headline lines per experiment (quoted, with file)</summary><div class="dbody">
+<p><b>E36</b> (<code class="path">results/E36_liar_2026-09-26.md</code> "Answer"): scoring "Yes, weakly"; gradient "Yes, conditionally"; ranking signal (path 3) "refuted on current evidence". Cost $0.0219 of a $5.00 cap. Phase 2 fabrications are synthetic.</p>
+<p><b>E37</b> (<code class="path">results/E37_audit_run1_prime_2026-09-27.md</code> TL;DR): 0/4 tasks pass, $15.13, 11 of 26 slots VER false. See <a href="exp_e37_audit_run1.html">exp_e37_audit_run1.html</a>.</p>
+<p><b>E38</b> (<code class="path">results/E38_audit_run1_round2_2026-09-27.md</code> TL;DR): the max-reward generation fails SR on all four tasks; factors lost to a regression of the R1 selection fix.</p>
+<p><b>E39</b> (<code class="path">results/E39_audit_run1_round3_2026-09-28.md</code> TL;DR): new bugs N8, N9, N10, N11 and N1-residual; only one of the 3 "passing" tasks shipped a passing capsule.</p>
+<p><b>E40</b> (<code class="path">results/E40_provisioning_investigation_2026-09-28.md</code> section 6): step 1 is <code>EXTRA_DEPS["phonopy"] = ["seekpath"]</code>. It is in the current <code class="path">sources/benchmark_evaluation/execution_sandbox.py</code> (<code>EXTRA_DEPS</code> at line 105, entry at line 121) and not at <code>336fe19</code> (my check with <code>git show</code>).</p>
+<p><b>E41</b> (<code class="path">results/E41_cage_2026-09-28.md</code>): re-graded 148 snapshots through Mimosa's own evaluator on temp copies. SR test-retest flip 0.108 (visual 0.167, programmatic 0.074), VER flip 0.013; a fresh-regrade ranker scores at most 0.854 against recorded labels, so <code>e30_online</code> 0.759 is ~89% of reachable. Noise dominated by a deepchem/numpy grading-env regression and unseeded training.</p>
+<p><b>E42</b> (<code class="path">results/E42_gradient_evolution_2026-09-29.md</code>): the gradient never converges - 73% of 55 gradient&rarr;mutation transitions die at source, 7% close on a correct diagnosis, 5/33 headline-gens gold-aligned. 0 of 7 SR-failing root causes fully diagnosable from gradient-visible artifacts.</p>
+</div></details>
+<p class="note">Amber: E36 names its module as <code>sources/evaluators/bs_detection.py</code>; the file now lives at <code class="path">sources/evaluators/generic_verifier/bs_detection.py</code> (it moved from <code>generic/</code> on 2026-10-10).</p>
+<p class="note">Amber: the E37-E39 audits cite <code>run_notes/run_1/</code>, <code>runs_capsule/run_1/</code> and <code>sources/workflows/run_1/</code>. On 2026-09-28 the E37 files sit under the <code>e35_first_attempt/</code> folders, and <code>run_1/</code> holds a newer run.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>E44 KUMITE &mdash; policy-script BT-tree; content-v2 confirmed</h2>
+<p class="intro">E44 (2026-10-02) replays a Bradley-Terry verifier whose pairwise comparator is an LLM-written deterministic <code>compare(dA,dB)</code> Python policy per task, over the frozen 19-task/148-gen arena with fresh re-execution of every snapshot. Two arms: v1 (as built) and v2 (five gold-free content levers on the recon/policy prompts; assembly untouched). Ranking stays inside noise; v2 moves gradient relevance 2.7&times;. Do not ship as a ranker; v2 feedback layer is a candidate gradient module.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 300" role="img" aria-label="E44 pipeline: snapshots re-executed, digested, one policy per task, BT fit per prefix, measured against gates">
+  <defs>
+    <marker id="arw44" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arw44b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+  </defs>
+  <a class="box" href="../../experiments_verifiers/workspace_artefacts/snapshots/">
+    <title>148 frozen workspaces, re-run on copy-on-write scratch copies.</title>
+    <rect x="20" y="26" width="200" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="120" y="48" text-anchor="middle">frozen arena</text>
+    <text class="box-sub" x="120" y="66" text-anchor="middle">19 tasks, 148 gens</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e44_reexec.py">
+    <title>e44_reexec.py: run.sh on CoW scratch, exec ledger, 117/149 clean.</title>
+    <rect x="20" y="112" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="134" text-anchor="middle">harness/e44_reexec.py</text>
+    <text class="box-sub" x="120" y="152" text-anchor="middle">fresh ledger, 117/149</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e44_digest.py">
+    <title>e44_digest.py: gold-free workspace digest, id_order_match.</title>
+    <rect x="250" y="112" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="350" y="134" text-anchor="middle">e44_digest.py</text>
+    <text class="box-sub" x="350" y="152" text-anchor="middle">gold-free digest</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e44_policy.py">
+    <title>e44_recon + e44_policy: 1 LLM call per task for config, then a compare(dA,dB) policy script, AST screen + antisymmetry repair.</title>
+    <rect x="480" y="112" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="580" y="128" text-anchor="middle">e44_policy.py</text>
+    <text class="box-sub" x="580" y="146" text-anchor="middle">compare(dA,dB) per task</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e44_bt.py">
+    <title>e44_bt.py: bt_fit_weighted per evolution prefix, ratings trajectory.</title>
+    <rect x="480" y="198" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="580" y="220" text-anchor="middle">e44_bt.py</text>
+    <text class="box-sub" x="580" y="238" text-anchor="middle">BT per prefix</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e44/">
+    <title>Raw evidence tree: exec ledger, digests, recon, policies, verdicts, tournament, measure.</title>
+    <rect x="710" y="112" width="170" height="70" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="795" y="134" text-anchor="middle">results/_e44/</text>
+    <text class="box-sub" x="795" y="152" text-anchor="middle">evidence tree</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/html_report_human_only/REPORT_E44_kumite_2026-10-02.html">
+    <title>Single-file offline HTML report of E44.</title>
+    <rect x="710" y="26" width="170" height="56" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="795" y="48" text-anchor="middle">HTML report</text>
+    <text class="box-sub" x="795" y="66" text-anchor="middle">REPORT_E44_kumite</text>
+  </a>
+  <path class="edge dashed-edge" d="M120,82 V112" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#arw44b)"/>
+  <text class="edge-label" x="130" y="101" text-anchor="start">CoW re-run</text>
+  <path class="edge" d="M220,140 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw44)"/>
+  <text class="edge-label" x="235" y="132" text-anchor="middle">ledger</text>
+  <path class="edge" d="M450,140 H480" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw44)"/>
+  <text class="edge-label" x="465" y="132" text-anchor="middle">digests</text>
+  <path class="edge" d="M580,168 V198" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw44)"/>
+  <text class="edge-label" x="590" y="187" text-anchor="start">verdicts</text>
+  <path class="edge dashed-edge" d="M680,140 H710" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw44b)"/>
+  <text class="edge-label" x="695" y="132" text-anchor="middle">writes</text>
+  <path class="edge dashed-edge" d="M795,112 V82" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw44b)"/>
+  <text class="edge-label" x="805" y="101" text-anchor="start">renders</text>
+  <text class="box-sub" x="20" y="290">cyan = harness script &middot; mint = result / report &middot; steel = raw evidence &middot; 7 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 8 - the E44 pipeline (8 harness scripts, <code>e44_pipeline.sh</code>). DeepSeek calls across both arms cost <b>$0.79 of a $10 cap</b>. 11 generations pass recorded labels but fail fresh re-execution (E41 CAGE noise made visible); frozen evidence stayed intact (manifest + pip-freeze guards). v1 arm kept verbatim under <code>results/_e44/v1/</code>.</p>
+
+<table>
+<thead><tr><th>Gate</th><th>Outcome</th><th>Number</th></tr></thead>
+<tbody>
+<tr><td class="sym">G1 ranking</td><td><span class="chip err">FAIL</span> honest negative</td><td>v2 pooled 0.687 (v1 0.704; cluster 0.676) vs legacy 0.558; task-cluster CI spans 0; below e19c 0.7415 and e30 0.7585</td></tr>
+<tr><td class="sym">G2 picking</td><td><span class="chip warn">9/19</span></td><td>v2 picks (v1 8/19); inside the saturated band</td></tr>
+<tr><td class="sym">G3 gradient</td><td><span class="chip err">FAIL</span> (v2 improves)</td><td>v1 0.188 &rarr; v2 0.504 relevance (zero-relevance rows 29&rarr;0, away 11&rarr;6, hallucination 0.175&rarr;0.158); gate bar 0.60, projection 0.4&ndash;0.55 hit</td></tr>
+<tr><td class="sym">G4 reliability</td><td><span class="chip ok">PASS</span></td><td>antisymmetry 1.000 both arms, errors 0.000 (v1 ties 0.424 &rarr; v2 0.43)</td></tr>
+</tbody>
+</table>
+<p>Verdict: ranking unmoved within noise; prompt/extraction content moves gradient quality 2.7&times; &mdash; feedback content and ranking are separable axes. <b>Correction (E45, 2026-10-02):</b> the v2 relevance claim (0.188 &rarr; 0.504) is re-labeled a <b>naming artifact</b> &mdash; placebo footer-only gradients scored 0.62 under E16v2 while real v2 gradients scored 0.51; see <a href="../../experiments_verifiers/results/_e44/measure/adv_circularity.json">results/_e44/measure/adv_circularity.json</a> and the E45 panel below. Do not ship as a ranker; the v2 feedback layer is a candidate gradient module. Within-task ratings track SR on 7/7 contrast tasks (+0.40&hellip;+0.86). Sources: <a href="../../experiments_verifiers/results/E44_kumite_2026-10-02.md">results/E44_kumite_2026-10-02.md</a> + <code>.json</code>; anatomy in <a href="../../experiments_verifiers/harness/e44_gradient_anatomy.md">harness/e44_gradient_anatomy.md</a> (5 gold-free v2 levers, projection 0.19 &rarr; 0.4&ndash;0.55) and <a href="../../experiments_verifiers/harness/e44_scout_failure_modes.md">harness/e44_scout_failure_modes.md</a>; v1 arm kept verbatim under <a href="../../experiments_verifiers/results/_e44/v1/">results/_e44/v1/</a>; report <a href="../../experiments_verifiers/html_report_human_only/REPORT_E44_kumite_2026-10-02.html">REPORT_E44_kumite_2026-10-02.html</a>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>E45 SPARTAN &mdash; adversarial verification of E44; instrument v2b + quarantined holdout</h2>
+<p class="intro">E45 (2026-10-02) attacks E44 before trusting it: a placebo probe (gradients holding only the coverage footer) scored 0.62 vs real 0.51 under the E16v2 relevance judge, so the v2 gain 0.188&rarr;0.504 was mostly a naming artifact and the design was in-sample. Fix set: a v2b assessment-scoring instrument (naming counts zero), a quarantined 7-task holdout whose gates were read once, a substance-only v3 arm and a no-recon generic control. Outcome: the instrument is fixed (placebo 0.000) but assessed substance stays &asymp;0.2 in every arm &mdash; the gap is structural (F6); the value-determinant rung is the one holdout-validated win.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 200" role="img" aria-label="E45: placebo probe exposes the E16v2 naming artifact, the v2b judge re-scores assessment substance, the quarantined holdout carries the v3 and generic arms to the gates">
+  <defs>
+    <marker id="arw45" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arw45b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+  </defs>
+  <a class="box" href="../../experiments_verifiers/results/E44_kumite_2026-10-02.md">
+    <title>E44 v2 gradients scored 0.504 relevance under E16v2.</title>
+    <rect x="20" y="24" width="190" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="115" y="46" text-anchor="middle">E44 v2 gradients</text>
+    <text class="box-sub" x="115" y="64" text-anchor="middle">E16v2 relevance 0.504</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e44/measure/adv_circularity.json">
+    <title>Placebo probe: footer-only gradients score 0.62, real gradients 0.51, under E16v2.</title>
+    <rect x="280" y="24" width="190" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="375" y="46" text-anchor="middle">placebo probe</text>
+    <text class="box-sub" x="375" y="64" text-anchor="middle">footer-only 0.62 &gt; real 0.51</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e45_spartan.py">
+    <title>e45_spartan.py: v2b assessment-scoring judge (placebo 0.000), v3 + generic arms on the holdout.</title>
+    <rect x="540" y="24" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="640" y="46" text-anchor="middle">v2b judge</text>
+    <text class="box-sub" x="640" y="64" text-anchor="middle">assessment scoring, placebo 0.000</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e45/">
+    <title>Quarantined holdout: bulk_modulus, FACTORS, brain_blood, tox21, fingerprint_similarity, compound_filter, polyverse.</title>
+    <rect x="20" y="118" width="200" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="140" text-anchor="middle">holdout, 7 tasks</text>
+    <text class="box-sub" x="120" y="158" text-anchor="middle">frozen, gates read once</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e45/policies_v3/">
+    <title>v3 substance-only policies and the generic no-recon control policy.</title>
+    <rect x="280" y="118" width="190" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="375" y="140" text-anchor="middle">v3 + generic arms</text>
+    <text class="box-sub" x="375" y="158" text-anchor="middle">substance-only / no recon</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E45_spartan_2026-10-02.md">
+    <title>Results pair of record: five gate readouts, per-task holdout table, cost ledger.</title>
+    <rect x="540" y="118" width="200" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="640" y="140" text-anchor="middle">gates + verdict</text>
+    <text class="box-sub" x="640" y="158" text-anchor="middle">results/E45_spartan .md + .json</text>
+  </a>
+  <path class="edge" d="M210,52 H278" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw45)"/>
+  <text class="edge-label" x="244" y="44" text-anchor="middle">probe</text>
+  <path class="edge" d="M470,52 H538" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw45)"/>
+  <text class="edge-label" x="504" y="44" text-anchor="middle">naming = 0</text>
+  <path class="edge dashed-edge" d="M375,80 V98 H120 V116" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw45b)"/>
+  <text class="edge-label" x="247" y="93" text-anchor="middle">quarantine split</text>
+  <path class="edge" d="M220,146 H278" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw45)"/>
+  <text class="edge-label" x="249" y="138" text-anchor="middle">prefix pairs</text>
+  <path class="edge" d="M470,146 H538" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw45)"/>
+  <text class="edge-label" x="504" y="138" text-anchor="middle">BT + judge</text>
+  <path class="edge dashed-edge" d="M640,80 V116" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw45b)"/>
+  <text class="edge-label" x="650" y="101" text-anchor="start">scores</text>
+  <text class="box-sub" x="20" y="192">mint = result &middot; cyan = harness / written policy &middot; steel = raw evidence &middot; 6 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 9 - E45 compact. The three arms (v2 baseline / v3 substance-only: no footers, decisive-rung floor, verbatim-goal-only KEEP, value-determinant rung / generic: goal + digest schema only) were frozen before any holdout read. v3 policy exclusions: aquatic and polyverse (persistent static-screen/runtime failures after repairs; polyverse has 0 contrast pairs). <b>E45 + adversarial verification $0.33; program-run total $1.12 of the $10 cap.</b></p>
+
+<table>
+<thead><tr><th>Gate</th><th>Outcome</th><th>Number</th></tr></thead>
+<tbody>
+<tr><td class="sym">G-INST instrument</td><td><span class="chip ok">PASS</span></td><td>v2b assessment-scoring judge: placebo (footer-only) gradients 0.000 (n=10) while real gradients keep nonzero scores (~0.18) &mdash; naming artifact closed at the instrument level</td></tr>
+<tr><td class="sym">G3-A substance</td><td><span class="chip err">FAIL</span> honest</td><td>v3 0.217 vs v2 0.183, +0.033 &lt; the 0.05 bar (n=18 paired rows); assessed substance &asymp; 0.2 in every arm &mdash; structural F6, matches E43</td></tr>
+<tr><td class="sym">G1-MACRO holdout</td><td><span class="chip ok">PASS</span> marginal</td><td>v3 0.702 &gt; v2 0.654 (+0.048, just under the label-noise floor) &gt; generic 0.519 &gt; recorded 0.437; value-determinant rung: bulk_modulus 0.615 &rarr; 0.808</td></tr>
+<tr><td class="sym">TRANSFER no recon</td><td><span class="chip err">FAIL</span></td><td>generic policy 0.519 vs v2 0.654, gap 0.135 &gt; the 0.10 bar &mdash; task-specific reconnaissance is load-bearing</td></tr>
+<tr><td class="sym">G4 reliability</td><td><span class="chip warn">PARTIAL</span></td><td>winner antisymmetry 1.000 over 1289 pairs; decisive-rung floor tripped on chem clintox (9&rarr;0, env-regression all-tie) and chem papyrus (17&rarr;1, humility ties); decisiveness rose on 5 tasks (mat 40&rarr;90, tox21 1&rarr;9, pains 15&rarr;30, factors 26&rarr;35, bulk 107&rarr;116)</td></tr>
+</tbody>
+</table>
+<p>Verdict: E16v2 relevance is deprecated for gradient-content iteration (naming artifact; v2b replaces it) &mdash; the instrument, not the prompt, was the mover. Assessed substance &asymp;0.2 in every arm: the gap to gold-level feedback relevance is structural (F6), matching E43. The one holdout-validated mechanism is the value-determinant rung (prediction distribution vs train-target stats) &mdash; candidate scorer content for the shipped hybrid; task-specific recon stays load-bearing (~$0.02 per task). <span class="chip unknown">cost E45+adv $0.33 &middot; program-run $1.12 / $10</span> Sources: <a href="../../experiments_verifiers/results/E45_spartan_2026-10-02.md">results/E45_spartan_2026-10-02.md</a> + <code>.json</code>; harness <a href="../../experiments_verifiers/harness/e45_spartan.py">harness/e45_spartan.py</a>; raw evidence <a href="../../experiments_verifiers/results/_e45/">results/_e45/</a>; placebo probes in <a href="../../experiments_verifiers/results/_e44/measure/adv_circularity.json">results/_e44/measure/adv_circularity.json</a>; report sections <a href="../../experiments_verifiers/html_report_human_only/REPORT_E44_kumite_2026-10-02.html#e45">REPORT_E44_kumite#e45</a> and <a href="../../experiments_verifiers/html_report_human_only/REPORT_all_experiments_2026-09-30.html#e45">REPORT_all_experiments#e45</a>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>E46 &mdash; hybrid visual BT: kimi-k3 figure scoring + policy v3</h2>
+<p class="intro">E46 (2026-10-03) fuses a kimi-k3 visual channel into the BT behind the exec-crash rung: per-workspace scoring (goal + up to 2 largest pred PNGs &rarr; overall 0-1 + defect note) for the 6 visual-judge tasks (aquatic, drugex_vis, fingerprint_similarity_vis, polyverse, protein_protein_fpsim, FACTORS &mdash; E26 convention; classified by grader, not by deliverable), with the E45 v3 python policy reused unchanged for the non-visual tasks. One score per generation, so the comparison is symmetric by construction; scores are cached.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 200" role="img" aria-label="E46: kimi-k3 per-workspace visual scorer feeds the shared exec-crash rung, non-visual tasks reuse E45 v3 tournaments, gates and the companion non-visual recompute close the panel">
+  <defs>
+    <marker id="arw46" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arw46b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+  </defs>
+  <a class="box" href="../../experiments_verifiers/harness/e46_hybrid.py">
+    <title>e46_hybrid.py: kimi-k3 per-workspace scoring, goal + 2 largest pred PNGs, overall 0-1 + figure notes, cached.</title>
+    <rect x="20" y="24" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="46" text-anchor="middle">e46_hybrid.py</text>
+    <text class="box-sub" x="120" y="64" text-anchor="middle">kimi visual scorer, cached</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E46_hybrid_visual_2026-10-03.json">
+    <title>Hybrid ladder: exec-crash rung (E44 ledger) first, then kimi overall comparison; non-visual tasks reuse E45 v3 unchanged.</title>
+    <rect x="280" y="24" width="190" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="375" y="46" text-anchor="middle">hybrid ladder</text>
+    <text class="box-sub" x="375" y="64" text-anchor="middle">crash rung &rarr; kimi compare</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E46_hybrid_visual_2026-10-03.md">
+    <title>Results pair of record: five gate readouts, per-task contrast table, cost ledger.</title>
+    <rect x="540" y="24" width="200" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="640" y="46" text-anchor="middle">gates + verdict</text>
+    <text class="box-sub" x="640" y="64" text-anchor="middle">results/E46 .md + .json</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e46/">
+    <title>Evidence tree: kimi_cache.jsonl, verdicts, tournament files.</title>
+    <rect x="20" y="118" width="200" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="140" text-anchor="middle">results/_e46/</text>
+    <text class="box-sub" x="120" y="158" text-anchor="middle">kimi cache, tour, verdicts</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e45/">
+    <title>E45 v3 tournaments reused unchanged for the non-visual tasks.</title>
+    <rect x="280" y="118" width="190" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="375" y="140" text-anchor="middle">E45 v3, reused</text>
+    <text class="box-sub" x="375" y="158" text-anchor="middle">non-visual, unchanged</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e44/measure/nonvisual.json">
+    <title>Companion non-visual recompute: v3 best arm 0.731 pooled; E45 G3-A passes non-visually (+0.088).</title>
+    <rect x="540" y="118" width="200" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="640" y="140" text-anchor="middle">nonvisual.json</text>
+    <text class="box-sub" x="640" y="158" text-anchor="middle">v3 0.731, G3-A +0.088</text>
+  </a>
+  <path class="edge" d="M220,52 H278" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw46)"/>
+  <text class="edge-label" x="249" y="44" text-anchor="middle">scores 0-1</text>
+  <path class="edge" d="M470,52 H538" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw46)"/>
+  <text class="edge-label" x="504" y="44" text-anchor="middle">BT + gates</text>
+  <path class="edge dashed-edge" d="M120,80 V116" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw46b)"/>
+  <text class="edge-label" x="130" y="101" text-anchor="start">writes cache</text>
+  <path class="edge dashed-edge" d="M375,116 V80" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw46b)"/>
+  <text class="edge-label" x="385" y="101" text-anchor="start">v3 verdicts</text>
+  <path class="edge dashed-edge" d="M640,116 V80" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw46b)"/>
+  <text class="edge-label" x="650" y="101" text-anchor="start">companion</text>
+  <text class="box-sub" x="20" y="192">mint = result &middot; cyan = harness / ladder &middot; steel = raw evidence &middot; 6 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 10 - E46 compact. Visual decisiveness was ~0 under script-only policies (they cannot see figure content); the kimi channel restores it at 0.75. Example recovered signal: polyverse gen 0.62, "Required node labels (atom symbols) are not visible", vs peers 0.95. G1-VIS rests on n=6 contrast pairs &mdash; directional only. 2/44 kimi responses returned empty JSON (missing score loses to any scored peer, crash-rung convention). <b>E46 $0.56; program-run total $1.68 of the $10 cap.</b></p>
+
+<table>
+<thead><tr><th>Gate</th><th>Outcome</th><th>Number</th></tr></thead>
+<tbody>
+<tr><td class="sym">G-VIS-DECISIVE</td><td><span class="chip ok">PASS</span></td><td>decisive rate 0.75 (129/172 visual pairs) vs ~0 for v1/v3 &mdash; visual ties broken by figure content</td></tr>
+<tr><td class="sym">G1-VIS contrast</td><td><span class="chip unknown">REPORT ONLY</span></td><td>0.833 pooled (5/6; fpsim 4/4, prot-prot 1/2) &mdash; equals the E26 BUMBLEBEE anchor 0.833 measured on a different pair set; n=6, directional</td></tr>
+<tr><td class="sym">G1-NONVIS guard</td><td><span class="chip ok">PASS</span></td><td>0.7305 macro, identical to E45 v3 by construction (non-visual tournaments reused unchanged)</td></tr>
+<tr><td class="sym">G2 picking</td><td><span class="chip warn">9/19</span></td><td>picks SR-true, saturated band</td></tr>
+<tr><td class="sym">G-COST</td><td><span class="chip ok">PASS</span></td><td>$0.5561 (44 kimi calls, 2 parse fails documented)</td></tr>
+</tbody>
+</table>
+<p>Verdict: best E4x configuration to date &mdash; script policy (non-visual) + kimi visual + shared exec-crash rung. Companion non-visual recompute (post-hoc, principled split; 141 pairs, 6 tasks): v3 is the best non-visual arm, 0.731 pooled / 0.727 macro (v2 0.695/0.709, v1 0.713/0.651, recorded 0.543), and E45's G3-A passes non-visually (v3 0.275 vs v2 0.188, +0.088 &ge; 0.05, n=12) &mdash; v2's assessment-relevance edge lived on visual-task rows, where naming flourishes; E46 supplies the missing visual substance. Sources: <a href="../../experiments_verifiers/results/E46_hybrid_visual_2026-10-03.md">results/E46_hybrid_visual_2026-10-03.md</a> + <code>.json</code>; harness <a href="../../experiments_verifiers/harness/e46_hybrid.py">e46_hybrid.py</a> + <a href="../../experiments_verifiers/harness/e46_results.py">e46_results.py</a>; evidence <a href="../../experiments_verifiers/results/_e46/">results/_e46/</a>; companion <a href="../../experiments_verifiers/results/_e44/measure/nonvisual.json">results/_e44/measure/nonvisual.json</a>. <span class="chip unknown">cost E46 $0.56 &middot; program-run $1.68 / $10</span></p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>E47 REFINER &mdash; LLM gradient refinement over E46's frozen hybrid BT</h2>
+<p class="intro">E47 (2026-10-03) inherits E46 unchanged (arms frozen; rank guard by construction) and adds one phase: an LLM refines each raw gradient, given the raw text as ground truth plus file previews (script head/tail, output.log tail, deliverables inventory, pred CSV headers, exec ledger facts). The refined gradient carries verified issues with evidence quotes, hypothesis-only explanations, missing-file flags and corrections of raw errors &mdash; no solutions, no thresholds, no gold.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 200" role="img" aria-label="E47: e47_refiner.py turns the raw E46 gradient plus file previews into a refined gradient with evidence-quoted issues, the v2b judge reads the paired measure, gates and the PromptAudit E48 list close the panel">
+  <defs>
+    <marker id="arw47" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arw47b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+  </defs>
+  <a class="box" href="../../experiments_verifiers/harness/e47_refiner.py">
+    <title>e47_refiner.py: raw gradient (ground truth) + file previews in; refined gradient out. No solutions, no thresholds, no gold.</title>
+    <rect x="20" y="24" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="46" text-anchor="middle">e47_refiner.py</text>
+    <text class="box-sub" x="120" y="64" text-anchor="middle">raw + previews &rarr; refined</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e47/refined/">
+    <title>Refined gradient per row: verified_issues with evidence quotes, likely_explanations (hypotheses only), missing_files, corrections, unverified_from_raw.</title>
+    <rect x="280" y="24" width="190" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="375" y="46" text-anchor="middle">refined gradient</text>
+    <text class="box-sub" x="375" y="64" text-anchor="middle">issues + evidence quotes</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E47_refiner_2026-10-03.md">
+    <title>Results pair of record: four gate readouts, qualitative value counts, E48 fix list, caveats.</title>
+    <rect x="540" y="24" width="200" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="640" y="46" text-anchor="middle">gates + verdict</text>
+    <text class="box-sub" x="640" y="64" text-anchor="middle">results/E47 .md + .json</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e47/">
+    <title>Evidence tree: refined/ (57 row JSONs) and measure.json (v2b paired rows).</title>
+    <rect x="20" y="118" width="200" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="120" y="140" text-anchor="middle">results/_e47/</text>
+    <text class="box-sub" x="120" y="158" text-anchor="middle">refined/ 57 + measure.json</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E46_hybrid_visual_2026-10-03.md">
+    <title>E46 hybrid BT inherited verbatim; its merged gradients (kimi visual feedback included) are the raw baseline.</title>
+    <rect x="280" y="118" width="190" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="375" y="140" text-anchor="middle">E46 hybrid BT</text>
+    <text class="box-sub" x="375" y="158" text-anchor="middle">inherited, arms frozen</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E47_refiner_2026-10-03.json">
+    <title>PromptAudit pre-flight: 5 ranked fixes recorded as the E48 list; 2 of 7 audited E44-E46 failures are harness bugs, not prompt issues.</title>
+    <rect x="540" y="118" width="200" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="640" y="140" text-anchor="middle">PromptAudit</text>
+    <text class="box-sub" x="640" y="158" text-anchor="middle">E48 list, 5 fixes</text>
+  </a>
+  <path class="edge" d="M220,52 H278" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw47)"/>
+  <text class="edge-label" x="249" y="44" text-anchor="middle">verified issues</text>
+  <path class="edge" d="M470,52 H538" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw47)"/>
+  <text class="edge-label" x="504" y="44" text-anchor="middle">v2b judged</text>
+  <path class="edge dashed-edge" d="M120,80 V116" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw47b)"/>
+  <text class="edge-label" x="130" y="101" text-anchor="start">writes 57 rows</text>
+  <path class="edge dashed-edge" d="M375,116 V80" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw47b)"/>
+  <text class="edge-label" x="385" y="101" text-anchor="start">raw baseline</text>
+  <path class="edge dashed-edge" d="M640,116 V80" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw47b)"/>
+  <text class="edge-label" x="650" y="101" text-anchor="start">E48 5-fix list</text>
+  <text class="box-sub" x="20" y="192">mint = result &middot; cyan = harness / artifact &middot; steel = raw evidence &middot; 6 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 11 - E47 compact. Every refined claim carries a quoted evidence line, yet the paired v2b means tie (&Delta;&minus;0.005): the instrument scores assessed graded-substance, not grounding. Raw mean 0.336 sits above earlier v2b reads (~0.18) because the E46 merged gradients carry kimi visual feedback. Pilot: the raw fold claimed <code>clintox_nn.py</code> missing while the 435-line file exists; the refined gradient pinned the true crash (<code>dc.metrics.loss_score</code> AttributeError at line 265) and flagged <code>pred_results/clintox_test_pred.csv</code> missing. <b>E47 $0.15; program-run total $1.83 of the $10 cap.</b></p>
+
+<table>
+<thead><tr><th>Gate</th><th>Outcome</th><th>Number</th></tr></thead>
+<tbody>
+<tr><td class="sym">G-REFINE-REL</td><td><span class="chip err">FAIL</span> honest negative</td><td>refined 0.331 vs raw 0.336 (paired &Delta;&minus;0.005, n=57) &mdash; relevance-neutral under v2b; raw mean rose to 0.336 because E46 merged gradients include kimi visual feedback</td></tr>
+<tr><td class="sym">G-FAITH</td><td><span class="chip warn">weak PASS</span></td><td>hallucination 0.053 refined vs 0.018 raw (3/57 vs 1/57); bar &le; max(raw, 0.15)</td></tr>
+<tr><td class="sym">G-RANK-GUARD</td><td><span class="chip ok">PASS</span></td><td>by construction &mdash; E46 tournaments unchanged; refinement touches gradient text only</td></tr>
+<tr><td class="sym">G-COST</td><td><span class="chip ok">PASS</span></td><td>$0.1452 (57 refine + 114 judge calls)</td></tr>
+</tbody>
+</table>
+<p>Qualitative product: <span class="chip ok">253 verified issues</span> <span class="chip warn">57 missing-file flags</span> <span class="chip ok">60 corrections of raw errors</span> &mdash; wins land where file-verification touches graded surfaces (charge_density 0.2&rarr;0.5+, papyrus i5 0.0&rarr;0.6); losses where verified process commentary dilutes assessed content (bulk i15/i16). PromptAudit pre-flight: 2 of 7 audited E44&ndash;E46 failures are harness bugs (E45 repair loop re-calls an identical LLM cache key; kimi empty responses cached with no retry); its 5 ranked fixes are recorded as the E48 list &mdash; brain_blood same-family and anti-truncation confirmed already fixed, inherited untouched. <span class="chip unknown">cost E47 $0.15 &middot; program-run $1.83 / $10</span></p>
+<p>Verdict: refined gradients are better-grounded but v2b cannot see it &mdash; a mutation-outcome test (does a refined gradient fix the next generation?) is the real validator, and none exists offline. Sources: <a href="../../experiments_verifiers/results/E47_refiner_2026-10-03.md">results/E47_refiner_2026-10-03.md</a> + <code>.json</code>; harness <a href="../../experiments_verifiers/harness/e47_refiner.py">e47_refiner.py</a>; evidence <a href="../../experiments_verifiers/results/_e47/">results/_e47/</a>.</p>
+</div>
+<div class="panel"><span class="br"></span>
+<h2>E48 FIXES &mdash; the 5 PromptAudit fixes applied and re-run</h2>
+<p class="intro">E48 (2026-10-03) applies the 5 PromptAudit fixes and re-runs both arms: real repair plumbing (screen errors passed in, cache-busting role), runtime smoke on 2 real digest pairs, the both-crash rung, kimi retry + cache self-heal, and the exact-token contract clause. One self-inflicted regression was caught in-session: the longer prompt exceeded the 6000-token cap and truncated 11 policies mid-string &mdash; cap now 12000, truncated fallbacks rejected.</p>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 900 200" role="img" aria-label="E48: three harness fix sites (e44_llm.py cap, e45_spartan.py fixes 1+2+3+5, e46_hybrid.py kimi self-heal) feed the re-run whose results land in results/E48, with pre48 baselines under the results">
+  <defs>
+    <marker id="arw48" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/></marker>
+    <marker id="arw48b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5E8CA3"/></marker>
+  </defs>
+  <a class="box" href="../../experiments_verifiers/harness/e44_llm.py">
+    <title>Shared llm() escalation cap raised to min(12000, max_tokens*2) so the longer prompt cannot truncate policies mid-string.</title>
+    <rect x="20" y="24" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="46" text-anchor="middle">e44_llm.py</text>
+    <text class="box-sub" x="120" y="64" text-anchor="middle">cap 6000 &rarr; 12000</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e45_spartan.py">
+    <title>Fixes 1+2+3+5: repair loop passes screen errors with a cache-busting role; runtime smoke on 2 real digest pairs; both-crash error-family rung; exact-token clause; write_policy rejects truncated fallbacks.</title>
+    <rect x="280" y="24" width="190" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="375" y="46" text-anchor="middle">e45_spartan.py</text>
+    <text class="box-sub" x="375" y="64" text-anchor="middle">fix 1+2+3+5, v3 re-run</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/E48_fixes_2026-10-03.md">
+    <title>Results pair of record: coverage, non-visual pooled, visual pairs, antisymmetry, both-crash verdict, cost.</title>
+    <rect x="540" y="24" width="200" height="56" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="640" y="46" text-anchor="middle">re-run results</text>
+    <text class="box-sub" x="640" y="64" text-anchor="middle">results/E48 .md + .json</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/harness/e46_hybrid.py">
+    <title>Fix 4: kimi retry-once on empty/parse-fail before caching; cache lookup self-heals by preferring any non-parse-fail entry for the key.</title>
+    <rect x="20" y="118" width="200" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="120" y="140" text-anchor="middle">e46_hybrid.py</text>
+    <text class="box-sub" x="120" y="158" text-anchor="middle">fix 4: kimi self-heal</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e45/pre48/">
+    <title>Pre-fix v3 snapshot: policies_v3/, tour_v3/, verdicts_v3/ — the before side of the paired comparison.</title>
+    <rect x="280" y="118" width="190" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="375" y="140" text-anchor="middle">_e45/pre48/</text>
+    <text class="box-sub" x="375" y="158" text-anchor="middle">v3 before-snapshot</text>
+  </a>
+  <a class="box" href="../../experiments_verifiers/results/_e46/pre48/">
+    <title>Pre-fix visual snapshot: kimi_cache.jsonl, tour/, tour_merged/, verdicts/ — before the cache self-heal.</title>
+    <rect x="540" y="118" width="200" height="56" rx="14" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="640" y="140" text-anchor="middle">_e46/pre48/</text>
+    <text class="box-sub" x="640" y="158" text-anchor="middle">visual before-snapshot</text>
+  </a>
+  <path class="edge" d="M220,52 H278" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw48)"/>
+  <text class="edge-label" x="249" y="44" text-anchor="middle">llm() calls</text>
+  <path class="edge" d="M470,52 H538" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw48)"/>
+  <text class="edge-label" x="504" y="44" text-anchor="middle">re-run 19 tasks</text>
+  <path class="edge dashed-edge" d="M120,116 V80" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw48b)"/>
+  <text class="edge-label" x="130" y="101" text-anchor="start">imports _load_env</text>
+  <path class="edge dashed-edge" d="M375,116 V80" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw48b)"/>
+  <text class="edge-label" x="385" y="101" text-anchor="start">v3 baseline</text>
+  <path class="edge dashed-edge" d="M640,116 V80" fill="none" stroke="#5E8CA3" stroke-width="1.25" marker-end="url(#arw48b)"/>
+  <text class="edge-label" x="650" y="101" text-anchor="start">visual baseline</text>
+  <text class="box-sub" x="20" y="192">mint = result &middot; cyan = harness fix site &middot; steel = pre-fix baseline &middot; 6 boxes</text>
+</svg>
+</div>
+<p class="figcap">Diagram 12 - E48 compact. The truncation regression's tell: the longer prompt exceeded the old 6000-token escalation cap, <code>llm()</code> returned the raw truncated JSON as a fallback, and the writer accepted it as the policy source &mdash; 11/19 policies were truncated mid-string. Cap now <code>min(12000, max_tokens&times;2)</code> (<code>e44_llm.py</code>); <code>write_policy</code> returns a screen-failing sentinel on any non-dict fallback so the repair loop handles it. <b>E48 $0.35 of regeneration calls; program-run total $2.18 of the $10 cap.</b></p>
+
+<p><span class="chip ok">coverage 17/19 &rarr; 19/19</span> aquatic + polyverse now generate, screen-pass and smoke-pass (polyverse despite its consensus-constants history) &middot; <span class="chip ok">non-visual pooled 0.7305 &rarr; 0.7482</span> (+0.018, under the noise floor, positive; macro 0.7479) &middot; <span class="chip ok">visual contrast pairs 5/6 &rarr; 6/6</span> the healed kimi score flips prot-prot 0.5 &rarr; 1.0 &middot; <span class="chip unknown">decisive 0.75 &middot; antisym 1.000 &middot; picks 9/19</span> all hold (705 pairs) &middot; <span class="chip warn">both-crash rung silent on chem clintox</span> all 10 gens share the identical deepchem signature &mdash; tie is rule-correct, the env regression stays a tie task.</p>
+<p>Verdict: the two audited harness bugs were real and load-bearing &mdash; the no-op repair loop and the permanent kimi fail-cache were what blocked aquatic and polyverse; the fix buys coverage first (2 tasks unblocked), ranking second (+0.018 pooled, under noise). Regression lesson: an LLM-writes-code pipeline must size <code>max_tokens</code> for the real code + JSON envelope and never accept raw response text as code when parsing failed. Sources: <a href="../../experiments_verifiers/results/E48_fixes_2026-10-03.md">results/E48_fixes_2026-10-03.md</a> + <code>.json</code>; fixes in <a href="../../experiments_verifiers/harness/e45_spartan.py">e45_spartan.py</a> + <a href="../../experiments_verifiers/harness/e46_hybrid.py">e46_hybrid.py</a> + <a href="../../experiments_verifiers/harness/e44_llm.py">e44_llm.py</a>; pre-fix baselines <a href="../../experiments_verifiers/results/_e45/pre48/">results/_e45/pre48/</a> and <a href="../../experiments_verifiers/results/_e46/pre48/">results/_e46/pre48/</a>.</p>
+</div>
+
+
+
+<footer>
+<p>Sources read: UPDATE_VISUAL_CLONE.md (sections 1, 3, 4, 6, 7, 9); docs/visual_clone/_reference.html; docs/visual_clone/_clone.css; experiments_verifiers/README.md (link lines only), EXPERIMENTS.md (section 3), HANDOFF.md (full, updated 2026-09-30), improve_experiment.md (full), manifest.json (description, counts, provenance, row keys), data/verifier_claims_sane.jsonl (key counts), data/manifest_sane.json (counts, row keys), data/manifest_run_notes.json (schema, row keys), results/E1_rubric_surgery_20260921.json, results/E10_per_task_oracle_2026-09-22.json, results/E19c_scores_2026-09-25.jsonl, results/E19b_hybrid_bt_v2_2026-09-24.md, REPORT_*.html (title lines only); diversity_experiments/README.md, report.html (intro text only), data/*/*/state_result.json (key test over 719 files), data/qd_archive.jsonl, data/variation_log.jsonl, scripts/extract_descriptors.py (header), scripts/compute_analysis.py (output paths); sources/evaluators/hybrid_verifier/scorers.py, inventory.py, aggregation.py, __init__.py; sources/core/evolution_engine.py, sources/core/selection.py, sources/core/genotype_embedding.py, sources/utils/archive_projection.py; experiments_verifiers/harness/e25_creed.py (line and byte count only), results/E25_creED_autopsy_2026-09-25.md (headings, verdict and table lines), results/E25_creED_autopsy_2026-09-25.json, results/_e25_flip_cases_2026-09-25.json (top-level keys), results/E25_creED_judgments_2026-09-25.jsonl, results/E25_creED_bt_cost_ledger_2026-09-25.jsonl, results/_e25_depth_sample_2026-09-25.jsonl, results/_e25_depth_llm_2026-09-25.jsonl (row counts, first row keys); experiments_verifiers/harness/e35_prime.py (line and byte count only), harness/e36_liar.py and e36_liar_bs.py and e41_cage.py (docstring and imports only), HANDOFF.md (headings, sections 4, 5, 8, 9, 3.4), results/E36_liar_2026-09-26.md (header, Phase 3, Answer, Cost), results/E37-E40 .md (title, TL;DR and headings) and .json (top-level keys), results/E41_cage_2026-09-28.json (all keys; read while E41 was running), E36/E41 ledgers (row counts only), results/E35_prime_2026-09-26.md (headings and readout lines), results/E35_prime_2026-09-26.json, results/E35_gradient_duel_2026-09-26.json, results/_e35_*.json (top-level keys), results/E35_*.jsonl and results/_e35_*.jsonl (row counts and first row keys), results/E35_registries/ and results/E35_prime_gradients/ (file counts and sizes).</p>
+<p class="skips">Skipped: experiments_verifiers/.env - never opened (secrets rule). results/_e41_venv/ (2 888 MB) and results/E41_cage_raw_2026-09-28/ (606 entries, 4.1 MB at 17:28) - E41 was writing, size and entry count only; E41_cage_full_log and pilot_log - not opened. results/_e36_perturbed/ and _e36_cache/ - file counts only (synthetic copies). results/_e24_venv/ (77 245 files, 2 889 MB) - a virtualenv, size counted only. results/_e3_sabotage/ (123 MB) - sabotage-control artifacts, size counted only. workspace_artefacts/snapshots/ 148 dirs - directory and extension counts only. ablations/ 462 JSON - counted; README section 2 says they are run_notes copies. diversity_experiments/results/pcas/ 25 PNG - counted only. diversity_experiments/data/ 1 127 run dirs - only the 719 state_result.json key sets were parsed; genotype, run_metrics and evaluation files were not read. HANDOFF_V2.md, verifier_sota_litterature_search.md, VERIFIER_ARCHITECTURE.md, CONTINUATION_PROMPTS_E19b_E24.md (present at the first pass, gone at write time) - headings and cited sections only. run_notes/, runs_capsule/, sources/workflows/, /tmp workspaces - Tier D, linked only (see data_runs.html). REPORT_*.html and report.html bodies - not read, titles and intro text only. results/E25_creED_judgments_2026-09-25.jsonl (219 rows at the snapshot), results/E25_creED_bt_cost_ledger_2026-09-25.jsonl (394 rows at the snapshot), results/_e25_depth_sample_2026-09-25.jsonl (44 rows), results/_e25_depth_llm_2026-09-25.jsonl (67 rows) - row counts and first row keys only, bodies not read; results/E25_creED_autopsy_2026-09-25.json (1 863 lines by <code>wc -l</code>) - top-level keys only.</p>
+<p>Volatile evidence: experiments_verifiers/ is not tracked by git (<code>git ls-files experiments_verifiers</code> is empty) and changed during this build. The root docs moved twice: earlier builds read <code>EXPERIMENTS_PLAN_V2.md</code>, <code>HANDOFF.md</code>, <code>HOW_TO_DO_EXPERIMENTS.md</code> and <code>VERIFIER_ARCHITECTURE.md</code>; of those, only <code>HANDOFF.md</code> is present again (an E1-E42 handoff, "Written 2026-09-28", updated 2026-09-30), next to <code>EXPERIMENTS.md</code>, <code>improve_experiment.md</code> and <code>deprecated_verifier_how_it_worked.md</code>. E26-E36 and E35 then landed: <code>harness/e35_prime.py</code> (2 848 lines, mtime 2026-09-26 12:45) plus 102 new entries in <code>results/</code> (E35 alone: 16 files and 2 folders, mtimes 2026-09-26 11:28-12:54), which the counts above now include. E37-E41 followed on 2026-09-27 and 2026-09-28: 16 new entries in <code>results/</code> and one script, <code>harness/e41_cage.py</code>. E42 (gradient autopsy) and the completed E41 CAGE verdict landed 2026-09-29. Counts above are my measurement at 2026-09-28 and may drift again.</p>
+<p>Built at <code>7da1f5e</code>, 2026-09-30 (data_experiments refresh for E1-E42), extended 2026-10-02 with the E44 KUMITE panel (sources: results/E44_kumite_2026-10-02.md read in full, harness/e44_gradient_anatomy.md, harness/e44_scout_failure_modes.md, ls of harness/e44_*.py and results/_e44/) and then with the E45 SPARTAN panel (sources: results/E45_spartan_2026-10-02.md + .json read in full, harness/e45_spartan.py, ls of results/_e45/ and results/_e44/measure/), then 2026-10-03 with the E46 hybrid-visual panel (sources: results/E46_hybrid_visual_2026-10-03.md + .json read in full, results/_e44/measure/nonvisual.json read, ls of harness/e46_hybrid.py + e46_results.py and results/_e46/), then with the E47 REFINER panel (sources: results/E47_refiner_2026-10-03.md + .json read in full, qualitative counts re-derived from the 57 files in results/_e47/refined/, harness/e47_refiner.py, ls of results/_e47/), then with the E48 FIXES panel (sources: results/E48_fixes_2026-10-03.md + .json read in full, fix sites grepped in harness/e45_spartan.py + e46_hybrid.py + e44_llm.py, ls of results/_e45/pre48/ and results/_e46/pre48/). First built at <code>336fe19</code>, 2026-09-26, refreshed at <code>ca72107</code> + working tree on 2026-09-28. experiments_verifiers/ is git-ignored; E41 was still writing into results/ at 2026-09-28 17:37 CEST and finished later (verdict in <code>E41_cage_2026-09-28.md</code>).</p>
+
+<p class="note">Amber (link repair, 2026-10-10): six report targets this page used to link to are no longer in the repository, <code class="path">experiments_verifiers/improve_experiment.md</code>, <code>REPORT_experiments.html</code>, <code>REPORT_cycle2_E12-E19.html</code>, <code>REPORT_e10_weights_visualization.html</code>, <code>REPORT_e11_theory.html</code> and <code>REPORT_excluded_task_bug_and_sane_replay.html</code>; those links are now plain text. The surviving single-file reports live in <code class="path">experiments_verifiers/html_report_human_only/</code> (<code>REPORT_all_experiments_2026-09-30.html</code>, <code>REPORT_cycle1_E1-E7_verifier_experiments.html</code>, <code>REPORT_cycles2-4_E12-E32_verifier_experiments.html</code>, <code>REPORT_E44_kumite_2026-10-02.html</code>, <code>REPORT_verifier_direction_reflection_2026-10-08.html</code>, <code>REPORT_verifier_literature_vs_failure_modes_2026-09-30.html</code>); the file names were not mapped one to one, so no link was invented.</p>
+<p>Updated 2026-10-13 (84db677 + working tree): the lifecycle and ported-conventions diagrams mark <code>sources/evaluators/hybrid_verifier/</code> as the previous channel (default 2026-09-24 &rarr; 2026-10-13); the policy/BT verifier (config.py:102) is the current default.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

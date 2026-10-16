@@ -12,29 +12,40 @@ import sys
 
 import dotenv
 
-
 # Prevent tokenizers parallelism warnings when forking processes
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Ensure the default memory directory exists before local imports that may read it.
-os.makedirs(os.path.join("sources", "memory"), exist_ok=True)
+from sources.utils import paths
 
-from sources.cli.pretty_print import print_ok, print_warn, print_err, print_info
+# Ensure the default memory directory exists before local imports that may read it.
+os.makedirs(paths.default_memory_dir(), exist_ok=True)
 
 from config import Config
+from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
+from sources.benchmark_evaluation.eval_workflow_generation import WorkflowEval
+from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
+from sources.cli import EvaluationCLI, MemoryChatCLI, OnboardCLI
+from sources.cli.pretty_print import (
+    print_err,
+    print_info,
+    print_ok,
+    print_phase,
+    print_warn,
+)
 from sources.core.evolution_engine import EvolutionEngine
 from sources.core.planner import Planner
 from sources.extensibility.human_mode import HumanMode
-from sources.cli import OnboardCLI, EvaluationCLI, MemoryChatCLI
-from sources.benchmark_evaluation.csv_mode import CsvEvaluationMode
-from sources.benchmark_evaluation.scenario_loader import ScenarioLoader
-from sources.benchmark_evaluation.eval_workflow_generation import WorkflowEval
+from sources.utils.ensure_env import ensure_environment
 from sources.utils.logging import setup_logging
-from sources.utils.transfer_toolomics import LocalTransfer
 from sources.utils.precheck import PreCheck
-from sources.security.check_package import PackageCheck
+from sources.utils.transfer_toolomics import LocalTransfer
+from sources.utils.workspace_management import WorkspaceManager
 
-dotenv.load_dotenv()
+# Search for .env from the current working directory upward (usecwd is
+# required for installed runs, where main.py lives in site-packages).
+dotenv.load_dotenv(dotenv.find_dotenv(usecwd=True))
+# Fallback: user-level env file (shell env and a CWD .env take precedence).
+dotenv.load_dotenv(paths.user_env_file())
 
 def validate_environment() -> None:
     """Validate required environment configuration."""
@@ -62,6 +73,103 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
     parser.add_argument("--runner_temp_dir", type=str, help="Override temp directory path for runners")
     parser.add_argument("--pushover_token", type=str, help="Override Pushover API token")
     parser.add_argument("--pushover_user", type=str, help="Override Pushover user key")
+    parser.add_argument(
+        "--verifier_kind",
+        type=str,
+        choices=["hybrid", "legacy", "gold", "policy_bt"],
+        help="Verifier channel: 'policy_bt' (default; cached artifact policy and fitted Bradley-Terry ratings), "
+        "'hybrid' (previous temporal-ladder verifier), 'legacy' (deprecated multi-source verifier), "
+        "or 'gold' (ORACLE / BENCHMARK-LEAKING research control: benchmark grader feedback as gradient; "
+        "needs --science_agent_bench; never report its scores)",
+    )
+    parser.add_argument(
+        "--gold_feedback_reward",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="verifier_kind=gold only: also take the reward from the benchmark grader "
+        "(full oracle). Default off = gradient-only oracle (reward stays hybrid)",
+    )
+    parser.add_argument(
+        "--gold_feedback_timeout_s",
+        type=int,
+        help="verifier_kind=gold only: wall-clock cap (s) on benchmark grading per "
+        "generation (default 1800; 0 disables the cap); on timeout the grade is censored",
+    )
+    parser.add_argument("--hybrid_verifier_num_claims", type=int, help="Override target key-claim count for the hybrid verifier")
+    parser.add_argument("--hybrid_verifier_refinement_rounds", type=int, help="Override max replacement claims per generation (hybrid verifier)")
+    parser.add_argument("--hybrid_verifier_scorer_timeout_s", type=int, help="Override hybrid verifier scorer subprocess timeout (seconds)")
+    parser.add_argument("--hybrid_verifier_digest_max_files", type=int, help="Override max deliverable files sampled by the hybrid verifier format digest")
+    parser.add_argument(
+        "--hybrid_verifier_pairwise_mode",
+        type=str,
+        choices=["temporal", "temporal_strict", "mean_diff", "sign_sum", "escalation"],
+        help="Override hybrid verifier pairwise reward mode (default temporal)",
+    )
+    parser.add_argument(
+        "--hybrid_verifier_reward",
+        type=str,
+        choices=["win_rate", "bradley_terry"],
+        help="Override hybrid verifier reward aggregation (default win_rate — measured best on the frozen arena)",
+    )
+    parser.add_argument(
+        "--hybrid_verifier_visual_rung",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable/disable the E26/E35 visual rung (figure tasks: goal-anchored "
+        "visual claims scored by the vision model, ladder stage before 'script')",
+    )
+    parser.add_argument(
+        "--hybrid_verifier_execution_gate",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Enable/disable the E24/E35 execution gate (crash/no-entry/timeout "
+        "re-execution caps reward at 0.0; divergent caps it at 0.5)",
+    )
+    parser.add_argument(
+        "--policy_bt_reward",
+        type=str,
+        choices=["bradley_terry"],
+        help="verifier_kind=policy_bt only: fitted Bradley-Terry tournament "
+        "(the only supported reward; refreshes all generations)",
+    )
+    parser.add_argument(
+        "--policy_bt_scorer_timeout_s",
+        type=int,
+        help="verifier_kind=policy_bt only: per policy-comparison subprocess "
+        "timeout (seconds)",
+    )
+    parser.add_argument(
+        "--policy_bt_visual_channel",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="verifier_kind=policy_bt only: use relevant visual artifacts "
+        "to resolve deterministic policy ties (default on)",
+    )
+    parser.add_argument(
+        "--policy_bt_reexecute",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="verifier_kind=policy_bt only: run the required reproduction "
+        "shell script on an isolated workspace copy (default on)",
+    )
+    parser.add_argument(
+        "--policy_bt_reexec_timeout_s",
+        type=int,
+        help="verifier_kind=policy_bt only: wall-clock cap per generation "
+        "re-execution (seconds, default 900)",
+    )
+    parser.add_argument(
+        "--policy_bt_repair_rounds",
+        type=int,
+        help="verifier_kind=policy_bt only: maximum generated policy or "
+        "adapter repairs (default 3)",
+    )
+    parser.add_argument(
+        "--planner_human_approve",
+        action="store_true",
+        default=False,
+        help="Show the generated plan and wait for approval before executing it (interactive --goal runs only)",
+    )
 
 def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
     """Apply CLI argument overrides to config."""
@@ -75,6 +183,55 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.prompt_workflow_creator = args.prompt_workflow_creator
     if args.runner_default_python_version:
         config.runner_default_python_version = args.runner_default_python_version
+    if getattr(args, "verifier_kind", None):
+        config.verifier_kind = args.verifier_kind
+    if getattr(args, "gold_feedback_reward", None) is not None:
+        config.gold_feedback_reward = args.gold_feedback_reward
+    if getattr(args, "gold_feedback_timeout_s", None) is not None:
+        # 0 (or negative) disables the cap.
+        config.gold_feedback_timeout_s = args.gold_feedback_timeout_s
+    if getattr(args, "hybrid_verifier_num_claims", None):
+        config.hybrid_verifier_num_claims = args.hybrid_verifier_num_claims
+    if getattr(args, "hybrid_verifier_refinement_rounds", None):
+        config.hybrid_verifier_refinement_rounds = args.hybrid_verifier_refinement_rounds
+    if getattr(args, "hybrid_verifier_scorer_timeout_s", None):
+        config.hybrid_verifier_scorer_timeout_s = args.hybrid_verifier_scorer_timeout_s
+    if getattr(args, "hybrid_verifier_pairwise_mode", None):
+        config.hybrid_verifier_pairwise_mode = args.hybrid_verifier_pairwise_mode
+    if getattr(args, "hybrid_verifier_reward", None):
+        config.hybrid_verifier_reward = args.hybrid_verifier_reward
+    if getattr(args, "hybrid_verifier_digest_max_files", None):
+        config.hybrid_verifier_digest_max_files = args.hybrid_verifier_digest_max_files
+    if getattr(args, "hybrid_verifier_visual_rung", None) is not None:
+        config.hybrid_verifier_visual_rung = args.hybrid_verifier_visual_rung
+    if getattr(args, "hybrid_verifier_execution_gate", None) is not None:
+        config.hybrid_verifier_execution_gate = args.hybrid_verifier_execution_gate
+    if getattr(args, "policy_bt_reward", None):
+        config.policy_bt_reward = args.policy_bt_reward
+    if config.verifier_kind == "policy_bt" and config.policy_bt_reward != "bradley_terry":
+        raise ValueError("policy_bt_reward must be 'bradley_terry'")
+    if getattr(args, "policy_bt_scorer_timeout_s", None):
+        config.policy_bt_scorer_timeout_s = args.policy_bt_scorer_timeout_s
+    if getattr(args, "policy_bt_visual_channel", None) is not None:
+        config.policy_bt_visual_channel = args.policy_bt_visual_channel
+    if getattr(args, "policy_bt_reexecute", None) is not None:
+        config.policy_bt_reexecute = args.policy_bt_reexecute
+    if getattr(args, "policy_bt_reexec_timeout_s", None):
+        config.policy_bt_reexec_timeout_s = args.policy_bt_reexec_timeout_s
+    if getattr(args, "policy_bt_repair_rounds", None) is not None:
+        config.policy_bt_repair_rounds = args.policy_bt_repair_rounds
+    if getattr(args, "early_stop_mode", None):
+        config.early_stop_mode = args.early_stop_mode
+    if getattr(args, "min_learning_evolve_iterations", None):
+        config.min_learning_evolve_iterations = (
+            args.min_learning_evolve_iterations
+        )
+    if getattr(args, "plateau_patience", None):
+        config.plateau_patience = args.plateau_patience
+    if getattr(args, "explore_after_plateau", None) is not None:
+        config.explore_after_plateau = args.explore_after_plateau
+    if getattr(args, "explore_base_rate", None) is not None:
+        config.explore_base_rate = args.explore_base_rate
     if args.runner_default_timeout:
         config.runner_default_timeout = args.runner_default_timeout
     if args.runner_default_max_memory_mb:
@@ -87,8 +244,34 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.pushover_token = args.pushover_token
     if args.pushover_user:
         config.pushover_user = args.pushover_user
+    if getattr(args, "planner_human_approve", False):
+        config.planner_human_approve = True
     if args.max_evolve_iterations:
         config.max_learning_evolve_iterations = args.max_evolve_iterations
+
+def warn_gold_feedback_mode(args: argparse.Namespace, config: Config) -> bool:
+    """Print the leakage warning when the gold (oracle) verifier is selected.
+
+    Args:
+        args: Parsed CLI arguments (``science_agent_bench`` is checked).
+        config: Run config after overrides.
+
+    Returns:
+        True when ``verifier_kind == "gold"`` (warning printed), else False.
+    """
+    if str(getattr(config, "verifier_kind", "")).lower() != "gold":
+        return False
+    from sources.evaluators.gold_feedback import LEAK_WARNING
+
+    print_warn(LEAK_WARNING)
+    if getattr(config, "gold_feedback_reward", False):
+        print_warn("gold_feedback_reward=True: FULL ORACLE — the reward also comes from the benchmark grader.")
+    if not getattr(args, "science_agent_bench", False):
+        print_warn(
+            "verifier_kind=gold outside --science_agent_bench: no benchmark task row exists, "
+            "so every generation falls back to the hybrid verifier gradient."
+        )
+    return True
 
 def setup_signal_handlers():
     """Setup signal handlers for graceful shutdown."""
@@ -125,7 +308,7 @@ async def science_bench_papers_mode(args, config):
         task_start_delay=task_start_delay
     )
     if args.single_agent:
-        print(f"⚠️ Starting in single agent mode")
+        print("⚠️ Starting in single agent mode")
     await papers.start_evaluation(
         dataset_type="science_agent_bench",
         dataset_path="datasets/ScienceAgentBench.csv",
@@ -153,7 +336,7 @@ def load_goal_from_file_or_string(goal_input: str) -> str:
     """
     if goal_input and os.path.isfile(goal_input):
         try:
-            with open(goal_input, 'r', encoding='utf-8') as f:
+            with open(goal_input, encoding='utf-8') as f:
                 content = f.read().strip()
                 print_ok(f"Loaded goal from file: {goal_input}")
                 return content
@@ -185,6 +368,7 @@ async def normal_execution_mode(args, config):
         goal_content = load_goal_from_file_or_string(args.goal)
         await planner.start_planner(goal=goal_content,
                                     judge=not args.disable_judge,
+                                    human_approve=config.planner_human_approve,
                                    )
         trs = LocalTransfer(config=config, workspace_path=config.workspace_dir, runs_capsule_dir=config.runs_capsule_dir)
         trs.transfer_workspace_files_to_capsule(args.goal or args.task)
@@ -259,14 +443,28 @@ async def main():
     add_config_arguments(parser, config)
     args = parser.parse_args()
 
-    # Load config from file if provided
+    # Load config from file if provided. Installed runs fall back to the
+    # persisted user config; repo checkouts keep the historical behaviour
+    # (no implicit config) so dev runs never pick up installed-tool settings.
     if args.config:
         config.load(args.config)
         print(f"Configuration loaded from: {args.config}")
+    elif not paths.is_repo_checkout() and paths.user_config_file().is_file():
+        config.load(str(paths.user_config_file()))
+        print(f"Configuration loaded from: {paths.user_config_file()}")
 
     # security check
     # Setup logging with debug flag
     setup_logging(debug=args.debug, disable=not args.verbose)
+
+    # ── Environment precheck phase ────────────────────────────────────────
+    # Ensure the host has Python 3.12 + pip available for Mimosa, auto-installing
+    # them when missing. Abort early if the environment cannot be provisioned.
+    print_phase("ENVIRONMENT PRECHECK")
+    if not ensure_environment(auto_install=True):
+        print_err("Environment precheck failed: Python 3.12 / pip could not be ensured.")
+        sys.exit(1)
+
 
     # Detect interactive (no-argument) mode early so we can skip pre-checks
     no_mode_selected = not any([
@@ -313,32 +511,42 @@ async def main():
     # ── Normal (argument-driven) execution path ───────────────────────────
     # Apply CLI argument overrides (these override config file values)
     apply_config_overrides(args, config)
+    warn_gold_feedback_mode(args, config)
 
     validate_environment()
 
     config.create_paths()
     config.validate_paths()
 
+    manager = WorkspaceManager(config)
 
     try:
         if (args.manual):
             await manual_mode(args, config)
         elif (args.papers):
-            PreCheck(config).run()
+            #PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await papers_mode(args, config)
         elif (args.science_agent_bench):
-            PreCheck(config).run()
+            #PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await science_bench_papers_mode(args, config)
         elif args.task or args.goal or args.scenario:
-            PreCheck(config).run()
+            #PreCheck(config).run(check_provider=not config.orchestrator_choose_model)
             await normal_execution_mode(args, config)
         elif args.workflow_eval_mode:
             await workflow_generation_evals(args, config)
     except KeyboardInterrupt:
+        manager.cleanup()
         raise
     except Exception as e:
+        manager.cleanup()
         print(f"❌ Error during execution: {e}")
         raise
+    print_info("Cleaning up...")
+    manager.cleanup()
+
+def cli_main() -> None:
+    """Synchronous console-script entry point (see [project.scripts])."""
+    asyncio.run(main())
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    cli_main()

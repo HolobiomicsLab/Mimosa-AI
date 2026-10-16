@@ -23,7 +23,7 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `planner_llm_model` | `str` | `deepseek/deepseek-chat` | Layer 0 — task decomposition. |
 | `workflow_llm_model` | `str` | `openai/gpt-5.5` | Workflow synthesis. |
 | `smolagent_model_id` | `str` | `openrouter/deepseek/deepseek-v3.2` | Execution agents inside the sandbox. |
-| `judge_model` | `str` | `openai/gpt-5.5` | Verifier soft-claim verdicts. |
+| `judge_model` | `str` | `openai/gpt-5.5` | Verifier LLM: claim-ladder extraction, format digests, policy-scorer code. |
 | `capsule_namer_model` | `str` | `deepseek/deepseek-chat` | Generates human-readable capsule names. |
 | `engine_name` | `str` | `litellm` | SmolAgents engine — keep as `litellm`. |
 | `reasoning_effort` | `str` | `medium` | `minimal | low | medium | high` for models that support it. |
@@ -41,9 +41,45 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `learned_score_threshold` | `float` | `0.9` | `--learn` stops when `overall_score` reaches this. |
-| `max_learning_evolve_iterations` | `int` | `20` | Hard cap on evolve iterations. |
+| `learned_score_threshold` | `float` | `0.92` | `--learn` stops when `overall_score` reaches this. |
+| `max_learning_evolve_iterations` | `int` | `25` | Hard cap on evolve iterations. |
 | `max_concurrent_eval_tasks` | `int` | `1` | Concurrent tasks in CSV / batch modes. |
+
+## Verifier channel
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `verifier_kind` | `str` | `hybrid` | Verifier channel: `hybrid` (E19/E19b), `legacy` (deprecated multi-source) or `gold` (ORACLE / BENCHMARK-LEAKING control: benchmark-grader feedback as gradient; research only, never report its scores — see [Gold feedback (oracle) mode](../concepts/evaluation-pipeline.md#gold-feedback-oracle-mode)). |
+| `gold_feedback_reward` | `bool` | `false` | `verifier_kind=gold` only: full oracle — the reward also comes from the benchmark grader (SR → 1.0, VER → 0.5·CBS, else 0.0). Default = gradient-only oracle. JSON strings `"false"`/`"0"` parse as false. |
+| `gold_feedback_timeout_s` | `int` | `1800` | `verifier_kind=gold` only: wall-clock cap (s) on benchmark grading per generation (`0` disables it); on timeout the grade is censored and the hybrid gradient is used. |
+| `hybrid_verifier_num_claims` | `int` | `10` | Target key-claim count per task (extraction accepts ±2). |
+| `hybrid_verifier_refinement_rounds` | `int` | `2` | Max replacement claims per generation for dead (non-discriminative) claims. |
+| `hybrid_verifier_scorer_timeout_s` | `int` | `60` | Per scorer-subprocess timeout (seconds). |
+| `hybrid_verifier_pairwise_mode` | `str` | `temporal` | Pairwise reward mode: `temporal` (earliest-differing ladder stage decides), `temporal_strict`, `mean_diff`, `sign_sum`, or `escalation`. |
+| `hybrid_verifier_digest_max_files` | `int` | `8` | Max deliverable files sampled by the hybrid verifier format digest. |
+
+## QD / novelty (selection & variation)
+
+Touch with caution — these are ablation-study knobs for the [evolution
+engine](../concepts/evolution-engine.md), not day-to-day settings.
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `selection_strategy` | `str` | `qd` | One of `greedy`, `tournament`, `novelty`, `qd`. |
+| `novelty_comparison` | `str` | `archive_knn` | Novelty comparison mode (k-NN over the archive vs. previous-N). |
+| `novelty_previous_n` | `int` | `15` | Window size when `novelty_comparison` is previous-N based. |
+| `length_penalty_baseline_chars` | `int` | `8000` | Genotype size (chars) at which the length penalty starts to grow. |
+| `length_penalty_lambda` | `float` | `0.05` | Length-penalty growth rate. |
+| `min_improvement_threshold` | `float` | `0.01` | Minimum relative improvement required for admission in greedy mode. |
+| `population_size` | `int` | `20` | Max individuals kept in the QD archive. |
+| `novelty_k_neighbours` | `int` | `15` | `k` for k-nearest-neighbour novelty. |
+| `novelty_weight` | `float` | `0.25` | Weight of novelty vs. quality in `qd_score` (`0` = pure quality, `1` = pure novelty). |
+| `admit_threshold` | `float` | `0.3` | Minimum `qd_score` for admission when the candidate doesn't strictly improve. |
+| `initial_population` | `int` | `2` | Seed generations before mutation/crossover kicks in. |
+| `crossover_rate` | `float` | `0.4` | Probability a generation combines two parents instead of mutating one. |
+| `n_parents` | `int` | `2` | Number of parents drawn per crossover. |
+| `parent_threshold_similarity` | `float` | `0.8` | Cold-start disk scan: minimum goal-embedding cosine similarity. |
+| `parent_threshold_score` | `float` | `0.01` | Cold-start disk scan / parent draw: minimum score to be considered. |
 
 ## OpenRouter routing
 

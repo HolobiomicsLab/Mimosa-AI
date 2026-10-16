@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>stopping.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/core &gt; stopping.py" data-built="7da1f5e+wt" data-built-date="2026-10-10">
+<div class="wrap">
+
+<h1 class="hud">stopping.py</h1>
+<p class="intro">Holds <code>StopController</code> (line 36), the session decision to stop the evolution loop; the folder map is <a href="area_sources_core.html">area_sources_core.html</a>. It replaces the absolute <code>learned_score_threshold</code> rule with a champion plateau for the pairwise verifiers <code>hybrid</code> and <code>policy_bt</code>. <code>EvolutionEngine.start_workflow_evolution</code> builds one controller per task, feeds it one <code>observe()</code> per generation, and asks <code>should_stop()</code> after each one (<a href="mod_core_evolution_engine.html">mod_core_evolution_engine.html</a> maps that engine).</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; what this file holds: one class, two constants, five methods</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 470" role="img" aria-label="StopController class and module constants">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="sArgs">
+    <title>Arguments of observe(), one call per completed generation</title>
+    <rect x="16" y="40" width="180" height="104" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="106" y="64" text-anchor="middle">observe() arguments</text>
+    <text class="box-sub" x="106" y="84" text-anchor="middle">uuid, iteration</text>
+    <text class="box-sub" x="106" y="100" text-anchor="middle">reward, pair_outcomes</text>
+    <text class="box-sub" x="106" y="116" text-anchor="middle">failed (L99-104)</text>
+  </g>
+
+  <a class="box" id="sCls" href="../../sources/core/stopping.py">
+    <title>StopController, a plain class with no I/O and no engine import</title>
+    <rect x="270" y="40" width="250" height="180" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="395" y="64" text-anchor="middle">StopController (L36)</text>
+    <text class="box-sub" x="395" y="88" text-anchor="middle">__init__ L66, resolves mode</text>
+    <text class="box-sub" x="395" y="106" text-anchor="middle">observe L99, one generation</text>
+    <text class="box-sub" x="395" y="124" text-anchor="middle">should_stop L150, returns decision</text>
+    <text class="box-sub" x="395" y="142" text-anchor="middle">resolution_note L219, log line</text>
+    <text class="box-sub" x="395" y="160" text-anchor="middle">_tag L236, 8-char uuid</text>
+    <text class="box-sub" x="395" y="182" text-anchor="middle">only import: __future__</text>
+    <text class="box-sub" x="395" y="198" text-anchor="middle">annotations (L27)</text>
+  </a>
+
+  <g class="box" id="sState">
+    <title>Private state set in __init__; no reset method exists</title>
+    <rect x="270" y="260" width="250" height="76" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="395" y="284" text-anchor="middle">private state</text>
+    <text class="box-sub" x="395" y="302" text-anchor="middle">_champion, _since_change</text>
+    <text class="box-sub" x="395" y="318" text-anchor="middle">_last_reward (L92-94)</text>
+  </g>
+
+  <g class="box" id="sOut">
+    <title>Return value of should_stop, read by the engine loop</title>
+    <rect x="620" y="40" width="210" height="80" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="725" y="64" text-anchor="middle">should_stop returns</text>
+    <text class="box-sub" x="725" y="84" text-anchor="middle">(stop, reason) L150</text>
+    <text class="box-sub" x="725" y="100" text-anchor="middle">"max:", "threshold:", "plateau:"</text>
+  </g>
+
+  <a class="box" id="sProps" href="../../sources/core/stopping.py">
+    <title>Read-only properties used by the engine and the frontier probe</title>
+    <rect x="620" y="150" width="210" height="104" rx="14" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="725" y="174" text-anchor="middle">properties</text>
+    <text class="box-sub" x="725" y="194" text-anchor="middle">champion L189, since_change L194</text>
+    <text class="box-sub" x="725" y="212" text-anchor="middle">last_reward L199, relative L204</text>
+    <text class="box-sub" x="725" y="230" text-anchor="middle">selects_champion L209</text>
+  </a>
+
+  <g class="box" id="sErr">
+    <title>An unknown mode string raises instead of falling back</title>
+    <rect x="620" y="290" width="210" height="64" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="725" y="314" text-anchor="middle">raises ValueError</text>
+    <text class="box-sub" x="725" y="332" text-anchor="middle">mode not in VALID_STOP_MODES</text>
+    <text class="box-sub" x="725" y="346" text-anchor="middle">(L78-82)</text>
+  </g>
+
+  <g class="box" id="sAuto">
+    <title>"auto" is resolved at construction and never stored</title>
+    <rect x="620" y="374" width="210" height="62" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="725" y="396" text-anchor="middle">auto resolution</text>
+    <text class="box-sub" x="725" y="414" text-anchor="middle">plateau if relative, else</text>
+    <text class="box-sub" x="725" y="428" text-anchor="middle">threshold (L83-84)</text>
+  </g>
+
+  <g class="box" id="sConst">
+    <title>Module constants: the relative kinds and the accepted modes</title>
+    <rect x="900" y="40" width="280" height="180" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1040" y="66" text-anchor="middle">module constants</text>
+    <text class="box-sub" x="1040" y="92" text-anchor="middle">RELATIVE_VERIFIER_KINDS L30</text>
+    <text class="box-sub" x="1040" y="110" text-anchor="middle">frozenset hybrid, policy_bt</text>
+    <text class="box-sub" x="1040" y="142" text-anchor="middle">VALID_STOP_MODES L33</text>
+    <text class="box-sub" x="1040" y="160" text-anchor="middle">auto, threshold, plateau, none</text>
+  </g>
+
+  <path class="edge" data-from="sArgs" data-to="sCls" d="M196,92 H270" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="233" y="84" text-anchor="middle">observe()</text>
+  <path class="edge" data-from="sCls" data-to="sOut" d="M520,72 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="570" y="64" text-anchor="middle">decides</text>
+  <path class="edge" data-from="sCls" data-to="sProps" d="M520,186 H620" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="570" y="178" text-anchor="middle">exposes</text>
+  <path class="edge dashed-edge" data-from="sCls" data-to="sState" d="M395,220 V260" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="405" y="246" text-anchor="start">keeps</text>
+  <path class="edge" data-from="sCls" data-to="sErr" d="M520,205 H845 V322 H830" fill="none" stroke="#FFB547" stroke-width="1.25" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="852" y="270" text-anchor="start">bad mode</text>
+  <path class="edge" data-from="sCls" data-to="sAuto" d="M520,130 H860 V405 H830" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="570" y="124" text-anchor="middle">resolves auto</text>
+  <path class="edge dashed-edge" data-from="sConst" data-to="sCls" d="M900,60 H880 V18 H440 V40" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="660" y="12" text-anchor="middle">reads constants</text>
+
+  <text class="box-sub" x="16" y="452">rectangle = module constant or data &#183; rounded = class &#183; dashed = outside the file or a read &#183; 8 boxes. Line refs: grep -n over all 238 lines.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>8 boxes</code>. The whole file is one class and two module constants; it has no I/O, no engine import (only <code>from __future__ import annotations</code>, line 27) and no <code>reset()</code> method, so the champion state lives for one session only.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; the champion-plateau rule, and the four stop modes</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1060 420" role="img" aria-label="observe and should_stop decision rules">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#39FF88"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#FFB547"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="o0">
+    <title>One observe() call per completed generation</title>
+    <rect x="30" y="28" width="240" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="52" text-anchor="middle">observe() L99</text>
+  </g>
+
+  <g class="box" id="d1">
+    <title>failed means errored, crashed or short-circuited generation</title>
+    <rect x="30" y="88" width="240" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="110" text-anchor="middle">failed or missing uuid</text>
+    <text class="box-sub" x="150" y="130" text-anchor="middle">L123 guard, counter L128</text>
+  </g>
+
+  <g class="box" id="d2">
+    <title>First generation with a real verdict becomes the champion</title>
+    <rect x="30" y="164" width="240" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="186" text-anchor="middle">champion is None ? L130</text>
+    <text class="box-sub" x="150" y="206" text-anchor="middle">yes: champion = uuid, counter 0</text>
+  </g>
+
+  <g class="box" id="d3">
+    <title>Only the head-to-head outcome against the current champion counts</title>
+    <rect x="30" y="240" width="240" height="72" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="150" y="262" text-anchor="middle">outcome against champion L140</text>
+    <text class="box-sub" x="150" y="280" text-anchor="middle">"won": new champion, counter 0</text>
+    <text class="box-sub" x="150" y="298" text-anchor="middle">tie, lost, missing: counter +1</text>
+  </g>
+
+  <g class="box" id="s0">
+    <title>Decision asked after every generation</title>
+    <rect x="560" y="28" width="230" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="675" y="52" text-anchor="middle">should_stop() L150</text>
+  </g>
+
+  <g class="box" id="s1">
+    <title>Hard cap: fires in every mode, even after an errored generation</title>
+    <rect x="560" y="84" width="230" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="675" y="108" text-anchor="middle">done &gt;= max_iter ? L162</text>
+  </g>
+
+  <g class="box" id="s2">
+    <title>No early stop before min_iter completed generations</title>
+    <rect x="560" y="140" width="230" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="675" y="164" text-anchor="middle">done &lt; min_iter ? L164</text>
+  </g>
+
+  <g class="box" id="s3">
+    <title>Threshold mode: the legacy absolute rule, now gated by min_iter</title>
+    <rect x="560" y="196" width="230" height="40" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="675" y="220" text-anchor="middle">mode threshold ? L166</text>
+  </g>
+
+  <g class="box" id="s4">
+    <title>Plateau mode: stop once the champion is stale for patience generations</title>
+    <rect x="560" y="252" width="230" height="40" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="675" y="276" text-anchor="middle">mode plateau ? L176</text>
+  </g>
+
+  <g class="box" id="s5">
+    <title>Mode none: only the max cap can stop the run</title>
+    <rect x="560" y="308" width="230" height="40" rx="2" fill="rgba(143,184,201,0.08)" stroke="#8FB8C9"/>
+    <text class="box-label" x="675" y="332" text-anchor="middle">mode none ? L183</text>
+  </g>
+
+  <g class="box" id="sOut">
+    <title>Reason strings: "max: N/M generations run", "threshold: reward ...", "plateau: champion ..."</title>
+    <rect x="900" y="196" width="140" height="104" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="970" y="224" text-anchor="middle">stop = True</text>
+    <text class="box-sub" x="970" y="246" text-anchor="middle">reason L163,</text>
+    <text class="box-sub" x="970" y="262" text-anchor="middle">L171, L178</text>
+    <text class="box-sub" x="970" y="286" text-anchor="middle">else (False, "")</text>
+  </g>
+
+  <path class="edge" data-from="o0" data-to="d1" d="M150,68 V88" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="d1" data-to="d2" d="M150,144 V164" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="160" y="160" text-anchor="start">no</text>
+  <path class="edge" data-from="d2" data-to="d3" d="M150,220 V240" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="160" y="236" text-anchor="start">no</text>
+  <text class="edge-label" x="290" y="110" text-anchor="start">yes: counter, return</text>
+  <text class="edge-label" x="290" y="186" text-anchor="start">yes: new champion</text>
+
+  <path class="edge" data-from="s0" data-to="s1" d="M675,68 V84" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <path class="edge" data-from="s1" data-to="s2" d="M675,124 V140" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="685" y="138" text-anchor="start">no</text>
+  <path class="edge" data-from="s2" data-to="s3" d="M675,180 V196" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="685" y="194" text-anchor="start">no</text>
+  <path class="edge" data-from="s3" data-to="s4" d="M675,236 V252" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="685" y="250" text-anchor="start">no, reward low</text>
+  <path class="edge" data-from="s4" data-to="s5" d="M675,292 V308" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="685" y="306" text-anchor="start">no, counter low</text>
+
+  <path class="edge" data-from="s1" data-to="sOut" d="M790,104 H940 V196" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="862" y="96" text-anchor="middle">yes: max</text>
+  <path class="edge" data-from="s3" data-to="sOut" d="M790,216 H900" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="845" y="208" text-anchor="middle">yes: reward</text>
+  <path class="edge" data-from="s4" data-to="sOut" d="M790,272 H900" fill="none" stroke="#39FF88" stroke-width="1.5" marker-end="url(#arw3)"/>
+  <text class="edge-label" x="845" y="264" text-anchor="middle">yes: stale</text>
+  <text class="edge-label" x="820" y="172" text-anchor="start">yes: (False, "")</text>
+
+  <text class="box-sub" x="30" y="372">left = state update inside observe() (L99-145) &#183; right = decision order inside should_stop() (L150-183) &#183; counters: since_change, patience.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>11 boxes</code>. The max cap is checked first (line 162), then the <code>min_iter</code> gate (line 164), then the mode; only <code>threshold</code> and <code>plateau</code> can stop early. A tie against the champion keeps it, so the champion cannot drift through equal generations (<code class="path">sources/core/stopping.py:135-139</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; who builds it and where its decision lands</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 1200 360" role="img" aria-label="construction, observation and consumers of the stop decision">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <marker id="arw4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7DF9C7"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="cfg">
+    <title>Config fields passed as constructor arguments</title>
+    <rect x="16" y="24" width="246" height="96" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="139" y="46" text-anchor="middle">Config fields</text>
+    <text class="box-sub" x="139" y="66" text-anchor="middle">early_stop_mode (L228)</text>
+    <text class="box-sub" x="139" y="82" text-anchor="middle">min_learning_evolve_iterations (L231)</text>
+    <text class="box-sub" x="139" y="98" text-anchor="middle">plateau_patience (L234)</text>
+    <text class="box-sub" x="139" y="114" text-anchor="middle">learned_score_threshold (L222)</text>
+  </g>
+
+  <g class="box" id="vk">
+    <title>WorkflowEvaluator stores the kind string it dispatched on</title>
+    <rect x="16" y="140" width="246" height="72" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="139" y="164" text-anchor="middle">judge.verifier_kind</text>
+    <text class="box-sub" x="139" y="184" text-anchor="middle">set from config, default</text>
+    <text class="box-sub" x="139" y="200" text-anchor="middle">"hybrid" (evaluator.py:121)</text>
+  </g>
+
+  <a class="box" id="mk" href="file_core_evolution_engine.html">
+    <title>Constructed once per session inside start_workflow_evolution</title>
+    <rect x="330" y="24" width="210" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="435" y="50" text-anchor="middle">StopController(...)</text>
+    <text class="box-sub" x="435" y="70" text-anchor="middle">evolution_engine.py:702</text>
+    <text class="box-sub" x="435" y="86" text-anchor="middle">logs [STOP] mode + note</text>
+  </a>
+
+  <a class="box" id="obs" href="file_core_evolution_engine.html">
+    <title>One observation per completed generation</title>
+    <rect x="620" y="24" width="220" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="730" y="50" text-anchor="middle">observe() per gen</text>
+    <text class="box-sub" x="730" y="70" text-anchor="middle">evolution_engine.py:914</text>
+    <text class="box-sub" x="730" y="86" text-anchor="middle">failed = is_failure or no uuid</text>
+  </a>
+
+  <a class="box" id="dec" href="file_core_evolution_engine.html">
+    <title>The loop asks for the decision after each evolved generation</title>
+    <rect x="900" y="24" width="200" height="80" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="1000" y="50" text-anchor="middle">should_stop() call</text>
+    <text class="box-sub" x="1000" y="70" text-anchor="middle">evolution_engine.py:1010</text>
+    <text class="box-sub" x="1000" y="86" text-anchor="middle">stop: notify + return runs</text>
+  </a>
+
+  <g class="box" id="rm">
+    <title>Per-generation stop state written by the engine</title>
+    <rect x="16" y="250" width="240" height="76" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="136" y="274" text-anchor="middle">run_metrics.json</text>
+    <text class="box-sub" x="136" y="292" text-anchor="middle">champion_uuid, since_change,</text>
+    <text class="box-sub" x="136" y="308" text-anchor="middle">stop_reason (evolution_engine.py:1436)</text>
+  </g>
+
+  <a class="box" id="probe" href="file_core_evolution_engine.html">
+    <title>The frontier probe reads champion and since_change</title>
+    <rect x="330" y="250" width="240" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="450" y="274" text-anchor="middle">frontier probe</text>
+    <text class="box-sub" x="450" y="292" text-anchor="middle">champion, since_change, patience</text>
+    <text class="box-sub" x="450" y="308" text-anchor="middle">evaluate_exploration_probe :145</text>
+  </a>
+
+  <a class="box" id="capsule" href="file_core_evolution_engine.html">
+    <title>Capsule selection ships the final champion in relative modes</title>
+    <rect x="900" y="250" width="200" height="76" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="1000" y="274" text-anchor="middle">capsule selection</text>
+    <text class="box-sub" x="1000" y="292" text-anchor="middle">champion, selects_champion</text>
+    <text class="box-sub" x="1000" y="308" text-anchor="middle">restore_best (L778)</text>
+  </a>
+
+  <path class="edge" data-from="cfg" data-to="mk" d="M262,72 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="299" y="64" text-anchor="middle">5 fields</text>
+  <path class="edge" data-from="vk" data-to="mk" d="M262,176 H300 V90 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="305" y="150" text-anchor="start">verifier kind</text>
+  <path class="edge" data-from="mk" data-to="obs" d="M540,64 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="580" y="56" text-anchor="middle">controller</text>
+  <path class="edge" data-from="obs" data-to="dec" d="M840,64 H900" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="870" y="56" text-anchor="middle">state</text>
+
+  <path class="edge dashed-edge" data-from="dec" data-to="rm" d="M1000,104 V228 H136 V250" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="560" y="220" text-anchor="middle">writes stop state</text>
+  <path class="edge" data-from="obs" data-to="probe" d="M730,104 V160 H450 V250" fill="none" stroke="#00E5FF" stroke-width="1.25" marker-end="url(#arw)"/>
+  <text class="edge-label" x="742" y="140" text-anchor="start">reads state</text>
+  <path class="edge dashed-edge" data-from="dec" data-to="capsule" d="M1050,104 V250" fill="none" stroke="#7DF9C7" stroke-width="1.25" marker-end="url(#arw4)"/>
+  <text class="edge-label" x="1040" y="180" text-anchor="end">champion ships</text>
+
+  <text class="box-sub" x="16" y="348">row 1 = construction and the per-generation calls &#183; row 2 = what the decision changes. Dashed = data written or read outside the module.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>8 boxes</code>. Construction is <code class="path">sources/core/evolution_engine.py:702-709</code>; the pair outcomes that drive the champion come from <code>wf_info.state_result["evaluation"]["verifier"]["pair_outcomes"]</code> (<code class="path">sources/core/evolution_engine.py:870</code>, passed at line 919). Dashed = data written or read.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">argument</td><td class="sym">uuid, iteration, reward, pair_outcomes, failed</td><td>observe signature, L99-104</td><td>one observation per completed generation</td></tr>
+<tr><td class="sym">argument</td><td class="sym">mode, min_iter, patience, threshold, max_iter</td><td>__init__ signature, L66-74</td><td>the whole rule set, passed in explicitly</td></tr>
+<tr><td class="sym">argument</td><td class="sym">verifier_kind</td><td>__init__ L73, used L76</td><td>decides relative or absolute reward</td></tr>
+<tr><td class="sym">constant</td><td class="sym">RELATIVE_VERIFIER_KINDS</td><td>L30: frozenset hybrid, policy_bt</td><td>auto resolves to plateau for these</td></tr>
+<tr><td class="sym">constant</td><td class="sym">VALID_STOP_MODES</td><td>L33: auto, threshold, plateau, none</td><td>validation, else ValueError</td></tr>
+<tr><td class="sym">config field</td><td class="sym">early_stop_mode</td><td>engine L703 (default "auto")</td><td>requested mode</td></tr>
+<tr><td class="sym">config field</td><td class="sym">min_learning_evolve_iterations</td><td>engine L704 (default 6)</td><td>min_iter gate; clamped to max_iter (L87)</td></tr>
+<tr><td class="sym">config field</td><td class="sym">plateau_patience</td><td>engine L705 (default 3)</td><td>plateau patience</td></tr>
+<tr><td class="sym">config field</td><td class="sym">learned_score_threshold</td><td>engine L706 (default 0.9)</td><td>threshold mode only</td></tr>
+<tr><td class="sym">config field</td><td class="sym">max_learning_evolve_iterations</td><td>engine L664, passed as max_iter L707</td><td>hard cap, default 16</td></tr>
+<tr><td class="sym">state</td><td class="sym">_champion, _since_change, _last_reward</td><td>set in L92-94</td><td>the three decision inputs</td></tr>
+<tr><td class="sym">file read</td><td class="sym">none</td><td>&mdash;</td><td>the module never opens a file</td></tr>
+<tr><td class="sym">file written</td><td class="sym">none</td><td>&mdash;</td><td>the engine writes run_metrics.json</td></tr>
+<tr><td class="sym">log</td><td class="sym">resolution_note, _tag</td><td>L219, L236</td><td>the [STOP] and [EXPLORE] lines</td></tr>
+</tbody>
+</table>
+<p class="note say">The controller is pure: the arguments carry every value, so the same configuration replays identically and tests build it without an engine; the constructor defaults mirror the Config defaults (min_iter 6, patience 3, threshold 0.9, max_iter 16), but the engine always passes all five explicitly.</p>
+<p class="note flag">Mismatch: the evaluator sets <code>self.verifier_kind</code> to the raw config string (<code class="path">sources/evaluators/evaluator.py:121</code>) while an unlisted kind falls through to <code>HybridVerifierEvaluator</code> (<code class="path">sources/evaluators/evaluator.py:117-119</code>); <code>config.verifier_kind</code> is not validated on load (<code class="path">config.py:594</code>). A JSON config with, for example, <code>verifier_kind = "generic"</code> therefore gets the hybrid win-rate reward together with <code>threshold</code> mode, which is the stop rule the module exists to replace.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<p class="sub">2 module constants, 1 class, 5 methods, 5 properties. Signatures verbatim from the file.</p>
+<details><summary>every def in sources/core/stopping.py</summary><div class="dbody">
+<pre>RELATIVE_VERIFIER_KINDS = frozenset({"hybrid", "policy_bt"})            # L30  - pairwise-reward kinds
+VALID_STOP_MODES = ("auto", "threshold", "plateau", "none")            # L33  - accepted early_stop_mode
+
+class StopController:                                                  # L36  - one controller per session
+    def __init__(self, mode: str = "auto", min_iter: int = 6,          # L66
+                 patience: int = 3, threshold: float = 0.9,
+                 max_iter: int = 16,
+                 verifier_kind: str | None = None) -&gt; None
+    def observe(self, uuid: str, iteration: int,                       # L99
+                reward: float | None,
+                pair_outcomes: dict[str, str] | None,
+                failed: bool) -&gt; None
+    def should_stop(self, iteration: int) -&gt; tuple[bool, str]          # L150
+
+    @property
+    def champion(self) -&gt; str | None                                    # L189 - current champion uuid
+    @property
+    def since_change(self) -&gt; int                                      # L194 - generations without a champion
+    @property
+    def last_reward(self) -&gt; float | None                              # L199 - latest observed reward
+    @property
+    def relative(self) -&gt; bool                                         # L204 - pairwise reward flag
+    @property
+    def selects_champion(self) -&gt; bool                                 # L209 - plateau or none, relative kind
+
+    def resolution_note(self) -&gt; str                                   # L219 - one log line for [STOP]
+    @staticmethod
+    def _tag(uuid: str) -&gt; str                                         # L236 - last 8 chars
+
+No reset(), no __main__ block, no other import than                            # grep, 2026-10-10
+from __future__ import annotations                                             # L27</pre>
+<p>Body ranges: <code>observe</code> L122-145 (reward cached, failure branch, first champion, head-to-head outcome); <code>should_stop</code> L161-183 (max cap, min_iter gate, threshold, plateau, none).</p>
+<p>State fields: <code>self._champion: str | None = None</code>, <code>self._since_change = 0</code>, <code>self._last_reward: float | None = None</code> (L92-94). Constructor clamps: <code>cap = max(1, int(max_iter))</code> (L85), <code>min_iter = max(1, min(int(min_iter), cap))</code> (L87), <code>patience = max(1, int(patience))</code> (L88).</p>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a></td><td>imports the class, builds it, observes, asks, ships the champion</td><td class="sym">L42, L702, L914, L1010, L746</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py::evaluate_exploration_probe</a></td><td>reads <code>patience</code>, <code>champion</code>, <code>since_change</code>; formats with <code>_tag</code></td><td class="sym">L184-188, L206</td></tr>
+<tr><td class="sym"><a href="../../sources/core/evolution_engine.py">evolution_engine.py::_build_run_metrics_snapshot</a></td><td>asks <code>should_stop</code> again for the snapshot (same pure answer)</td><td class="sym">L1432-1440</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a></td><td>sets <code>self.verifier_kind</code>, the string the engine passes in</td><td class="sym">L108-121</td></tr>
+<tr><td class="sym"><a href="../../sources/core/__init__.py">sources/core/__init__.py</a></td><td>does not re-export <code>StopController</code></td><td class="sym">grep, no match</td></tr>
+<tr><td class="sym"><a href="../../tests/evolution_engine_stop_test.py">tests/evolution_engine_stop_test.py</a></td><td>8 pure tests, 2 engine-level stop-state tests</td><td class="sym">10 <code>test_</code> in 380 lines</td></tr>
+<tr><td class="sym"><a href="../../tests/exploration_probe_test.py">tests/exploration_probe_test.py</a></td><td>builds controllers to drive the probe triggers</td><td class="sym">L42, L51-58</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>producer to consumer round trip: <code>pair_outcomes</code> warp to the champion</td><td class="sym">L2132-2153</td></tr>
+<tr><td class="sym"><a href="../../tests/policy_bt_verifier_test.py">tests/policy_bt_verifier_test.py</a></td><td>a lost pair never becomes champion and advances the plateau</td><td class="sym">L1588-1604</td></tr>
+</tbody>
+</table>
+<p class="note">A dated observation of the landing point: <code class="path">sources/workflows/20261010_131904_da31d9ed/run_metrics.json</code> records <code>champion_uuid</code> = its own uuid, <code>since_change</code> 0; the two later generations of the same run (<code class="path">20261010_133420_6731de76</code>, <code class="path">20261010_133659_a1d6e9ce</code>) keep that champion with <code>since_change</code> 1 and 2 and <code>stop_reason</code> null, and gen 2's <code class="path">state_result.json</code> shows <code>pair_outcomes = {"20261010_131904_da31d9ed": "tie"}</code>. My reading, 2026-10-10; these runtime folders are volatile.</p>
+</div>
+
+<footer>
+<p>Sources: <a href="../../sources/core/stopping.py">sources/core/stopping.py</a> (all 238 lines, read line by line; line refs re-derived with <code>grep -n</code>), <a href="../../sources/core/evolution_engine.py">sources/core/evolution_engine.py</a> (L42, L145-219, L632-709, L870-940, L1001-1031, L1413-1460, L740-782 for the champion flag and restore_best call), <a href="../../config.py">config.py</a> (L222-234, L699-748, L901-906), <a href="../../config_default.json">config_default.json</a> (L80-86), <a href="../../main.py">main.py</a> (L230-238 and an AST scan of all 48 <code>add_argument</code> calls), <a href="../../sources/evaluators/evaluator.py">sources/evaluators/evaluator.py</a> (L90-126), <a href="../../sources/utils/run_metrics.py">sources/utils/run_metrics.py</a> (L17-33), <a href="../../tests/evolution_engine_stop_test.py">tests/evolution_engine_stop_test.py</a> (all 380 lines), <a href="../../tests/exploration_probe_test.py">tests/exploration_probe_test.py</a> (L38-58), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L2099-2153), <a href="../../tests/policy_bt_verifier_test.py">tests/policy_bt_verifier_test.py</a> (L1588-1604), plus two dated <code>run_metrics.json</code> reads under <code class="path">sources/workflows/</code> and a <code>grep -rn</code> for <code>StopController</code> over <code>sources/</code>, <code>tests/</code>, <code>main.py</code>, <code>config.py</code>. Line counts are my computation with <code>wc -l</code> and <code>ast.parse</code>.</p>
+<p class="skips">Skipped: the bodies of the four test files (only their <code>StopController</code> touchpoints are cited; each file tests its own package); the internals of <code>evaluate_exploration_probe</code> and <code>VariationEngine</code> (no page covers the frontier probe yet); the verifier packages that produce <code>pair_outcomes</code> (<a href="mod_evaluators_policy_bt_verifier.html">mod_evaluators_policy_bt_verifier.html</a> and <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a> own them); <code>sources/workflows</code>, <code>run_notes/</code> and <code>logs/</code> runtime data, Tier D, except the three dated <code>run_metrics.json</code> reads quoted above; the deprecated inline threshold fallback in the engine. No <code>.env</code>, <code>token.json</code> or key file was opened, and no pytest run and no application run were made, by the build rules.</p>
+<p>Built at commit <code>7da1f5e</code> + working tree, 2026-10-10. New page: <code>sources/core/stopping.py</code> is untracked in the working tree, so all line refs are against the tree, not the commit.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

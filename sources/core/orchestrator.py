@@ -1,5 +1,13 @@
-"""
-This class orchestrates the execution of workflows in a sandboxed environment.
+"""End-to-end workflow production and sandboxed execution (Layer 3).
+
+This file owns the run pipeline that turns one task into an executed
+workflow: optional Perspicacite-AI literature grounding, genotype code
+generation through the workflow factories, then dependency install and
+execution inside the sandboxed runner. The evolution engine (Layer 2)
+calls :class:`WorkflowOrchestrator.orchestrate_workflow` for every
+candidate it wants to create and score; console output and push
+notifications report progress. Generation and execution failures are
+returned, not raised, so the evolution loop can re-attempt.
 """
 
 import logging
@@ -21,18 +29,27 @@ from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
 
 
 class WorkflowOrchestrator:
-    """Main Meta-Agent workflow orchestration class.
+    """Produce workflow code and execute it inside the sandboxed runner.
 
-    Attributes:
-        workflow_dir (str): Directory containing workflow templates
+    The evolution engine constructs one orchestrator per run with the
+    application config and keeps it across generations; the async
+    context manager protocol guarantees runner cleanup. Invariant:
+    :meth:`orchestrate_workflow` never raises on workflow failure — it
+    reports errors through its return tuple instead.
     """
 
     def __init__(self, config: "Config") -> None:
-        """Initialize the Workflow orchestrator.
+        """Build the factories, notifier, and sandbox runner.
+
+        The evolution engine calls it once per run. It wires the
+        single-agent and workflow factories to the same config and
+        creates the runner from the configured defaults; no sandbox is
+        started here.
 
         Args:
-            config: Configuration object containing paths and settings (workspace
-                dir, workflow dir, Pushover credentials, runner defaults, etc.).
+            config: Application configuration with workspace and
+                workflow directories, runner defaults, Pushover
+                credentials, and model settings (config file).
         """
         self.config = config
         self.single_agent_factory = SingleAgentFactory(config)
@@ -44,15 +61,20 @@ class WorkflowOrchestrator:
             python_version=self.config.runner_default_python_version,
             timeout=self.config.runner_default_timeout,
             max_memory_mb=self.config.runner_default_max_memory_mb,
+            temp_dir=self.config.runner_temp_dir,
         )
         self.workflow_runner = WorkflowRunner(self.runner_config, self.config.workspace_dir)
 
     async def workflow_requirements_install(self) -> None:
         """Install the runner's declared dependencies into the sandbox.
 
+        :meth:`_execute_in_sandbox` calls it before every execution so
+        the workflow's imports resolve inside the runner. The package
+        list comes from ``config.runner_requirements`` (config file).
+
         Raises:
-            RuntimeError: If the dependency installation does not complete
-                successfully.
+            RuntimeError: If the dependency installation does not
+                complete successfully.
         """
         deps = self.config.runner_requirements
         print_info(f"📦 Installing workflow dependencies: {deps}")
@@ -61,22 +83,31 @@ class WorkflowOrchestrator:
             raise RuntimeError(f"Dependency installation failed: {dep_result.stderr}")
 
     async def workflow_sandbox_run(self, workflow_genotype_code: str) -> str:
-        """Run the workflow code in a sandboxed environment.
+        """Run the workflow code in the sandboxed runner.
+
+        :meth:`_execute_in_sandbox` calls it with the complete
+        generated source; output lines stream to stdout while the run
+        progresses. A COMPLETED result returns the captured output;
+        timeouts, syntax errors, and other failures raise so the caller
+        can report them.
 
         Args:
-            workflow_genotype_code: Python source code for the workflow to
-                execute inside the sandbox.
+            workflow_genotype_code: Python source code for the workflow
+                (LLM factory output).
 
         Returns:
-            The workflow execution output (stdout, or stderr/fallback message
-            when stdout is empty).
+            str: The workflow output — stdout, or stderr, or a
+            placeholder message when stdout is empty.
 
         Raises:
-            Exception: If the workflow execution does not reach COMPLETED status.
+            Exception: When the run does not reach COMPLETED status;
+            the message is prefixed with TIMEOUT, SYNTAX_ERROR, or
+            RUNTIME_ERROR.
         """
         logging.getLogger(__name__)
 
         def progress_handler(line: str) -> None:
+            """Print one sandbox output line to the console."""
             print(line)
 
         print_info("▶ Executing workflow in Python sandbox…")
@@ -89,18 +120,32 @@ class WorkflowOrchestrator:
                 result.stdout or result.stderr or "No output from workflow execution."
             )
         else:
-            print_err(f"Workflow execution failed: {result.stderr}")
-            raise Exception(f"Workflow execution failed: {result.stderr}")
+            stderr = result.stderr or ""
+            if "TimeoutExpired" in stderr or "timed out" in stderr.lower():
+                error_type = "TIMEOUT"
+            elif "SyntaxError" in stderr:
+                error_type = "SYNTAX_ERROR"
+            else:
+                error_type = "RUNTIME_ERROR"
+            print_err(f"[{error_type}] Workflow execution failed: {stderr}")
+            raise Exception(f"[{error_type}] Workflow execution failed: {stderr}")
 
     def perspicacite_grounding_task(self, task: str) -> str:
         """Query Perspicacite-AI for a literature-grounded approach to a task.
 
+        :meth:`_ground_with_perspicacite` calls it during grounding when
+        the run enables literature grounding. The task text is embedded
+        in a fixed prompt that asks for canonical methods, expert roles,
+        and validation criteria; service errors degrade to a fallback
+        message instead of raising.
+
         Args:
-            task: The scientific task description to ground.
+            task: The scientific task description to ground (current
+                run's goal or original task).
 
         Returns:
-            The literature-grounded response text, or a fallback message when
-            the service is unavailable or returns no relevant context.
+            str: The literature-grounded response, or a fallback
+            message when the service is unavailable or returns nothing.
         """
         prompt = f"""You are a scientific literature specialist supporting a scientist on a task.
 SCIENTIFIC TASK:
@@ -131,17 +176,22 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             return "Query failed. Unable to help with scientific litterature"
 
     def _ground_with_perspicacite(self, task: str, craft_instructions: str) -> str:
-        """Enrich craft instructions with scientific context from Perspicacite-AI.
+        """Prepend Perspicacite-AI scientific context to craft instructions.
 
-        Returns the original instructions if grounding is unavailable.
+        :meth:`orchestrate_workflow` calls it when literature grounding
+        is enabled, before code generation. When the grounding query
+        fails or returns nothing, the instructions pass through
+        unchanged.
 
         Args:
-            task: The scientific task to query for context.
-            craft_instructions: Original craft instructions to be enriched.
+            task: The scientific task to query for context (original
+                task text).
+            craft_instructions: Recipe for the LLM workflow generator
+                (evolution prompt output).
 
         Returns:
-            The craft instructions, optionally prepended with formatted
-            scientific context retrieved from Perspicacite-AI.
+            str: The craft instructions, prepended with the formatted
+            scientific context when grounding succeeded.
         """
         print_phase(
             "🔬 Querying Perspicacite-AI for scientific context... (This can take several minutes)"
@@ -165,25 +215,31 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         single_agent_mode: bool,
         original_task: str | None,
     ) -> tuple[str, str, str]:
-        """Generate workflow code via the appropriate factory.
+        """Generate workflow code via the selected factory.
 
-        Returns (complete_code, workflow_genotype_code, uuid).
-        Raises on generation failure; factories may encode "UUID:<uuid>|<msg>".
+        :meth:`orchestrate_workflow` calls it once per candidate. It
+        dispatches to the single-agent factory in single-agent mode and
+        to the multi-agent workflow factory otherwise; both persist the
+        generated workflow and return its UUID.
 
         Args:
-            goal: Workflow goal (may be knowledge-wrapped).
-            craft_instructions: Recipe for the LLM workflow generator.
-            single_agent_mode: When True, dispatch to the single-agent factory;
-                otherwise use the multi-agent workflow factory.
-            original_task: Unwrapped task for similarity matching, or None.
+            goal: Workflow goal, possibly knowledge-wrapped (evolution
+                engine).
+            craft_instructions: Recipe for the LLM workflow generator
+                (evolution prompt, grounding, and model-list notes).
+            single_agent_mode: When ``True``, dispatch to the
+                single-agent factory; otherwise the multi-agent one.
+            original_task: Unwrapped task for similarity matching, or
+                ``None``.
 
         Returns:
-            A tuple ``(complete_code, workflow_genotype_code, uuid)`` produced
-            by the selected factory.
+            tuple[str, str, str]: ``(complete_code, workflow_genotype_code,
+            uuid)`` produced by the selected factory.
 
         Raises:
-            Exception: Any error raised by the underlying factory; the message
-                may be encoded as ``"UUID:<uuid>|<msg>"``.
+            Exception: Any factory error; the message may be encoded as
+            ``"UUID:<uuid>|<msg>"`` — see
+            :meth:`_parse_generation_error`.
         """
         if single_agent_mode:
             return await self.single_agent_factory.craft_single_agent(
@@ -195,17 +251,21 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
 
     @staticmethod
     def _parse_generation_error(error: Exception) -> tuple[str, str]:
-        """Extract (uuid, message) from a factory generation error.
+        """Extract ``(uuid, message)`` from a factory generation error.
 
-        Returns ("generation_failed", message) when no uuid is encoded.
+        :meth:`orchestrate_workflow` calls it in the generation error
+        handler so a partially created workflow keeps a usable UUID in
+        logs and return values.
 
         Args:
-            error: Exception raised by a workflow factory during generation.
+            error: Exception raised by a workflow factory during
+                generation.
 
         Returns:
-            A tuple ``(uuid, message)``. When the error message uses the
-            ``"UUID:<uuid>|<msg>"`` convention, the encoded UUID and message
-            are returned; otherwise ``("generation_failed", str(error))``.
+            tuple[str, str]: ``(uuid, message)``. When the message uses
+            the ``"UUID:<uuid>|<msg>"`` convention, the encoded UUID and
+            message are returned; otherwise
+            ``("generation_failed", str(error))``.
         """
         msg = str(error)
         if msg.startswith("UUID:") and "|" in msg:
@@ -214,17 +274,19 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         return "generation_failed", msg
 
     async def _execute_in_sandbox(self, complete_code: str) -> tuple[str, float, float]:
-        """Install dependencies and run the workflow in a sandbox.
+        """Install dependencies and run the workflow in the sandbox.
 
-        Returns (execution_output, deps_install_time, exec_time).
-        Raises on dependency install or execution failure.
+        :meth:`orchestrate_workflow` calls it for every generated
+        candidate, and both phases are timed for the completion
+        summary.
 
         Args:
-            complete_code: Full Python source code for the workflow to execute.
+            complete_code: Full Python source code for the workflow
+                (factory output).
 
         Returns:
-            A tuple ``(execution_output, deps_install_time, exec_time)`` where
-            times are in seconds.
+            tuple[str, float, float]: ``(execution_output,
+            deps_install_time, exec_time)`` with times in seconds.
 
         Raises:
             RuntimeError: If dependency installation fails.
@@ -246,11 +308,18 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
     def _notify_execution_failure(self, uuid: str, goal: str, workflow_time: float, error: Exception) -> None:
         """Send a Pushover notification for an execution failure.
 
+        :meth:`orchestrate_workflow` calls it once per failed run so the
+        operator learns about the failure even without watching the
+        console.
+
         Args:
-            uuid: Identifier of the workflow that failed.
-            goal: Workflow goal text (truncated in the notification body).
+            uuid: Identifier of the workflow that failed (factory
+                output).
+            goal: Workflow goal text (truncated in the notification
+                body).
             workflow_time: Elapsed time before the failure, in seconds.
-            error: Exception describing the failure (truncated in the body).
+            error: Exception describing the failure (truncated in the
+                body).
         """
         self.notifier.send_message(
             f"Workflow {uuid} execution failed after {workflow_time:.1f}s\n"
@@ -259,6 +328,38 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             title=f"Workflow {uuid} execution failed",
             priority=1,
         )
+    
+    def _prompt_agents_model_list(self, craft_instructions: str) -> str:
+        """Prepend the per-agent model-choice note to craft instructions.
+
+        :meth:`orchestrate_workflow` calls it before generation. When
+        ``config.orchestrator_choose_model`` is off, a banner appended
+        after the instructions tells the generator to keep the default
+        models; when on, the allowed model list is prepended.
+
+        Args:
+            craft_instructions: Recipe for the LLM workflow generator
+                (evolution prompt output).
+
+        Returns:
+            str: The craft instructions with the model-choice note
+            prepended or appended.
+        """
+        if not self.config.orchestrator_choose_model:
+            unallowed_banner = """
+\nYou are not allowed to choose per agent model. The workflow will use the default model(s) specified in the configuration.\n
+"""
+            return craft_instructions + unallowed_banner
+
+        model_list = self.config.smolagent_model_id if isinstance(self.config.smolagent_model_id, list) else [self.config.smolagent_model_id]
+        model_list_str = '\n - '.join(model_list)
+        model_list_prompt = (
+            "You can choose per agent model for this workflow from the following list:\n"
+            f"{model_list_str}\n"
+            "Do not choose a model that is not in the list. If you do not want to choose a model, you can leave it empty and the default model will be used.\n"
+            "Specify the model parameter for each agent with the value of your choice."
+        )
+        return model_list_prompt + '\n' + craft_instructions
 
     async def orchestrate_workflow(
         self,
@@ -270,25 +371,35 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
     ) -> tuple[str, str, str, bool]:
         """Execute a workflow end-to-end: grounding → generation → sandbox run.
 
-        Errors are captured into the return tuple so the evolution loop can
-        recover via re-attempt; `executed=False` is the structural signal.
+        The evolution engine calls it once per candidate generation.
+        Errors are captured into the return tuple so the loop can
+        re-attempt; ``executed=False`` is the structural failure signal,
+        and a Pushover notice is sent for execution failures.
 
         Args:
-            goal: Workflow goal (may be knowledge-wrapped).
+            goal: Workflow goal, possibly knowledge-wrapped (evolution
+                engine).
             craft_instructions: Recipe for the LLM workflow generator.
-            original_task: Unwrapped task for similarity matching.
-            single_agent_mode: Use the single-agent factory instead of multi-agent.
+            original_task: Unwrapped task for similarity matching, or
+                ``None``.
+            single_agent_mode: Use the single-agent factory instead of
+                the multi-agent one.
             no_run: Skip dependency install and sandbox execution.
 
         Returns:
-            (execution_output, workflow_uuid, workflow_genotype_code, executed).
-            `executed` is False on any generation or execution error.
+            tuple[str, str, str, bool]: ``(execution_output,
+            workflow_uuid, workflow_genotype_code, executed)``.
+            ``executed`` is ``False`` on any generation or execution
+            error; with ``no_run`` the output is ``""``.
         """
         logger = logging.getLogger(__name__)
         workflow_start = time.time()
         science_task = original_task or goal
 
-        craft_instructions = self._ground_with_perspicacite(science_task, craft_instructions)
+        craft_instructions = self._prompt_agents_model_list(craft_instructions)
+
+        if self.config.literrature_grounding == True:
+            craft_instructions = self._ground_with_perspicacite(science_task, craft_instructions)
 
         logger.info(f"[WORKFLOW START] Orchestrating workflow - {goal[:50]}...")
         print_phase("WORKFLOW GENERATION PHASE")
@@ -339,11 +450,29 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         return output, uuid, workflow_genotype_code, True
 
     async def __aenter__(self) -> "WorkflowOrchestrator":
-        """Async context manager entry."""
+        """Enter the async context and return the orchestrator.
+
+        Evolution runs wrap the orchestrator in ``async with`` so
+        runner cleanup is guaranteed.
+
+        Returns:
+            WorkflowOrchestrator: This orchestrator instance.
+        """
         return self
 
     async def __aexit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        """Async context manager exit with proper cleanup."""
+        """Exit the async context and clean up the sandbox runner.
+
+        Runs for every ``async with`` block, including error paths.
+        Cleanup errors are printed, never raised.
+
+        Args:
+            exc_type: Exception class of an in-flight error, or
+                ``None``.
+            exc_val: Exception instance of an in-flight error, or
+                ``None``.
+            exc_tb: Traceback of an in-flight error, or ``None``.
+        """
         try:
             await self.workflow_runner.cleanup()
         except Exception as e:
@@ -353,7 +482,12 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             traceback.print_exc()
 
     def __del__(self) -> None:
-        """Cleanup resources on deletion - sync fallback."""
+        """Best-effort synchronous cleanup when the orchestrator is deleted.
+
+        The interpreter may run it during shutdown with no event loop,
+        so every failure is suppressed; normal runs should rely on the
+        async context manager instead.
+        """
         try:
             import sys
 
@@ -375,6 +509,13 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
             pass
 
 async def test_workflow_orchestrator():
+    """Manual smoke entry: generate one workflow with a placeholder prompt.
+
+    Developers run this file directly to exercise the generation
+    factories without a full evolution loop. It builds the default
+    config and orchestrator, then calls the multi-agent generation
+    path; results print to stdout.
+    """
     evolution_prommt = '''
 put here evolution prompt to test
 '''

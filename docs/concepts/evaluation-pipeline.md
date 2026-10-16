@@ -1,9 +1,11 @@
 # Evaluation pipeline
 
-> This page describes the **judge** that runs after every workflow
-> execution — the [`VerifierEvaluator`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/verifier.py)
-> in `sources/core/evaluators/`. It is the **pressure signal that drives
-> workflow evolution**, not a benchmark grader.
+> This page describes the **judge** that runs after each workflow
+> execution. The default is the policy-based **Bradley–Terry verifier**
+> ([`sources/evaluators/policy_bt_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/)).
+> It supplies the **pressure signal that drives workflow evolution**,
+> not a benchmark grade. The previous hybrid and legacy verifiers remain
+> available and are described below.
 >
 > If you are looking for ScienceAgentBench or PaperBench grading — those
 > are different systems that compare the workflow's output against
@@ -11,29 +13,615 @@
 > [ScienceAgentBench evaluation](../science_agent_bench_evaluation.md)
 > and [PaperBench evaluation](../papers_bench_evaluation.md).
 
-Mimosa scores each workflow run with a **multi-source, per-claim
-verifier**. The verifier writes and executes **deterministic Python
-programs** in the workspace to confirm what the agents claim they did,
-across six independent vantage points (literature, user goal, agent
-narration, math invariants, computational reproducibility, statistical
-fingerprint). The single signal that flows back to the mutator is a short
-**prompt gradient** that summarizes failure modes without leaking the
-verified claims themselves.
+The default, `verifier_kind = "policy_bt"`, compares the artifacts of
+each generation with those of its predecessors. A cached Python policy
+decides the pairs. Relevant visual evidence can resolve a policy tie.
+The complete set of wins, losses, and ties fits a **Bradley–Terry
+tournament**, which updates the current reward of **every generation**
+after each evaluation.
 
-The same per-claim verdicts are projected into a 6-dim **failure
-fingerprint** that the [evolution engine](evolution-engine.md#behaviour-descriptor-failure-fingerprint)
-uses as the behaviour descriptor for QD novelty. The descriptor is
-centered so overall quality cannot leak into novelty — see the firewall
-section below.
+The feedback passed to the mutator remains the **textual gradient**
+(`evaluation.verifier.abstracted_textual_gradient` in `state_result.json`,
+plus `textual_gradient.txt`). It explains decisive differences and
+prioritizes the earliest stage at which the current generation lost.
 
-![Evaluation pipeline](../images/evaluation_pipeline.png){ width="100%" }
+The older multi-source per-claim `VerifierEvaluator` — with its five
+claim sources (`a`/`b`/`c`/`e`/`g`), self-rated claim importances,
+importance-weighted mean, and 0.89 hard-fail cap — is
+**deprecated (2026-09-24)** and described in
+[Legacy multi-source verifier](#legacy-multi-source-verifier-deprecated)
+below; it remains reachable via `verifier_kind = "legacy"`.
 
-## The pipeline
+## Policy-based Bradley–Terry verifier (default)
+
+The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/DESIGN.md#2-how-it-would-work):
+
+1. **Reproduction contract.** Each generation must contain a shell
+   (`.sh`) script that regenerates its outputs and, unless the runtime
+   provisions packages (ScienceAgentBench), installs its requirements
+   first. A missing or invalid script makes the generation ineligible:
+   reward is zero and feedback states the required correction.
+2. **Owned artifact copies.** The verifier inspects copies of saved
+   generation workspaces, never changes the original artifacts, and
+   optionally runs the reproduction script on a copy.
+3. **Reconnaissance and normalization.** Inventories and compact content
+   previews inform the LLM. Schema adapters map differing artifact
+   layouts to a common representation. A new schema can extend the
+   adapters without changing the comparison criteria. When the goal asks
+   for saved outputs, the criteria include an `output_conformance` gate
+   (before any quality measure): exact goal paths; field names taken from
+   the goal, else copied exactly from the task inputs (no invented
+   `_pred`/`_prob` variants); record identifiers copied verbatim; one
+   output record per input record in input order for per-record results,
+   and only input records for selections. The adapter checks this by
+   reading the input and the output files, and the feedback names each
+   found-vs-expected mismatch. Strict benchmark graders fail correct
+   science delivered in another shape, so this gate is measured, not
+   assumed.
+4. **Pairwise policy.** A cached deterministic Python policy compares
+   each pair and returns a verdict, evidence, and feedback for both
+   sides. On a tie, comparable goal-relevant visual artifacts can be
+   sent to the configured vision model; otherwise the pair stays tied.
+5. **Current ratings.** The accumulated pair results fit a regularized
+   Bradley–Terry model. The first eligible generation starts at 0.5;
+   an ineligible generation remains at zero.
+
+Re-execution (`policy_bt_reexecute`, default `true`) runs the script
+with bash on the copy, in a fresh venv with no API keys; existing
+outputs are moved aside first, so stale artifacts cannot pass. This is
+trusted local shell execution — **not** an OS security sandbox. Run
+logs are copied into `.policy_bt_reexec/` inside the snapshot so
+adapters can read stdout-only metrics.
+
+The rerun runtime is `policy_bt_reexec_runtime`: `python` (venv
+interpreter), `constraints` (pip caps, applied to every install through
+`PIP_CONSTRAINT`), `env` (extra variables that cannot override the
+isolation variables) and `provisioner` (`module:function`). Empty means
+the host interpreter with no caps and an empty venv that `run.sh` fills
+itself. ScienceAgentBench mode fills it with the grader's own runtime
+(`execution_sandbox.grading_runtime()`: Python 3.10, `PINNED_CONSTRAINTS`,
+`TF_USE_LEGACY_KERAS=1`, provisioner `provision_capsule_venv`). The
+provisioner builds the rerun venv with the grader's exact install path —
+same base layer, pipreqs over the workspace's imports, SAB rules and caps
+— then pip in the venv is replaced by a no-op that prints a notice, and
+`PIP_NO_INDEX=1` is set, so `pip install -r requirements.txt` in `run.sh`
+has no effect, as in grading. In that mode the contract needs no install
+step, the goal tells agents not to install
+(`reexec.reproduction_goal_note`), the resolved versions are recorded in
+`execution.runtime.provisioned`, and a provisioning failure is an
+instrument error (the grader would exclude the task). A failed or output-less rerun gets one LLM root-cause
+diagnosis from bounded evidence (runtime, script, requirements, stderr
+head and tail), added to the reason before the raw stderr tail; if that
+call fails, `diagnosis_error` records why and the tail alone remains.
+The diagnosis must quote the log line behind every cause it states
+(missing-module messages first) and may not infer a version
+incompatibility from installed version numbers alone. A declared output
+counts as regenerated when its path exists again after the rerun, an
+empty directory included (outputs are moved aside before the run).
+A workspace virtual environment (a directory holding `pyvenv.cfg`) is
+snapshotted as its `pyvenv.cfg` only.
+
+**Adapters run in a small Python subset** (stdlib `json`/`math`/`struct`
+calls plus harness-provided read capabilities and CSV parsing — no
+`numpy`/`pandas`/binary scientific readers). Formats outside that
+subset stay "unknown" (`null`), never a fabricated loss.
+
+Per generation the verifier writes `evaluation.txt` (reward, tournament
+version, execution record, and the pair verdicts), `textual_gradient.txt`,
+`policy_bt_evidence.json`, and `verifier_policy_bt.log`. The tournament
+state for a task session lives in
+`<workflow_dir>/.policy_bt/<sha256(goal, session)>/tournament.json`
+with one `snapshots/<uuid>/` copy per generation. Verifier LLM calls
+are saved as `memory/<uuid>/verifier_policy_bt_<channel>_<n>.json` and
+counted in the run cost.
+
+If the verifier itself fails before scoring — bad LLM answer,
+adapter/policy error, venv creation failure — the generation is NOT
+scored: `state_result.json` carries
+`skipped_reason = "verifier_instrument_error"` and the engine treats it
+as a failed generation, keeping it out of the QD archive.
+
+### Current ratings versus arrival scores
+
+Each result carries `verifier_kind = "policy_bt"`, `tournament_rewards`
+(workflow UUID to current rating), and `tournament_version`.
+Earlier `state_result.json` verifier blocks receive the latest rating.
+The engine updates all in-memory run rewards and QD archive rewards
+**before survivor selection**. QD scores retain the existing novelty,
+quality, and length-penalty composition. Parent selection reads the
+updated archive and reloads persisted workflow scores.
+
+`arrival_reward` records the score at the generation's first evaluation;
+the reward curve and existing per-generation history remain historical.
+Those historical values do not choose QD survivors or the final capsule.
+The policy-BT capsule is the generation with the **highest current
+tournament rating**, not the stop controller's head-to-head champion.
+The existing relative-score stopping rule remains in use; hybrid and
+legacy stopping and capsule behavior are unchanged. Each evolution
+session receives a fresh tournament registry scope.
+
+### Configuration
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `verifier_kind` | `"policy_bt"` | Select the policy tournament verifier |
+| `policy_bt_reward` | `"bradley_terry"` | Only supported policy-BT reward |
+| `policy_bt_reexecute` | `true` | Run the required reproduction script |
+| `policy_bt_reexec_timeout_s` | `900` | Reproduction wall-clock limit |
+| `policy_bt_scorer_timeout_s` | `60` | Policy comparison time limit |
+| `policy_bt_repair_rounds` | `3` | Maximum policy or adapter repairs |
+| `policy_bt_visual_channel` | `true` | Allow relevant visual tie resolution |
+
+Use `--no-policy_bt_reexecute` to inspect existing artifacts without
+running the script. The script requirement still applies. Use
+`--policy_bt_reexecute` to enable execution again. Configuration JSON
+preserves these choices. Old policy `win_rate`, refiner, pair-limit,
+environment-reuse, visual-first, verbose, and recon-gap controls are
+no longer part of this verifier.
+
+## The hybrid temporal-ladder verifier (previous default)
+
+Implemented in
+[`sources/evaluators/hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/):
+`evaluator.py` (`HybridVerifierEvaluator`) orchestrates, and the stages
+live in `claims.py`, `digest.py`, `scorers.py`, `registry.py`,
+`aggregation.py`, `gradient.py`, `layers.py`. One evaluation of one
+generation runs:
+
+1. **Key-claim extraction — the temporal ladder** — ONE judge-LLM call
+   per task (cached) turns the goal plus a workspace inventory (file
+   sizes, CSV rows×cols, PNG dimensions) into 8–12 stage-tagged claims
+   in temporal order (`claims.py`).
+2. **Format digests** — ONE judge-LLM call per task (cached) samples
+   deterministic head/middle/tail slices of the deliverable files and
+   writes a short format digest per file, injected into every
+   policy-writer prompt (`digest.py`).
+3. **Python policy scorers** — ONE judge-LLM call per claim writes a
+   self-contained deterministic Python script that scores a single
+   workspace 0..1 on that claim; the same cached script re-scores every
+   generation of the task, with a bounded repair loop on execution
+   failures (`scorers.py`, `layers.py`).
+4. **Aggregation — Bradley–Terry via temporal elimination** — the
+   reward is the win-rate of this generation against every previous
+   generation of the same task, each pair decided at the earliest
+   ladder stage where the two differ; zero-variance (dead) claims are
+   dropped and replaced by refined claims (`aggregation.py`,
+   `registry.py`).
+5. **Elimination-point gradient** — a textual gradient that leads with
+   the earliest stage/claim where this generation lost, plus
+   `evaluation.txt` with stage headers (`gradient.py`).
+
+```mermaid
+%%{init: {"theme": "base", "themeVariables": {
+  "primaryColor": "#F1FBF6",
+  "primaryBorderColor": "#2E8B57",
+  "primaryTextColor": "#0E2A1A",
+  "lineColor": "#2E5C45",
+  "fontSize": "13px"
+}} }%%
+flowchart TB
+    %% ===== inputs =====
+    Goal[/"task goal<br/>(user task / benchmark row)"/]
+    WS[/"workspace of the generation<br/>scripts · logs · deliverable artifacts"/]
+    Prev[/"per-task registry<br/>score vectors of every previous generation"/]
+
+    %% ===== Stage 1: temporal-ladder claim extraction =====
+    subgraph Claims["Stage 1 — temporal-ladder claim extraction (ONE call per task, cached)"]
+        direction LR
+        S1["script rung<br/>code exists · structurally valid<br/>reads the goal's inputs"]
+        S2["log rung<br/>loss decreasing · best/final loss<br/>accuracy at step X · no NaN"]
+        S3["result rung<br/>pred-CSV columns = ORIGINAL input columns<br/>completeness · prediction sanity"]
+    end
+    Goal --> S1
+    Goal --> S2
+    Goal --> S3
+    WS --> S1
+
+    Digest["format digests (ONE call per task, cached)<br/>seeded head/middle/tail slices of deliverables<br/>columns · log grammar · value formats"]
+    Goal --> Digest
+    WS --> Digest
+
+    Ladder["8–12 validated claims in temporal order<br/>generic claims dropped · ≤ 14 live incl. replacements"]
+    S1 --> Ladder
+    S2 --> Ladder
+    S3 --> Ladder
+
+    %% ===== Stage 2: policy scorers =====
+    subgraph Scorers["Stage 2 — Python policy scorers (ONE call per claim, cached + repaired)"]
+        direction TB
+        GenPol["judge LLM writes a self-contained scorer<br/>stdlib + numpy + pandas + PIL only;<br/>write / network / process APIs statically banned"]
+        Subproc[["pinned-interpreter subprocess<br/>sys.executable · cwd = workspace · 60 s timeout<br/>one JSON line out<br/>(NOT the SmolAgents AST sandbox)"]]
+        Repair{"valid output?"}
+    end
+    Ladder --> GenPol
+    Digest --> GenPol
+    GenPol --> Subproc
+    Subproc --> Repair
+    Repair -- "no → stderr feedback (≤ 3 attempts)" --> GenPol
+
+    %% ===== Stage 3: registry + variance filter =====
+    subgraph Reg["Stage 3 — per-task registry + variance filter"]
+        Vectors["per-generation score vectors<br/>(same cached scorer re-scores every generation)"]
+        Dead{"zero variance<br/>across ≥ 2 workspaces?"}
+        Refine["refinement: replace dead claims<br/>≤ hybrid_verifier_refinement_rounds per generation"]
+    end
+    Repair -- yes --> Vectors
+    Vectors --> Dead
+    Dead -- yes --> Refine
+    Refine --> Vectors
+    Prev --> Vectors
+
+    %% ===== Stage 4: pairwise temporal elimination =====
+    subgraph Reward["Stage 4 — Bradley–Terry via temporal elimination"]
+        Stage["per pair (now, prev):<br/>earliest differing stage decides<br/>higher pass-count (score ≥ 0.5) wins<br/>tie → stage mean score-diff"]
+        WinRate["reward = (wins + 0.5·ties) / n_previous<br/>first generation → mean claim score"]
+    end
+    Vectors --> Stage
+    Stage --> WinRate
+
+    %% ===== Stage 5: elimination-point gradient =====
+    WinRate --> Grad["Stage 5 — elimination-point textual gradient<br/>leads with the earliest lost stage/claim<br/>(both scores · measured evidence · goal-anchored fix)<br/>→ textual_gradient.txt + evaluation.txt<br/>→ evaluation.verifier.abstracted_textual_gradient"]
+    Grad -. drives .-> Loop[/"EvolutionEngine.evolve_generation()"/]
+
+    %% ===== styling =====
+    classDef stage fill:#F1FBF6,stroke:#2E8B57,stroke-width:1px,color:#0E2A1A;
+    classDef external fill:#FFF7E6,stroke:#A36A00,color:#202020;
+    class Claims,Scorers,Reg,Reward stage;
+    class Goal,WS,Prev external;
+```
+
+### The temporal claim ladder (`script` → `log` → `result`)
+
+ONE judge-LLM call per task (`claims.extract_claims_prompt`) reads the
+goal plus the union inventory of the candidate workspaces and emits
+8–12 claims (target `hybrid_verifier_num_claims = 10`, extraction
+accepts ±2), each tagged with a ladder stage and a temporal index:
+
+| Stage | Rung meaning | Typical claims |
+| ------ | ------------ | -------------- |
+| `script` (earliest) | the delivered **code** exists, is structurally valid, reads the goal's input files correctly, implements the intended pipeline — checkable by reading the candidate's own scripts | required method / featurization present in the code; the goal's input files opened correctly |
+| `log` (middle) | execution / training dynamics parsed from the run's **logs** | loss decreasing; best/final loss value; accuracy at step X; no NaN or crash markers |
+| `result` (latest) | **artifact fidelity** | prediction-CSV columns match the ORIGINAL input file's column names exactly (no spurious `_pred` suffixes); one row per input row (completeness); prediction sanity (probabilities in [0,1], non-negative counts) |
+
+Every claim must be **task-defining** (only properties the goal's own
+words specify or imply — a demanded-but-unmeasured artifact is a
+hallucinated requirement), **decidable** by deterministic Python from
+the workspace's files alone (no gold outputs, no reference labels, no
+network), **decisive** (a claim every workspace will pass — or none can
+— is worthless), and **graded** (the scoring rule must measure a
+quantity and map it to continuous 0..1 partial credit). Validation
+(`claims.validate_claims`) drops generic claims — a scoring rule that
+names no measurable quantity — enforces stage tagging and temporal
+order, and the live claim set is capped at 14 including replacements
+(`layers.MAX_CLAIMS_TOTAL`).
+
+### Format digests
+
+ONE judge-LLM call per task (`digest.py`), cached in the registry,
+samples deterministic head/middle/tail slices (1 200 bytes each;
+offsets derived from the file size and a per-path seed, so the same
+bytes are sampled on every machine and re-run) of up to
+`hybrid_verifier_digest_max_files` (default 8) deliverable-ish files
+and writes a short format digest per file: column names, log-line
+grammar, value formats. The digests are injected into every
+policy-writer prompt, so the code-writing LLM sees the real file
+*formats*, not just their names.
+
+### Python policy scorers
+
+ONE judge-LLM call per claim (`scorers.scorer_prompt`) writes a
+**self-contained deterministic Python script** that grades a *single*
+workspace of the task on that claim, printing exactly one JSON line:
+
+```json
+{"claim_id": "C3", "score": 0.85, "evidence": "341/400 rows carry a probability in [0,1]"}
+```
+
+- **Policy contract** — imports are restricted to the standard library
+  + `numpy` + `pandas` + `PIL` (`scorers.ALLOWED_IMPORTS`); a static
+  screen (`static_violations`) rejects network, subprocess, randomness
+  and write APIs (including write-mode `open(...)`) before anything
+  runs.
+- **Execution** — scorers run as plain subprocesses of the pinned host
+  interpreter (`sys.executable`, cwd = the workspace) under a
+  `hybrid_verifier_scorer_timeout_s` (default 60 s) timeout. Like the
+  legacy verifier's checks, these are **not** run inside the SmolAgents
+  AST sandbox (which applies to workflow agents only) — they are
+  LLM-written code executing with the operator's Python, bounded by the
+  import screen above.
+- **Repair loop** — a scorer that fails statically or at runtime is
+  regenerated from its exit-status/stderr feedback at most twice
+  (`scorers.MAX_CODE_ATTEMPTS = 3` attempts total).
+- **Reuse** — the accepted script is cached in the per-task registry
+  and re-run verbatim for every later generation of the task, so scores
+  are comparable across the evolution history and the measurement is
+  deterministic and symmetric by construction.
+
+### Per-task registry, variance filter, refinement
+
+`registry.py` persists one JSON file per task
+(`hybrid_registry_<key>.json`, key = first 16 hex chars of
+`sha256(goal + REGISTRY_VERSION)` — the same keying scheme as the
+legacy rubric cache, so a registry is shared across generations of one
+goal and distinct between goals). It stores the claim set (statement,
+target, scoring rule, stage, temporal index), the cached scorer scripts
+and format digests, every generation's per-claim score vector, and the
+union workspace inventory.
+
+A claim whose scores have **zero variance** across all scored
+workspaces (≥ 2 observations, `aggregation.claim_stats`) is
+non-discriminative — it cannot separate candidates — and is dropped
+("dead"), as is a claim every workspace fails. Dead claims are
+replaced by refined claims (`claims.refinement_prompt`) up to
+`hybrid_verifier_refinement_rounds` (default 2) replacements per
+generation; the dead-claim report appears at the end of the gradient.
+
+### Reward — Bradley–Terry via temporal elimination
+
+`aggregation.win_rate_reward` computes the reward as the mean
+**win-rate** of the current generation against *every previous
+generation of the same task* (ties count 0.5) — a Bradley–Terry
+aggregation across the evolution history. The first generation of a
+task has no rivals and falls back to its mean claim score
+(`reward_fallback = "mean_claim"`).
+
+The pairwise policy is **temporal elimination** (default mode
+`temporal`): a pair (A, B) is decided at the **earliest ladder stage
+where the two generations differ** — the stage pass-count (number of
+the stage's claims scoring ≥ `PASS_THRESHOLD = 0.5`) decides; a
+pass-count tie falls to that stage's mean score difference; if the
+whole ladder ties, the pair is a tie. "Whoever makes it longer in the
+temporal ladder wins": a script-stage failure loses regardless of
+result-stage quality.
+
+| Mode | Policy |
+| ---- | ------ |
+| `temporal` (default) | earliest differing **stage** decides (pass-count, then stage mean-diff) |
+| `temporal_strict` | the first differing **claim** in temporal order wins outright |
+| `sign_sum` | flat: more claims scored higher wins |
+| `mean_diff` | flat: larger total score difference wins |
+| `escalation` | flat: sign-sum, then mean-diff tie-break |
+
+Zero-variance (dead) claims are excluded from all comparisons. Layer
+`gate` hooks (below) cap the reward: `reward = min(reward, *caps)`.
+
+### Gradient and artifacts
+
+The gradient (`gradient.py`) is **elimination-point-first**: it leads
+with the earliest stage/claim where this generation lost to a rival —
+both scores, the measured evidence (with numbers), and the goal-anchored
+requirement — then the remaining stage losses/wins in temporal order,
+the full per-claim transcript, the pairwise record, and the dead-claim
+report. It is a faithful transcript of measured facts: no
+editorializing, no labels.
+
+Artifacts per generation (same downstream locations as the legacy
+verifier):
+
+- `sources/workflows/<uuid>/evaluation.txt` — human-readable report
+  with stage headers;
+- `sources/workflows/<uuid>/textual_gradient.txt` — the gradient
+  sidecar;
+- `state_result.json` → `evaluation.verifier.*` — structured scores:
+  `overall_score` (the win-rate reward), `overall_score_uncapped`,
+  `mean_claim_score`, `win_rate`, `n_pairs` / `n_wins` / `n_losses` /
+  `n_ties`, `pairwise_mode`, `reward_fallback`, `n_claims` /
+  `n_surviving` / `n_dropped` / `n_scored` / `n_scorer_failures` /
+  `n_replacements`, a per-claim `claim_summary` (id, category,
+  statement, score, surviving, evidence), and
+  `abstracted_textual_gradient` (the legacy `abstractec_` typo key is
+  also written for one release so old readers keep working).
+
+The evolution engine consumes the gradient through
+`workflow_info.abstracted_textual_gradient` (structured key first, then
+the sidecar). A generation whose workflow failed to generate or execute
+short-circuits: one synthetic `execution_produced_artifacts` claim
+scored from the workspace listing, reward 0.0, and a non-empty gradient
+— the mutator never sees an empty diagnosis. The legacy
+`failure_fingerprint` key is still written, but as a **neutral
+placeholder** (zero vector, 0.5 pass rates) for schema compatibility —
+the hybrid verifier does not compute per-source pass rates.
+
+### Extension interface — `EvidenceLayer`
+
+`layers.py` defines the extension point. The aggregator, registry,
+reward and gradient code are layer-agnostic — they consume
+`(claim_id, score)` pairs keyed only by id. A new evidence layer (e.g.
+E24-style clean-room re-execution or verifier-owned holdout checks)
+implements the `EvidenceLayer` protocol and is passed to
+`HybridVerifierEvaluator(extra_layers=[...])`:
+
+- `collect(context) -> list[LayerScore]` — measure one workspace; never
+  raises (degrade per-item);
+- `revise(context, dead_claim_ids)` *(optional)* — replace dead claims
+  after the variance filter;
+- `gate(context, collected) -> float | None` *(optional)* — cap the
+  final reward (`reward = min(reward, *caps)`).
+
+The default layer, `ClaimsEvidenceLayer`, is the claims+scorers pipeline
+above and stays as-is beside custom layers.
+
+### Configuration
+
+| Knob | Default | What it controls |
+| ---- | ------- | ---------------- |
+| `verifier_kind` | `policy_bt` | Select `hybrid` explicitly for the pipeline in this section; `legacy` and the benchmark-leaking `gold` control also remain available |
+| `hybrid_verifier_num_claims` | `10` | target key-claim count per task (extraction accepts ±2) |
+| `hybrid_verifier_refinement_rounds` | `2` | max replacement claims per generation for dead claims |
+| `hybrid_verifier_scorer_timeout_s` | `60` | per scorer-subprocess timeout (seconds) |
+| `hybrid_verifier_pairwise_mode` | `temporal` | pairwise reward mode (see the table above) |
+| `hybrid_verifier_digest_max_files` | `8` | max deliverable files sampled by the format digest |
+
+All knobs follow the standard plumbing — default in `config.py`, JSON
+config override, CLI flags `--verifier_kind` / `--hybrid_verifier_*`
+(see [CLI reference](../reference/cli.md) and
+[Configuration reference](../reference/configuration.md)).
+
+### Why this design (measured)
+
+The hybrid verifier was measured best-of-six feedback channels in the
+offline + live E19 / E19b / E19c experiments (2026-09-23..25,
+`experiments_verifiers/`): the legacy verifier's reward
+**anti-correlated** with benchmark success at the top of the archive
+(Kendall τ ≈ −0.82) and its gradients hallucinated ~65 % of
+"requirements" the goal never stated, against ~25 % for the hybrid
+channel (E19b v2: gold-relevance 0.672, hallucination 0.252; ~$0.38
+per full tournament). Determinism and symmetry are by construction —
+the same cached scorer scripts grade every generation.
+
+## Gold feedback (oracle) mode
+
+> **ORACLE / BENCHMARK-LEAKING MODE.** `verifier_kind = "gold"` feeds the
+> benchmark grader's own verdict — computed against the gold reference —
+> back into evolution. A run that uses it is contaminated by the
+> benchmark. Use it only as an upper-bound research control (E43 causal
+> feedback experiment). **Never report its VER / SR / CBS as a Mimosa
+> benchmark score**, and keep its `workflow_dir` separate from honest runs
+> (the workflow selector ranks every genotype in `workflow_dir`).
+
+Package: `sources/evaluators/gold_feedback/` (`GoldFeedbackEvaluator`).
+It is a composition, not a new verifier:
+
+- An inner `HybridVerifierEvaluator` runs as usual. In the default
+  **gradient-only** mode it still makes the reward, the QD score, the
+  early stop and the capsule selection.
+- The generation's workspace is copied into a private temp dir
+  (`mimosa_gold_*`) **before** the hybrid runs. The copy is graded with the
+  same machinery as the per-generation snapshot ablations:
+  `sources/benchmark_evaluation/snapshot_grading.grade_directory` →
+  `CapsuleEvaluator` (VER re-execution 900 s, SR eval program 300 s,
+  CodeBERT CBS). The sandbox copies `pred_results/` back into the graded
+  directory, so the live workspace and the `/tmp` snapshot are never
+  touched. The copy is deleted afterwards.
+- Only the steering text is replaced: `abstracted_textual_gradient` (and
+  its typo twin) in `state_result.json` `evaluation.verifier`, and the
+  `textual_gradient.txt` sidecar. The engine consumes it unchanged.
+
+**Gradient format** (E33 'TRUMAN' order, `gold_feedback/format.py`): the
+execution outcome first (decisive error line, then a tail-heavy verbatim
+excerpt of `VER_message`), then the grader verdict verbatim
+(`SR_message`; for the figure judge the `[FINAL SCORE]` line of every
+critique first, then the critiques). The text is compacted to at most
+2000 characters, decisive content first. No oracle label is put in the
+text (it would change the directive LLM's behaviour); the labels live in
+the metadata below.
+
+**Full oracle** — `gold_feedback_reward = True` (`--gold_feedback_reward`):
+the reward also comes from the grader: SR true → 1.0, VER true → 0.5·CBS,
+else 0.0 (`reward_fallback` is cleared; the hybrid values stay in
+`hybrid_overall_score*`). This changes selection **and** steering, so it
+is not a gradient-only experiment.
+
+**Task context.** The grader needs the benchmark task row (eval program,
+gold program, expected outputs). `CsvEvaluationMode` puts it on the config
+per task (`gold_feedback_task_row`, `gold_feedback_sab_loader`, runtime
+only, never serialized) — only when `verifier_kind == "gold"`.
+
+**Edge cases** (recorded in `evaluation.verifier.gold_feedback.status`):
+
+| Case | Status | Gradient |
+| ---- | ------ | -------- |
+| grader verdict available | `gold` | gold text |
+| no task row (plain `--task` / `--goal` runs) | `no_task_context` | hybrid gradient unchanged; reason logged |
+| hybrid short-circuit (no code / no state) | `skipped_short_circuit` | hybrid gradient (nothing to grade) |
+| grading environment failure (sandbox build, provisioning gap, missing `OPENAI_API_KEY` for the figure judge, harness exception) | `censored_infra` | one-line "result censored" note + hybrid gradient |
+| workspace copy failed | `censored_copy_failed` | same as above |
+| uninformative message (`N/A`, empty, bare `a / b`, no result tuple) | `gold` + `uninformative: true` | gold text + "the grader gave no detail beyond pass/fail" |
+
+In full-oracle mode every non-`gold` status keeps the hybrid reward and
+records `reward_fallback_reason`. Censored generations (`censored_infra`,
+`censored_copy_failed`) are different: their hybrid win-rate is on a
+different scale from the oracle rewards of graded siblings, so they get
+`overall_score = overall_score_uncapped = 0.0` ("no oracle measurement"),
+`reward_censored: true`, `reward_source: "oracle_censored"` and
+`reward_fallback = "oracle_censored"`; the hybrid values stay in
+`hybrid_overall_score`, `hybrid_overall_score_uncapped` and
+`hybrid_reward_fallback`. So a censored generation cannot trigger the early
+stop (`learned_score_threshold`), is not admitted to the QD archive
+(`admit_threshold`), and is skipped by the capsule argmax like a
+`mean_claim` fallback. Degenerate case: if every generation of a task is
+censored, all rewards are 0.0, evolution has no reward signal and the
+capsule is the last generation. `no_task_context` and short-circuit
+generations keep the hybrid reward (a no-context run is all hybrid). Grader
+rewards (`reward_source = "benchmark_grader"`) are never treated as
+fallbacks, even at generation 0 where the hybrid recorded no pairs.
+
+**Wall-clock cap.** `gold_feedback_timeout_s` (default 1800,
+`--gold_feedback_timeout_s`; `0` disables the cap) caps the grading of one
+generation. On timeout the grade is censored (`censored_infra`) and the
+hybrid gradient is used; the abandoned grader thread still ends at the
+sandbox's own VER/SR timeouts and then deletes its private copy (ownership
+is decided under a lock, so exactly one side deletes it). Known gap: the
+worker is a daemon thread, so if the process exits while an abandoned
+worker runs, its `mimosa_gold_*` copy stays in the system temp dir. In gold mode the engine
+runs the whole verifier call in a worker thread (`asyncio.to_thread`), so
+concurrent CSV workers keep their event loop; every other verifier keeps
+the synchronous call.
+
+**Registry isolation.** The inner hybrid verifier gets its own per-task
+registry root: `<temp_dir or workflow_dir/_verifier_tmp>_gold` (a shallow
+config copy; the run config is not modified). Honest runs sharing the
+same `workflow_dir` and goal therefore never compute win-rates against
+gold-steered generations, and the gold run starts its own claims/scorers.
+
+**Leak guard.** Honest runs' `WorkflowSelector` skips every generation
+whose folder holds `gold_feedback.json` or whose
+`evaluation.verifier.oracle` is true, with a `[LEAK GUARD]` warning; only a
+gold run may reuse them. A gold run warns at start-up when its
+`workflow_dir` already holds non-oracle generations. The capsule
+`evaluation_results.json` of a gold run gets `oracle_feedback`,
+`verifier_kind`, `gold_feedback_reward` and `benchmark_leak_warning` keys
+(the graded VER/SR/CBS fields are unchanged), and the final CSV summary
+prints the warning.
+
+**Leak markers.** `state_result.json` `evaluation.verifier` gets
+`verifier_kind: "gold"`, `oracle: true`, `benchmark_leak: true`,
+`gold_feedback_warning`, `reward_source`, `hybrid_textual_gradient` and a
+`gold_feedback` summary; a separate `evaluation.gold_oracle` block keeps
+the verbatim grader messages (ignored by the reward code). Sidecars:
+`textual_gradient_hybrid.txt`, `gold_feedback.json`, and a warning banner
+on top of `evaluation.txt`. Run notes get `oracle_feedback: true`,
+`verifier_kind`, `gold_feedback_reward` and `benchmark_leak_warning`.
+Logs print the warning at start-up and on every generation.
+
+**Cost.** Each generation is graded twice (hybrid + benchmark): up to
+900 s + 300 s more wall-clock (capped by `gold_feedback_timeout_s`), the
+shared sandbox venv build on the first call, and one GPT-4o `n=3` call per
+figure task.
+
+## Legacy multi-source verifier (deprecated)
+
+> **Deprecated 2026-09-24.** The campaigns currently on disk were
+> produced by this verifier; the current default is the hybrid
+> temporal-ladder verifier described above. Still reachable via
+> `verifier_kind = "legacy"`.
+
+The sections below describe the previous default — the multi-source
+per-claim `VerifierEvaluator` (`verifier.py` and its mixin modules) —
+kept for reference and research replay. It scored each workflow run by
+writing and executing **deterministic Python programs** in the workspace
+to confirm what the agents claimed they did, across five independent
+vantage points (literature, user goal, math invariants, statistical
+fingerprint, visual correctness). The single signal that flowed back to
+the mutator was a short **prompt gradient** summarizing failure modes
+without leaking the verified claims themselves.
+
+![Evaluation pipeline — legacy multi-source verifier](../images/evaluation_pipeline.png){ width="100%" }
+
+*(The figure shows the legacy pipeline; the current flow is the mermaid
+diagram above.)*
+
+
 
 The verifier runs four stages per workflow run:
 
-1. **Multi-source claim extraction** — six independent prompts each look at
+1. **Multi-source claim extraction** — five independent prompts each look at
    the run from a different vantage point and emit success-polarity claims.
+   Extraction runs **once per task**: the first successful extraction is
+   frozen as the task rubric (cache key `sha256(goal + _RUBRIC_VERSION)`)
+   and reused verbatim — ids, descriptions, importances — for every later
+   generation; only each claim's `likely_relevant_files` hints are
+   re-validated against the current workspace.
 2. **Per-claim verification** — for each claim, the judge either writes a
    small Python program that recomputes the asserted value from workspace
    files (the default path), or renders a soft LLM verdict when no
@@ -45,19 +633,21 @@ The verifier runs four stages per workflow run:
    scores, or sources, so the mutator cannot turn the verified-claim
    vocabulary back into a rubric to optimize against.
 
-## The six claim sources
+## The five claim sources
 
 Each source is a different definition of "success" — claims from each are
-merged and verified by the same per-claim machinery downstream.
+merged and verified by the same per-claim machinery downstream. The
+letters are the code labels registered in the `SOURCES` tuple of
+`sources/evaluators/verifier_claim_sources.py` (`a`/`b`/`c`/`e`/`g`);
+letters `d` and `f` are retired and never emitted.
 
 | Source | Vantage | What it asks |
 | ------ | ------- | ------------ |
 | **A — Literature** | Peer-reviewed practice (via [Perspicacité](grounding.md)) | Does the science meet the methodology bar the field would demand? |
 | **B — User goal** | The literal goal text | Did the agents deliver the deliverable the user spelled out (format, columns, bars, scope)? |
-| **C — Agent narration** | The workflow's self-report | Are the agents telling the truth? Can claimed numbers / artefacts be reproduced from disk? |
-| **D — Math invariants** | The type of object produced | Do the artefacts satisfy mathematical sanity properties (probabilities in [0,1], symmetry, no NaN, shape consistency, conservation)? |
-| **E — Computational reproducibility** | An independent computer scientist re-running this | Are the **non-negotiable** CS practices present (declared deps cover used imports, no absolute paths, seeds on stochastic ops, entrypoint)? |
-| **F — Statistical fingerprint** | A skeptical statistician | Is the result *real*, not vacuous? Does it beat a baseline, avoid degenerate predictions, show no leakage signatures? |
+| **C — Math invariants** | The type of object produced | Do the artefacts satisfy mathematical sanity properties (probabilities in [0,1], symmetry, no NaN, shape consistency, conservation)? |
+| **E — Statistical fingerprint** | A skeptical statistician | Is the result *real*, not vacuous? Does it beat a baseline, avoid degenerate predictions, show no leakage signatures? |
+| **G — Visual correctness** | A vision-capable judge model | Is the figure deliverable scientifically plausible? Only emits claims when the goal asks for a visual deliverable. |
 
 A few important constraints on these sources, enforced via the shared
 `_CLAIM_RULES_BLOCK`:
@@ -65,12 +655,12 @@ A few important constraints on these sources, enforced via the shared
 - **Positive polarity** — every claim asserts a *success condition*. A
   workflow that produced nothing fails the claim "produced the deliverable",
   not passes "the answer is empty".
-- **Discrimination test** — bare file-existence claims are *never* `hard`.
-  An artifact claim only counts when chained to a functional property
-  (e.g. "manifest covers the imports actually used by produced code").
-- **Source E exclusions** — Source E explicitly forbids claims about
-  README / docstrings / tests / code style / type hints / logging /
-  module layout. It verifies CS *practice*, not engineering aesthetics.
+- **Discrimination test** — an artifact claim only counts when chained
+  to a functional property (e.g. "predictions.csv contains a valid
+  probability for every row"); the shared rules block rejects bare
+  file-existence or file-size claims as too weak. There is no separate
+  `hard` tag in code — "hard claim" means rated importance ≥ 8 (see
+  [Aggregation](#aggregation)).
 
 ## Per-claim verification
 
@@ -81,23 +671,37 @@ only falls back to an LLM verdict when no executable check is possible.
 
     An LLM writes a small Python program *per claim*. The program opens
     workspace files and **recomputes the asserted value** from disk,
-    then emits a single JSON line. Programs run in the agents'
-    workspace with `numpy`, `pandas`, `scipy`, and `scikit-learn`
-    pre-installed by the verifier on first use.
+    then emits a single JSON line. Programs run with the agents'
+    workspace as working directory, under the **same host interpreter
+    that runs Mimosa** (`sys.executable`), with `numpy`, `pandas`,
+    `scipy`, `scikit-learn` and other helpers pip-installed by the
+    verifier on first use (see the security note below).
 
     Because the check is deterministic Python touching the same files
     the agents produced, the verdict does not depend on the judge LLM
     re-believing the agent's narration.
 
-    **Anti-tautology tripwires:**
+    **Anti-tautology rules** (enforced in the generation prompt and the
+    file-selection logic, not by a separate code pass):
 
-    - Programs must touch real I/O markers, not parse the agent's answer
-      string back to themselves.
-    - Embedding the workflow output as a string literal and comparing it
-      to itself is rejected.
+    - Verifier scripts must never read or parse the workflow's own
+      source files (`.py`, `.R`, notebooks) as evidence — result
+      artefacts and the goal's ground-truth schema only.
+    - A printed pass/fail verdict is distrusted when exception markers
+      (tracebacks, import errors) leak into the verifier's own stderr.
 
     Each executable claim returns `pass / fail / error` → `1.0 / 0.0 /
-    excluded from the mean`.
+    0.0`. Unlike soft-claim errors, executable (and visual) errors
+    **stay in the mean at score 0** — see [Aggregation](#aggregation).
+
+    **Security note — verifier checks are NOT sandboxed.** The
+    SmolAgents `LocalPythonExecutor` AST allow-list applies to workflow
+    agents only. Verifier scripts run as plain subprocesses of the host
+    interpreter (`python_executable=sys.executable`, cwd = the agents'
+    workspace), and the dependency-recovery path can pip-install up to 6
+    LLM-vetted packages **into the host environment** (with
+    `--break-system-packages`). Verifier scripts are untrusted
+    LLM-written code executing with the operator's Python.
 
 === "Soft claims (fallback)"
 
@@ -109,56 +713,76 @@ only falls back to an LLM verdict when no executable check is possible.
     - `unsure` → `0.5`
     - `fail` → `0.0`
 
+    A soft-claim `error` (judge call failed) is **dropped from the
+    mean**, unlike executable/visual errors which are scored `0.0` and
+    kept in.
+
 ## Aggregation
 
 ```python
-base_mean = importance_weighted_mean(score for each non-error claim)
+included  = [claims with status pass / fail / unsure]   # soft errors dropped
+included += [executable and visual errors]              # re-scored at 0.0
+base_mean = importance_weighted_mean(score for c in included)
 pre_cap   = clamp(base_mean, 0, 1)
 
-overall_score = min(pre_cap, hard_fail_cap) if any_hard_claim_refuted else pre_cap
+hard_fail = any(c.importance >= 8 and c.status == "fail")   # _HARD_FAIL_IMPORTANCE
+overall_score = min(pre_cap, hard_fail_cap) if hard_fail else pre_cap
 ```
 
-- Per-claim weights come from the rater-assigned importance (1–10), so an
+- Per-claim weights come from the claim's rated importance (1–10), so an
   importance-10 deliverable claim moves the score ~5× more than a
   low-importance hygiene claim.
-- `hard_fail_cap = _HARD_FAIL_CAP = 0.99` — currently set permissively
-  to keep the evolutionary signal smooth; a refuted hard claim still
-  flags `hard_fail_capped = True`.
-- The engine separately keeps `overall_score_uncapped` (pre-cap) so QD
-  rank ordering doesn't flatten under hard fails.
+- Error handling is asymmetric: an `error` on a **soft** claim is
+  excluded from the mean, while an `error` on an **executable** or
+  **visual** claim is scored `0.0` and kept in — a check that could not
+  run counts as a failed check.
+- `hard_fail_cap = _HARD_FAIL_CAP = 0.89`; the cap fires when any claim
+  with importance ≥ 8 (`_HARD_FAIL_IMPORTANCE = 8`) is refuted, and
+  flags `hard_fail_capped = True`. The cap — like `max_claims` and the
+  verifier timeouts — is a constructor-only default of
+  `VerifierEvaluator`, not plumbed into `config.py` or the CLI.
+- The engine still records `overall_score_uncapped` (pre-cap) for
+  analysis, but QD ranks on the capped `overall_score` — a run that
+  refuted a hard claim cannot top the archive on its other claims alone.
 
-## Failure fingerprint (QD behaviour descriptor)
+## Failure fingerprint (diagnostic)
 
-The verifier doesn't just emit a score — the same per-claim verdicts feed
-the QD novelty signal as a **failure fingerprint**: a centered vector
-of per-source pass rates that tells the archive *how* a candidate fails,
-not *whether* it failed.
+The verifier also projects the same per-claim verdicts into a **failure
+fingerprint**: a centered vector of per-source pass rates that records
+*how* a candidate fails, not *whether* it failed.
 
 ```python
-# Per source A..F (six entries, always — absent sources get a neutral value).
+# Per source letter (a–g, fixed length — absent sources get a neutral value).
 pass_rate[s] = passes[s] / total[s]              if total[s] > 0  else 0.5
 presence[s]  = 1.0                                if total[s] > 0  else 0.0
-# Center so the descriptor encodes profile shape, not quality level.
+# Center so the vector encodes profile shape, not quality level.
 mean_present = mean(pass_rate[s] for s where presence[s] == 1)
 vector[s]    = pass_rate[s] - mean_present       if presence[s] == 1
              = 0                                  otherwise
 ```
 
-**The quality firewall.** An all-pass run and an all-fail run both yield
-the zero profile. This is intended and asserted in the tests
-(`test_all_pass_yields_zero_profile`,
-`test_all_fail_yields_zero_profile`). The QD score combines quality and
-novelty *additively* — `(1 − w)·quality_norm + w·novelty_norm` — so
-quality already drives `quality_norm`. If quality also leaked into
-novelty, QD would collapse back into greedy search. The centering step
-is what keeps these two terms separable.
+Centering means an all-pass run and an all-fail run both collapse to the
+zero profile (asserted by `test_all_pass_yields_zero_profile` and
+`test_all_fail_yields_zero_profile`), so the vector captures the *shape*
+of which sources fail rather than the overall quality level.
 
-The fingerprint is persisted under
-`state_result.json` → `evaluation.verifier.failure_fingerprint.vector`
-and consumed by
-[`SelectionPressure._extract_behaviour_descriptor`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py).
-Full info-flow audit:
-[`docs/info-flow/failure_fingerprint.md`](../info-flow/failure_fingerprint.md).
+The fingerprint was computed by
+[`compute_failure_fingerprint`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py)
+at the end of `VerifierEvaluator.evaluate()` and persisted under
+`state_result.json` → `evaluation.verifier.failure_fingerprint`. The
+hybrid verifier keeps writing that key, but only as a neutral
+placeholder (zero vector, 0.5 pass rates) for schema compatibility.
+
+
+> **Diagnostic only — not the novelty descriptor.** The QD behaviour
+> descriptor is the **genotype embedding** of the workflow's source code,
+> and novelty is cosine distance in that space (see
+> [Selection](evolution-engine.md#behaviour-descriptor-genotype-embedding)).
+> `SelectionPressure` no longer reads the failure fingerprint; it remains
+> persisted so failure profiles can be inspected offline. The module
+> header itself is marked `[DEPRECATED]` — expect it to be removed.
+Full info-flow audit of the QD behaviour descriptor:
+[`docs/info-flow/genotype_embedding.md`](../info-flow/genotype_embedding.md).
 
 ## Prompt gradient
 
@@ -167,7 +791,7 @@ After aggregation the verifier composes a single-sentence diagnosis (the
 similar runs. It is the **only** verifier output that reaches the
 mutator, and it is written so it does not leak the verified claims back:
 
-- It does not name specific claims, scores, or which of the six sources
+- It does not name specific claims, scores, or which of the five sources
   raised the issue.
 - It encodes failure modes by short code names (e.g.
   `FALLBACK_ECFP_CLASSIFIER`) so recurring patterns can be tracked across
@@ -177,40 +801,55 @@ The intent is informational, not punitive: the mutator learns *what
 direction to push the workflow next* without being handed a vocabulary
 it can over-fit against.
 
+> **Historical bug, fixed by the hybrid verifier.** The legacy verifier
+> persisted the gradient under the misspelled structured key
+> `evaluation.verifier.abstractec_textual_gradient` (`abstractec_`
+> instead of `abstracted_`), so for short-circuited generations —
+> workflow failed to generate or execute, no sidecar written — the
+> reader found neither key and the mutator saw an **empty gradient**.
+> The hybrid verifier writes the corrected
+> `abstracted_textual_gradient` key (the legacy typo key is also
+> written for one release) and always writes a non-empty gradient, even
+> on the short-circuit path.
+
 ## Behavioral pressure against shortcut workflows
 
 Pressure against shortcut or fabricated workflows comes from the
 verifier pipeline itself:
 
-- Source C's recompute-from-disk verifiers.
-- The "Used fallback" claim type, whose score is *inverted* — a passing
-  fallback check counts as 0, a failing one as 1.
-- The anti-tautology tripwires in the per-claim verifier generator.
+- The per-claim recompute-from-disk verifiers (Stage 2), which judge
+  produced artefacts rather than the agents' narration.
+- Source E's non-triviality claims: a degenerate, hard-coded or
+  fallback-patterned output fails the claim outright (success-polarity —
+  there is no score inversion in the code).
+- The anti-tautology rules in the per-claim verifier generator.
 
-## Why this design?
+## Why this design? *(legacy verifier rationale)*
 
 | Concern | Mitigation |
 | ------- | ---------- |
 | The judge LLM repeats the agent's claims verbatim. | Per-claim deterministic Python recomputation, with anti-tautology tripwires. |
 | The mutator over-fits to a numeric rubric. | Only the prompt gradient is returned — and it does not name the verified claims. |
-| The hard-fail cap collapses ranking among failed runs. | `overall_score_uncapped` keeps QD ordering meaningful. |
-| One vantage point misses the failure. | Six independent sources, claims merged. |
-| Cosmetic hygiene gets gamed as "quality". | Source E only verifies non-negotiable CS practice; docs/tests/style are forbidden. |
-| Artifact existence checks reward "moved files around". | `_CLAIM_RULES_BLOCK` forbids bare-existence as `hard`; max 2 soft artifact claims. |
+| The hard-fail cap collapses ranking among failed runs. | Deliberate: QD ranks on the capped `overall_score`, with ties at the cap broken by novelty; `overall_score_uncapped` is still logged for analysis. |
+| One vantage point misses the failure. | Five independent sources, claims merged. |
+| Cosmetic hygiene gets gamed as "quality". | Source E only rewards non-trivial, statistically real results; no source emits docs/tests/style hygiene claims. |
+| Artifact existence checks reward "moved files around". | `_CLAIM_RULES_BLOCK` only accepts artifact claims chained to a functional property. |
 | Soft-claim judges hallucinate. | Verdicts are grounded in workspace previews and Perspicacité. |
 
 ## Other evaluator backends
 
-The default is `VerifierEvaluator`, but you can swap it via
-`WorkflowEvaluator`:
+The default verifier channel is `HybridVerifierEvaluator`; switch with
+`config.verifier_kind` (or `--verifier_kind`):
 
 | Backend             | File                                                                                                                                            | Use                                       |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `VerifierEvaluator` | [`verifier.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/verifier.py)                                       | **Default** — multi-source per-claim.     |
-| `GenericEvaluator`  | [`generic.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/generic.py)                                         | Legacy 4-criterion LLM judge.             |
-| `ScenarioEvaluator` | [`scenario.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/scenario.py)                                       | Rubric / assertion-based scoring.         |
-| Perspicacité grounding | [`grounding.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/grounding.py)                                  | Adapter used by Source A.                 |
-| `BullshitDetector`  | [`bs_detection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/bs_detection.py)                               | Numerical-fraud penalty.                  |
+| `HybridVerifierEvaluator` | [`hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/)                             | **Default** — E19/E19b temporal claim ladder + policy scorers + pairwise reward.  |
+| `GoldFeedbackEvaluator` | [`gold_feedback/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/gold_feedback/) | **Oracle control, leaks the benchmark** (`verifier_kind="gold"`): hybrid reward + benchmark-grader gradient. Research only. |
+| `VerifierEvaluator` | [`verifier.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/verifier.py)                                       | Deprecated multi-source per-claim (`verifier_kind="legacy"`). |
+| `GenericEvaluator`  | [`generic.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/generic.py)                                         | Legacy 4-criterion LLM judge.             |
+| `ScenarioEvaluator` | [`scenario.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/scenario.py)                                       | Rubric / assertion-based scoring.         |
+| Perspicacité grounding | [`grounding.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/grounding.py)                                  | Adapter used by the legacy verifier (Source A) and `GenericEvaluator`; the hybrid verifier does not call it. |
+| `BullshitDetector`  | [`bs_detection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/bs_detection.py)                               | Numerical-fraud penalty.                  |
 
 ## See also
 

@@ -17,12 +17,13 @@ flowchart TB
     Seed -- yes --> SeedPrompt[Seed genome prompt<br/>or template mutation]
     Seed -- no --> Pick[Pick parents via QD-roulette<br/>fallback to disk similarity scan]
     SeedPrompt --> Orch[Orchestrate workflow<br/>LLM → sandbox]
-    Pick --> Decide{Crossover ≈ 0.1?}
-    Decide -- mutation --> Mut[Mutation prompt<br/>stagnation-scoped]
+    Pick --> Decide{Crossover ≈ 0.4?}
+    Decide -- mutation --> Think[Directive LLM<br/>diagnosis + search state<br/>→ 3-sentence directive]
     Decide -- crossover --> Cross[Crossover prompt<br/>best-parent-first]
+    Think --> Mut[Mutation prompt<br/>parent code + directive]
     Mut --> Orch
     Cross --> Orch
-    Orch --> Eval[multi-source per-claim verifier<br/>reward + prompt gradient]
+    Orch --> Eval[hybrid temporal-ladder verifier<br/>reward + textual gradient]
     Eval --> Admit{Validity: improvement<br/>or qd_score ≥ threshold?}
     Admit -- yes --> Archive[Admit to archive]
     Admit -- no --> Reject[Reject<br/>telemetry only]
@@ -41,9 +42,9 @@ A more detailed view lives in the source diagram
 1. **Reset** the workspace to the initial state.
 2. **Orchestrate** a workflow run (LLM writes Python → sandbox runs it).
 3. **Snapshot** the workspace.
-4. **Evaluate** — get `overall_score` and `reward_uncapped` (i.e.
-   `overall_score_uncapped` in the persisted JSON) plus an
-   `abstracted_prompt_gradient`.
+4. **Evaluate** — get `overall_score` (which drives QD quality) plus the
+  `abstracted_textual_gradient`; `overall_score_uncapped` is still
+  persisted for analysis.
 5. **`validate_survivor()`** — admit to the archive when the candidate
    improves over baseline or clears `qd_score > admit_threshold`;
    capacity is curated by lowest-`qd_score` eviction.
@@ -52,158 +53,234 @@ A more detailed view lives in the source diagram
 
 Termination:
 
-- `overall_score >= learned_score_threshold` (default `0.9`) in `--learn` mode, *or*
+- `overall_score >= learned_score_threshold` (default `0.92`) in `--learn` mode, *or*
 - `max_depth` reached — `1` in single-shot mode, `max_learning_evolve_iterations`
-  (default `20`) in `--learn` mode.
+  (default `25`) in `--learn` mode.
 
 ## Selection: Quality-Diversity (QD)
 
 [`SelectionPressure`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py)
 implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
-(default). In QD mode:
+(default, set via config's `selection_strategy`). In QD mode:
 
-- A **session archive** holds up to `population_size = 50` members.
+- A **session archive** holds up to `population_size = 20` members
+  (config field, ablation-tunable).
 - Each member has `qd_score = (1−w)·quality_norm + w·novelty_norm`, with
   `w = novelty_weight = 0.25`. Quality and novelty are **additive** — never
   multiplied — so high quality cannot rescue a redundant profile and high
   novelty cannot drag a broken run above peers.
-- Quality is sourced from `reward_uncapped` so the hard-fail cap doesn't
-  flatten rank ordering.
-- Novelty is k-NN distance (`k = 15`) in **failure-fingerprint** space.
-  The descriptor is the centered per-source pass-rate vector produced by
-  [`failure_fingerprint.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/failure_fingerprint.py)
-  from the verifier's per-claim verdicts (see below).
+- Quality is sourced from `reward` (the capped `overall_score`), so a run
+  that refuted a hard claim ranks at its capped score and cannot top the
+  archive on its other claims alone; ties at the cap are broken by the
+  novelty and length-penalty terms.
+- Novelty is cosine-distance k-NN (`k = 15`) in **genotype-embedding**
+  space. The descriptor is the L2-normalised embedding of the workflow's
+  generated source code (its *genotype*), produced by
+  [`genotype_embedding.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/genotype_embedding.py)
+  through the [`code_features.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py)
+  shim (see below).
 - Admission gate: candidate is admitted when it either improves over
-  baseline by `min_improvement_threshold` or clears
-  `qd_score > admit_threshold`. When the archive reaches capacity, the
-  lowest-`qd_score` member is evicted.
+  baseline by `min_improvement_threshold` (default `0.01`) or clears
+  `qd_score > admit_threshold` (default `0.3`). When the archive reaches
+  capacity, the lowest-`qd_score` member is evicted.
 - Parent draw applies an inverse-child-count penalty
   `÷ (1 + n_children_already)`, and parents are hard-capped at
-  `MAX_CHILDREN_PER_PARENT = 2` before that penalty kicks in, so the
+  `MAX_CHILDREN_PER_PARENT = 8` before that penalty kicks in, so the
   offspring stream stays spread across the archive.
 
+All of the above — `min_improvement_threshold`, `population_size`,
+`novelty_k_neighbours`, `novelty_weight`, `admit_threshold` — are `Config`
+fields (see [Configuration reference](../reference/configuration.md#qd-novelty-selection-variation)),
+not hardcoded constants; touch them only for ablation studies.
+
 When the archive is empty (cold start), [`WorkflowSelector`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
-falls back to a **similarity-filtered disk scan** (`cosine ≥ 0.8` on MiniLM
-embeddings of `original_task`, `score ≥ 0.1`) — this lets useful workflows
-transfer across tasks.
+falls back to a **similarity-filtered disk scan** (`cosine ≥
+parent_threshold_similarity` — default `0.8` — on MiniLM embeddings of
+`original_task`, `score ≥ parent_threshold_score` — default `0.01`) — this
+lets useful workflows transfer across tasks.
 
-### Behaviour descriptor: failure fingerprint
+When this scan also finds no parent (for example every reward is 0, so
+the archive stays empty), the mutation branch mutates the generation that
+just ran, if it left a genotype on disk: lineage `kind="mutation"`,
+`parents=[<that uuid>]`, and its code, verifier gradient and run log all
+describe the same run. A generation without a genotype (failed run)
+still gives a parentless mutation (lineage `kind="seed"`, no parents).
+Crossover selection and the cold-start thresholds are unchanged.
 
-The novelty signal compares candidates in **failure-fingerprint** space.
-Per source A–F (literature, user goal, agent narration, math invariants,
-computational reproducibility, statistical fingerprint), the verifier
-records a pass rate. Sources with zero claims get the neutral value
-`0.5` and a presence-mask entry of `0`. The vector is then **centered**:
-the mean pass rate across present sources is subtracted from every entry.
+### Behaviour descriptor: genotype embedding
 
-The centering is the *quality firewall*. Without it, an all-pass run sits
-at `[1,1,1,1,1,1]` and an all-fail run at `[0,0,0,0,0,0]` — Euclidean
-distance between them is large, and quality silently leaks into novelty.
-After centering, **both** runs collapse to the zero profile and novelty
-encodes only the *shape* of which sources fail relative to the others.
-Two workflows that fail in the same way are redundant regardless of how
-different their DAGs look; two that fail in different ways explore
-different basins and both deserve a seat in the archive.
+The novelty signal compares candidates in **genotype-embedding** space.
+Each workflow's generated source code (its *genotype*) is embedded into a
+dense vector and L2-normalised; novelty is the mean **cosine distance**
+(`1 − cosine_similarity`, range `[0, 2]`) from a candidate to its
+comparison set. Two workflows whose code is semantically similar collapse
+to nearly the same point and are treated as redundant; two that explored
+different approaches land far apart, and both earn a seat in the archive.
+This reads "how different is the generated approach" directly, rather
+than inferring it from a proxy.
 
-The fingerprint is computed at the end of `VerifierEvaluator.evaluate()`
-and persisted in `state_result.json` under
-`evaluation.verifier.failure_fingerprint.vector`. The full audit trail —
-which variable comes from where, the failure modes the descriptor must
-survive, and the centering invariant asserted by the tests — lives in
-[`docs/info-flow/failure_fingerprint.md`](../info-flow/failure_fingerprint.md).
+The embedding backend is pluggable
+([`genotype_embedding.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/genotype_embedding.py)):
 
-When a run has no usable fingerprint (verifier short-circuit on a fully
-failed workflow), `SelectionPressure._extract_behaviour_descriptor`
-returns a neutral zero vector so distance lookups stay well-defined and
-the cold path doesn't artificially win or lose on novelty.
+- **Default — local `all-MiniLM-L6-v2`** (sentence-transformers): no
+  network at runtime, deterministic, free. Embeddings are cached per
+  process by the SHA-1 of the source, so the QD inner loop stays cheap
+  even when archive refresh walks dozens of members.
+- **Optional — OpenAI `text-embedding-3-small`**, used only when both
+  `MIMOSA_GENOTYPE_EMBEDDING_BACKEND=openai` and `OPENAI_API_KEY` are
+  set; it falls back to MiniLM if the client can't be constructed.
 
-The legacy structural descriptor (`[n_agents, n_edges, n_branches,
-prompt_chars]`) shipped by
-[`code_features.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/code_features.py)
-is retained for ablations and offline analysis but is **no longer used**
-for QD novelty — empirical work showed it barely co-varies with outcomes.
+The descriptor dimension is whatever the backend emits (384 for MiniLM),
+not a fixed width — drain the archive if you switch backends mid-run.
 
-## Variation: evidence-driven mutation scope (Rechenberg 1/5 rule)
+When a genotype is degenerate — missing, empty, or the backend errors —
+the embedder returns `None` and
+`SelectionPressure._extract_behaviour_descriptor` treats the missing
+signal as **neutral** (no novelty) rather than max-novel, so broken
+offspring are never rewarded merely for being "different".
+
+> **The failure fingerprint is no longer the novelty signal.** Earlier
+> versions derived QD novelty from a *failure fingerprint* — a 7-D
+> centered vector of per-source verifier pass rates (one slot per
+> registered source letter `a`–`g`; the module is now marked deprecated)
+> — and, before that,
+> from a structural descriptor `[n_agents, n_edges, n_branches,
+> prompt_chars]`. Both have been retired as the behaviour descriptor.
+> The `failure_fingerprint` key is still written by the verifier
+> under `state_result.json` → `evaluation.verifier.failure_fingerprint`,
+> but only as a diagnostic — selection no longer reads it. (Under the
+> hybrid verifier that key holds a neutral placeholder; only the
+> deprecated legacy verifier computes real pass rates.) The structural
+> descriptor is gone entirely; `code_features.py` is now the
+> genotype-embedding shim.
+
+## Variation: directive-implicit mutation scope
 
 [`VariationEngine`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/variation_engine.py)
-assembles mutation and crossover prompts. There is no fixed phase
-schedule by iteration progress; mutation boldness is a continuous
-function of two evidence signals — how long the lineage has been
-failing to improve, *and* how often recent offspring actually beat the
-best-so-far.
+assembles mutation and crossover prompts. There is **no step-size
+controller any more**: mutation magnitude ("how bold") is decided
+implicitly by the directive LLM, informed by a deterministic,
+read-only `<search_state>` block assembled in code.
 
-**Plateau signal.** `_iters_since_improvement()` counts the run of
-trailing scored offspring (failures and unscored entries skipped) that
-did not strictly beat the best-so-far at the moment they were
-produced. It is normalised to `plateau = min(1, iters / _PLATEAU_PATIENCE)`
-with `_PLATEAU_PATIENCE = 6`.
+An earlier design computed an "effective boldness" scalar from a
+success-rate rule blended with a plateau counter, mapped it onto five
+advisory scope bands (EXPLOITATION → RE-SPECIATION), and grew the
+agent budget with it. That controller was removed because it
+never actuated a real knob: generation temperature is sampled
+randomly at the workflow factory, the band text reached only the
+directive LLM as prose, and offline measurement showed the scalar's
+influence on realised edit size was noise-dominated — directive
+word-choice predicted the outcome far better than the boldness value
+itself.
 
-**Success-rate signal.** `_compute_success_rate(window=5)` counts the
-fraction of the last 5 scored offspring whose `overall_score` strictly
-beat the running best at the moment they were produced. The classical
-Rechenberg 1/5 success rule (1973) is the threshold: below `0.20`
-the search is "stuck" and step size must grow; above it, real progress
-is happening and step size should be damped.
+What survived is the **observer**. For every mutation the engine
+assembles a `<search_state>` block from recorded history: the parent
+score, the iteration progress (`iteration / max_iterations`), the
+plateau streak `_iters_since_improvement()` (scored offspring since
+the last strict improvement, normalised by `_PLATEAU_PATIENCE = 6`),
+the success rate `_compute_success_rate(window=5)` over the last 5
+scored offspring, and a short score-only trajectory (last 5 child
+scores). The block deliberately contains no rubric or diagnosis text,
+so no verifier rubric text leaks into the mutation state. The same
+fields are written to `variation_state` telemetry.
 
-**Effective boldness.** Combining the two signals:
+Magnitude guidance lives in the directive prompt instead: the LLM
+judges for itself how bold the next change should be — small tweak vs
+component rewrite vs structural redesign — justified by the search
+state (recent improvements and a rising trajectory call for small
+tweaks; a long plateau, a 0 % success rate, or repeated identical
+failures call for bolder restructuring). Hard guardrails remain in
+code, not prose: the mutation agent budget is sampled
+**parent-centered** — uniformly within ±1 agent of the parent's agent
+count, hard-capped to `[1, max_possible_agents = 7]` (seed generation
+still draws from `[1, 4]`; crossover is still capped at the highest
+parent agent count) — and the mutation prompt keeps the deterministic
+mandates: add or remove at most 1 agent, do not change topology unless
+the directive explicitly suggests it, keep 90 % of the previous
+workflow prompts and code unchanged.
 
-- **Cold start** (fewer than two comparable scored offspring) —
-  `effective = 0.3 · plateau`. A capped cold-start ramp avoids jumping
-  straight into RE-SPECIATION before any feedback has accumulated.
-- **Below 1/5** (`success_rate < 0.20`) — average the deficit and the
-  plateau: `effective = 0.5 · deficit + 0.5 · plateau`, where
-  `deficit = (0.20 − success_rate) / 0.20`. A run of no-improvements
-  and a stalling success rate both push scope up.
-- **Above 1/5** — damp boldness in proportion to how far above
-  threshold we are: `effective = plateau · (1 − progress)`, where
-  `progress = min(1, (success_rate − 0.20) / (0.80 − 0.20))`. At
-  `success_rate ≥ 0.80` boldness collapses regardless of plateau.
-- **Near-finish floor** — only in the last 5 % of the score range,
-  `effective` is multiplied by `(1 − 0.5 · near_finish)` where
-  `near_finish = max(0, (parent_score − 0.95) / 0.05)`. This is the
-  *only* point where the parent's absolute score re-enters the boldness
-  calculation, so a 0.96 parent isn't gambled away one generation
-  before early-stop.
-- **RE-SPECIATION gate.** The top band is hysteresis-gated: unless
-  `iters_since_improvement ≥ _RESPECIATION_PATIENCE` (default `8`) *and*
-  `success_rate ∈ {None, 0.0}`, `effective` is clamped to
-  `_RESPECIATION_CLAMP = 0.89` — just below the EXPLORATION/RE-SPECIATION
-  boundary at `0.90`.
+### Mutation directive: offloading reasoning from the orchestrator
 
-Notably, `parent_score` no longer multiplies the whole signal — that
-older behaviour locked high-score lineages into "tiny tweak" mode even
-when offspring kept failing identically.
+The orchestrator LLM has one job: write the next workflow's Python
+code. Earlier revisions dumped the raw diagnosis and the per-agent
+answers into the orchestrator prompt and asked it to figure out the
+right intervention while also coding it.
+That mixed two very different kinds of reasoning into one call —
+diagnosis ("what went wrong, and what kind of change does that imply?")
+and synthesis ("emit valid LangGraph + agent code") — and the
+orchestrator routinely either over-edited (rewriting unrelated agents
+because it re-litigated the diagnosis) or under-edited (touching only
+phrasing while the diagnosis pointed at a missing agent).
 
-**Agent budget.** The current agent count grows toward
-`max_possible_agents = 7` proportionally to `effective`, then a
-Beta-Binomial draw samples the actual count inside that window
-(biased upward by `effective`). The seed generation samples agents
-from `[1, 4]` with a `0.5` boldness prior.
+`VariationEngine.llm_think_mutation_directive()` splits these two
+reasoning steps. Before the orchestrator is invoked, a dedicated LLM
+call reads:
 
-**Scope band.** A single advisory line is added to the mutation prompt,
-chosen by `effective`:
+- the parent's per-agent answers (`<agents_answers>`),
+- the textual gradient from the verifier
+  (`<diagnosis>` — trusted as ground truth),
+- when the parent has no verifier gradient, the parent's own run log
+  (`run_stdout.log`, read through `WorkflowInfo.run_stdout`) instead
+  (`<raw_log>` — **unverified**, sent verbatim, never as a
+  `<diagnosis>`; the prompt then says that no verifier diagnosis is
+  available); with no parent there is no log, and a fixed no-feedback
+  note is the diagnosis,
+- the read-only search-state block produced by `_search_state_block`
+  (`<search_state>` — plain search statistics: parent score, iteration
+  progress, plateau streak, success rate, score trajectory),
+- and the goal,
 
-| Effective boldness  | Mutation scope                                                              |
-| ------------------- | --------------------------------------------------------------------------- |
-| < 0.35              | `EXPLOITATION` — point mutation: minor phrasing / prompt-adjective tweaks   |
-| < 0.50              | `ALIGNMENT` — interface optimization: refine handoff prompts, IO contracts  |
-| < 0.65              | `ADAPTATION` — component overhaul: rewrite lagging agent prompts, swap tools |
-| < 0.90              | `EXPLORATION` — macro structural mutation: add/merge agents, change routing |
-| ≥ 0.90              | `RE-SPECIATION` — clean-slate redesign of the multi-agent architecture      |
+and emits a **≤ 3-sentence directive** that names exactly one issue,
+the kind of mutation it implies (prompt tweak, persona change, agent
+add/remove, topology change), the **intended magnitude** (small tweak,
+component rewrite, structural redesign) justified by the search state,
+and the rationale. The system prompt is explicit about trust ranks —
+the verifier diagnosis is trusted; agent self-reports may mislead; the
+raw log is unverified and may hold the agent's own mistakes, guessed
+paths and transient tool errors — and about action limits — add or
+remove at most one agent per step, and prefer small incremental
+changes unless the evidence and search state say the approach is
+fundamentally flawed. For the raw log it adds four rules: look for
+recurring patterns, not single error lines; never turn one error into
+an environment-wide rule (a permission error on a path the agent chose
+means a wrong path, not a read-only workspace); never prescribe
+absolute paths or move work outside the relative workspace (only that
+workspace is collected); phrase log-derived points as symptoms.
 
-The bands are advisory text steered to the LLM, not hard gates: the
-LLM can still pick any topology. The hard control is the agent-count
-budget passed in the same prompt block.
+Crossover has no directive LLM: a parent without a verifier gradient
+gets the last 1024 characters of the run stdout in a `<raw_log>` block
+(instead of `<error_diagnosis>`), and the task list gains the same
+"unverified, symptoms only, stay in the relative workspace" rule.
+
+The orchestrator then receives only the parent code and that single
+directive, wrapped in `<directive>...</directive>` with hard
+instructions:
+
+- **follow the directive exactly** as the only change-guideline,
+- **do not add or remove more than 1 agent at a time** and never beyond
+  the budget,
+- **do not change topology** unless the directive says so,
+- **do not edit prompt instructions outside the directive's scope**,
+- **keep ≥ 90 % of the previous workflow code and prompts unchanged**.
+
+The pre-digested directive is grounded — every claim it makes is
+sourced from the search state and the verifier diagnosis, never
+from the orchestrator's own re-reading of the rubric — and precise —
+the orchestrator is no longer asked to weigh evidence, only to
+implement one named change. This consistently reduces drift between
+generations and prevents the change mandate from leaking into
+unintended structural rewrites.
 
 ## Crossover
 
-With probability `crossover_rate` per generation (default `0.1`, and only
-once at least `initial_population = 2` runs have happened), two parents
-are combined instead of one being mutated. The crossover prompt is
-**best-parent-first**: the strongest parent's code structure leads,
-weaker parents contribute specific improvements rather than competing
-for the skeleton, and the offspring is hard-capped at the highest
-parent agent count to prevent runaway complexity.
+With probability `crossover_rate` per generation (default `0.4`, and only
+once at least `initial_population` — default `2` — runs have happened),
+`n_parents` (default `2`) parents are combined instead of one being
+mutated. The crossover prompt is **best-parent-first**: the strongest
+parent's code structure leads, weaker parents contribute specific
+improvements rather than competing for the skeleton, and the offspring
+is hard-capped at the highest parent agent count to prevent runaway
+complexity.
 
 ## Lineage & reproducibility
 
@@ -214,15 +291,34 @@ Combined with `evolution_prompt_<uuid>.md` (the exact LLM prompt used),
 runs are fully reproducible — same prompt, same code path, same seed
 yields the same code.
 
-## Visualisations
+## Watching evolution happen
 
-When the loop finishes, Mimosa emits two artifacts in
-`sources/workflows/<uuid>/`:
+The directive LLM, the QD archive, the
+crossover roll — none of it is visible inside a single generation.
+The shape of the search only emerges when you step back across a
+whole run, and that's what the lineage tree in
+`sources/workflows/<best_uuid>/evolution_tree.png` is for: it lays
+every workflow the engine produced on the same canvas, with the
+operator that linked each pair drawn explicitly. It's the most
+direct way to confirm that the mechanics on this page are doing
+something on your task.
 
-- `reward_progress.png` — reward over iterations.
-- `evolution_tree.png` — rendered lineage tree.
+![Evolution tree example](../images/evolution_tree.png){ width="60%" }
 
-![Reward progress example](../images/evolve_example.png){ width="80%" }
+Generation depth runs down the y-axis, each node is a workflow
+coloured by its `overall_score` (red → green), solid edges are
+mutation parents and dashed edges are crossover parents. Failed runs
+stay in the picture as labelled red nodes off the main trunk so you
+can see *where* a branch died, not just that it did. Read top-down
+to follow the ratchet — a 0.48 seed branching into 0.64 and 0.62
+children, those crossing over into the 0.67/0.69 generation, then a
+0.73 mutation finally bridging into a 0.74 leaf — and watch for the
+dashed edges that span the tree horizontally: those are the
+recombinations that pulled in a structural idea the local mutation
+chain wouldn't have reached on its own. Long mutation runs at the
+same colour are the plateau the directive LLM sees in its search
+state; the colour jump that follows them is what a deliberately bolder
+mutation looks like.
 
 ## Run metrics artifacts
 
@@ -234,18 +330,26 @@ Each iteration also writes structured metrics for post-hoc analysis:
   `overall_score{,_uncapped}`, `qd_descriptor`, `qd_score`,
   `novelty_score`, the `selection_log`, and the
   `variation_state` (`iters_since_improvement`, `plateau`,
-  `success_rate`, `effective_boldness`, `parent_score`,
-  `respeciation_gate_open`, , `agent_budget`) that produced
-  this offspring.
+  `success_rate`, `parent_score`, and the parent-centered
+  `agent_budget` sample) that produced this offspring. Historical files
+  from before the controller removal may additionally hold
+  `effective_boldness` / `respeciation_gate_open`.
+- `sources/workflows/<uuid>/run_stdout.log` — the raw workflow execution
+  output returned by the orchestrator, stored verbatim (UTF-8, ANSI
+  escapes kept), written right after execution and before evaluation.
+  Failed runs store the error text instead. When this generation is a
+  parent without a verifier gradient, the directive LLM (mutation) or
+  the crossover prompt (last 1024 characters) receives this text as an
+  unverified `<raw_log>`.
 - `sources/workflows/qd_archive.jsonl` — append-only, one line per
   `validate_survivor` call. Records the candidate's descriptor,
   `qd_score`, `novelty_score`, admission verdict, and the `evicted_uuid`
   (if the archive was at capacity).
 - `sources/workflows/variation_log.jsonl` — append-only, one line per
   mutation/crossover/seed prompt assembled. Lets you retrace the
-  Rechenberg 1/5 step-size schedule without rerunning the engine.
+  search-state observer without rerunning the engine.
 
-All three are best-effort and fail-soft: an I/O error logs a warning
+All four are best-effort and fail-soft: an I/O error logs a warning
 but never aborts a run.
 
 ## See also

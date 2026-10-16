@@ -4,7 +4,7 @@ The code is not imported directly. It is loaded by the workflow factory and used
 """
 
 from typing import TypedDict, List, Union, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 import ast
 import json
 
@@ -12,8 +12,25 @@ class Answer(BaseModel):
     status: str
     message: str = ""
     retry_advice: str = ""
-    error: str = ""
-    
+    # FIX (2026-10-06): Optional with None default — agents emit "error": null
+    # when nothing went wrong (per workflow_v15.md's "error details if any"),
+    # and pydantic 2.13 rejects None for str fields. Same latent risk for
+    # message/retry_advice — handled by the _null_to_empty validator below.
+    error: Union[str, None] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _null_to_empty(cls, data: Any) -> Any:
+        """Convert explicit None values to empty strings for str fields.
+
+        Agents following the completion protocol emit JSON null for optional
+        fields when nothing went wrong; pydantic rejects None for str.
+        """
+        if isinstance(data, dict):
+            return {k: ("" if v is None and k != "status" else v)
+                    for k, v in data.items()}
+        return data
+
     @classmethod
     def validate(cls, data: Union[str, dict, Any]) -> 'Answer':
         """
@@ -33,7 +50,13 @@ class Answer(BaseModel):
                 except Exception as e:
                     return cls._extract_from_malformed(data)
         elif isinstance(data, dict):
-            return cls.model_validate(data)
+            # FIX: fall back to from_raw on validation failure — matching
+            # the class docstring's "Robust parsing" promise (the str branch
+            # already has graceful fallbacks; this was the unprotected path).
+            try:
+                return cls.model_validate(data)
+            except Exception:
+                return cls.from_raw(data)
         else:
             return cls(status="ERROR", message=f"Invalid data type: {type(data)}")
     

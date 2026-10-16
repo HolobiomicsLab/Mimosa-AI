@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>claims.py - Mimosa-AI visual clone</title>
+<link rel="stylesheet" href="_clone.css">
+</head>
+<body data-crumb="File digests &gt; sources/evaluators/hybrid_verifier &gt; claims.py" data-built="ca72107+wt" data-built-date="2026-09-28">
+<div class="wrap">
+
+<h1 class="hud">claims.py</h1>
+<p class="intro">This file writes the two claim prompts, screens the judge's replies and validates the ladder claims. It runs inside <code>ClaimsEvidenceLayer._extract</code> and <code>ClaimsEvidenceLayer.revise</code> (<a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a>), once per task plus once per refinement round. The package view is on <a href="mod_evaluators_hybrid_verifier.html">mod_evaluators_hybrid_verifier.html</a>.</p>
+
+<div id="legend" data-auto></div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 1 &mdash; the batched-screen reply path: first balanced block, then a verdict list</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 470" role="img" aria-label="claims.py reply parsing chain">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="pRaw">
+    <title>Whatever the judge transport returned, fences and prose included</title>
+    <rect x="20" y="40" width="180" height="96" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="110" y="64" text-anchor="middle">judge reply text</text>
+    <text class="box-sub" x="110" y="82" text-anchor="middle">str from llm_text</text>
+    <text class="box-sub" x="110" y="98" text-anchor="middle">may carry ```json fence</text>
+    <text class="box-sub" x="110" y="114" text-anchor="middle">_screen_call arg (332)</text>
+  </g>
+
+  <a class="box" id="pBlock" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>Keeps the block that opens first, array or object</title>
+    <rect x="250" y="30" width="230" height="120" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="365" y="54" text-anchor="middle">_first_json_block (271)</text>
+    <text class="box-sub" x="365" y="72" text-anchor="middle">fence unwrapped first (280)</text>
+    <text class="box-sub" x="365" y="88" text-anchor="middle">array-first, not object-first (283)</text>
+    <text class="box-sub" x="365" y="104" text-anchor="middle">balanced scan, quotes aware (290)</text>
+    <text class="box-sub" x="365" y="120" text-anchor="middle">empty str when unbalanced (309)</text>
+  </a>
+
+  <a class="box" id="pParse" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>json.loads inside the screen call; a bad block becomes None</title>
+    <rect x="530" y="30" width="200" height="120" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="630" y="54" text-anchor="middle">json.loads (351)</text>
+    <text class="box-sub" x="630" y="72" text-anchor="middle">inside _screen_call</text>
+    <text class="box-sub" x="630" y="88" text-anchor="middle">JSONDecodeError to None (353)</text>
+    <text class="box-sub" x="630" y="104" text-anchor="middle">only the block is parsed</text>
+    <text class="box-sub" x="630" y="120" text-anchor="middle">no payload: retry (358)</text>
+  </a>
+
+  <a class="box" id="pList" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>Accepts the array, or an object whose first list value holds it</title>
+    <rect x="770" y="30" width="190" height="120" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="865" y="54" text-anchor="middle">_as_verdict_list (312)</text>
+    <text class="box-sub" x="865" y="72" text-anchor="middle">list passes through (321)</text>
+    <text class="box-sub" x="865" y="88" text-anchor="middle">dict: first list value (323)</text>
+    <text class="box-sub" x="865" y="104" text-anchor="middle">anything else: None (326)</text>
+    <text class="box-sub" x="865" y="120" text-anchor="middle">parse stays structural</text>
+  </a>
+
+  <g class="box" id="pOut">
+    <title>The verdict list the two screens read per claim id</title>
+    <rect x="770" y="210" width="190" height="100" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="865" y="234" text-anchor="middle">verdict list out</text>
+    <text class="box-sub" x="865" y="252" text-anchor="middle">returned at 357</text>
+    <text class="box-sub" x="865" y="268" text-anchor="middle">_flag reads one key (263)</text>
+    <text class="box-sub" x="865" y="284" text-anchor="middle">unknown ids ignored (421, 478)</text>
+  </g>
+
+  <g class="box" id="pRetry">
+    <title>One re-issue, then give up open</title>
+    <rect x="20" y="210" width="230" height="100" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="135" y="234" text-anchor="middle">retry, then degrade open</text>
+    <text class="box-sub" x="135" y="252" text-anchor="middle">attempts 1 and 2 (342)</text>
+    <text class="box-sub" x="135" y="268" text-anchor="middle">llm_text raises: return None (348)</text>
+    <text class="box-sub" x="135" y="284" text-anchor="middle">re-issue names the failure (355)</text>
+  </g>
+
+  <g class="box" id="pBase">
+    <title>Not imported by this file any more (removed in commit 4020790)</title>
+    <rect x="290" y="210" width="230" height="100" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="405" y="234" text-anchor="middle">base.extract_json_payload</text>
+    <text class="box-sub" x="405" y="252" text-anchor="middle">import line removed</text>
+    <text class="box-sub" x="405" y="268" text-anchor="middle">layers.py:30, digest.py:23 keep it</text>
+    <text class="box-sub" x="405" y="284" text-anchor="middle">object-first, so it hid arrays</text>
+  </g>
+
+  <path class="edge" data-from="pRaw" data-to="pBlock" d="M200,88 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="225" y="80" text-anchor="middle">raw text</text>
+  <path class="edge" data-from="pBlock" data-to="pParse" d="M480,90 H530" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="505" y="82" text-anchor="middle">block</text>
+  <path class="edge" data-from="pParse" data-to="pList" d="M730,90 H770" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="750" y="82" text-anchor="middle">parsed</text>
+  <path class="edge" data-from="pList" data-to="pOut" d="M865,150 V210" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="875" y="182" text-anchor="start">list</text>
+  <path class="edge dashed-edge" data-from="pParse" data-to="pRetry" d="M530,120 V260 H250" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="400" y="252" text-anchor="middle">no verdict list</text>
+  <path class="edge dashed-edge" data-from="pBase" data-to="pBlock" d="M405,210 V150" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="415" y="176" text-anchor="start">replaced by</text>
+  <text class="box-sub" x="20" y="380">The screen call is shared by is_generic_claim (381), t1_violations (426) and scorers.exact_name_violations; agents hybrid_screen_generic, _t1, _exact_name.</text>
+  <text class="box-sub" x="20" y="404">The two helpers came in commit 4020790; the extraction path in layers.py still parses its object with base.extract_json_payload.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 1 &mdash; <code>7 boxes</code>. Both new helpers are private: <code>_first_json_block</code> keeps a top-level verdict <b>array</b> that the object-first <code>base.extract_json_payload</code> collapsed into a nested object. No test calls the two helpers directly; <code>test_validate_claims_drops_generic_claims</code> and <code>test_is_generic_claim_batch_llm_screen</code> drive them through <code>_screen_call</code> with array-shaped stub replies (<code class="path">tests/hybrid_verifier_test.py:325, 360</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 2 &mdash; data flow: what comes in, what goes out</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 340" role="img" aria-label="data flow of claims.py">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="dIn1">
+    <title>Text arguments supplied by the evidence layer</title>
+    <rect x="20" y="30" width="210" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="54" text-anchor="middle">in: task text</text>
+    <text class="box-sub" x="125" y="72" text-anchor="middle">goal (62, 197)</text>
+    <text class="box-sub" x="125" y="88" text-anchor="middle">union_inventory (63, 198)</text>
+    <text class="box-sub" x="125" y="104" text-anchor="middle">previews (64)</text>
+    <text class="box-sub" x="125" y="120" text-anchor="middle">lo, hi (65-66, 173, 215)</text>
+  </g>
+
+  <g class="box" id="dIn2">
+    <title>Rows read from the per-task registry JSON, passed in by layers.py</title>
+    <rect x="20" y="190" width="210" height="110" rx="2" fill="none" stroke="#8FB8C9" stroke-dasharray="5 4"/>
+    <text class="box-label" x="125" y="214" text-anchor="middle">in: registry rows</text>
+    <text class="box-sub" x="125" y="232" text-anchor="middle">claims (321, 331, 343)</text>
+    <text class="box-sub" x="125" y="248" text-anchor="middle">generations (321)</text>
+    <text class="box-sub" x="125" y="264" text-anchor="middle">JSON: hybrid_registry_&lt;16 hex&gt;</text>
+    <text class="box-sub" x="125" y="280" text-anchor="middle">loaded at evaluator.py:433</text>
+  </g>
+
+  <a class="box" id="dFn" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>Five groups of this file</title>
+    <rect x="300" y="55" width="250" height="210" rx="2" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="425" y="85" text-anchor="middle">claims.py (701 lines)</text>
+    <text class="box-sub" x="425" y="110" text-anchor="middle">2 prompt builders</text>
+    <text class="box-sub" x="425" y="132" text-anchor="middle">json helpers + screen call</text>
+    <text class="box-sub" x="425" y="154" text-anchor="middle">2 batched judge screens</text>
+    <text class="box-sub" x="425" y="176" text-anchor="middle">composition counts and error</text>
+    <text class="box-sub" x="425" y="198" text-anchor="middle">shape check, order, claim ids</text>
+    <text class="box-sub" x="425" y="220" text-anchor="middle">outcome_report</text>
+    <text class="box-sub" x="425" y="246" text-anchor="middle">no file read, no file write</text>
+  </a>
+
+  <g class="box" id="dOut1">
+    <title>Two prompt strings; the caller sends them to the judge model</title>
+    <rect x="620" y="30" width="340" height="80" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="790" y="54" text-anchor="middle">out: prompt strings</text>
+    <text class="box-sub" x="790" y="72" text-anchor="middle">sent as hybrid_extract_claims (layers.py 244)</text>
+    <text class="box-sub" x="790" y="88" text-anchor="middle">hybrid_refine_claims (layers.py 333)</text>
+  </g>
+
+  <g class="box" id="dOut2">
+    <title>Validated claims, stored by the caller</title>
+    <rect x="620" y="130" width="340" height="80" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="790" y="154" text-anchor="middle">out: claims + error</text>
+    <text class="box-sub" x="790" y="172" text-anchor="middle">registry.seed_claims (layers.py:288)</text>
+    <text class="box-sub" x="790" y="188" text-anchor="middle">replace_claims (layers.py:360)</text>
+  </g>
+
+  <g class="box" id="dOut3">
+    <title>Verdict dicts, fresh id, history block</title>
+    <rect x="620" y="230" width="340" height="80" rx="2" fill="rgba(94,140,163,0.08)" stroke="#5E8CA3"/>
+    <text class="box-label" x="790" y="254" text-anchor="middle">out: dicts and strings</text>
+    <text class="box-sub" x="790" y="272" text-anchor="middle">{claim id: reason} or {claim id: [field:value]}</text>
+    <text class="box-sub" x="790" y="288" text-anchor="middle">"C14" next id; report text (701)</text>
+  </g>
+
+  <text class="box-sub" x="620" y="330" text-anchor="start">The two screens call llm_text(uuid, agent, prompt) themselves (346, 349); the cached judge transport lives in evaluator.py:309.</text>
+
+  <path class="edge" data-from="dIn1" data-to="dFn" d="M230,85 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="265" y="77" text-anchor="middle">arguments</text>
+  <path class="edge" data-from="dIn2" data-to="dFn" d="M230,245 H300" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="265" y="237" text-anchor="middle">rows</text>
+  <path class="edge" data-from="dFn" data-to="dOut1" d="M550,85 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="585" y="77" text-anchor="middle">str</text>
+  <path class="edge" data-from="dFn" data-to="dOut2" d="M550,160 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="585" y="152" text-anchor="middle">claims</text>
+  <path class="edge" data-from="dFn" data-to="dOut3" d="M550,245 H620" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="585" y="237" text-anchor="middle">dicts, str</text>
+  <text class="box-sub" x="20" y="322">Config fields read: none (grep over the file, 2026-09-26). Files read or written by this file: none.</text>
+</svg>
+</div>
+<p class="figcap">Diagram 2 &mdash; <code>6 boxes</code>. The registry JSON path is built in <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (<code>task_key</code> = sha256(goal + version)[:16]); this file only sees the rows the caller loaded. The two judge screens do issue their own calls through the injected <code>llm_text</code>.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Diagram 3 &mdash; control logic: the shape loop, the screens and the count contract</h2>
+<div class="canvas">
+<svg class="diagram" viewBox="0 0 980 500" role="img" aria-label="decision tree inside validate_claims">
+  <defs>
+    <marker id="arw" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#00E5FF"/>
+    </marker>
+    <marker id="arw2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#4D9FFF"/>
+    </marker>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="2.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g class="box" id="v0">
+    <title>Top-level shape check</title>
+    <rect x="20" y="26" width="230" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="48" text-anchor="middle">dict with claims list ?</text>
+    <text class="box-sub" x="135" y="66" text-anchor="middle">line 575</text>
+  </g>
+
+  <g class="box" id="v1">
+    <title>The per-claim loop</title>
+    <rect x="20" y="112" width="230" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="134" text-anchor="middle">each claim in turn</text>
+    <text class="box-sub" x="135" y="152" text-anchor="middle">for k, c in enumerate (579)</text>
+  </g>
+
+  <g class="box" id="v2">
+    <title>Per-claim shape checks</title>
+    <rect x="20" y="198" width="230" height="76" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="220" text-anchor="middle">dict, id seen, fields ?</text>
+    <text class="box-sub" x="135" y="238" text-anchor="middle">580, 583, 586</text>
+    <text class="box-sub" x="135" y="254" text-anchor="middle">empty string also fails (587)</text>
+  </g>
+
+  <g class="box" id="v3">
+    <title>Generic-claim screen, batched, line 591</title>
+    <rect x="20" y="304" width="230" height="76" rx="2" fill="rgba(255,181,71,0.06)" stroke="#FFB547"/>
+    <text class="box-label" x="135" y="326" text-anchor="middle">drop_generic and llm_text ?</text>
+    <text class="box-sub" x="135" y="344" text-anchor="middle">is_generic_claim (592)</text>
+    <text class="box-sub" x="135" y="360" text-anchor="middle">flagged claims dropped (593)</text>
+  </g>
+
+  <g class="box" id="v4">
+    <title>Count contract on the survivors</title>
+    <rect x="20" y="410" width="230" height="56" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="135" y="432" text-anchor="middle">kept count within lo..hi ?</text>
+    <text class="box-sub" x="135" y="450" text-anchor="middle">line 595</text>
+  </g>
+
+  <a class="box" id="g0" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>is_generic_claim and its one batched judge call</title>
+    <rect x="330" y="90" width="260" height="120" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="460" y="114" text-anchor="middle">is_generic_claim (381)</text>
+    <text class="box-sub" x="460" y="132" text-anchor="middle">_claim_block, one JSON line (366)</text>
+    <text class="box-sub" x="460" y="148" text-anchor="middle">_screen_call, agent (414)</text>
+    <text class="box-sub" x="460" y="164" text-anchor="middle">_flag reads "generic" (263)</text>
+    <text class="box-sub" x="460" y="180" text-anchor="middle">failed call flags nothing (423)</text>
+    <text class="box-sub" x="460" y="196" text-anchor="middle">unknown ids dropped (421)</text>
+  </a>
+
+  <a class="box" id="g1" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>The normalized claim shape</title>
+    <rect x="330" y="240" width="260" height="110" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="460" y="264" text-anchor="middle">_normalize_claim (519)</text>
+    <text class="box-sub" x="460" y="282" text-anchor="middle">unknown stage to "result" (512)</text>
+    <text class="box-sub" x="460" y="298" text-anchor="middle">bad temporal_index: fallback (523)</text>
+    <text class="box-sub" x="460" y="314" text-anchor="middle">unknown category: "other" (531)</text>
+    <text class="box-sub" x="460" y="330" text-anchor="middle">7 output keys (527-535)</text>
+  </a>
+
+  <a class="box" id="g2" href="../../sources/evaluators/hybrid_verifier/claims.py">
+    <title>E30 composition mandate, checked on the ordered claims</title>
+    <rect x="330" y="385" width="260" height="90" rx="14" fill="rgba(125,249,199,0.08)" stroke="#7DF9C7"/>
+    <text class="box-label" x="460" y="409" text-anchor="middle">composition_error (501)</text>
+    <text class="box-sub" x="460" y="427" text-anchor="middle">composition_counts (489)</text>
+    <text class="box-sub" x="460" y="443" text-anchor="middle">2 core_computation, 2 method_identity (49)</text>
+    <text class="box-sub" x="460" y="459" text-anchor="middle">only when require_composition (601)</text>
+  </a>
+
+  <g class="box" id="g3">
+    <title>Every failing branch returns the claims collected so far plus a message</title>
+    <rect x="650" y="26" width="310" height="90" rx="2" fill="rgba(255,77,106,0.07)" stroke="#FF4D6A"/>
+    <text class="box-label" x="805" y="52" text-anchor="middle">return out, "reason"</text>
+    <text class="box-sub" x="805" y="70" text-anchor="middle">shape 576, non-object 581</text>
+    <text class="box-sub" x="805" y="86" text-anchor="middle">duplicate id 584, empty field 588</text>
+    <text class="box-sub" x="805" y="102" text-anchor="middle">count 599, mandate 604</text>
+  </g>
+
+  <g class="box" id="g4">
+    <title>The two success returns</title>
+    <rect x="650" y="146" width="310" height="90" rx="2" fill="rgba(57,255,136,0.07)" stroke="#39FF88"/>
+    <text class="box-label" x="805" y="172" text-anchor="middle">return ordered, None (605)</text>
+    <text class="box-sub" x="805" y="190" text-anchor="middle">sort_claims_temporally at 600</text>
+    <text class="box-sub" x="805" y="206" text-anchor="middle">best effort + mandate error (604)</text>
+    <text class="box-sub" x="805" y="222" text-anchor="middle">ladder: script, log, result</text>
+  </g>
+
+  <g class="box" id="g5">
+    <title>Fresh ids for replacements</title>
+    <rect x="650" y="266" width="310" height="100" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="805" y="290" text-anchor="middle">next_claim_id (628)</text>
+    <text class="box-sub" x="805" y="308" text-anchor="middle">_max_claim_no scans ids (633)</text>
+    <text class="box-sub" x="805" y="324" text-anchor="middle">dedupe_claim_ids (642)</text>
+    <text class="box-sub" x="805" y="340" text-anchor="middle">taken id: loop to next free (652)</text>
+    <text class="box-sub" x="805" y="356" text-anchor="middle">returns "C13", "C14", ...</text>
+  </g>
+
+  <g class="box" id="g6">
+    <title>Label-free per-claim history for the refinement prompt</title>
+    <rect x="650" y="396" width="310" height="90" rx="2" fill="rgba(0,229,255,0.08)" stroke="#00E5FF"/>
+    <text class="box-label" x="805" y="420" text-anchor="middle">outcome_report (660)</text>
+    <text class="box-sub" x="805" y="438" text-anchor="middle">ALL EQUAL or N distinct (684)</text>
+    <text class="box-sub" x="805" y="454" text-anchor="middle">NO SCORES case (676-679)</text>
+    <text class="box-sub" x="805" y="470" text-anchor="middle">evidence cut to 200 chars (699)</text>
+  </g>
+
+  <path class="edge" data-from="v0" data-to="v1" d="M135,82 V112" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="145" y="104" text-anchor="start">yes</text>
+  <path class="edge" data-from="v1" data-to="v2" d="M135,168 V198" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="145" y="190" text-anchor="start">next</text>
+  <path class="edge" data-from="v2" data-to="v3" d="M135,274 V304" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="145" y="296" text-anchor="start">valid</text>
+  <path class="edge" data-from="v3" data-to="g1" d="M250,342 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="290" y="334" text-anchor="middle">survivors</text>
+  <path class="edge dashed-edge" data-from="v3" data-to="v4" d="M135,380 V410" fill="none" stroke="#4D9FFF" stroke-width="1.5" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="145" y="402" text-anchor="start">dropped</text>
+  <path class="edge" data-from="g1" data-to="v4" d="M460,350 V438 H250" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="400" y="430" text-anchor="middle">kept claims</text>
+  <path class="edge" data-from="v3" data-to="g0" d="M250,320 L330,180" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="280" text-anchor="middle">calls (592)</text>
+  <path class="edge dashed-edge" data-from="v0" data-to="g3" d="M250,46 H650" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="420" y="38" text-anchor="middle">no</text>
+  <path class="edge dashed-edge" data-from="v4" data-to="g3" d="M250,430 H620 V120 H650" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="560" y="132" text-anchor="end">no</text>
+  <path class="edge" data-from="v4" data-to="g2" d="M250,442 H290 V430 H330" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="300" y="462" text-anchor="middle">yes</text>
+  <path class="edge" data-from="g2" data-to="g4" d="M590,420 H620 V191 H650" fill="none" stroke="#00E5FF" stroke-width="1.5" marker-end="url(#arw)"/>
+  <text class="edge-label" x="610" y="330" text-anchor="middle">clean or best effort</text>
+  <path class="edge dashed-edge" data-from="v4" data-to="g4" d="M250,452 H600 V430 H620 V200 H650" fill="none" stroke="#4D9FFF" stroke-width="1.25" marker-end="url(#arw2)"/>
+  <text class="edge-label" x="520" y="470" text-anchor="middle">not required</text>
+  <text class="box-sub" x="20" y="490">A generic claim is dropped, then the count contract runs on the survivors, so a fully generic batch fails with "got 0" (596).</text>
+</svg>
+</div>
+<p class="figcap">Diagram 3 &mdash; <code>12 boxes</code>. The composition mandate is checked only when the caller asks for it, and an unmet mandate returns the ordered claims <b>with</b> the error, so <code>layers.py:269</code> keeps the best effort after its retry budget. Test <code>test_validate_claims_drops_generic_claims</code> covers the drop and the floor (<code class="path">tests/hybrid_verifier_test.py:325</code>).</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>What it reads and writes</h2>
+<table>
+<thead><tr><th>Kind</th><th>Name</th><th>Where</th><th>Used for</th></tr></thead>
+<tbody>
+<tr><td class="sym">argument</td><td class="sym">goal</td><td>signature 62, 197 (trimmed at 87, 217)</td><td>task text in both prompts, capped at 4000 chars</td></tr>
+<tr><td class="sym">argument</td><td class="sym">union_inventory</td><td>lines 63, 198 (used at 91, 221)</td><td>file paths, sizes, presence counts</td></tr>
+<tr><td class="sym">argument</td><td class="sym">previews</td><td>line 64 (used at 93)</td><td>up to 3 deliverable-ish file samples</td></tr>
+<tr><td class="sym">argument</td><td class="sym">lo, hi</td><td>lines 65-66 (used at 173, 595)</td><td>claim count floor and ceiling</td></tr>
+<tr><td class="sym">argument</td><td class="sym">dead_block, alive_block</td><td>lines 200-201 (used at 227, 230)</td><td>claims to replace, claims to keep</td></tr>
+<tr><td class="sym">argument</td><td class="sym">n_new, next_id</td><td>lines 202-203 (used at 233, 248)</td><td>replacement count and first fresh id</td></tr>
+<tr><td class="sym">argument</td><td class="sym">outcome_report</td><td>line 199 (used at 224)</td><td>label-free history block for the prompt</td></tr>
+<tr><td class="sym">argument</td><td class="sym">llm_text, uuid</td><td>lines 382-384, 427-430, 544-545 (used at 349, 414, 471)</td><td>the judge transport the two screens call</td></tr>
+<tr><td class="sym">argument</td><td class="sym">drop_generic, require_composition</td><td>lines 542-543 (used at 591, 601)</td><td>run the screen; enforce the E30 counts</td></tr>
+<tr><td class="sym">state read</td><td class="sym">registry.claims</td><td>layers.py:321, 331, 343</td><td>existing claims, max id, id collisions</td></tr>
+<tr><td class="sym">state read</td><td class="sym">registry.generations</td><td>layers.py:321</td><td>per-generation scores and evidence (669-674)</td></tr>
+<tr><td class="sym">judge call</td><td class="sym">hybrid_screen_generic</td><td>agent name at 414, retry at 344</td><td>which claims are generic, one call per set</td></tr>
+<tr><td class="sym">judge call</td><td class="sym">hybrid_screen_t1</td><td>agent name at 471, retry at 344</td><td>which claims smuggle a numeric answer</td></tr>
+<tr><td class="sym">constant</td><td class="sym">CLAIM_CATEGORIES</td><td>line 27 (9 names, applied at 531)</td><td>category whitelist, unknown becomes "other"</td></tr>
+<tr><td class="sym">constant</td><td class="sym">STAGES, FIGURE_STAGES, STAGE_RANK</td><td>lines 44-46 (used at 515, 616)</td><td>ladder order, visual first for figure tasks</td></tr>
+<tr><td class="sym">constant</td><td class="sym">LEVER_MIN_COUNTS</td><td>line 49 (used at 506)</td><td>2 core_computation and 2 method_identity</td></tr>
+<tr><td class="sym">constant</td><td class="sym">FIDELITY_CATEGORIES</td><td>line 51 (used at 496)</td><td>schema, sanity and path families counted</td></tr>
+<tr><td class="sym">constant</td><td class="sym">_REQUIRED_FIELDS</td><td>line 58 (used at 586)</td><td>statement, target, scoring_rule non-empty</td></tr>
+<tr><td class="sym">returns</td><td class="sym">list[dict] + str | None</td><td>lines 576, 581, 584, 588, 599, 604, 605</td><td>claims in temporal order, or a repair message</td></tr>
+<tr><td class="sym">returns</td><td class="sym">str, dict</td><td>13 return sites (L69-L701)</td><td>prompt text, verdicts, fresh id, report text</td></tr>
+<tr><td class="sym">config field</td><td class="sym">none</td><td>grep over the file, 2026-09-26</td><td>this module reads no Config object</td></tr>
+<tr><td class="sym">file</td><td class="sym">none</td><td>&mdash;</td><td>no <code>open</code> and no <code>Path</code> in this file</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Full symbol inventory</h2>
+<p class="sub">19 top-level functions, no class, 7 module constants. 701 lines (<code>wc -l</code>). Imports: <code>collections</code>, <code>json</code>, <code>re</code>, <code>typing.Any</code>, <code>collections.abc.Callable</code>. No import from <code>sources.evaluators.base</code> any more (commit <code>4020790</code>).</p>
+<details><summary>every def and constant in sources/evaluators/hybrid_verifier/claims.py</summary><div class="dbody">
+<pre>CLAIM_CATEGORIES: tuple[str, ...]                      # L27  - 9 category names
+STAGES = ("script", "log", "result")                   # L44  - text-task ladder
+FIGURE_STAGES = ("visual", "script", "log", "result")  # L45  - figure-task ladder
+STAGE_RANK = {s: i for i, s in enumerate(FIGURE_STAGES)}  # L46 - stage to 0/1/2/3
+LEVER_MIN_COUNTS = {"core_computation": 2, "method_identity": 2}  # L49 - E30 floor
+FIDELITY_CATEGORIES: tuple[str, ...]                   # L51  - schema, sanity, path
+_REQUIRED_FIELDS = ("statement", "target", "scoring_rule")  # L58 - non-empty str fields
+
+extract_claims_prompt(goal, union_inventory, previews, lo, hi) -&gt; str        # L61  - first-sight claim rubric
+refinement_prompt(goal, union_inventory, outcome_report, dead_block,
+    alive_block, n_new, next_id) -&gt; str                                      # L196 - replacement claim prompt
+_flag(verdict, key) -&gt; bool                                                  # L263 - true / "true" / 1
+_first_json_block(text) -&gt; str                                               # L271 - NEW: array-first balanced block
+_as_verdict_list(parsed) -&gt; list[Any] | None                                 # L312 - NEW: list or first list value
+_screen_call(llm_text, uuid, agent, prompt) -&gt; list[dict] | None             # L329 - one call, one retry
+_claim_block(claims) -&gt; str                                                  # L366 - claims as one JSON line
+is_generic_claim(claims, llm_text, uuid="") -&gt; dict[str, str]                # L381 - batched generic screen
+t1_violations(claims, goal, llm_text, uuid="") -&gt; dict[str, list[str]]       # L426 - batched smuggled-answer screen
+composition_counts(claims) -&gt; dict[str, int]                                 # L489 - E30 lever counts
+composition_error(claims) -&gt; str | None                                      # L501 - unmet mandate text
+_normalize_stage(raw) -&gt; str                                                 # L512 - coerce stage
+_normalize_claim(c, fallback_index) -&gt; dict                                  # L519 - canonical 7-key claim
+validate_claims(obj, lo, hi, drop_generic=True, require_composition=False,
+    llm_text=None, uuid="") -&gt; tuple[list[dict], str | None]                 # L538 - shape, screens, count
+sort_claims_temporally(claims, stages=FIGURE_STAGES) -&gt; list[dict]           # L607 - stage, then index
+next_claim_id(claims) -&gt; str                                                 # L628 - "C&lt;max+1&gt;"
+_max_claim_no(claims) -&gt; int                                                 # L633 - highest numeric suffix
+dedupe_claim_ids(new_claims, existing) -&gt; list[dict]                         # L642 - re-id collisions
+outcome_report(claims, generations) -&gt; str                                   # L660 - label-free history
+
+claim dict keys produced: id, stage, temporal_index, category,
+    statement, target, scoring_rule                                       # L526-533
+error strings: "top-level JSON must be an object with a 'claims' list"      # L576
+    "claim #k is not an object" / "duplicate claim id Cx"                  # L581, L584
+    "claim Cx: missing/empty 'field'"                                      # L588
+    "exactly lo-hi non-generic claims required, got N"                     # L596
+    "composition mandate unmet: ..."                                       # L509
+return sites (statement positions in this file): 69, 206, 267, 308, 321, 357,
+    368, 423, 486, 625, 630, 657, 701</pre>
+</div></details>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Change since the last build (committed in 4020790)</h2>
+<p class="sub">Evidence: <code>git diff 336fe19 4020790 -- sources/evaluators/hybrid_verifier/claims.py</code> (68 lines changed); the edit was uncommitted at the 2026-09-26 build and is now part of commit <code>4020790</code>. <code>ca72107</code> and the working tree do not change this file.</p>
+<details><summary>the four hunks of the diff, quoted in one line each</summary><div class="dbody">
+<blockquote>1. <code>-from sources.evaluators.base import extract_json_payload</code> &mdash; the cross-area import is gone; the parser lives here now.<br>
+2. <code>+def _first_json_block(text: str) -&gt; str:</code> &mdash; first balanced JSON block, array-first, fences tolerated (now L271).<br>
+3. <code>+def _as_verdict_list(parsed: Any) -&gt; list[Any] | None:</code> &mdash; list, or the object's first list value (now L312).<br>
+4. <code>-        payload = extract_json_payload(raw or "")</code> / <code>+        payload = _first_json_block(raw or "")</code> and <code>-if isinstance(parsed, list):</code> / <code>+verdicts = _as_verdict_list(parsed)</code> &mdash; the screen call swapped over (now 349, 355).<br>
+5. <code>-CUT</code> &mdash; a stray literal token above the helper region was deleted.</blockquote>
+<p>Why the swap: <code>base.extract_json_payload</code> is object-first, so a judge reply that is a top-level verdict array lost its array shape. <code>layers.py</code> (<code>_llm_json</code>, L179; <code>VisualEvidenceLayer._vision_json</code>, L722) and <code>digest.py</code> (L88) still call <code>base.extract_json_payload</code> for object-shaped replies.</p>
+</div></details>
+<p class="note say">Why it matters: the two screens judge claim content with the model, so the only thing this file still enforces by code is claim shape, the count contract and the ladder order.</p>
+</div>
+
+<div class="panel"><span class="br"></span>
+<h2>Callers and tests</h2>
+<table>
+<thead><tr><th>Importer / caller</th><th>What it uses</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/layers.py">hybrid_verifier/layers.py</a></td><td><code>_extract</code> and <code>revise</code> call the prompts, both screens, validation, ids and <code>outcome_report</code></td><td class="sym">import L32; 224, 248, 259, 283, 318, 321, 331, 336, 346</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/evaluator.py">hybrid_verifier/evaluator.py</a></td><td><code>STAGES</code> / <code>FIGURE_STAGES</code> pick the ladder; <code>sort_claims_temporally</code> orders reward and gradient</td><td class="sym">import L66; 507, 511, 621, 649</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/gradient.py">hybrid_verifier/gradient.py</a></td><td><code>STAGES</code>, as the default ladder for the gradient text</td><td class="sym">import L22; default at L136</td></tr>
+<tr><td class="sym"><a href="../../sources/evaluators/hybrid_verifier/scorers.py">hybrid_verifier/scorers.py</a></td><td><code>_flag</code> and <code>_screen_call</code> for the exact-name screen (agent <code>hybrid_screen_exact_name</code>); new in <code>4020790</code></td><td class="sym">import L27; call L318, flag L325</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e35_prime.py">experiments_verifiers/harness/e35_prime.py</a></td><td>patches <code>CLAIMS.CLAIM_CATEGORIES</code>, <code>STAGES</code> and <code>STAGE_RANK</code> in-process, then reuses validation and ordering</td><td class="sym">167, 173-174, 1019, 1548</td></tr>
+<tr><td class="sym"><a href="../../experiments_verifiers/harness/e19c_ratchet.py">e19c_ratchet.py</a>, <a href="../../experiments_verifiers/harness/e32_mirror_v2.py">e32_mirror_v2.py</a>, <a href="../../experiments_verifiers/harness/e30_optimus.py">e30_optimus.py</a></td><td>offline harnesses that reuse <code>extract_claims_prompt</code>, <code>validate_claims</code> and <code>sort_claims_temporally</code></td><td class="sym">e19c_ratchet 384, 398; e32_mirror_v2 477; e30_optimus 581</td></tr>
+<tr><td class="sym"><a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a></td><td>imports the module as <code>claims_mod</code> and exercises it directly</td><td class="sym">import L44</td></tr>
+<tr><td class="sym">test_validate_claims_enforces_count_and_shape</td><td>count error text, valid claims keep their category, duplicate-id rejection</td><td class="sym">lines 300-311</td></tr>
+<tr><td class="sym">test_next_claim_id_and_dedupe</td><td><code>"C13"</code> after C12; a colliding replacement is re-ided</td><td class="sym">lines 314-322</td></tr>
+<tr><td class="sym">test_validate_claims_drops_generic_claims</td><td>one batched screen call, the drop, the floor failure <code>"got 0"</code></td><td class="sym">lines 325-357</td></tr>
+<tr><td class="sym">test_is_generic_claim_batch_llm_screen</td><td>one call per set; unknown ids ignored; a failed call flags nothing</td><td class="sym">lines 360-382</td></tr>
+<tr><td class="sym">test_t1_firewall_rejects_numeric_answer_keys / test_t1_firewall_passes_structural_constants</td><td><code>t1_violations</code> flags a smuggled number, passes structural constants, degrades open</td><td class="sym">lines 1600-1673</td></tr>
+<tr><td class="sym">test_extract_prompt_demands_content_lever / test_extraction_retries_on_t1_and_composition_then_accepts</td><td>the content mandate and the 3-attempt extract loop with screens between attempts</td><td class="sym">lines 1681-1762</td></tr>
+<tr><td class="sym">test_ladder_claim_validation_and_ordering</td><td>returns <code>["script", "log", "result"]</code>; unknown stage to "result"</td><td class="sym">lines 1359-1395</td></tr>
+<tr><td class="sym">test_stage_order_visual_first_configurable</td><td>the same claim set ordered under <code>FIGURE_STAGES</code> and <code>STAGES</code></td><td class="sym">lines 2104-2132</td></tr>
+<tr><td class="sym">test_zero_variance_drops_claim_and_triggers_replacement</td><td>the refine path through <code>layers.revise</code>: outcome report, fresh id, replacement claims</td><td class="sym">lines 665-741</td></tr>
+<tr><td class="sym">_first_json_block / _as_verdict_list (object-wrapped case)</td><td>no direct test; array-shaped stubs only, so wrapping branch 323 untested</td><td class="sym">grep tests/, 2026-09-28 18:06</td></tr>
+</tbody>
+</table>
+<p class="note">My run: <code>uv run pytest tests/hybrid_verifier_test.py -q</code> gives <code>53 passed</code> (2 warnings, 2.02 s) on 2026-09-26 &mdash; my computation, not a recorded result. On 2026-09-28 the file defines 65 <code>test_*</code> functions (my count, AST, 18:06); no pytest run in this update.</p>
+</div>
+
+<footer>
+<p>Sources read: <a href="../../sources/evaluators/hybrid_verifier/claims.py">sources/evaluators/hybrid_verifier/claims.py</a> (all 701 lines, line by line), <a href="../../sources/evaluators/hybrid_verifier/layers.py">layers.py</a> (L30-L32 imports, L167-L189 <code>_llm_json</code>, L200-L289 <code>_extract</code>, L291-L365 <code>revise</code>), <a href="../../sources/evaluators/hybrid_verifier/evaluator.py">evaluator.py</a> (L66 import, L507-L511 stage order, L616-L649 gradient and report inputs), <a href="../../sources/evaluators/hybrid_verifier/gradient.py">gradient.py</a> (L18 import), <a href="../../sources/evaluators/hybrid_verifier/registry.py">registry.py</a> (<code>task_key</code>), <a href="../../tests/hybrid_verifier_test.py">tests/hybrid_verifier_test.py</a> (L44 import, L300-L382, L665-L741, L1359-L1395, L1600-L1762, L2104-L2132, L2306-L2354), <a href="../../experiments_verifiers/harness/e35_prime.py">experiments_verifiers/harness/e35_prime.py</a> (L167-L174), plus greps over <code>sources/</code>, <code>tests/</code> and <code>experiments_verifiers/harness/</code>. Line counts from <code>wc -l</code> and greps; text budget and colours per UPDATE_VISUAL_CLONE.md sections 6-7.</p>
+<p class="skips">Skipped: the long prompt prose inside <code>extract_claims_prompt</code> and <code>refinement_prompt</code> (summarised as the four hard rules plus the E29/E30 mandates, with line numbers instead of quotes); <code>CLAIM_CATEGORIES</code> listed by count, not quoted in full; <a href="area_evaluators_legacy.html">the deprecated legacy verifier</a> (now <code>sources/evaluators/legacy_verifier/verifier_claims.py</code>, out of scope); the bodies of <code>scorers.py</code> and <code>digest.py</code> (own cards; <code>digest.py</code> keeps <code>base.extract_json_payload</code>, <code>scorers.py</code> reuses <code>_screen_call</code>). No application run, by the build rules.</p>
+<p>Built at commit <code>336fe19</code>, 2026-09-26 (it then described the uncommitted <code>claims.py</code> edit). Updated at <code>ca72107</code> + working tree, 2026-09-28: the edit is now committed in <code>4020790</code> and <code>claims.py</code> is unchanged since, so its line refs stay; new caller <code>scorers.py</code>; test and <code>gradient.py</code> refs re-derived. <code class="path">tests/hybrid_verifier_test.py</code> read at 18:06 CEST while it has uncommitted edits in flight, so test line numbers can move.</p>
+</footer>
+</div>
+<script src="_clone.js"></script>
+</body>
+</html>

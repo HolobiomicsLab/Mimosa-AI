@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../images/logo_mimosa.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -31,7 +31,7 @@
       
     
     
-      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -1553,6 +1553,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#qd-novelty-selection-variation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QD / novelty (selection &amp; variation)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#openrouter-routing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2067,6 +2078,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#qd-novelty-selection-variation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        QD / novelty (selection &amp; variation)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#openrouter-routing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2338,13 +2360,13 @@ Ports must be in <code>[0, 65535]</code> and <code>port_min ≤ port_max</code>.
 <tr>
 <td><code>learned_score_threshold</code></td>
 <td><code>float</code></td>
-<td><code>0.9</code></td>
+<td><code>0.92</code></td>
 <td><code>--learn</code> stops when <code>overall_score</code> reaches this.</td>
 </tr>
 <tr>
 <td><code>max_learning_evolve_iterations</code></td>
 <td><code>int</code></td>
-<td><code>20</code></td>
+<td><code>25</code></td>
 <td>Hard cap on evolve iterations.</td>
 </tr>
 <tr>
@@ -2352,6 +2374,111 @@ Ports must be in <code>[0, 65535]</code> and <code>port_min ≤ port_max</code>.
 <td><code>int</code></td>
 <td><code>1</code></td>
 <td>Concurrent tasks in CSV / batch modes.</td>
+</tr>
+</tbody>
+</table>
+<h2 id="qd-novelty-selection-variation">QD / novelty (selection &amp; variation)<a class="headerlink" href="#qd-novelty-selection-variation" title="Permanent link">&para;</a></h2>
+<p>Touch with caution — these are ablation-study knobs for the <a href="../concepts/evolution-engine.html">evolution
+engine</a>, not day-to-day settings.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>selection_strategy</code></td>
+<td><code>str</code></td>
+<td><code>qd</code></td>
+<td>One of <code>greedy</code>, <code>tournament</code>, <code>novelty</code>, <code>qd</code>.</td>
+</tr>
+<tr>
+<td><code>novelty_comparison</code></td>
+<td><code>str</code></td>
+<td><code>archive_knn</code></td>
+<td>Novelty comparison mode (k-NN over the archive vs. previous-N).</td>
+</tr>
+<tr>
+<td><code>novelty_previous_n</code></td>
+<td><code>int</code></td>
+<td><code>15</code></td>
+<td>Window size when <code>novelty_comparison</code> is previous-N based.</td>
+</tr>
+<tr>
+<td><code>length_penalty_baseline_chars</code></td>
+<td><code>int</code></td>
+<td><code>8000</code></td>
+<td>Genotype size (chars) at which the length penalty starts to grow.</td>
+</tr>
+<tr>
+<td><code>length_penalty_lambda</code></td>
+<td><code>float</code></td>
+<td><code>0.05</code></td>
+<td>Length-penalty growth rate.</td>
+</tr>
+<tr>
+<td><code>min_improvement_threshold</code></td>
+<td><code>float</code></td>
+<td><code>0.01</code></td>
+<td>Minimum relative improvement required for admission in greedy mode.</td>
+</tr>
+<tr>
+<td><code>population_size</code></td>
+<td><code>int</code></td>
+<td><code>20</code></td>
+<td>Max individuals kept in the QD archive.</td>
+</tr>
+<tr>
+<td><code>novelty_k_neighbours</code></td>
+<td><code>int</code></td>
+<td><code>15</code></td>
+<td><code>k</code> for k-nearest-neighbour novelty.</td>
+</tr>
+<tr>
+<td><code>novelty_weight</code></td>
+<td><code>float</code></td>
+<td><code>0.25</code></td>
+<td>Weight of novelty vs. quality in <code>qd_score</code> (<code>0</code> = pure quality, <code>1</code> = pure novelty).</td>
+</tr>
+<tr>
+<td><code>admit_threshold</code></td>
+<td><code>float</code></td>
+<td><code>0.3</code></td>
+<td>Minimum <code>qd_score</code> for admission when the candidate doesn't strictly improve.</td>
+</tr>
+<tr>
+<td><code>initial_population</code></td>
+<td><code>int</code></td>
+<td><code>2</code></td>
+<td>Seed generations before mutation/crossover kicks in.</td>
+</tr>
+<tr>
+<td><code>crossover_rate</code></td>
+<td><code>float</code></td>
+<td><code>0.4</code></td>
+<td>Probability a generation combines two parents instead of mutating one.</td>
+</tr>
+<tr>
+<td><code>n_parents</code></td>
+<td><code>int</code></td>
+<td><code>2</code></td>
+<td>Number of parents drawn per crossover.</td>
+</tr>
+<tr>
+<td><code>parent_threshold_similarity</code></td>
+<td><code>float</code></td>
+<td><code>0.8</code></td>
+<td>Cold-start disk scan: minimum goal-embedding cosine similarity.</td>
+</tr>
+<tr>
+<td><code>parent_threshold_score</code></td>
+<td><code>float</code></td>
+<td><code>0.01</code></td>
+<td>Cold-start disk scan / parent draw: minimum score to be considered.</td>
 </tr>
 </tbody>
 </table>
@@ -2511,8 +2638,8 @@ Ports must be in <code>[0, 65535]</code> and <code>port_min ≤ port_max</code>.
 </tbody>
 </table>
 <h2 id="methods-worth-knowing">Methods worth knowing<a class="headerlink" href="#methods-worth-knowing" title="Permanent link">&para;</a></h2>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">config</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="s2">&quot;my_config.json&quot;</span><span class="p">)</span>     <span class="c1"># Save current config to JSON.</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">config</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">&quot;my_config.json&quot;</span><span class="p">)</span>     <span class="c1"># Load config from JSON.</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">config</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="s2">"my_config.json"</span><span class="p">)</span>     <span class="c1"># Save current config to JSON.</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">config</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s2">"my_config.json"</span><span class="p">)</span>     <span class="c1"># Load config from JSON.</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">config</span><span class="o">.</span><span class="n">refresh_pricing</span><span class="p">()</span>          <span class="c1"># Force re-fetch of OpenRouter pricing.</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">config</span><span class="o">.</span><span class="n">openrouter_provider_for</span><span class="p">(</span><span class="n">model_id</span><span class="p">)</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">config</span><span class="o">.</span><span class="n">openrouter_quantizations_for</span><span class="p">(</span><span class="n">model_id</span><span class="p">)</span>
@@ -2658,7 +2785,7 @@ Ports must be in <code>[0, 65535]</code> and <code>port_min ≤ port_max</code>.
       <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.path", "navigation.indexes", "navigation.top", "navigation.footer", "toc.follow", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link", "content.tooltips"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>

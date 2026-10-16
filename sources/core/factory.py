@@ -1,9 +1,13 @@
 
-"""
-Base factory class for both single agent and workflow generation.
-Child classes:
-- SingleAgentFactory: Handles crafting of single agent code with cost tracking support.
-- WorkflowFactory: Handles crafting of multi-agent workflows with dynamic tool integration.
+"""Shared plumbing for crafting runnable agent code in Mimosa-AI.
+
+This module owns the code-generation basics both emitters reuse: MCP
+tool loading, run-folder creation, and metadata saving.
+:class:`WorkflowFactory` (multi-agent workflows) and
+:class:`SingleAgentFactory` (single-agent baseline) subclass
+:class:`Factory` and add their own script assembly. The orchestrator and
+the evolution engine reach the subclasses at crafting time, before any
+generated code runs (Layers 2-3).
 """
 
 import os
@@ -14,18 +18,23 @@ from .tools_manager import ToolManager
 
 
 class Factory:
-    """Base factory for both single-agent and workflow generation.
+    """Base class for the workflow and single-agent code factories.
 
-    Handles common tasks like loading tools, creating folders, and saving files.
-    Subclasses (:class:`SingleAgentFactory`, :class:`WorkflowFactory`) reuse this
-    plumbing and add their own code-assembly logic on top.
+    The two factory subclasses are constructed with the global ``Config``
+    by the orchestrator. This base owns the shared plumbing: MCP tool
+    loading, run-folder creation, and metadata saving. Key invariant:
+    every run gets one UUID that names its folder pair and its saved
+    files.
     """
 
     def __init__(self, config: "Config") -> None:
-        """Initialize the workflow crafting system.
+        """Store the config, the output folders, and a module logger.
+
+        Called by subclass constructors at crafting time.
 
         Args:
-            config: Configuration object containing paths and settings.
+            config: Global ``Config`` object; supplies ``workflow_dir``,
+                ``memory_dir``, prompt paths, and engine settings.
         """
         self.workflow_dir = config.workflow_dir
         self.memory_dir = config.memory_dir
@@ -35,34 +44,64 @@ class Factory:
     async def load_tools_code(self) -> tuple[str, str]:
         """Discover all MCP servers and format their client code.
 
+        Both factories call this before rendering a script, so the
+        generated code can reach every available MCP tool. Discovery
+        retries with exponential backoff for up to 300 seconds while MCP
+        containers start.
+
         Returns:
-            Tuple of ``(tools_code, existing_tool_prompt)``:
-                - ``tools_code``: Combined Python code for all MCP clients.
-                - ``existing_tool_prompt``: Prompt listing discovered MCP names
-                  for workflow-generation tool-awareness.
+            Tuple ``(tools_code, existing_tool_prompt)``:
+                - ``tools_code``: Combined Python code for all MCP
+                  clients.
+                - ``existing_tool_prompt``: Prompt listing discovered MCP
+                  names for tool awareness during generation.
 
         Raises:
-            RuntimeError: If MCP server discovery fails.
+            RuntimeError: If MCP servers do not become ready in time.
             ValueError: If no MCP servers are found.
         """
         tools_code = ""
         existing_tool_prompt = ""
+        import asyncio as _asyncio
+        import time as _time
         tool_manager = ToolManager(self.config)
-        try:
-            tool_setup = False
-            while tool_setup == False:
+        # MCP servers can take minutes to come up (Docker image builds, cold
+        # starts, a server brought up by hand). Bound on total wait, not on a
+        # fixed attempt count. Exponential backoff capped at 30 s per wait.
+        max_wait_seconds = 300.0
+        backoff = 1.0
+        deadline = _time.monotonic() + max_wait_seconds
+        attempt = 0
+        mcps = []
+        while True:
+            attempt += 1
+            try:
                 mcps = await tool_manager.discover_mcp_servers()
                 tool_setup = await tool_manager.verify_tools()
-        except Exception as e:
-            self.logger.error(f"load_tools_code: Failed to discover MCP servers: {str(e)}")
-            raise RuntimeError(f"Failed to discover MCP servers: {str(e)}") from e
+                if tool_setup and mcps:
+                    break
+                reason = "MCP servers not ready yet"
+            except Exception as e:
+                reason = str(e)
+            if _time.monotonic() >= deadline:
+                self.logger.error(
+                    f"load_tools_code: MCP discovery failed after {max_wait_seconds:.0f}s "
+                    f"({attempt} attempts): {reason}"
+                )
+                raise RuntimeError(
+                    f"MCP servers did not become ready within {max_wait_seconds:.0f}s: {reason}"
+                )
+            self.logger.warning(
+                f"MCP discovery attempt {attempt} failed ({reason}). Retrying in {backoff:.1f}s…"
+            )
+            await _asyncio.sleep(backoff)
+            backoff = min(backoff * 2, 30.0)
         if not mcps:
             raise ValueError(
                 "\n" + "=" * 80 +
                 "\n🚨  FATAL ERROR: No MCP Servers Found! 🚨"
                 "\n" + "-" * 80 +
                 "\nPlease ensure at least one MCP instance is running on Toolomics."
-                "\nRetrying until MCPs detected.... use CTRL+C to stop."
                 "\n" + "=" * 80 + "\n"
             )
         for mcp in mcps:
@@ -73,10 +112,15 @@ class Factory:
         return tools_code, existing_tool_prompt
 
     async def load_single_agent_system_prompt(self) -> str:
-        """Load the system prompt for single-agent mode.
+        """Load the system prompt text for single-agent mode.
+
+        :class:`SingleAgentFactory` calls it while rendering the
+        single-agent script, and the workflow factory reads it too when
+        assembling agent prompts.
 
         Returns:
-            The system prompt content read from disk.
+            The prompt text read from ``config.prompt_smolagent`` on
+            disk.
 
         Raises:
             ValueError: If the system-prompt file cannot be read.
@@ -88,13 +132,17 @@ class Factory:
             raise ValueError(f"Failed to load single agent system prompt: {str(e)}") from e
 
     def create_folder_structure(self, uuid_str: str) -> tuple[str, str]:
-        """Create the directory structure for a new workflow.
+        """Create the workflow and memory folders for one run.
+
+        Both factories call this right before saving generated code,
+        using the run UUID as the folder name.
 
         Args:
-            uuid_str: Unique identifier for the workflow.
+            uuid_str: Unique run identifier minted by the caller.
 
         Returns:
-            Tuple ``(workflow_path, memory_path)`` of the two created directories.
+            Tuple ``(workflow_path, memory_path)``: the two created
+            directory paths under ``workflow_dir`` and ``memory_dir``.
         """
         workflow_path = os.path.join(self.workflow_dir, uuid_str)
         self.logger.info(f"Created workflow directory: {workflow_path}")
@@ -107,16 +155,20 @@ class Factory:
     def _extract_original_from_goal(self, goal: str) -> str:
         """Extract the original task from a knowledge-wrapped goal string.
 
-        Looks for the marker ``"Now, use this knowledge to complete:"`` produced
-        by ``planner._build_knowledge_aware_task()`` and returns the text that
-        follows it. When the marker is absent, returns the goal unchanged.
+        :meth:`save_workflow_files` calls this when the caller did not
+        pass an explicit original task, so run folders keep the raw task
+        for similarity matching. It looks for the marker ``"Now, use this
+        knowledge to complete:"`` produced by
+        ``planner._build_knowledge_aware_task()`` and returns the text
+        that follows it. When the marker is absent, it returns the goal
+        unchanged.
 
         Args:
-            goal: Goal text that may be wrapped with knowledge context.
+            goal: Goal text from the planner; may be knowledge-wrapped.
 
         Returns:
-            The extracted original task, or the goal itself when not wrapped.
-            Returns an empty string when ``goal`` is falsy.
+            The extracted original task, or the goal itself when not
+            wrapped. Returns an empty string when ``goal`` is falsy.
         """
         if not goal:
             return ""
@@ -133,19 +185,22 @@ class Factory:
     def save_workflow_files(
         self, path: str, uuid_str: str, workflow_genotype_code: str, goal: str, original_task: str | None = None
     ) -> None:
-        """Save workflow code and metadata to files.
+        """Write the generated code and its metadata files to a run folder.
 
-        Writes ``workflow_genotype_<uuid>.py``, ``system_prompt_<uuid>.md``,
-        ``goal_<uuid>.txt`` and, when available, ``original_task_<uuid>.txt``
-        into ``path``. Each write failure is logged and skipped without raising.
+        Both factories call this after rendering a script, so every run
+        keeps its genotype, system prompt, goal, and original task on
+        disk. It writes ``workflow_genotype_<uuid>.py``,
+        ``system_prompt_<uuid>.md``, ``goal_<uuid>.txt`` and, when
+        available, ``original_task_<uuid>.txt`` into ``path``. Each write
+        failure is logged and skipped without raising.
 
         Args:
-            path: Directory path to save files.
-            uuid_str: Unique workflow identifier.
-            workflow_genotype_code: Generated workflow code.
+            path: Run folder created by :meth:`create_folder_structure`.
+            uuid_str: Unique workflow identifier; names each saved file.
+            workflow_genotype_code: Generated code from the factory.
             goal: The goal description (may be knowledge-wrapped).
-            original_task: The original unwrapped task for similarity matching.
-                When ``None``, an attempt is made to extract it from ``goal``.
+            original_task: Original unwrapped task from the caller. When
+                ``None``, it is extracted from ``goal`` instead.
         """
         try:
             with open(os.path.join(path, f"workflow_genotype_{uuid_str}.py"), "w") as f:

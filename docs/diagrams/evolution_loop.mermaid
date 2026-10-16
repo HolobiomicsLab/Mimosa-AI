@@ -8,7 +8,7 @@
 flowchart TB
     %% ===== task entry =====
     Task[/"task spec<br/>(user goal / benchmark row)"/]
-    Install["install task-locked checklist<br/>(Layer 2 — built once / task_hash)"]
+    Install["load per-task hybrid-verifier registry<br/>(claim ladder + cached scorers, sha256(goal))"]
     Task --> Install
 
     %% ===== initial population =====
@@ -28,12 +28,12 @@ flowchart TB
         DrawArch["select_parent_workflows()<br/>QD-roulette over archive<br/>÷ (1 + n_children_already)"]
         DrawDisk["cold-start fallback:<br/>similarity-filtered disk scan"]
         Decide{{"crossover_rate ≈ 0.1?<br/>(only once initial_population met)"}}
-        Mut["mutation_prompt()<br/>evidence-driven scope (Rechenberg 1/5)<br/>raw_stagnation × success-rate gating"]
-        Cross["crossover_prompt()<br/>best-parent-first ordering<br/>rubric-blind diagnosis"]
+        Mut["mutation_prompt()<br/>directive-implicit mutation magnitude<br/>+ read-only search-state block"]
+        Cross["crossover_prompt()<br/>best-parent-first ordering<br/>verifier textual gradients"]
 
         Orch["WorkflowOrchestrator<br/>LLM → workflow code → install deps → sandbox run"]
         State["state_result.json<br/>+ workspace artefacts"]
-        Verify["multi-source per-claim verifier<br/>(see evaluation_pipeline.mermaid)<br/>→ overall_score / overall_score_uncapped<br/>→ abstracted_prompt_gradient"]
+        Verify["hybrid temporal-ladder verifier<br/>(see verifiers_judge.mermaid)<br/>→ overall_score (pairwise win-rate)<br/>→ abstracted_textual_gradient"]
 
         Validate["SelectionPressure.validate_survivor()<br/>relative_improvement > θ<br/>OR qd_score > admit_threshold"]
         Admit{{"_try_admit()<br/>is_valid?"}}
@@ -79,11 +79,11 @@ flowchart TB
 
     %% ===== sidebars =====
     subgraph QD["Quality-Diversity machinery"]
-        BD["behaviour descriptor<br/>failure_fingerprint(per_claim) →<br/>centered per-source pass rates<br/>over sources A..F (6-D)"]
-        Nov["k-NN novelty<br/>(k=25, against archive)"]
-        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.4)<br/>quality from reward_uncapped<br/>(additive: no quality leak into novelty)"]
+        BD["behaviour descriptor<br/>genotype_embedding(code) →<br/>L2-normalised code embedding<br/>(MiniLM all-MiniLM-L6-v2, default)"]
+        Nov["k-NN novelty<br/>(cosine distance, k=15, against archive)"]
+        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.25)<br/>quality from reward (capped overall_score)<br/>(additive: no quality leak into novelty)"]
     end
-    State -. verifier per-claim verdicts .-> BD
+    State -. workflow genotype (code) .-> BD
     Archive -. distances .-> Nov
     BD --> QDscore
     Nov --> QDscore

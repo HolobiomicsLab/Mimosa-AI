@@ -1,26 +1,78 @@
-"""Tests for VariationEngine plateau counter, success-rate signal and adaptive step size."""
+"""Tests for VariationEngine observer diagnostics, search-state block and
+parent-centered mutation budget."""
 
 import sys
 from pathlib import Path
 
-import numpy as np
-import pytest
-
 sys.path.append(str(Path(__file__).parent.parent))
 
+import sources.core.variation_engine as variation_engine_module
 from sources.core.variation_engine import VariationEngine
+from sources.core.workflow_info import WorkflowInfo
+
+
+class _FakeConfig:
+    """Minimal stand-in for the real Config, just enough to satisfy
+    VariationEngine.setup_llm without touching any network/provider code."""
+
+    workflow_llm_model = "openai/gpt-4o-mini"
+    reasoning_effort = "low"
+    max_tokens = 8192
+
+    def openrouter_provider_for(self, model):
+        return None
+
+    def openrouter_quantizations_for(self, model):
+        return None
+
+
+def _make_engine():
+    return VariationEngine(_FakeConfig())
+
+
+class _FakeProvider:
+    """Offline stand-in for LLMProvider: captures prompts, returns canned text."""
+
+    last = None
+
+    def __init__(self, system_msg=None, config=None, **kwargs):
+        self.system_msg = system_msg or ""
+        self.config = config
+        self.prompt = None
+        _FakeProvider.last = self
+
+    def __call__(self, prompt):
+        self.prompt = prompt
+        return (
+            "Directive: make the solver prompt more domain-specific. "
+            "Kind: prompt tweak. Magnitude: small tweak."
+        )
+
+
+class _FakeWorkflowInfo:
+    """Duck-typed stand-in for WorkflowInfo used by mutation_prompt."""
+
+    def __init__(self, score=0.7, gradient="claim verification failed", state=None,
+                 run_stdout=""):
+        self.overall_score = score
+        self.abstracted_textual_gradient = gradient
+        self.run_stdout = run_stdout
+        self.state_result = state if state is not None else {
+            "step_name": ["solver", "verifier"],
+            "answers": ["did x", "did y"],
+        }
 
 
 # ── _iters_since_improvement ──────────────────────────────────────────────
 
 
 def test_iters_since_improvement_empty_history_is_zero():
-    ve = VariationEngine()
+    ve = _make_engine()
     assert ve._iters_since_improvement() == 0
 
 
 def test_iters_since_improvement_no_scored_entries_is_zero():
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(4):
         ve.record_offspring_gradient("crash", is_failure=True)
     ve.record_offspring_gradient("no scores attached")  # child_score = None
@@ -28,7 +80,7 @@ def test_iters_since_improvement_no_scored_entries_is_zero():
 
 
 def test_iters_since_improvement_counts_consecutive_non_improvers():
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("up",   child_score=0.30, best_before=0.20)
     ve.record_offspring_gradient("flat", child_score=0.30, best_before=0.30)
     ve.record_offspring_gradient("flat", child_score=0.30, best_before=0.30)
@@ -37,7 +89,7 @@ def test_iters_since_improvement_counts_consecutive_non_improvers():
 
 
 def test_iters_since_improvement_resets_after_strict_improvement():
-    ve = VariationEngine()
+    ve = _make_engine()
     for _ in range(4):
         ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     ve.record_offspring_gradient("up", child_score=0.6, best_before=0.5)
@@ -47,7 +99,7 @@ def test_iters_since_improvement_resets_after_strict_improvement():
 def test_iters_since_improvement_skips_failures_and_none_entries():
     """Failures and unscored entries are transparent: they neither break nor
     extend the streak. The streak walks through them as if they weren't there."""
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     ve.record_offspring_gradient("crash", is_failure=True)
     ve.record_offspring_gradient("nul",   child_score=None, best_before=0.5)
@@ -58,7 +110,7 @@ def test_iters_since_improvement_skips_failures_and_none_entries():
 def test_iters_since_improvement_tie_is_not_an_improvement():
     """``c == b`` is a tie, not a strict improvement: the streak must NOT
     reset on equality."""
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     ve.record_offspring_gradient("flat", child_score=0.5, best_before=0.5)
     assert ve._iters_since_improvement() == 2
@@ -68,13 +120,13 @@ def test_iters_since_improvement_tie_is_not_an_improvement():
 
 
 def test_compute_success_rate_none_when_no_scored_history():
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("only a gradient, no score")
     assert ve._compute_success_rate() is None
 
 
 def test_compute_success_rate_counts_strict_improvements():
-    ve = VariationEngine()
+    ve = _make_engine()
     # 2 improvements out of 4 ⇒ success_rate = 0.5
     ve.record_offspring_gradient("a", child_score=0.30, best_before=0.20)
     ve.record_offspring_gradient("b", child_score=0.30, best_before=0.30)  # tie ≠ improvement
@@ -84,7 +136,7 @@ def test_compute_success_rate_counts_strict_improvements():
 
 
 def test_compute_success_rate_excludes_failures():
-    ve = VariationEngine()
+    ve = _make_engine()
     ve.record_offspring_gradient("ok", child_score=0.50, best_before=0.40)
     ve.record_offspring_gradient(
         "crash", is_failure=True, child_score=0.99, best_before=0.40
@@ -93,127 +145,280 @@ def test_compute_success_rate_excludes_failures():
     assert ve._compute_success_rate() == 1.0
 
 
-# ── record_offspring_gradient: history bookkeeping unchanged ──────────────
+# ── Search-state block (deterministic observer) ───────────────────────────
 
 
-def test_failure_entries_persist_in_history_for_audit():
-    ve = VariationEngine()
-    ve.record_offspring_gradient("crash", is_failure=True)
-    ve.record_offspring_gradient("real diag")
-    assert ve.textual_gradient_history == [("crash", True), ("real diag", False)]
-
-
-# ── _get_prompt_step_size routing ─────────────────────────────────────────
-
-
-def test_step_size_damped_when_recent_offspring_improve():
-    """When success_rate ≥ 0.80, boldness collapses regardless of plateau."""
-    ve = VariationEngine()
-    prev_best = 0.5
-    for inc in (0.05, 0.07, 0.09, 0.11, 0.13):
-        ve.record_offspring_gradient(
-            "PROGRESS " + str(inc),
-            child_score=prev_best + inc,
-            best_before=prev_best,
-        )
-        prev_best += inc
-    block = ve._get_prompt_step_size(parent_score=0.97)
-    assert ve.last_variation_state["effective_boldness"] < 0.35, ve.last_variation_state
-    assert "EXPLOITATION" in block, block
-
-
-def test_step_size_plateau_escalates_but_hysteresis_blocks_respeciation():
-    """Plateau at high parent_score: scope must lift past EXPLOITATION but
-    must not reach RE-SPECIATION on a 5-iteration streak — the hysteresis
-    gate requires iters_since_improvement ≥ 8."""
-    ve = VariationEngine()
+def test_search_state_block_reports_observer_fields_only():
+    ve = _make_engine()
     for _ in range(5):
-        ve.record_offspring_gradient(
-            "DATA_LEAKAGE: same diagnosis again",
-            child_score=0.92,
-            best_before=0.92,
-        )
-    block = ve._get_prompt_step_size(parent_score=0.92)
+        ve.record_offspring_gradient("stuck", child_score=0.92, best_before=0.92)
+    block = ve._search_state_block(parent_score=0.92, iteration_count=4, max_iterations=10)
+
+    assert "parent_score: 0.92" in block
+    assert "iteration: 5 of 10" in block
+    assert "iterations_since_improvement: 5" in block
+    assert "success_rate_last_5: 0.00" in block
+    assert "recent_scores_oldest_first: 0.92" in block
+
     state = ve.last_variation_state
-    assert state["effective_boldness"] >= 0.35, state
-    assert state["effective_boldness"] < 0.90, state
-    assert state["respeciation_gate_open"] is False, state
-    assert "RE-SPECIATION" not in block, block
+    assert state["iters_since_improvement"] == 5
+    assert abs(state["plateau"] - 5 / 6) < 1e-9
+    assert state["success_rate"] == 0.0
+    assert state["parent_score"] == 0.92
+    # Controller fields are gone for good.
+    assert "effective_boldness" not in state
+    assert "respeciation_gate_open" not in state
 
 
-def test_step_size_low_parent_and_stuck_lifts_scope():
-    ve = VariationEngine()
-    for _ in range(5):
-        ve.record_offspring_gradient(
-            "repeating failure",
-            child_score=0.10,
-            best_before=0.10,
-        )
-    ve._get_prompt_step_size(parent_score=0.10)
-    state = ve.last_variation_state
-    # 5 consecutive non-improvers + success_rate = 0.0 must escape EXPLOITATION.
-    assert state["effective_boldness"] >= 0.35, state
+def test_search_state_trajectory_lists_last_five_scored_children():
+    ve = _make_engine()
+    for c in (0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70):
+        ve.record_offspring_gradient("g", child_score=c, best_before=0.05)
+    block = ve._search_state_block(parent_score=0.7, iteration_count=7, max_iterations=10)
+    assert "recent_scores_oldest_first: 0.30, 0.40, 0.50, 0.60, 0.70" in block
 
 
-def test_hysteresis_gate_opens_after_eight_consecutive_non_improvers():
-    """RE-SPECIATION fires only when iters_since_improvement ≥ 8 AND
-    success_rate ∈ {None, 0.0}."""
-    ve = VariationEngine()
-    for _ in range(8):
-        ve.record_offspring_gradient(
-            "stuck", child_score=0.5, best_before=0.5,
-        )
-    block = ve._get_prompt_step_size(parent_score=0.5)
-    state = ve.last_variation_state
-    assert state["respeciation_gate_open"] is True, state
-    assert "RE-SPECIATION" in block, block
+def test_search_state_block_contains_no_diagnosis_text():
+    ve = _make_engine()
+    ve.record_offspring_gradient("DATA_LEAKAGE: rubric claim 3 failed", child_score=0.4, best_before=0.4)
+    block = ve._search_state_block(parent_score=0.4, iteration_count=1, max_iterations=10)
+    assert "DATA_LEAKAGE" not in block
+    assert "rubric" not in block
 
 
-def test_cold_start_boldness_capped_at_thirty_percent():
-    """No scored offspring → success_rate is None → effective ≤ 0.3 · plateau."""
-    ve = VariationEngine()
-    for _ in range(20):
-        ve.record_offspring_gradient("just a diagnosis, no score")
-    ve._get_prompt_step_size(parent_score=0.5)
-    state = ve.last_variation_state
-    assert state["success_rate"] is None, state
-    assert state["effective_boldness"] <= 0.3 + 1e-9, state
+# ── Directive prompt (offline, mocked provider) ────────────────────────────
 
 
-def test_step_size_parent_score_clipped_to_unit_interval():
-    """Out-of-range parent_score must be clipped to [0, 1]; the reported
-    boldness percentage stays inside [0, 100]."""
-    ve = VariationEngine()
-    for _ in range(4):
-        ve.record_offspring_gradient(
-            "stuck", child_score=0.5, best_before=0.5,
-        )
-    block = ve._get_prompt_step_size(parent_score=1.5)
-    import re
-    m = re.search(r"Boldness:\s*([\d.]+)%", block)
-    assert m is not None, f"no boldness reported: {block}"
-    boldness_pct = float(m.group(1))
-    assert 0.0 <= boldness_pct <= 100.0, boldness_pct
+def test_directive_prompt_has_search_state_and_no_boldness(monkeypatch):
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    search_state = ve._search_state_block(parent_score=0.5, iteration_count=2, max_iterations=10)
+    ve.llm_think_mutation_directive(
+        agent_answers="agent solver: did x",
+        textual_gradient_block="claim verification failed",
+        search_state=search_state,
+        goal="solve the task",
+    )
+    captured = _FakeProvider.last
+    assert "<search_state>" in captured.prompt
+    assert "parent_score: 0.50" in captured.prompt
+    assert "success_rate_last_5" in captured.prompt
+    for banned in ("boldness", "<boldness>", "band", "EXPLOITATION", "RE-SPECIATION"):
+        assert banned.lower() not in captured.prompt.lower()
+        assert banned.lower() not in captured.system_msg.lower()
 
 
-def test_mutation_prompt_does_not_touch_gradient_history():
-    ve = VariationEngine()
-
-    class _FakeWfInfo:
-        overall_score = 0.5
-        abstracted_textual_gradient = "FAKE_DIAG_should_not_be_recorded"
-        state_result = None
-
-    before = len(ve.textual_gradient_history)
-    ve.mutation_prompt(
-        goal="g",
-        wf_info=_FakeWfInfo(),
-        genotype="# code",
-        run_stderr="",
-        iteration_count=0,
+def test_directive_flow_embedded_in_mutation_prompt(monkeypatch):
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    prompt = ve.mutation_prompt(
+        goal="solve the task",
+        wf_info=_FakeWorkflowInfo(),
+        genotype="# parent code",
+        iteration_count=1,
         max_iterations=10,
     )
-    assert len(ve.textual_gradient_history) == before
+    assert "<directive>" in prompt
+    assert "prompt tweak" in prompt  # canned directive text flows through
+    # Hard guardrails stay.
+    assert "Do not add or remove more than 1 agent at a time" in prompt
+    assert "keep 90% of the previous workflow prompts and code unchanged" in prompt
+    assert "Do not change the workflow's overall topology" in prompt
+
+
+# ── Evidence routing: verifier diagnosis vs unverified raw log ────────────
+
+_RAW_STDOUT = (
+    "Step 107: write_txt_file('/workspace/conformer_search.py')\n"
+    "Error: [Errno 30] Read-only file system: '/workspace'\n"
+    "Step 120: python /app/workspace/run_pipeline.py\n"
+    "Reached max steps."
+)
+
+
+def test_directive_prefers_verifier_gradient_over_parent_log(monkeypatch):
+    """Live case (ClinTox): the gradient names exact columns; turning
+    underscores into spaces made the directive prescribe 'FDA APPROVED'."""
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    gradient = 'Your output column "FDA_APPROVED_prob" should be "FDA_APPROVED".'
+    ve.mutation_prompt(
+        goal="g",
+        wf_info=_FakeWorkflowInfo(gradient=gradient, run_stdout=_RAW_STDOUT),
+        genotype="code", iteration_count=1, max_iterations=10,
+    )
+    directive_input = _FakeProvider.last.prompt
+    assert f"<diagnosis>\n{gradient}\n</diagnosis>" in directive_input
+    assert "<raw_log>" not in directive_input
+    assert "Errno 30" not in directive_input
+
+
+def test_directive_routes_parent_log_verbatim_without_gradient(monkeypatch):
+    """Parent without a gradient: its own log is a raw log, never a diagnosis."""
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    ve.mutation_prompt(
+        goal="g", wf_info=_FakeWorkflowInfo(gradient="", run_stdout=_RAW_STDOUT),
+        genotype="code", iteration_count=1, max_iterations=10,
+    )
+    directive_input = _FakeProvider.last.prompt
+    assert f"<raw_log>\n{_RAW_STDOUT}\n</raw_log>" in directive_input
+    assert "/app/workspace/run_pipeline.py" in directive_input
+    assert "<diagnosis>" not in directive_input
+
+
+def test_directive_without_parent_has_no_raw_log(monkeypatch):
+    """No parent: no log belongs to the mutated code, so none is shown."""
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    ve.mutation_prompt(
+        goal="g", wf_info=None, genotype="", iteration_count=1, max_iterations=10,
+    )
+    directive_input = _FakeProvider.last.prompt
+    assert "<raw_log>" not in directive_input
+    assert "<diagnosis>" in directive_input
+
+
+def test_crossover_routes_raw_stdout_only_for_parent_without_gradient():
+    ve = _make_engine()
+    prompt = ve.crossover_prompt(
+        goal="g",
+        wf_infos=[
+            _FakeWorkflowInfo(score=0.7, gradient="CLAIM_X: failed", run_stdout=_RAW_STDOUT),
+            _FakeWorkflowInfo(score=0.4, gradient="", run_stdout=_RAW_STDOUT),
+        ],
+        genotypes=["code1", "code2"],
+        iteration_count=1,
+    )
+    first_parent, second_parent = prompt.split("### Parent 2")
+    assert "<error_diagnosis>\nCLAIM_X: failed\n</error_diagnosis>" in first_parent
+    assert "<raw_log>" not in first_parent
+    assert f"<raw_log>\n{_RAW_STDOUT}\n</raw_log>" in second_parent
+    assert "<error_diagnosis>" not in second_parent
+
+
+def _workflow_with_log(tmp_path: Path, uuid: str, log: str) -> WorkflowInfo:
+    """Write a generation folder holding only ``run_stdout.log``."""
+    folder = tmp_path / uuid
+    folder.mkdir()
+    (folder / "run_stdout.log").write_text(log, encoding="utf-8")
+    return WorkflowInfo(uuid, folder)
+
+
+def test_crossover_shows_each_parent_its_own_log(tmp_path):
+    ve = _make_engine()
+    log_a = "parent A log: solver hit max steps"
+    log_b = "parent B log: CREST no valid input file"
+    prompt = ve.crossover_prompt(
+        goal="g",
+        wf_infos=[
+            _workflow_with_log(tmp_path, "uuid_a", log_a),
+            _workflow_with_log(tmp_path, "uuid_b", log_b),
+        ],
+        genotypes=["code1", "code2"],
+        iteration_count=1,
+    )
+    first_parent, second_parent = prompt.split("### Parent 2")
+    assert f"<raw_log>\n{log_a}\n</raw_log>" in first_parent
+    assert log_b not in first_parent
+    assert f"<raw_log>\n{log_b}\n</raw_log>" in second_parent
+    assert log_a not in second_parent
+
+
+def test_workflow_info_run_stdout_reads_log_or_empty(tmp_path):
+    raw = "\x1b[31mError:\x1b[0m é\n"
+    assert _workflow_with_log(tmp_path, "with_log", raw).run_stdout == raw
+    assert WorkflowInfo("missing", tmp_path / "missing").run_stdout == ""
+
+
+def test_mutation_prompt_has_no_scope_band_text(monkeypatch):
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    prompt = ve.mutation_prompt(
+        goal="solve the task",
+        wf_info=_FakeWorkflowInfo(),
+        genotype="# parent code",
+        iteration_count=1,
+        max_iterations=10,
+    )
+    for banned in (
+        "Mutation scope:",
+        "Boldness",
+        "boldness",
+        "EXPLOITATION",
+        "ALIGNMENT",
+        "ADAPTATION",
+        "EXPLORATION",
+        "RE-SPECIATION",
+    ):
+        assert banned.lower() not in prompt.lower(), banned
+
+
+# ── Parent-centered mutation agent budget ──────────────────────────────────
+
+
+def test_mutation_agent_budget_is_parent_centered(monkeypatch):
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    state = {"step_name": ["solver", "verifier", "repair"], "answers": ["a", "b", "c"]}
+    for _ in range(25):
+        ve.mutation_prompt(
+            goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
+            iteration_count=1, max_iterations=10,
+        )
+        budget = ve.last_variation_state["agent_budget"]
+        assert 2 <= budget <= 4  # parent has 3 agents → within ±1
+        assert 1 <= budget <= ve.max_possible_agents
+
+
+def test_mutation_agent_budget_counts_distinct_agents_only(monkeypatch):
+    """Retry loops repeat step names; distinct agents are what counts."""
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    state = {"step_name": ["solver", "verifier", "solver", "verifier"],
+             "answers": ["a", "b", "c", "d"]}
+    ve.mutation_prompt(
+        goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
+        iteration_count=1, max_iterations=10,
+    )
+    assert 1 <= ve.last_variation_state["agent_budget"] <= 3  # 2 distinct agents
+
+
+def test_mutation_agent_budget_caps_at_max_possible_agents(monkeypatch):
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    state = {"step_name": [f"agent{i}" for i in range(9)], "answers": ["a"] * 9}
+    for _ in range(10):
+        ve.mutation_prompt(
+            goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
+            iteration_count=1, max_iterations=10,
+        )
+        assert 6 <= ve.last_variation_state["agent_budget"] <= 7
+
+
+def test_mutation_agent_budget_falls_back_to_history(monkeypatch):
+    """Without step names the last sampled budget anchors the window."""
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    state = {"answers": "raw string, no step_name"}
+    ve.mutation_prompt(
+        goal="g", wf_info=_FakeWorkflowInfo(state=state), genotype="code",
+        iteration_count=1, max_iterations=10,
+    )
+    assert 1 <= ve.last_variation_state["agent_budget"] <= 2  # no history → 1
+
+
+def test_seed_prompt_budget_stays_in_one_to_four():
+    import re
+
+    ve = _make_engine()
+    for _ in range(25):
+        prompt = ve.seed_genome_prompt("g")
+        m = re.search(r"maximum (\d+) agents", prompt)
+        assert m and 1 <= int(m.group(1)) <= 4
+
+
+# ── Controller-removal guard (grep-based) ──────────────────────────────────
 
 
 if __name__ == "__main__":

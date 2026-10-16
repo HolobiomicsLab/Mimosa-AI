@@ -5,7 +5,7 @@ private datasets, or domain-specific reproductions.
 
 !!! info "Two systems again"
     This page covers batch execution and per-task aggregation. The
-    **per-generation pressure signal** (and the prompt gradient that
+    **per-generation pressure signal** (and the textual gradient that
     drives evolution) still comes from the in-loop verifier described
     in [Evaluation pipeline](../concepts/evaluation-pipeline.md). A
     custom benchmark either layers a scenario rubric on top (see below)
@@ -19,7 +19,7 @@ private datasets, or domain-specific reproductions.
 | ------ | -------- | ----------- |
 | `task` or `prompt` | yes | Task description that becomes Mimosa's goal. |
 | `instance_id` | no | Stable identifier — used in capsule names. |
-| `expected_output` | no | Reference output for soft-claim grounding. |
+| `expected_output` | no | Reference output filename (legacy soft-claim grounding path; the batch runner itself reads `output_fname`). |
 | `domain_knowledge` | no | Extra context fed to the workflow factory. |
 
 (Mimosa is forgiving about column names — see

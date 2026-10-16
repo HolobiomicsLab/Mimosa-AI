@@ -1,19 +1,25 @@
 *.wav
+UPDATE_VISUAL_CLONE.md
+mlrbench/
+audits/
+diversity_experiments/
+experiments_verifiers/
 .claude/*
 docs/support/*
 credentials.json
 token.json
 *credentials*
+run_notes/
 *.DS_Store
 *.log
 *.tmp
 *.safetensors
-.asingle_agent_tests
 *.egg-info
 cookies.json
 .env
 .env.*
 */.env
+CLAUDE.md
 workflows/*
 runs_capsule/*
 runs_notes/*
@@ -35,6 +41,7 @@ datasets/**/*.tif"
 datasets/ScienceAgentBench/datasets/
 runs_notes/*
 docs/*.tex
+docs/communication_strategy/*
 *.wav
 ### react ###
 .DS_*

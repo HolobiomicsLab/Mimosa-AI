@@ -92,7 +92,8 @@ intermediate files, scripts, downloads, plots — go through this
 directory. The workspace gives Mimosa:
 
 - A single filesystem-level rendezvous between agents and MCP servers.
-- A predictable path for the verifier to recompute claims against.
+- A predictable path for the verifier's policy scorers to measure
+  claims against.
 - An archive surface for `runs_capsule/` snapshots.
 
 If you use Toolomics, the workspace is the directory you passed to

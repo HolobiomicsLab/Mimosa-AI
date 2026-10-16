@@ -1,14 +1,13 @@
-"""
-Evolution Strategy
-Supports two modes:
-  1. Greedy : validates that the latest run improved over recent history.
-  2. Open-ended : maintains a population archive, uses novelty + quality to decide which individuals survive
+"""Selection policies for the evolution loop (Layer 2: engine + QD search).
 
-Novelty uses the genotype embedding from :mod:`sources.core.code_features`:
-two workflows whose generated code is semantically close collapse onto
-the same point and are redundant; ones that explored different
-approaches land far apart and both survive. A length-penalty term in
-``qd_score`` discourages runaway code growth without overriding ranking.
+``SelectionPressure`` decides which workflow runs survive a generation and
+which parents feed the next one. ``sources.core.evolution_engine`` builds one
+per session and calls it after every evaluated run; ``workflow_selection``
+reuses it to pick parents among stored workflows. Greedy mode keeps a run only
+when it beats the recent baseline; novelty and quality-diversity (QD) modes
+also keep behaviourally novel runs. Novelty is ``1 - cosine_similarity``
+between unit-norm genotype embeddings from :mod:`sources.core.code_features`,
+and a length penalty stops ``qd_score`` from rewarding code bloat.
 """
 
 import logging
@@ -21,7 +20,7 @@ from typing import Any
 
 from .code_features import genotype_embedding_descriptor
 
-MAX_CHILDREN_PER_PARENT = 2
+MAX_CHILDREN_PER_PARENT = 8
 
 # Comparison-set modes for novelty.
 NOVELTY_ARCHIVE_KNN = "archive_knn"
@@ -29,31 +28,41 @@ NOVELTY_PREVIOUS_N = "previous_n"
 
 
 class SelectionStrategy(Enum):
-    """Available selection strategies for the evolution loop."""
+    """Selection strategies offered to the evolution loop.
+
+    ``sources.core.evolution_engine`` reads ``selection_strategy`` from config
+    and passes the chosen name here. GREEDY keeps only strict improvements;
+    TOURNAMENT accepts near-ties and regressions with decaying probability;
+    NOVELTY and QUALITY_DIVERSITY also admit behaviourally novel runs into the
+    archive.
+    """
     GREEDY = "greedy"             # Accept only if strictly better (current behaviour)
     TOURNAMENT = "tournament"     # Probabilistic tournament selection
     NOVELTY = "novelty"           # Novelty search: reward behavioural diversity
-    QUALITY_DIVERSITY = "qd"      # MAP-Elites style: novelty + quality combined
+    QUALITY_DIVERSITY = "qd"      # Unstructured archive scored by scalarised novelty + quality
 
 
 @dataclass
 class PopulationMember:
-    """A single individual in the evolution archive.
+    """One individual stored in the quality-diversity archive.
+
+    ``SelectionPressure`` builds a member whenever an open-ended run is
+    validated, and eviction keeps the archive within ``population_size``.
+    Invariant: ``behaviour_descriptor`` is unit-norm or empty, and ``qd_score``
+    is recomposed from ``reward``, ``novelty_score`` and ``genotype_chars``.
 
     Attributes:
-        iteration: Iteration index at which this member was produced.
-        reward: Capped reward used for greedy comparisons.
-        cost: Monetary or compute cost spent to produce this member.
-        uuid: Workflow UUID; ``None`` for members without on-disk artifacts.
-        behaviour_descriptor: Unit-norm genotype embedding used for the
-            cosine-distance novelty signal. Empty list when no embedding
-            could be produced (treated as neutral by the selection layer).
-        genotype_chars: Raw character length of the workflow source —
-            used for the length-penalty term in ``qd_score``.
-        novelty_score: Mean cosine distance to the current comparison set.
-        qd_score: Combined quality-diversity score with length penalty.
-        reward_uncapped: Base reward with no hard-fail cap.
-        created_at: Wall-clock timestamp of construction.
+        iteration: int — engine iteration index that produced this run.
+        reward: float — capped ``overall_score``; the quality term of QD.
+        cost: float — monetary or compute cost of producing this run.
+        uuid: str | None — workflow UUID; ``None`` when the run has no
+            on-disk artifacts.
+        behaviour_descriptor: list[float] — unit-norm genotype embedding for
+            the novelty signal; empty when no embedding could be produced.
+        genotype_chars: int — source-code length feeding the length penalty.
+        novelty_score: float — mean cosine distance to the comparison set.
+        qd_score: float — novelty + quality score minus the length penalty.
+        created_at: datetime — wall-clock time when the member was built.
     """
     iteration: int
     reward: float
@@ -63,26 +72,21 @@ class PopulationMember:
     genotype_chars: int = 0
     novelty_score: float = 0.0
     qd_score: float = 0.0
-    reward_uncapped: float = 0.0
     created_at: datetime = field(default_factory=datetime.now)
 
 
 class SelectionPressure:
-    """Evaluates whether a new run should be kept or discarded.
+    """Keeps or discards each new run and samples parents for the next one.
 
-    In **greedy** mode (default) this behaves identically to the previous
-    implementation — it checks whether the latest run beats the recent
-    baseline by a minimum threshold.
-
-    In **open-ended** modes it maintains a population archive and uses
-    novelty / quality-diversity scoring so that low-performing but
-    behaviourally novel runs can survive and potentially lead to better
-    solutions later. Novelty is ``1 − cosine_similarity`` between unit-norm
-    genotype embeddings.
+    ``sources.core.evolution_engine`` constructs one instance per session and
+    calls ``validate_survivor`` after every evaluated run. Invariants: the
+    archive never holds more than ``population_size`` members, and novelty is
+    ``1 - cosine_similarity`` between unit-norm genotype embeddings.
     """
 
     def __init__(
         self,
+        config: dict[str, Any],
         min_improvement_threshold: float = 0.01,
         strategy: str | SelectionStrategy = SelectionStrategy.QUALITY_DIVERSITY,
         population_size: int = 25,
@@ -95,27 +99,50 @@ class SelectionPressure:
         length_penalty_baseline_chars: int = 5000,
         length_penalty_lambda: float = 0.05,
     ) -> None:
-        """Configure thresholds and the active selection strategy.
+        """Store thresholds, strategy and archive state for one session.
+
+        ``sources.core.evolution_engine`` calls it once per session with the
+        loaded config; tests and the ``__main__`` smoke check pass smaller
+        values. It copies config-driven knobs into attributes and creates
+        the empty archive.
 
         Args:
-            min_improvement_threshold: Minimum relative improvement for greedy mode (5% default).
-            strategy: Selection strategy (greedy | tournament | novelty | qd).
-            population_size: Max individuals kept in the archive (for open-ended modes).
-            novelty_k_neighbours: k for k-nearest novelty calculation (archive_knn mode).
-            novelty_weight: Weight of novelty vs quality in QD score (0 = pure quality, 1 = pure novelty).
-            admit_threshold: Minimum qd_score for admission when greedy validity fails.
-            max_children: Maximum offspring drawn from a single parent before
-                its inverse-child-count weight pushes it below peers.
-            novelty_comparison: Comparison-set mode — ``"archive_knn"`` (k-NN
-                against the archive, default) or ``"previous_n"`` (mean
-                distance to the N most recently produced genotypes).
-            previous_n: Window size for ``"previous_n"`` mode.
-            length_penalty_baseline_chars: Genotype size at which the length
-                penalty starts to grow above zero.
-            length_penalty_lambda: Strength of the length penalty term
-                subtracted from ``qd_score``. Kept conservative so it only
-                breaks near-ties.
+            config: dict[str, Any] — session config from the engine; kept
+                for reference only.
+            min_improvement_threshold: float — greedy acceptance bar as a
+                relative reward gain; from ``min_improvement_threshold`` in
+                config (default 0.01).
+            strategy: str | SelectionStrategy — strategy name or member;
+                from ``selection_strategy`` in config (default
+                QUALITY_DIVERSITY).
+            population_size: int — archive capacity before eviction
+                (default 25).
+            novelty_k_neighbours: int — nearest archive members averaged by
+                ``archive_knn`` novelty (default 10).
+            novelty_weight: float — novelty share of ``qd_score`` in
+                [0, 1] (default 0.25).
+            admit_threshold: float — minimum ``qd_score`` that admits a run
+                when greedy validity fails (default 0.3).
+            max_children: int — children allowed per parent before its
+                sampling weight decays (default ``MAX_CHILDREN_PER_PARENT``).
+            novelty_comparison: str — ``"archive_knn"`` or ``"previous_n"``;
+                selects the novelty comparison set. Other values fall back
+                to ``"archive_knn"``.
+            previous_n: int — window size for ``"previous_n"`` novelty
+                (default 5).
+            length_penalty_baseline_chars: int — code length where the
+                length penalty starts (default 5000).
+            length_penalty_lambda: float — length-penalty weight subtracted
+                from ``qd_score`` (default 0.05).
+
+        Returns:
+            None.
+
+        Raises:
+            ValueError: when ``strategy`` is a string that names no member
+                of ``SelectionStrategy``.
         """
+        self.config = config
         self.logger = logging.getLogger(__name__)
         self.min_improvement_threshold = min_improvement_threshold
 
@@ -149,23 +176,29 @@ class SelectionPressure:
         new_runs: list[Any] | Any,
         threshold: float | None = None,
     ) -> dict[str, Any]:
-        """Validate whether the new run(s) represent a meaningful step forward.
+        """Judge whether the latest run(s) survive into the next generation.
 
-        Dispatches to the strategy-specific validator based on
-        ``self.strategy``.
+        The evolution engine calls it after each evaluated run with recent
+        baseline runs and fresh candidate runs. It dispatches to the
+        strategy-specific validator and returns the verdict dict the engine
+        logs and acts on.
 
         Args:
-            baseline_runs: One or more previous runs (list or single IndividualRun).
-            new_runs: One or more candidate runs (list or single IndividualRun).
-            threshold: Override for ``min_improvement_threshold``.
+            baseline_runs: list or IndividualRun — previous runs; each needs
+                a ``reward`` attribute (engine state).
+            new_runs: list or IndividualRun — candidate runs being judged
+                (engine state).
+            threshold: float | None — override for
+                ``min_improvement_threshold``; ``None`` uses the configured
+                value.
 
         Returns:
-            Dict with keys: ``valid``, ``relative_improvement``,
+            dict[str, Any] with ``valid``, ``relative_improvement``,
             ``absolute_improvement``, ``baseline_reward``, ``new_reward``,
-            ``confidence``, ``threshold_used``, ``strategy``, ``validated_at``
-            (open-ended modes additionally include ``novelty_score``,
-            ``qd_score``, ``archive_size``, ``admit_rejected``,
-            ``admit_rejected_total``).
+            ``confidence``, ``threshold_used``, ``strategy`` and
+            ``validated_at``; novelty/QD modes add ``novelty_score``,
+            ``qd_score``, ``archive_size``, ``admit_rejected`` and
+            ``admit_rejected_total``.
         """
         threshold = threshold if threshold is not None else self.min_improvement_threshold
 
@@ -187,21 +220,25 @@ class SelectionPressure:
         runs: list[Any],
         child_counts: dict[str, int] | None = None,
     ) -> Any:
-        """Select a single parent for mutation.
+        """Sample one parent run for the next mutation or crossover.
 
-        In greedy mode: always returns the best-scoring run from `runs`.
-        In tournament mode: probabilistic tournament among a random subset of `runs`.
-        In novelty/QD mode: samples a `PopulationMember` from `_archive` biased toward high QD-score
+        The engine calls it per offspring, and ``workflow_selection`` calls
+        it through its score adapter when picking stored workflows. Greedy
+        and tournament modes pick by reward from ``runs``; novelty/QD modes
+        sample a ``PopulationMember`` from the archive with weight
+        proportional to ``qd_score``.
 
         Args:
-            runs: Candidate pool. May be a list of `PopulationMember` (archive
-                draw) or any object with a `reward` attribute (greedy/tournament).
-            child_counts: Optional ``{uuid: n_children_already}`` map used in
-                QD/novelty mode to apply a ``1/(1+n_children)`` penalty
+            runs: list — candidate pool; run objects with ``reward``, or
+                ``PopulationMember`` items for archive-driven sampling.
+            child_counts: dict[str, int] | None — ``{uuid: children so
+                far}``; caps a parent at ``max_children`` children and
+                divides its weight by ``1 + n_children`` in QD/novelty mode.
 
         Returns:
-            The chosen parent (a run object or a ``PopulationMember``), or
-            ``None`` if neither `runs` nor the archive holds any candidates.
+            The chosen parent — a run object or a ``PopulationMember`` — or
+            ``None`` when neither ``runs`` nor the archive holds a
+            candidate.
         """
         if not runs and not self._archive:
             return None
@@ -243,19 +280,27 @@ class SelectionPressure:
         crossover_rate: float = 0.4,
         child_counts: dict[str, int] | None = None,
     ) -> tuple[list[Any], bool]:
-        """Select one or more parents from a candidate pool.
+        """Pick one or more parents and decide mutation versus crossover.
+
+        The engine calls it before each variation step; a coin flip at
+        ``crossover_rate`` picks crossover, which needs at least two
+        distinct parents drawn without replacement.
 
         Args:
-            candidates: Pool of objects with a reward (or overall_score) attribute.
-            n_parents:  Number of parents to pick when crossover fires (≥2).
-            crossover_rate: Probability ∈ [0, 1] of choosing crossover over mutation.
-            child_counts: Optional ``{uuid: n_children_already}`` map forwarded to
-                `select_parent` to apply an inverse-child-count penalty.
+            candidates: list — pool of objects with a ``reward`` (or
+                ``overall_score``) attribute.
+            n_parents: int — parents drawn when crossover fires (default
+                2; raised to at least 2).
+            crossover_rate: float — probability in [0, 1] of crossover
+                over mutation.
+            child_counts: dict[str, int] | None — forwarded to
+                ``select_parent`` for the inverse-child-count penalty.
 
         Returns:
-            ``(parents, use_crossover)`` — the chosen parents and whether to
-            apply crossover; ``use_crossover`` is ``False`` when fewer than two
-            distinct parents could be drawn.
+            tuple[list, bool] — ``(parents, use_crossover)``;
+            ``use_crossover`` is False when fewer than two distinct
+            parents could be drawn, and ``parents`` is empty only when
+            ``candidates`` is empty.
         """
         if not candidates:
             return [], False
@@ -286,8 +331,37 @@ class SelectionPressure:
 
     @property
     def archive(self) -> list[PopulationMember]:
-        """Read-only access to the population archive."""
+        """Return a defensive copy of the population archive.
+
+        Read-only consumers such as the engine's archive plot call it.
+        Returns list[PopulationMember]; empty before the first admitted run.
+        """
         return list(self._archive)
+
+    def refresh_rewards(self, rewards: dict[str, float]) -> None:
+        """Fold current tournament ratings into archive quality scores.
+
+        The evolution engine calls it after each Bradley-Terry fit so parent
+        sampling and eviction use fresh ratings. Members whose UUID is not
+        in ``rewards`` keep their old values.
+
+        Args:
+            rewards: dict[str, float] — fitted rating per workflow UUID,
+                from the policy-BT tournament.
+
+        Returns:
+            None. Matching members get ``reward`` and a recomposed
+            ``qd_score``; stored novelty and length stay unchanged.
+        """
+        novelty_range = self._novelty_range()
+        for member in self._archive:
+            if member.uuid not in rewards:
+                continue
+            member.reward = rewards[member.uuid]
+            member.qd_score = self._compose_qd_score(
+                member.reward, member.novelty_score,
+                member.genotype_chars, novelty_range,
+            )
 
     # ------------------------------------------------------------------
     # Greedy strategy (backward-compatible)
@@ -299,15 +373,18 @@ class SelectionPressure:
         new_list: list[Any],
         threshold: float,
     ) -> dict[str, Any]:
-        """Classic greedy validation: best-of-new must beat mean-of-baseline.
+        """Greedy validation: the best new run must beat the mean baseline.
+
+        ``validate_survivor`` dispatches here in greedy mode. Runs expose
+        ``reward``; ``threshold`` carries the relative gain required.
 
         Args:
-            baseline_list: Previous runs whose mean reward forms the bar.
-            new_list: Candidate run(s) being evaluated.
-            threshold: Relative-improvement threshold for acceptance.
+            baseline_list: list — previous runs forming the mean-reward bar.
+            new_list: list — candidate runs; only the best one is judged.
+            threshold: float — relative gain required for acceptance.
 
         Returns:
-            Validation result dict from :meth:`_build_result`.
+            dict[str, Any] — result assembled by ``_build_result``.
         """
         baseline_reward = _mean_reward(baseline_list)
         new_reward = _best_reward(new_list)
@@ -334,16 +411,21 @@ class SelectionPressure:
         new_list: list[Any],
         threshold: float,
     ) -> dict[str, Any]:
-        """Tournament selection: new run wins with probability proportional
-        to its advantage over a random baseline sample.
+        """Tournament validation with probabilistic acceptance.
+
+        ``validate_survivor`` dispatches here in tournament mode. A gain
+        above ``threshold`` always passes; a near-tie (within ``threshold``)
+        passes on a 50% coin flip; a larger regression passes with
+        probability ``exp(-10 * |delta|)``.
 
         Args:
-            baseline_list: Previous runs used to sample a small baseline.
-            new_list: Candidate run(s) being evaluated.
-            threshold: Relative-improvement threshold for unconditional accept.
+            baseline_list: list — previous runs; up to three are sampled as
+                the bar.
+            new_list: list — candidate runs; only the best one is judged.
+            threshold: float — relative gain accepted unconditionally.
 
         Returns:
-            Validation result dict from :meth:`_build_result`.
+            dict[str, Any] — result assembled by ``_build_result``.
         """
         baseline_sample = random.sample(baseline_list, min(3, len(baseline_list)))
         baseline_reward = _mean_reward(baseline_sample)
@@ -383,39 +465,43 @@ class SelectionPressure:
         new_list: list[Any],
         threshold: float,
     ) -> dict[str, Any]:
-        """Novelty / QD validation: admit to archive if the candidate is improving or behaviourally novel.
+        """Novelty/QD validation: admit improving or behaviourally novel runs.
 
-        QD weighting uses ``reward_uncapped`` (uncapped base reward),
-        then subtracts a length-penalty term so runaway code growth costs
-        ranking points without overriding it on real improvements.
+        ``validate_survivor`` dispatches here in NOVELTY and QUALITY_DIVERSITY
+        modes. Quality uses the capped reward, so ties at the cap are broken
+        by novelty and the length penalty. A run passes when its relative
+        gain beats ``threshold`` or its ``qd_score`` beats ``admit_threshold``;
+        the run is scored, offered to the archive, and recorded in the
+        recent-genotype window either way.
 
         Args:
-            baseline_list: Previous runs whose mean reward forms the bar.
-            new_list: Candidate run(s) being evaluated.
-            threshold: Relative-improvement threshold for greedy validity.
+            baseline_list: list — previous runs forming the mean-reward bar.
+            new_list: list — candidate runs; only the best one is judged.
+            threshold: float — relative gain required for greedy validity.
 
         Returns:
-            Validation result dict from :meth:`_build_result`, extended with
-            ``novelty_score``, ``qd_score``, ``length_penalty``,
-            ``archive_size``, ``admit_rejected`` and ``admit_rejected_total``.
+            dict[str, Any] — ``_build_result`` keys plus ``novelty_score``,
+            ``qd_score``, ``quality_norm``, ``novelty_norm``,
+            ``length_penalty``, ``behaviour_descriptor``, ``archive_size``,
+            ``admit_rejected``, ``admit_rejected_total`` and ``evicted_uuid``.
         """
         self._last_evicted_uuid = None
 
         baseline_reward = _mean_reward(baseline_list)
         new_reward = _best_reward(new_list)
         best_new = max(new_list, key=lambda r: _safe_attr(r, "reward", 0.0))
-        new_reward_uncapped = _safe_attr(best_new, "reward_uncapped", 0.0) or new_reward
+        new_reward = _safe_attr(best_new, "reward", 0.0) or new_reward
 
         descriptor = self._extract_behaviour_descriptor(best_new)
         genotype_chars = _genotype_chars(best_new)
         novelty = self._compute_novelty(descriptor)
 
         novelty_range = self._novelty_range()
-        quality_norm = min(max(new_reward_uncapped, 0.0), 1.0)
+        quality_norm = min(max(new_reward, 0.0), 1.0)
         novelty_norm = min(novelty / max(novelty_range, 1e-6), 1.0)
         length_penalty = _length_penalty(genotype_chars, self.length_baseline_chars)
         qd_score = self._compose_qd_score(
-            new_reward_uncapped, novelty, genotype_chars, novelty_range,
+            new_reward, novelty, genotype_chars, novelty_range,
         )
 
         absolute_improvement = new_reward - baseline_reward
@@ -431,7 +517,6 @@ class SelectionPressure:
             genotype_chars=genotype_chars,
             novelty_score=novelty,
             qd_score=qd_score,
-            reward_uncapped=new_reward_uncapped,
         )
         admit_rejected = not self._try_admit(member, is_valid)
         self._record_previous(descriptor)
@@ -463,20 +548,20 @@ class SelectionPressure:
         return result
 
     def _extract_behaviour_descriptor(self, run: Any) -> list[float] | None:
-        """Unit-norm genotype embedding used as the QD behaviour descriptor.
+        """Return the unit-norm genotype embedding for one run.
 
-        Reads a pre-computed ``run.behaviour_descriptor`` first (used by
-        tests injecting stub vectors); otherwise embeds ``run.code`` via
-        the configured genotype embedder.
+        ``_validate_open_ended`` calls it for every candidate. A precomputed
+        ``run.behaviour_descriptor`` (tests inject stub vectors) wins; else
+        ``run.code`` is embedded via ``sources.core.code_features``.
 
         Args:
-            run: Object exposing ``code`` (workflow source) and optionally
-                a pre-computed ``behaviour_descriptor``.
+            run: Any — run object exposing ``code`` and optionally a
+                precomputed ``behaviour_descriptor``.
 
         Returns:
-            Unit-norm descriptor as ``list[float]``, or ``None`` when no
-            usable genotype was available — callers must treat the missing
-            signal as neutral, never as max-novel.
+            list[float] | None — unit-norm descriptor, or ``None`` when no
+            usable genotype exists. Callers treat ``None`` as neutral, never
+            as maximally novel.
         """
         precomputed = _safe_attr(run, "behaviour_descriptor", None)
         if isinstance(precomputed, list) and precomputed:
@@ -485,22 +570,19 @@ class SelectionPressure:
         return genotype_embedding_descriptor(code)
 
     def _compute_novelty(self, descriptor: list[float] | None) -> float:
-        """Mean cosine distance to the active comparison set.
+        """Mean cosine distance from a descriptor to its comparison set.
 
-        ``archive_knn`` (default) uses the mean distance to the k-nearest
-        archive members — the existing behaviour, generalised to cosine
-        distance. ``previous_n`` uses the mean distance to the N most
-        recently produced genotypes (lighter-weight mode that ignores
-        eviction).
+        ``_validate_open_ended`` calls it once per candidate. ``archive_knn``
+        averages the ``novelty_k`` nearest archive members; ``previous_n``
+        averages the whole recent window.
 
         Args:
-            descriptor: Candidate descriptor; ``None`` / empty yields ``0.0``
-                so a missing embedding contributes nothing to QD score.
+            descriptor: list[float] | None — candidate embedding; ``None`` or
+                empty yields ``0.0`` so a missing embedding adds nothing.
 
         Returns:
-            Non-negative novelty value in ``[0, 2]`` (cosine distance range
-            for unit vectors). ``0.0`` for empty comparison sets so the
-            cold start is neither novel nor stale.
+            float — novelty in [0, 2] (cosine-distance range for unit
+            vectors); ``0.0`` when the comparison set is empty.
         """
         if not descriptor:
             return 0.0
@@ -514,13 +596,32 @@ class SelectionPressure:
         return sum(distances[:k]) / k if k > 0 else 0.0
 
     def _comparison_peers(self) -> list[list[float]]:
-        """Descriptors of the active comparison set, filtered to non-empty."""
+        """Return the non-empty descriptors of the active comparison set.
+
+        ``_compute_novelty`` and ``_novelty_range`` call it. ``previous_n``
+        mode reads the recent window; other modes read archive members.
+
+        Returns:
+            list[list[float]] — comparison descriptors; empty on a cold
+            start.
+        """
         if self.novelty_comparison == NOVELTY_PREVIOUS_N:
             return [p for p in self._previous_descriptors if p]
         return [m.behaviour_descriptor for m in self._archive if m.behaviour_descriptor]
 
     def _record_previous(self, descriptor: list[float] | None) -> None:
-        """Push ``descriptor`` onto the previous-N sliding window."""
+        """Append a descriptor to the previous-N sliding window.
+
+        ``_validate_open_ended`` calls it after every candidate so later
+        runs compare against recent genotypes. Empty descriptors are
+        ignored, and the window keeps at most ``previous_n`` entries.
+
+        Args:
+            descriptor: list[float] | None — candidate embedding to record.
+
+        Returns:
+            None.
+        """
         if not descriptor:
             return
         self._previous_descriptors.append(list(descriptor))
@@ -528,11 +629,15 @@ class SelectionPressure:
             self._previous_descriptors.pop(0)
 
     def _novelty_range(self) -> float:
-        """Estimate the typical novelty scale from the active comparison set.
+        """Estimate the novelty scale used to normalise ``qd_score``.
+
+        Novelty scoring and reward refreshes call it. ``previous_n`` mode
+        uses the largest pairwise distance inside the window; other modes
+        use the largest stored member novelty.
 
         Returns:
-            Maximum positive novelty seen across the current comparison
-            members, or ``1.0`` when too small to estimate.
+            float — the observed maximum, or ``1.0`` when too few members
+            exist to estimate one.
         """
         if self.novelty_comparison == NOVELTY_PREVIOUS_N:
             peers = self._comparison_peers()
@@ -549,20 +654,23 @@ class SelectionPressure:
         return max(novelties) if novelties else 1.0
 
     def _try_admit(self, member: PopulationMember, is_valid: bool) -> bool:
-        """Admit `member` to the archive when it passes the validity check.
+        """Admit a validated member to the archive or count the rejection.
+
+        ``_validate_open_ended`` calls it with the validity verdict.
+        Rejected members only bump the rejection counter and log a line.
 
         Args:
-            member: Candidate population member.
-            is_valid: Result of the upstream validity check.
+            member: PopulationMember — candidate archive entry built from
+                the best new run.
+            is_valid: bool — verdict computed by the caller.
 
         Returns:
-            ``True`` if the member was added, ``False`` if rejected (and the
-            internal rejection counter is incremented).
+            bool — True when the member was admitted, False when rejected.
         """
         if not is_valid:
             self._n_admit_rejected += 1
             self.logger.info(
-                f"ADMIT REJECTED (uncapped={member.reward_uncapped:.3f}, "
+                f"ADMIT REJECTED (reward={member.reward:.3f}, "
                 f"qd={member.qd_score:.3f}, novelty={member.novelty_score:.3f}) — "
                 f"total rejected={self._n_admit_rejected}"
             )
@@ -571,10 +679,17 @@ class SelectionPressure:
         return True
 
     def _add_to_archive(self, member: PopulationMember) -> None:
-        """Append member; evict the lowest-qd_score peer if over capacity.
+        """Append a member and evict the weakest peer when over capacity.
+
+        ``_try_admit`` calls it for accepted candidates. When the archive
+        exceeds ``population_size``, the lowest-``qd_score`` member is
+        removed and its UUID recorded for logging.
 
         Args:
-            member: The population member to admit.
+            member: PopulationMember — accepted member to append.
+
+        Returns:
+            None.
         """
         self._archive.append(member)
 
@@ -590,7 +705,15 @@ class SelectionPressure:
         self._refresh_member_metrics()
 
     def _refresh_member_metrics(self) -> None:
-        """Recompute stored novelty + qd_score for every archive member."""
+        """Recompute stored novelty and ``qd_score`` for every archive member.
+
+        ``_add_to_archive`` calls it after each admission so stored scores
+        reflect the changed archive. Skipped while fewer than two members
+        exist.
+
+        Returns:
+            None. Members are updated in place.
+        """
         if len(self._archive) < 2:
             return
         for m in self._archive:
@@ -601,11 +724,22 @@ class SelectionPressure:
         )
         for m in self._archive:
             m.qd_score = self._compose_qd_score(
-                m.reward_uncapped, m.novelty_score, m.genotype_chars, novelty_range,
+                m.reward, m.novelty_score, m.genotype_chars, novelty_range,
             )
 
     def _knn_novelty_against_peers(self, m: PopulationMember) -> float:
-        """k-NN cosine-distance novelty for ``m`` against the rest of the archive."""
+        """k-nearest-neighbour novelty of one member within the archive.
+
+        ``_refresh_member_metrics`` calls it for each member. Distances are
+        cosine distances to all other members with non-empty descriptors.
+
+        Args:
+            m: PopulationMember — member to score.
+
+        Returns:
+            float — mean distance to the ``novelty_k`` nearest peers;
+            ``0.0`` when no peer has a descriptor.
+        """
         distances = sorted(
             _cosine_distance(m.behaviour_descriptor, o.behaviour_descriptor)
             for o in self._archive
@@ -616,13 +750,27 @@ class SelectionPressure:
 
     def _compose_qd_score(
         self,
-        reward_uncapped: float,
+        reward: float,
         novelty: float,
         genotype_chars: int,
         novelty_range: float,
     ) -> float:
-        """``(1-w)·quality + w·novelty − λ·length_penalty`` in one place."""
-        quality_norm = min(max(reward_uncapped, 0.0), 1.0)
+        """Compose the quality-diversity score for one member.
+
+        Admission and refresh paths call it so the weighting stays in one
+        place: ``(1 - w) * quality + w * novelty - lambda * length_penalty``.
+
+        Args:
+            reward: float — capped run reward (the quality term).
+            novelty: float — cosine-distance novelty of the member.
+            genotype_chars: int — source-code length for the length penalty.
+            novelty_range: float — scale used to normalise novelty.
+
+        Returns:
+            float — composed score; quality and novelty are clipped to
+            [0, 1] before weighting.
+        """
+        quality_norm = min(max(reward, 0.0), 1.0)
         novelty_norm = min(novelty / max(novelty_range, 1e-6), 1.0)
         length_penalty = _length_penalty(genotype_chars, self.length_baseline_chars)
         return (
@@ -645,19 +793,23 @@ class SelectionPressure:
         confidence: float,
         threshold: float,
     ) -> dict[str, Any]:
-        """Assemble the common validation-result dictionary.
+        """Assemble the standard validation-result dictionary.
+
+        Every strategy validator returns its verdict through it, and the
+        engine logs and forwards these keys downstream.
 
         Args:
-            is_valid: Whether the candidate passed validation.
-            relative_improvement: Reward delta relative to baseline.
-            absolute_improvement: Raw reward delta.
-            baseline_reward: Reward summary of the baseline runs.
-            new_reward: Reward summary of the new runs.
-            confidence: Bounded confidence score in [0, 1].
-            threshold: Threshold used for the decision.
+            is_valid: bool — whether the candidate passed validation.
+            relative_improvement: float — reward delta relative to baseline.
+            absolute_improvement: float — raw reward delta.
+            baseline_reward: float — reward summary of the baseline runs.
+            new_reward: float — reward summary of the new runs.
+            confidence: float — confidence score in [0, 1].
+            threshold: float — threshold applied to the decision.
 
         Returns:
-            Dict of standardised keys consumed by callers and downstream logs.
+            dict[str, Any] — the values above under their result keys plus
+            ``validated_at`` (current time) and ``strategy`` (enum value).
         """
         return {
             "valid": is_valid,
@@ -680,15 +832,21 @@ class SelectionPressure:
         confidence: float,
         threshold: float,
     ) -> None:
-        """Emit an info/warning log line summarising the validation outcome.
+        """Log one validation verdict as an INFO or WARNING line.
+
+        Strategy validators call it right after building their result dict
+        so the engine log records each acceptance or rejection.
 
         Args:
-            is_valid: Whether the candidate passed validation.
-            relative_improvement: Reward delta relative to baseline.
-            baseline_reward: Reward summary of the baseline runs.
-            new_reward: Reward summary of the new runs.
-            confidence: Bounded confidence score in [0, 1].
-            threshold: Threshold used for the decision.
+            is_valid: bool — whether the candidate passed validation.
+            relative_improvement: float — reward delta relative to baseline.
+            baseline_reward: float — reward summary of the baseline runs.
+            new_reward: float — reward summary of the new runs.
+            confidence: float — confidence score in [0, 1].
+            threshold: float — threshold applied to the decision.
+
+        Returns:
+            None. Accepted runs log at INFO; rejected runs log at WARNING.
         """
         if is_valid:
             self.logger.info(
@@ -709,15 +867,19 @@ class SelectionPressure:
 # ------------------------------------------------------------------
 
 def _safe_attr(obj: Any, attr: str, default: Any = 0.0) -> Any:
-    """Safely get an attribute from an object, returning default if missing.
+    """Read one attribute from a duck-typed object with a safe default.
+
+    Reward summary helpers call it on run objects whose fields may be
+    missing.
 
     Args:
-        obj: Source object, possibly ``None``.
-        attr: Attribute name to look up.
-        default: Value returned when `obj` is ``None`` or `attr` is missing.
+        obj: Any — source object, possibly ``None``.
+        attr: str — attribute name to read.
+        default: Any — value returned when the object or attribute is
+            missing (callers pass ``0.0`` or ``None``).
 
     Returns:
-        Attribute value or `default`.
+        Any — the attribute value, or ``default`` when absent.
     """
     return getattr(obj, attr, default) if obj is not None else default
 
@@ -725,11 +887,15 @@ def _safe_attr(obj: Any, attr: str, default: Any = 0.0) -> Any:
 def _mean_reward(runs: list[Any]) -> float:
     """Mean reward across a list of runs.
 
+    Baseline validators call it to set the bar the new run must beat.
+
     Args:
-        runs: Iterable of run-like objects with a ``reward`` attribute.
+        runs: list[Any] — run-like objects with ``reward``; ``None`` entries
+            are skipped.
 
     Returns:
-        Arithmetic mean of available rewards; ``0.0`` when `runs` is empty.
+        float — arithmetic mean of the remaining rewards; ``0.0`` when no
+        run qualifies.
     """
     rewards = [_safe_attr(r, "reward", 0.0) for r in runs if r is not None]
     return sum(rewards) / max(len(rewards), 1)
@@ -738,11 +904,14 @@ def _mean_reward(runs: list[Any]) -> float:
 def _best_reward(runs: list[Any]) -> float:
     """Best (max) reward across a list of runs.
 
+    Validators call it to score the new runs by their strongest member.
+
     Args:
-        runs: Iterable of run-like objects with a ``reward`` attribute.
+        runs: list[Any] — run-like objects with ``reward``; ``None`` entries
+            are skipped.
 
     Returns:
-        Maximum reward seen, or ``0.0`` when `runs` is empty.
+        float — the maximum reward, or ``0.0`` when the list is empty.
     """
     rewards = [_safe_attr(r, "reward", 0.0) for r in runs if r is not None]
     return max(rewards) if rewards else 0.0
@@ -751,13 +920,15 @@ def _best_reward(runs: list[Any]) -> float:
 def _cosine_distance(a: list[float], b: list[float]) -> float:
     """Cosine distance between two vectors of equal length.
 
+    Novelty scoring calls it between unit-norm genotype embeddings.
+
     Args:
-        a: First vector.
-        b: Second vector.
+        a: list[float] — first vector.
+        b: list[float] — second vector.
 
     Returns:
-        ``1 − cosine_similarity`` in ``[0, 2]``; ``1.0`` (neutral) when the
-        vectors are empty or have mismatching shapes.
+        float — ``1 - cosine_similarity`` in [0, 2]; ``1.0`` (neutral) when
+        either vector is empty, the lengths differ, or a norm is zero.
     """
     if not a or not b or len(a) != len(b):
         return 1.0
@@ -771,14 +942,18 @@ def _cosine_distance(a: list[float], b: list[float]) -> float:
 
 
 def _length_penalty(chars: int, baseline_chars: int) -> float:
-    """Clipped relative excess over the baseline genotype length.
+    """Clipped relative excess of a genotype length over a baseline.
+
+    ``_compose_qd_score`` calls it to subtract a code-growth penalty from
+    QD scores.
 
     Args:
-        chars: Genotype character count for the run.
-        baseline_chars: Configured baseline above which the penalty grows.
+        chars: int — candidate genotype character count.
+        baseline_chars: int — configured size where the penalty starts.
 
     Returns:
-        ``clip((chars − baseline) / baseline, 0, 1)``.
+        float — ``clip((chars - baseline) / baseline, 0, 1)``; ``0.0`` when
+        ``baseline_chars`` is not positive.
     """
     if baseline_chars <= 0:
         return 0.0
@@ -787,7 +962,17 @@ def _length_penalty(chars: int, baseline_chars: int) -> float:
 
 
 def _genotype_chars(run: Any) -> int:
-    """Character length of the run's workflow source code, ``0`` when missing."""
+    """Character length of a run's workflow source code.
+
+    Open-ended validation calls it to feed the length penalty.
+
+    Args:
+        run: Any — run object whose ``code`` may be a string.
+
+    Returns:
+        int — length of ``run.code``; ``0`` when the code is missing or not
+        a string.
+    """
     code = _safe_attr(run, "code", None)
     return len(code) if isinstance(code, str) else 0
 
@@ -796,15 +981,16 @@ if __name__ == "__main__":
     from types import SimpleNamespace
 
     def _run(reward: float, descriptor: list[float], uuid: str, *, code_len: int = 100) -> SimpleNamespace:
+        """Build one stub run for this offline smoke check."""
         return SimpleNamespace(
-            reward=reward, reward_uncapped=reward, current_uuid=uuid,
+            reward=reward, current_uuid=uuid,
             iteration_count=1, cost=0.0,
             code="x" * code_len,
             behaviour_descriptor=descriptor,
         )
 
     sp = SelectionPressure(
-        strategy="qd", population_size=50, novelty_k_neighbours=25,
+        config={}, strategy="qd", population_size=50, novelty_k_neighbours=25,
         novelty_weight=0.4, length_penalty_baseline_chars=5000,
         length_penalty_lambda=0.05,
     )
@@ -828,7 +1014,7 @@ if __name__ == "__main__":
 
     # previous_n mode: cosine distance against the recent window.
     sp_pn = SelectionPressure(
-        strategy="qd", population_size=50, novelty_weight=0.4,
+        config={}, strategy="qd", population_size=50, novelty_weight=0.4,
         novelty_comparison="previous_n", previous_n=4,
     )
     sp_pn._validate_open_ended([seed], [seed], threshold=0.01)

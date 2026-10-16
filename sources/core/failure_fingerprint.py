@@ -1,6 +1,11 @@
-"""
-Failure-fingerprint behaviour descriptor for the QD archive.
-[DEPRECATED] This descriptor is no longer used in the archive as diversity metrics
+"""Failure-fingerprint behaviour descriptor for the QD archive.
+
+[DEPRECATED] The archive no longer uses this descriptor as its diversity
+metric; novelty now comes from genotype embeddings (see
+:mod:`sources.core.genotype_embedding`). The readers stay because older
+runs keep a fingerprint inside their ``state_result.json``. The legacy
+verifier still computes the descriptor once per evaluation and stores it
+with the run's scores.
 """
 
 import json
@@ -8,9 +13,9 @@ from pathlib import Path
 from typing import Any, Iterable
 
 # Canonical claim-source order. The verifier emits ``"source_a"`` … through
-# the six independent extractor prompts; expected letters are kept here so
+# the registered extractor prompts; expected letters are kept here so
 # the descriptor stays a fixed-length vector even if a source is silenced.
-SOURCES: tuple[str, ...] = ("a", "b", "c", "d", "e", "f")
+SOURCES: tuple[str, ...] = ("a", "b", "c", "d", "e", "f", "g")
 DESCRIPTOR_DIM: int = len(SOURCES)
 
 _NEUTRAL_PASS_RATE: float = 0.5
@@ -18,10 +23,18 @@ _PASS_STATUS: str = "pass"
 
 
 def _source_letter(raw: Any) -> str | None:
-    """Normalise a claim source label to its lowercase letter (``a``-``f``).
+    """Normalise a claim source label to its canonical letter (``a``-``g``).
 
-    Accepts ``"source_a"``, ``"a"``, ``"A"``, ``"SOURCE_A"``. Returns the
-    bare letter when recognised, ``None`` otherwise.
+    ``_pass_total_by_source`` calls it for every verifier claim, passing
+    the raw ``claim["source"]`` value from the scored claim dicts.
+
+    Args:
+        raw: Claim source label from verifier output. Accepts
+            ``"source_a"``, ``"a"``, ``"A"``, ``"SOURCE_A"``.
+
+    Returns:
+        The bare lowercase letter when recognised, else ``None`` for
+        unknown or empty labels.
     """
     if not raw:
         return None
@@ -36,10 +49,19 @@ def _pass_total_by_source(
 ) -> dict[str, tuple[int, int]]:
     """Tally ``(passes, total)`` per canonical source letter.
 
-    Non-pass statuses (``fail``, ``error``, ``unsure``) all count toward
-    ``total`` but not ``passes``: a measurement error is still a non-pass
-    from the optimiser's perspective, and quality already penalises errors
-    via ``quality_norm``.
+    :func:`compute_failure_fingerprint` calls it with the verifier's
+    per-claim results. Non-pass statuses (``fail``, ``error``,
+    ``unsure``) all count toward ``total`` but not ``passes``: a
+    measurement error is still a non-pass, and quality scoring already
+    penalises errors via ``quality_norm``.
+
+    Args:
+        per_claim: Iterable of per-claim scored dicts from the verifier;
+            each carries ``status`` and ``claim["source"]``.
+
+    Returns:
+        Dict mapping each letter in ``SOURCES`` to its ``(passes,
+        total)`` integer pair.
     """
     tally: dict[str, list[int]] = {s: [0, 0] for s in SOURCES}
     for c in per_claim:
@@ -57,6 +79,10 @@ def compute_failure_fingerprint(
     per_claim: Iterable[dict[str, Any]],
 ) -> dict[str, list[float]]:
     """Return centered fingerprint, presence mask, and raw pass rates.
+
+    The legacy verifier calls this after scoring all claims and stores
+    the result under ``evaluation.verifier.failure_fingerprint`` in the
+    run's ``state_result.json``.
 
     Args:
         per_claim: Iterable of per-claim scored dicts as produced by the
@@ -101,10 +127,20 @@ def failure_fingerprint_from_state_result(
 ) -> list[float] | None:
     """Pull the centered vector from a persisted ``state_result`` dict.
 
-    Returns ``None`` when no usable fingerprint has been persisted (the
-    workflow short-circuited, the verifier hasn't run yet, or the field
-    has the wrong shape). Callers should fall back to a neutral vector
-    so distance lookups stay well-defined.
+    Archive and selection tooling call it when scoring stored runs. It
+    walks ``evaluation.verifier.failure_fingerprint`` and checks the
+    vector shape before returning it.
+
+    Args:
+        state_result: Parsed ``state_result.json`` content from disk, or
+            ``None``.
+
+    Returns:
+        The centered vector as ``DESCRIPTOR_DIM`` floats, or ``None``
+        when no usable fingerprint is persisted (the workflow
+        short-circuited, the verifier has not run yet, or the field has
+        the wrong shape). Callers should fall back to a neutral vector
+        so distance lookups stay well-defined.
     """
     if not isinstance(state_result, dict):
         return None
@@ -132,8 +168,18 @@ def failure_fingerprint_from_workflow_dir(
 ) -> list[float] | None:
     """Read the fingerprint vector from ``<workflow_dir>/<uuid>/state_result.json``.
 
-    Returns ``None`` when the file is missing, unreadable, or doesn't
-    carry a fingerprint of the expected shape.
+    Convenience wrapper for callers that hold a workflow directory
+    instead of a parsed ``state_result`` dict.
+
+    Args:
+        workflow_dir: Project workflow directory from config (parent of
+            the ``<uuid>/`` folder).
+        uuid: Workflow UUID to read.
+
+    Returns:
+        The centered fingerprint vector, or ``None`` when the file is
+        missing, unreadable, or carries no fingerprint of the expected
+        shape.
     """
     path = Path(workflow_dir) / uuid / "state_result.json"
     try:
@@ -146,9 +192,12 @@ def failure_fingerprint_from_workflow_dir(
 def neutral_fingerprint() -> list[float]:
     """Zero-vector fingerprint of length ``DESCRIPTOR_DIM``.
 
-    Used as the cold-start default (no archive yet, no verifier output
-    yet) so distance computations stay well-defined and the cold run is
-    treated as neither novel nor stale relative to itself.
+    Archive code uses it as the cold-start default (no archive yet, no
+    verifier output yet) so distance computations stay well-defined and
+    a cold run is treated as neither novel nor stale relative to itself.
+
+    Returns:
+        List of ``DESCRIPTOR_DIM`` zeros.
     """
     return [0.0] * DESCRIPTOR_DIM
 
@@ -175,8 +224,8 @@ if __name__ == "__main__":
     ])
     assert mixed["vector"][0] > 0.0 and mixed["vector"][1] < 0.0
     assert mixed["presence_mask"][:2] == [1.0, 1.0]
-    assert mixed["presence_mask"][2:] == [0.0] * 4
-    assert mixed["vector"][2:] == [0.0] * 4
+    assert mixed["presence_mask"][2:] == [0.0] * 5
+    assert mixed["vector"][2:] == [0.0] * 5
 
     # Source label normalisation across forms.
     norm = compute_failure_fingerprint([

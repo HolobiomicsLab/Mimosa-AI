@@ -94,36 +94,26 @@ The screen is split into:
 
 The CLI is read-only — it does not modify any memory file.
 
-## `memory_timelapse.py` — memory growth visualisation
-
-For longer `--learn` runs, you may want a coarser view: how the agent's
-memory grew over iterations. Run:
-
-```bash
-uv run memory_timelapse.py <uuid>
-```
-
-It renders an animated frame-by-frame view of the memory state, useful for
-spotting where the agent's understanding shifted.
-
 ## Reading `state_result.json`
 
 The verifier writes summary scores plus the workflow's final state to
 `sources/workflows/<uuid>/state_result.json` under
-`evaluation.verifier.*`. Useful fields:
+`evaluation.verifier.*` (hybrid verifier fields; see
+[Evaluation pipeline](../concepts/evaluation-pipeline.md#gradient-and-artifacts)
+for the full list):
 
 | Field | What it tells you |
 | ----- | ----------------- |
-| `overall_score` | Capped (≤ `_HARD_FAIL_CAP`, currently `0.99`) when a hard claim is refuted. |
-| `overall_score_uncapped` | Same score pre-cap — used as `reward_uncapped` for QD ranking. |
-| `base_mean` | Importance-weighted mean over non-error per-claim scores. |
-| `hard_fail_capped` | `true` when a hard claim was refuted (cap fired). |
-| `n_claims` / `n_pass` / `n_fail` / `n_error` / `n_unsure` / `n_scored` | Per-claim status counts. |
-| `abstracted_prompt_gradient` | Code-named diagnostic summary — the only signal the mutator sees. Does not name the verified claims back. |
+| `overall_score` | The reward — mean win-rate against every previous generation of the task (first generation: mean claim score). Also surfaced as `reward`. |
+| `win_rate` / `n_pairs` / `n_wins` / `n_losses` / `n_ties` | The pairwise record behind the reward. |
+| `mean_claim_score` | Mean score over the surviving claims (absolute quality, independent of the pairwise reward). |
+| `n_claims` / `n_surviving` / `n_dropped` / `n_scored` / `n_scorer_failures` / `n_replacements` | Claim-ladder bookkeeping: live claims, dead (zero-variance) claims dropped, scorer execution outcome, refinement replacements. |
+| `claim_summary` | Per-claim entries: id, category, statement, 0..1 score, `surviving` flag, measured evidence. |
+| `abstracted_textual_gradient` | The elimination-point gradient the mutator sees (also written to the `textual_gradient.txt` sidecar; the legacy `abstractec_` typo key is written for one release). |
 
-The full per-claim detail (status, rationale, stderr tail, recomputed
-values) lives in `sources/workflows/<uuid>/evaluation.txt` alongside the
-JSON.
+The full per-claim detail (stage headers, scores, evidence, pairwise
+transcript, dead-claim report) lives in
+`sources/workflows/<uuid>/evaluation.txt` alongside the JSON.
 
 ## Inspecting the genotype
 
@@ -135,7 +125,7 @@ sources/workflows/<uuid>/workflow_genotype_<uuid>.py
 
 It's plain Python — readable end-to-end, no DSL. Look at it when:
 
-- The abstracted prompt gradient is vague and you want to see what the
+- The textual gradient is vague and you want to see what the
   agents actually do.
 - You suspect the verifier missed something.
 - You want to lift a successful workflow into another project as a
@@ -163,16 +153,20 @@ every LLM call.
 
 ## What's hidden from the mutator
 
-Important for understanding the audit trail: the mutator sees **only** the
-`abstracted_prompt_gradient`. It cannot see:
+Important for understanding the audit trail: the mutator sees **only**
+the verifier's `abstracted_textual_gradient`. It cannot see:
 
-- Numerical scores.
-- Per-claim verdicts.
-- Which source (A–F) raised any given claim.
+- The policy-scorer scripts (they stay in the per-task registry).
+- The pairwise machinery — win-rate computation, registry score
+  vectors, dead-claim/refinement internals.
+- The workspace snapshot and logs beyond what the gradient quotes as
+  evidence.
 
-This is by design — the prompt gradient tells the mutator what direction
-to push next without naming the verified claims back, so the loop cannot
-turn the rubric vocabulary into an optimization target. See
+This is by design: the gradient is a faithful transcript of measured
+facts (the elimination point, both scores, the evidence), so the
+mutator is steered by what was actually measured rather than by the
+agents' narration — and the scoring machinery itself stays out of the
+evolution prompt. See
 [Evaluation pipeline](../concepts/evaluation-pipeline.md).
 
 ## See also

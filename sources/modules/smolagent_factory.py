@@ -9,6 +9,7 @@ import base64
 import json
 import re
 import time
+import sys
 import uuid
 import logging
 from typing import Callable
@@ -35,6 +36,12 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
 from dotenv import load_dotenv
 load_dotenv()
+# Fallback: user-level env file. Inline (no project imports) because this
+# file is injected into generated workflows running in a separate venv.
+load_dotenv(os.path.join(
+    os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config")),
+    "mimosa", ".env",
+))
 
 from smolagents.local_python_executor import BASE_PYTHON_TOOLS, DANGEROUS_FUNCTIONS, DANGEROUS_MODULES
 import signal
@@ -42,6 +49,35 @@ import signal
 import subprocess
 DANGEROUS_FUNCTIONS = {subprocess}
 DANGEROUS_MODULES = {}
+
+# Cap accepted by most OpenRouter providers (OpenAI allows up to 20).
+TOP_LOGPROBS = 5
+
+
+def logprobs_kwargs_for(model_id) -> dict:
+    """Return the logprobs request params `model_id`'s provider accepts.
+
+    litellm raises UnsupportedParamsError for request params a provider
+    lacks (mistral and anthropic take neither param, gemini takes logprobs
+    but not top_logprobs), so build the request from its param map instead
+    of crashing at call time. Providers litellm has no param map for keep
+    the full request — litellm cannot validate those, so it won't reject
+    the params either.
+    """
+    kwargs = {"logprobs": True, "top_logprobs": TOP_LOGPROBS}
+    try:
+        import litellm
+        supported = litellm.get_supported_openai_params(model=model_id)
+    except Exception:
+        return kwargs
+    if supported is None:
+        return kwargs
+    if "logprobs" not in supported:
+        print(f"WARNING: logprobs disabled for '{model_id}': provider does not support them.")
+        return {}
+    if "top_logprobs" not in supported:
+        del kwargs["top_logprobs"]
+    return kwargs
 
 LANGFUSE_PUBLIC_KEY=os.getenv("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY=os.getenv("LANGFUSE_SECRET_KEY")
@@ -63,14 +99,15 @@ class SmolAgentFactory:
                  name,
                  instruct_prompt,
                  tools=[],
-                 temperature=0.7,
-                 max_steps=128,
+                 model=None,
+                 temperature=1.0,
+                 max_steps=128
                 ) -> None:
         self.name = name
         self.instruct_prompt = instruct_prompt
         self.tools = tools
         # variable defined by workflow factory
-        self.model_id = MODEL_ID
+        self.model_id = model or MODEL_ID
         self.memory_folder = MEMORY_PATH
         self.engine_name = ENGINE_NAME
         self.system_prompt = SYSTEM_PROMPT
@@ -82,6 +119,18 @@ class SmolAgentFactory:
         self.token = os.getenv("HF_TOKEN")
         # Optional pin for OpenRouter routing. May be injected by the workflow
         self.openrouter_provider = globals().get("OPENROUTER_PROVIDER", None)
+        # Request token logprobs and save them with memory (for ablations).
+        # Only the litellm engine forwards the request, and only when the
+        # provider accepts the params (litellm raises UnsupportedParamsError
+        # otherwise, e.g. mistral) — gating both keeps the missing-logprobs
+        # warning honest.
+        logprobs_requested = (
+            globals().get("SAVE_LOGPROBS", False) and self.engine_name == "litellm"
+        )
+        self.logprobs_kwargs = (
+            logprobs_kwargs_for(self.model_id) if logprobs_requested else {}
+        )
+        self.save_logprobs = bool(self.logprobs_kwargs)
         # run parameters
         self.run_uuid = str(uuid.uuid4())
         # Per-agent execution timeout (seconds). Injected from the main config
@@ -100,6 +149,9 @@ class SmolAgentFactory:
                 name=f"{self.name}_agent",
                 max_steps=max_steps,
                 #planning_interval=planning_interval, # think more before acting
+                # authorized imports are limited to basic python libraries for action-as-code execution.
+                # More advanced packages such as scientific computing, data analysis, and machine learning libraries are not allowed here.
+                # Advanced package should be installed in the shell MCP of Toolomics. Agent can install packages through the shell MCP if needed.
                 additional_authorized_imports = [
                     'requests', 'json', 'requests.exceptions',
                     # Core Utilities
@@ -154,26 +206,39 @@ class SmolAgentFactory:
                 max_tokens=self.max_tokens,
             )
         elif self.engine_name == "litellm":
-            extra_kwargs = {}
+            extra_kwargs = dict(self.logprobs_kwargs)
             if self.openrouter_provider and str(self.model_id).startswith("openrouter/"):
                 order = (
                     [self.openrouter_provider]
                     if isinstance(self.openrouter_provider, str)
                     else list(self.openrouter_provider)
                 )
+                # OpenRouter's Claude endpoints list neither temperature nor
+                # logprobs in supported_parameters, so require_parameters=True
+                # leaves no endpoint (404 "No endpoints found that can handle
+                # the requested parameters"). Relax it for anthropic/* only;
+                # Claude then returns no logprobs.
                 extra_kwargs["extra_body"] = {
                     "provider": {
                         "order": order,
                         "allow_fallbacks": False,
-                        "require_parameters": True,
+                        "require_parameters": not str(self.model_id).startswith("openrouter/anthropic/"),
                     }
                 }
+            # OpenAI deprecated `max_tokens` for `max_completion_tokens`;
+            # newer OpenAI models hard-reject `max_tokens` with a 400.
+            # LiteLLMModel forwards extra kwargs verbatim to litellm.
+            budget_kwarg = (
+                "max_completion_tokens"
+                if str(self.model_id).startswith("openai/")
+                else "max_tokens"
+            )
             return LiteLLMModel(
                 model_id=self.model_id,
                 temperature=self.temperature,
-                max_tokens=self.max_tokens,
                 timeout=self.timeout,
                 request_timeout=180,
+                **{budget_kwarg: self.max_tokens},
                 **extra_kwargs,
             )
         elif self.engine_name == "openai":
@@ -236,6 +301,31 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
             success.append(step.error is None)
         return actions, observations, success
 
+    def extract_logprobs(self, step) -> Optional[dict]:
+        """Return token logprobs from a step's raw model response, or None.
+
+        Logprobs only exist on the raw provider response kept in
+        ``model_output_message.raw``, which ``save_memories`` strips.
+        Steps replayed from memory carry no raw response and yield None.
+        Drops the per-token ``bytes`` arrays (redundant with ``token``)
+        to keep memory files small.
+        """
+        raw = getattr(getattr(step, "model_output_message", None), "raw", None)
+        if raw is None:
+            return None
+        try:
+            logprobs = raw.choices[0].logprobs
+            if logprobs is None:
+                return None
+            dumped = logprobs.model_dump() if hasattr(logprobs, "model_dump") else dict(logprobs)
+            for token_entry in dumped.get("content") or []:
+                token_entry.pop("bytes", None)
+                for alternative in token_entry.get("top_logprobs") or []:
+                    alternative.pop("bytes", None)
+            return dumped
+        except (AttributeError, IndexError, TypeError, KeyError):
+            return None
+
     def save_memories(self, workflow_uuid: str):
         print(f"Saving agent memory for workflow UUID: {workflow_uuid}")
         if not workflow_uuid or not workflow_uuid.strip():
@@ -259,7 +349,11 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
                         if step.model_output_message
                         else None
                     )
+                    action_step["logprobs"] = self.extract_logprobs(step)
+                    action_step["model"] = self.model_id
                     memories.append(action_step)
+            if self.save_logprobs and memories and all(m["logprobs"] is None for m in memories):
+                print(f"WARNING: logprobs requested but none returned for agent '{self.name}'; check provider support.")
             try:
                 agent_task_path = os.path.join(self.memory_folder, f"task_{self.name}.json")
                 with open(agent_task_path, "w") as f:
@@ -335,6 +429,32 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
         except Exception as e:
             raise ValueError(f"Failed to load memory: {str(e)}")
 
+    def report_agent_failure(self, error: BaseException, attempts: int) -> None:
+        """Print a loud banner for an agent whose every run attempt raised.
+
+        Written to stderr so it lands in run_stdout.log and in the stderr the
+        orchestrator reports, right above the re-raised traceback.
+        """
+        message = f"{type(error).__name__}: {error}"
+        if len(message) > 2000:
+            message = message[:2000] + " ...[truncated, full traceback below]"
+        lines = [
+            f"AGENT '{self.name}' FAILED ({attempts}/{attempts} attempts raised)",
+            f"model: {self.model_id}  engine: {self.engine_name}",
+            f"error: {message}",
+        ]
+        if "No endpoints found that can handle the requested parameters" in str(error):
+            lines.append(
+                "hint: OpenRouter rejected the request parameters for every allowed "
+                f"provider ({self.openrouter_provider}). With require_parameters=True, "
+                "a provider that does not support temperature or logprobs is "
+                "filtered out; change smolagent_model_id, disable save_logprobs, "
+                "or run PreCheck to select compatible providers."
+            )
+        bar = "!" * 100
+        banner = "\n".join([bar, "!!! WARNING: AGENT EXECUTION ERROR (not a timeout)", bar, *lines, bar])
+        print(f"\n{banner}\n", file=sys.stderr, flush=True)
+
     def run_cached(self, state: WorkflowState, instructions: str) -> dict:
         import threading
         workflow_uuid = state.get("workflow_uuid", None)
@@ -342,6 +462,7 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
             self.load_agent_memory(workflow_uuid, instructions)
 
         timeout_seconds = getattr(self, 'timeout', 180)
+        max_attempts = 3
         result = {'response': None, 'exception': None, 'completed': False}
 
         def _run_agent():
@@ -349,32 +470,37 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
             error = True
             count = 0
             warning = False
-            while error and count < 3:
+            while error and count < max_attempts:
                 if warning:
                     instructions += "\nWARNING: Last run failed due to context exceeded, read file content carefully (content[:2048]), same for tool output usage (output[:2048])"
                 try:
                     result['response'] = self.agent.run(instructions)
                     result['completed'] = True
+                    result['exception'] = None
                     error = False
                     warning = True
                 except Exception as e:
-                    print(str(e))
-                    print("retrying...")
-                    error = True
                     count += 1
-                #result['exception'] = e
-                #result['completed'] = True
+                    print(f"Agent '{self.name}' attempt {count}/{max_attempts} failed: {type(e).__name__}: {e}")
+                    if count < max_attempts:
+                        print("retrying...")
+                    result['exception'] = e
+                    error = True
 
         agent_thread = threading.Thread(target=_run_agent, daemon=True)
         agent_thread.start()
         agent_thread.join(timeout=timeout_seconds)
 
         try:
-            if not result['completed']:
-                self.save_memories(workflow_uuid=workflow_uuid)
+            if agent_thread.is_alive():
+                # no save here: the except branch below saves once for all failures
                 raise TimeoutError(f"Agent '{self.name}' execution timed out after {timeout_seconds} seconds")
-            if result['exception']:
-                raise result['exception']
+            if not result['completed']:
+                error = result['exception'] or RuntimeError(
+                    f"Agent '{self.name}' thread exited without a result or exception"
+                )
+                self.report_agent_failure(error, max_attempts)
+                raise error
             self.save_memories(workflow_uuid=workflow_uuid)
             return result['response']
         except Exception as e:

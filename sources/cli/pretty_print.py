@@ -70,9 +70,9 @@ def print_step(step: int, total: int, title: str, width: int = 120) -> None:
         ────────────────────────────────────────────────────────────
     """
     bar = "─" * width
-    print(f"\n{CYAN}{bar}{RESET}")
-    print(f"{CYAN}  Step {step}/{total}  ·  {title}{RESET}")
-    print(f"{CYAN}{bar}{RESET}")
+    print(f"\n{YELLOW}{bar}{RESET}")
+    print(f"{YELLOW}  Step {step}/{total}  ·  {title}{RESET}")
+    print(f"{YELLOW}{bar}{RESET}")
 
 
 # ── Phase / section banners ──────────────────────────────────────────────────
@@ -81,7 +81,7 @@ def print_phase(
     title: str,
     icon: str = "▶▶",
     width: int = _W,
-    color: str = CYAN,
+    color: str = YELLOW,
 ) -> None:
     """
     Full-width phase banner with centred title and horizontal rules.
@@ -106,7 +106,7 @@ def print_section(
     print(f"\n{color}──{label}{'─' * remaining}{RESET}")
 
 
-def print_rule(width: int = _W, color: str = CYAN) -> None:
+def print_rule(width: int = _W, color: str = YELLOW) -> None:
     """Print a plain horizontal rule."""
     print(f"{color}{'─' * width}{RESET}")
 
@@ -123,13 +123,13 @@ def print_iteration_header(
     Prominent iteration counter banner shown at the start of each evolution engine loop.
     """
     bar = "═" * width
-    print(f"\n{CYAN}{bar}{RESET}")
+    print(f"\n{YELLOW}{bar}{RESET}")
     if total <= 1:
-        print(f"{CYAN}{BOLD} Starting task... {RESET}")
+        print(f"{YELLOW}{BOLD} Starting task... {RESET}")
     else:
-        print(f"{CYAN}{BOLD}  ITERATION {current}/{total}  ·  {subtitle}{RESET}")
+        print(f"{YELLOW}{BOLD}  ITERATION {current}/{total}  ·  {subtitle}{RESET}")
         print(f"{DIM} Mimosa will now learn how to build the workflow for the task.{RESET}")
-    print(f"{CYAN}{bar}{RESET}")
+    print(f"{YELLOW}{bar}{RESET}")
 
 
 # ── Content box ──────────────────────────────────────────────────────────────

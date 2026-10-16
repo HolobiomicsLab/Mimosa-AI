@@ -42,11 +42,11 @@ Without `--learn`, the engine still runs the verifier but never iterates
 
 Mimosa stops the moment either condition is met:
 
-- `overall_score >= learned_score_threshold` (config field, default `0.9`).
-- `iteration ≥ max_learning_evolve_iterations` (default `20`).
+- `overall_score >= learned_score_threshold` (config field, default `0.92`).
+- `iteration ≥ max_learning_evolve_iterations` (default `25`).
 
-The "best" workflow at termination — the one with the highest
-`reward_uncapped` in the archive — has its workspace snapshot restored as
+The "best" workflow at termination — the one with the highest `reward`
+(the capped `overall_score`) — has its workspace snapshot restored as
 the run's final state.
 
 !!! tip "Tuning the threshold"
@@ -54,30 +54,27 @@ the run's final state.
       stops early; you'll always hit `max_learning_evolve_iterations`.
     - Setting it too low (e.g. `0.7`) means the loop stops after one lucky
       generation that *happens* to fool the judge.
-    - The default `0.9` is a reasonable balance — adjust based on observed
+    - The default `0.92` is a reasonable balance — adjust based on observed
       score distributions for your task family.
 
 ## What evolves between generations
 
-| Effective boldness | Mutation scope                                                              |
-| ------------------ | --------------------------------------------------------------------------- |
-| < 0.35             | `EXPLOITATION` — point mutation: minor phrasing / prompt-adjective tweaks   |
-| < 0.50             | `ALIGNMENT` — interface optimization: refine handoff prompts, IO contracts  |
-| < 0.65             | `ADAPTATION` — component overhaul: rewrite lagging agent prompts, swap tools |
-| < 0.90             | `EXPLORATION` — macro structural mutation: add/merge agents, change routing |
-| ≥ 0.90             | `RE-SPECIATION` — clean-slate redesign of the multi-agent architecture      |
+Mutation magnitude is **directive-implicit**: there is no step-size
+controller. Each mutation assembles a deterministic, read-only
+`<search_state>` block — parent score, iteration progress, a plateau
+counter (`iters_since_improvement / 6`) over recent scored offspring,
+the success rate of the last 5 scored offspring, and a short
+score-only trajectory — and the directive LLM judges how bold the next
+change should be (small tweak vs component rewrite vs structural
+redesign) from those facts: recent improvements call for small tweaks,
+a long plateau or a 0 % success rate calls for bolder restructuring.
+Hard guardrails stay in code: the mutation agent budget is sampled
+parent-centered — within ±1 agent of the parent's count, hard-capped
+at `[1, 7]` — at most one agent may be added or removed per mutation,
+and 90 % of the previous workflow must stay unchanged.
 
-Effective boldness is computed from two signals: a plateau counter
-(`iters_since_improvement / 6`) over recent scored offspring, and the
-Rechenberg 1/5 success rate of the last 5 scored offspring (below `0.20`
-the search escalates, above it boldness damps; at `≥ 0.80` it collapses
-regardless of plateau). Only in the last 5 % of the score range does
-the parent's absolute score re-enter, as a near-finish damper, so
-near-winners aren't gambled away one generation before early-stop. The
-agent budget grows with boldness up to a hard ceiling of `7`.
-
-By default `~10 %` of generations do **crossover** instead of mutation
-(`crossover_rate = 0.1`) — two parents combined, best-parent-first, with
+By default `~40 %` of generations do **crossover** instead of mutation
+(`crossover_rate = 0.4`) — two parents combined, best-parent-first, with
 the offspring hard-capped at the highest parent agent count.
 
 ## What you'll see on disk
@@ -91,7 +88,7 @@ the end. Across the run you'll also get:
   node a workflow, edges showing mutation/crossover).
 - `runs_capsule/<capsule_name>/` — archived snapshot of the best run.
 
-![Reward progress example](../images/evolve_example.png){ width="70%" }
+![Evolution tree example](../images/evolution_tree.png){ width="60%" }
 
 ## Mid-run interruption
 
