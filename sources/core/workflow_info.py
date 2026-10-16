@@ -16,14 +16,6 @@ import re
 from pathlib import Path
 from statistics import mean
 
-#: ``evaluation.verifier.reward_fallback`` values whose reward is NOT on the
-#: comparable scale and must stay out of the capsule argmax. ``mean_claim``
-#: is the hybrid verifier's first-generation fallback; ``oracle_censored``
-#: marks a full-oracle gold-feedback generation whose benchmark grade was
-#: censored (it only carries the hybrid win-rate); ``unmeasured_prior`` marks
-#: a generation whose scorers all failed on a workspace that produced
-#: artifacts (N9) — its 0.5 is a neutral prior, not a measurement.
-#: ``short_circuit`` is a real measured 0.0 and is deliberately absent.
 FALLBACK_REWARD_KINDS = frozenset(
     {"mean_claim", "oracle_censored", "unmeasured_prior"}
 )
@@ -39,10 +31,7 @@ def is_oracle_generation(workflow_folder: Path | str, state_result: dict | None 
     Workflow selection calls this during discovery to enforce the leak
     guard: genotypes evolved under gold feedback may only be reused by
     another gold run. The caller passes the generation folder path and,
-    when already loaded, its parsed ``state_result.json``. The check is
-    on-disk only: the gold verifier writes ``gold_feedback.json`` into
-    every folder it scores, and some runs also persist an explicit
-    ``evaluation.verifier.oracle`` flag in the state result.
+    when already loaded, its parsed ``state_result.json``.
 
     Args:
         workflow_folder: Path to the generation folder on disk.
@@ -70,10 +59,7 @@ class WorkflowInfo:
     Workflow selection, lineage scans, and audit scripts construct it
     with a UUID plus the folder path under ``workflows/``. Construction
     performs no I/O; each property reads its file on first access and
-    caches the value for the object's lifetime. Score consumers must
-    treat :attr:`overall_score` and :attr:`reward_is_fallback` as one
-    unit: a fallback reward never enters the capsule argmax against
-    measured rewards.
+    caches the value for the object's lifetime.
     """
 
     def __init__(self, uuid: str, workflow_folder: Path | str) -> None:
@@ -287,11 +273,6 @@ class WorkflowInfo:
         call it so the score and the fallback flag always come from the
         same block. Blocks are tried in priority order (``generic`` →
         ``verifier`` → ``scenario``) and the first mapping found wins.
-        Using one block stops a two-evaluator state result from pairing
-        one block's score with another block's ``reward_fallback``
-        (N1: the pains_brenk gen-13 mean-claim flag was read from a
-        different block than the 0.745 score that won the capsule
-        argmax).
 
         Returns:
             dict: The first evaluation block found, or ``{}`` when the

@@ -1155,10 +1155,6 @@ class EvolutionEngine:
         if rewards_history is not None and wf_info is not None:
             rewards_history.append(wf_info.overall_score)
 
-        # ── Stop-controller bookkeeping (champion plateau) ────────────
-        # One observation per completed generation: the head-to-head
-        # pair outcomes vs predecessors (engine contract §2.5) drive the
-        # champion; failed generations can only advance the plateau.
         if stop_controller is not None:
             stop_controller.observe(
                 uuid=uuid or "",
@@ -1168,14 +1164,6 @@ class EvolutionEngine:
                 failed=is_failure or not uuid,
             )
 
-        # ── Frontier probe (review 2026-10-09 §4.3) ──────────────────
-        # Evaluated after the stop observation and before the stop
-        # decision, so a probe is guaranteed to shape the next prompt
-        # whenever the plateau is one generation from stopping
-        # (explore_after defaults to patience − 1). The probe state is
-        # persisted through last_variation_state (run_metrics.json +
-        # variation_log.jsonl); textual_gradient.txt stays 100% verifier
-        # output.
         exploration_probe: dict | None = None
         if stop_controller is not None:
             exploration_probe = self._evaluate_exploration_probe(
@@ -1243,9 +1231,6 @@ class EvolutionEngine:
                 wf_info.overall_score, current_iteration_cost, runs[-1].goal, uuid, wf_info.state_result, rewards_history
             )
         
-        # N3 (2026-10-08 audit): HARD cap regardless of on_error — an
-        # errored generation at the cap used to fall through to parent
-        # selection and recurse past max_depth without bound.
         if runs[-1].iteration_count >= runs[-1].max_depth-1:
             print_info("Maximum recursive depth reached.")
             return runs
@@ -1492,10 +1477,6 @@ class EvolutionEngine:
         print_phase("WORKFLOW EVALUATION PHASE")
         eval_start = time.time()
         if getattr(self.judge, "verifier_kind", None) == "gold":
-            # Gold-feedback (oracle) control only: its benchmark grading
-            # (VER re-run + SR eval, minutes) runs in a worker thread so
-            # concurrent CSV workers keep their event loop. Every other
-            # verifier keeps the synchronous call below unchanged.
             eval_result = await asyncio.to_thread(
                 self.judge.evaluate,
                 uuid=uuid,

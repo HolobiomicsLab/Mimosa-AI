@@ -12,17 +12,6 @@ enough"). The two pairwise verifiers produce RELATIVE rewards instead:
   predecessor reaches only ~0.58-0.86 within 16 generations, so the
   threshold silently becomes "never stop".
 
-A relative signal can only say the search stopped improving. The
-replacement rule is therefore a CHAMPION PLATEAU: a new generation
-becomes the champion only by beating the current champion head-to-head;
-when no new champion arrives for ``patience`` consecutive generations
-(and at least ``min_iter`` generations have completed), the run stops
-and ships the final champion as the capsule.
-
-The controller is deliberately pure (no I/O, no engine imports): the
-engine creates it once per session, feeds it one ``observe()`` per
-completed generation, and asks ``should_stop()`` after each iteration.
-
 In Mimosa-AI's layered architecture this is the Layer 2 evolution engine's
 stop policy: ``sources/core/evolution_engine.py`` builds the controller
 from the run configuration's early-stop knobs at session start, and the
@@ -46,9 +35,7 @@ class StopController:
     run configuration's early-stop knobs, and the stop-controller tests
     drive it directly. The controller tracks a single champion uuid plus the number
     of generations since the champion last changed, and converts that state
-    into a stop/no-stop decision. Key invariant: only a head-to-head "won"
-    outcome against the current champion replaces the champion; ties and
-    failed generations only advance the plateau counter. Mode semantics:
+    into a stop/no-stop decision.
 
     - ``"auto"`` — resolved once at construction from the verifier kind:
       ``plateau`` for relative verifiers (:data:`RELATIVE_VERIFIER_KINDS`),
