@@ -195,6 +195,7 @@ def test_subprocess_env_sets_legacy_keras(monkeypatch):
     monkeypatch.delenv("TF_USE_LEGACY_KERAS", raising=False)
     sb = object.__new__(ExecutionSandbox)
     sb.venv_path = Path("/nonexistent-venv")
+    sb.base_venv_path = Path("/nonexistent-base")
     sb.cpu_only = True
     env = sb._subprocess_env()
     assert env["TF_USE_LEGACY_KERAS"] == "1"
@@ -210,6 +211,7 @@ def test_verifier_runtime_matches_what_graded_programs_get(monkeypatch):
     runtime = grading_runtime()
     sb = object.__new__(ExecutionSandbox)
     sb.venv_path = Path("/nonexistent-venv")
+    sb.base_venv_path = Path("/nonexistent-base")
     sb.cpu_only = True
     graded_env = sb._subprocess_env()
     assert runtime["python"] == "/py3.10"

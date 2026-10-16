@@ -11,7 +11,7 @@ should approach 100% (figure tasks need OPENAI_API_KEY or they are excluded).
 Uses the SAME ExecutionSandbox + methods (run_generated_code / run_eval_script)
 as Mimosa's real eval, and by default the SAME base packages
 (ExecutionSandbox.BASIC_PACKAGES: torch/tensorflow/rdkit/…). The first task pays
-a one-time heavy install into the shared venv; every task after reuses it.
+a one-time heavy install of the base layer; each task then grades in its own venv.
 
 Input datasets are untracked and live in the MAIN working tree, not in a git
 worktree — this harness resolves them (and the CSV) by walking up to the main

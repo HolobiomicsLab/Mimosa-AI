@@ -143,7 +143,7 @@ class CapsuleEvaluator:
             }
         finally:
             if self.sandbox is not None:
-                self.sandbox.cleanup()  # free per-task disk; shared venv persists
+                self.sandbox.cleanup()  # removes the capsule venv; base layer persists
 
         self.metrics['summary'] = self._generate_summary()
         self.logger.info(f"[EVAL] Evaluation complete for task {self.instance_id}")

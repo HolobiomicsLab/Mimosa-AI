@@ -309,16 +309,18 @@ class ExecutionSandbox:
         "pip-tools",
     ]
 
-    # Process-wide base venvs, created once per environment fingerprint and
-    # reused across tasks. Keyed by a hash of (base_packages, constraints) so
-    # queued runs with differing environments never share (and drift) a venv.
-    # Entry: {"venv_path": Path, "base_dir": str, "constraints_file": str}
+    # Process-wide BASE LAYERS, one per environment fingerprint (base_packages,
+    # constraints). A base layer is built once with the base stack and is
+    # IMMUTABLE afterwards: per-capsule installs never go into it. Each graded
+    # capsule gets its own fresh venv that sees the base layer through a .pth
+    # file (see _create_capsule_venv), so torch/tensorflow are installed once
+    # while no capsule can change another capsule's packages. Before
+    # 2026-10-16 every task installed into one shared venv: deepchem 2.7.1
+    # (Task 1) pinned scipy to 1.8.1 for all later tasks, which crashed the
+    # drugex capsule (Task 17) natively; a fresh venv graded it SR True.
+    # Entry: {"venv_path", "base_dir", "constraints_file", "python", "site_packages"}
     _shared_venvs: dict[str, dict] = {}
     _shared_venv_lock = threading.Lock()
-    # Serializes pip installs into shared venvs — after the C1 fix the eval
-    # loop runs sandbox setup from multiple threads (asyncio.to_thread), so
-    # event-loop serialization no longer protects per-task installs.
-    _shared_install_lock = threading.Lock()
 
     def __init__(
         self,
@@ -329,9 +331,11 @@ class ExecutionSandbox:
         """
         Initialize execution sandbox and set up its Python environment.
 
-        The base venv is created ONCE per process and reused across tasks (see
-        _create_or_reuse_base_venv); only the per-task working directories are
-        rebuilt each time. This avoids re-installing torch/tensorflow per task.
+        The base layer is built ONCE per process and reused (see
+        _create_or_reuse_base_venv). Every sandbox then creates its own fresh
+        venv on top of it and installs this capsule's dependencies there only
+        (see _create_capsule_venv), so grading never depends on which tasks
+        ran before.
 
         Args:
             capsule_path: Path to capsule directory containing generated code
@@ -339,7 +343,7 @@ class ExecutionSandbox:
                 from the spawned scripts. Sidesteps CUDA/XLA plumbing issues
                 (e.g. missing libdevice) that would otherwise fail VER on
                 machines with a partial CUDA install.
-            base_packages: Packages to ensure in the shared venv. Defaults to
+            base_packages: Packages of the shared base layer. Defaults to
                 BASIC_PACKAGES; pass a lighter set for fast, targeted runs.
         """
         self.capsule_path = Path(capsule_path)
@@ -348,16 +352,17 @@ class ExecutionSandbox:
         self.logger = logging.getLogger(f"{__name__}.{self.__class__.__name__}")
         self._constraints_file: str | None = None  # set by _create_or_reuse_base_venv
 
-        # Per-instance temp dir for execution/eval working copies (cleaned per task).
+        # Per-instance temp dir: capsule venv plus execution/eval working copies.
         self._temp_dir_context = tempfile.TemporaryDirectory(prefix="mimosa_sandbox_")
         self.temp_dir = Path(self._temp_dir_context.name)
 
-        # Reuse the process-wide base venv instead of rebuilding it per task.
-        self.venv_path = self._create_or_reuse_base_venv()
+        base = self._create_or_reuse_base_venv()
+        self.base_venv_path = base["venv_path"]
+        self.venv_path = self._create_capsule_venv(base)
         self.python_exe = self.venv_path / "bin" / "python"
         self.pip_exe = self.venv_path / "bin" / "pip"
 
-        # Ensure base + capsule dependencies are present in the shared venv.
+        # Install this capsule's dependencies into its own venv only.
         self._setup_environment()
 
     def _venv_fingerprint(self) -> str:
@@ -405,77 +410,124 @@ class ExecutionSandbox:
             raise subprocess.TimeoutExpired(cmd, timeout, output=stdout, stderr=stderr)
         return subprocess.CompletedProcess(cmd, proc.returncode, stdout, stderr)
 
-    def _create_or_reuse_base_venv(self) -> Path:
-        """Create the process-wide base venv once per env fingerprint, then reuse it.
+    def _create_or_reuse_base_venv(self) -> dict:
+        """Build the process-wide base layer once per env fingerprint, then reuse it.
 
-        Building a fresh venv and re-installing heavy packages (torch,
-        tensorflow) for every task dominated eval time. The venv is created
-        once per (base_packages, constraints) fingerprint, cached on the
-        class, and reused; per-task working directories stay isolated.
-        Creation is lock-guarded; per-task installs into the shared venv are
-        serialized by _shared_install_lock (see _setup_environment).
+        ``__init__`` calls it for every sandbox. The first call per
+        fingerprint creates a Python SANDBOX_PYTHON_VERSION venv and installs
+        the whole base stack in one pip transaction; the layer is registered
+        only after that install succeeds, and nothing installs into it later.
+        Creation is serialized by _shared_venv_lock.
+
+        Returns:
+            dict: Base-layer entry with ``venv_path`` (Path), ``base_dir``
+            (str), ``constraints_file`` (str), ``python`` (str, interpreter
+            that built it) and ``site_packages`` (list[str]).
+
+        Raises:
+            RuntimeError: When the interpreter or venv cannot be created.
+            EvalInfraError: When the base-stack install fails.
         """
         cls = type(self)
         fingerprint = self._venv_fingerprint()
         with cls._shared_venv_lock:
             existing = cls._shared_venvs.get(fingerprint)
             if existing is not None and (existing["venv_path"] / "bin" / "python").exists():
-                self.logger.info(f"[SANDBOX] Reusing shared base venv at {existing['venv_path']}")
+                self.logger.info(f"[SANDBOX] Reusing base layer at {existing['venv_path']}")
                 self._constraints_file = existing["constraints_file"]
-                return existing["venv_path"]
+                return existing
 
             base_dir = tempfile.mkdtemp(prefix="mimosa_base_venv_")
             venv_path = Path(base_dir) / "venv"
             py = resolve_sandbox_python()
             self.logger.info(
-                f"[SANDBOX] Creating shared Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py} "
+                f"[SANDBOX] Creating base layer: Python {SANDBOX_PYTHON_VERSION} venv at {venv_path} via {py} "
                 f"(fingerprint {fingerprint})"
             )
-            result = self._run_process(
-                [py, "-m", "venv", str(venv_path)],
-                timeout=600,
-            )
-            if result.returncode != 0:
-                shutil.rmtree(base_dir, ignore_errors=True)
-                raise RuntimeError(
-                    f"venv creation failed via {py}: {result.stderr[:500]} "
-                    f"(missing module? apt install python{SANDBOX_PYTHON_VERSION}-venv)"
-                )
-
-            python_exe = venv_path / "bin" / "python"
-            if not python_exe.exists():
-                shutil.rmtree(base_dir, ignore_errors=True)
-                raise RuntimeError(
-                    f"Virtual environment created but Python executable not found at {python_exe}."
-                )
-
-            # Fail loudly on a version mismatch instead of evaluating on the wrong interpreter.
-            ver = subprocess.run(
-                [str(python_exe), "--version"], capture_output=True, text=True, timeout=10
-            )
-            got = (ver.stdout or ver.stderr).strip()
-            if not got.startswith(f"Python {SANDBOX_PYTHON_VERSION}."):
-                shutil.rmtree(base_dir, ignore_errors=True)
-                raise RuntimeError(
-                    f"Eval venv is {got}, expected Python {SANDBOX_PYTHON_VERSION}.x"
-                )
-
             constraints = Path(base_dir) / "constraints.txt"
             constraints.write_text("\n".join(PINNED_CONSTRAINTS) + "\n")
-
-            cls._shared_venvs[fingerprint] = {
-                "venv_path": venv_path,
-                "base_dir": base_dir,
-                "constraints_file": str(constraints),
-            }
             self._constraints_file = str(constraints)
+            try:
+                self._make_venv(py, venv_path)
+                self._pip_install(venv_path / "bin" / "pip", self.base_packages)
+                entry = {"venv_path": venv_path, "base_dir": base_dir,
+                         "constraints_file": str(constraints), "python": py,
+                         "site_packages": self._site_packages(venv_path / "bin" / "python")}
+            except BaseException:
+                shutil.rmtree(base_dir, ignore_errors=True)
+                raise
+            cls._shared_venvs[fingerprint] = entry
             atexit.register(cls.cleanup_shared_venv)
-            self.logger.info(f"[SANDBOX] Shared base venv ready at {venv_path} ({got})")
-            return venv_path
+            self.logger.info(f"[SANDBOX] Base layer ready at {venv_path}")
+            return entry
+
+    def _make_venv(self, python: str, venv_path: Path) -> None:
+        """Create one venv and check it runs the grading Python version.
+
+        The base layer and every capsule venv are made with it, from the
+        interpreter resolved by ``resolve_sandbox_python``.
+
+        Args:
+            python (str): Absolute path of the grading interpreter.
+            venv_path (Path): Directory to create; must not exist yet.
+
+        Raises:
+            RuntimeError: When venv creation fails or the version is wrong.
+        """
+        result = self._run_process([python, "-m", "venv", str(venv_path)], timeout=600)
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"venv creation failed via {python}: {result.stderr[:500]} "
+                f"(missing module? apt install python{SANDBOX_PYTHON_VERSION}-venv)"
+            )
+        python_exe = venv_path / "bin" / "python"
+        if not python_exe.exists():
+            raise RuntimeError(f"Virtual environment created but Python executable not found at {python_exe}.")
+        ver = subprocess.run([str(python_exe), "--version"], capture_output=True, text=True, timeout=10)
+        got = (ver.stdout or ver.stderr).strip()
+        if not got.startswith(f"Python {SANDBOX_PYTHON_VERSION}."):
+            raise RuntimeError(f"Eval venv is {got}, expected Python {SANDBOX_PYTHON_VERSION}.x")
+
+    @staticmethod
+    def _site_packages(python_exe: Path) -> list[str]:
+        """Return the purelib and platlib directories of one venv.
+
+        Args:
+            python_exe (Path): The venv's ``bin/python``.
+
+        Returns:
+            list[str]: Distinct site-packages paths, purelib first.
+        """
+        probe = "import sysconfig as s; p = s.get_paths(); print(p['purelib']); print(p['platlib'])"
+        out = subprocess.run([str(python_exe), "-c", probe], capture_output=True, text=True, timeout=30, check=True)
+        return list(dict.fromkeys(out.stdout.split()))
+
+    def _create_capsule_venv(self, base: dict) -> Path:
+        """Create this capsule's fresh venv layered over the immutable base layer.
+
+        ``__init__`` calls it once per sandbox. A ``.pth`` file appends the
+        base layer's site-packages after the capsule venv's own, so base
+        packages import without reinstalling; pip then reports them as
+        satisfied, and a capsule that needs another version installs it into
+        its own venv, which shadows the base copy ("Not uninstalling ...
+        outside environment"). The venv lives in the sandbox temp dir and is
+        removed by ``cleanup``.
+
+        Args:
+            base (dict): Base-layer entry from ``_create_or_reuse_base_venv``.
+
+        Returns:
+            Path: The capsule venv directory.
+        """
+        venv_path = self.temp_dir / "venv"
+        self._make_venv(base["python"], venv_path)
+        own = self._site_packages(venv_path / "bin" / "python")
+        (Path(own[0]) / "_mimosa_base_layer.pth").write_text("\n".join(base["site_packages"]) + "\n")
+        return venv_path
 
     @classmethod
     def cleanup_shared_venv(cls) -> None:
-        """Remove all process-wide base venvs (also registered with atexit)."""
+        """Remove all process-wide base layers (also registered with atexit)."""
         with cls._shared_venv_lock:
             for entry in cls._shared_venvs.values():
                 base_dir = entry["base_dir"]
@@ -483,46 +535,37 @@ class ExecutionSandbox:
                     shutil.rmtree(base_dir, ignore_errors=True)
             cls._shared_venvs.clear()
 
-    # Small tools that must be installed before per-task dep discovery can run.
-    _DISCOVERY_TOOLS = ("pipreqs", "pip-tools")
-
     def _setup_environment(self) -> None:
-        """Ensure base packages and capsule dependencies exist in the shared venv.
+        """Install this capsule's dependencies into its own venv.
 
-        Install order: the pipreqs/pip-tools discovery tools first (needed to
-        analyze the capsule), then the rest of the base stack and the per-task
-        deps in ONE pip transaction — pip co-resolves the full graph instead of
-        drifting across separate installs (matching the authors' merged
-        ``pip install -r`` in config_conda_env.py).
+        The base stack is listed again in the same pip transaction, so pip
+        co-resolves the full graph (matching the authors' merged
+        ``pip install -r`` in config_conda_env.py): base packages that fit
+        are already satisfied through the base layer, and a per-capsule
+        conflict is installed into the capsule venv only. No lock is needed:
+        the capsule venv is private to this sandbox.
         """
         try:
-            # Serialize installs into the shared venv across worker threads.
-            with type(self)._shared_install_lock:
-                tools = [p for p in self.base_packages if p in self._DISCOVERY_TOOLS]
-                if tools:
-                    self._install_packages(tools)
+            per_task, present = self._discover_capsule_dependencies()
 
-                per_task, present = self._discover_capsule_dependencies()
-
-                rest = [p for p in self.base_packages if p not in self._DISCOVERY_TOOLS]
-                # Drop per-task entries already covered (pinned) by the base set —
-                # pip errors on a requirement named twice in one command.
-                rest_names = {self._req_name(p) for p in rest}
-                merged = rest + [p for p in per_task if self._req_name(p) not in rest_names]
-                # Sdist-only packages needing build-env pins get their own pip
-                # call (see SOURCE_BUILD_CONSTRAINTS) so their backend drift
-                # cannot fail the whole merged transaction.
-                source_pinned = [
-                    p for p in merged if self._req_name(p) in SOURCE_BUILD_CONSTRAINTS
-                ]
-                merged = [
-                    p for p in merged if self._req_name(p) not in SOURCE_BUILD_CONSTRAINTS
-                ]
-                # pip skips already-satisfied packages, so this is cheap after the first task.
-                self.logger.info("[SANDBOX] Ensuring base + per-program packages...")
-                self._install_packages(merged)
-                self._install_source_constrained(source_pinned)
-                self._run_special_case_installs(present)
+            rest = list(self.base_packages)
+            # Drop per-task entries already covered (pinned) by the base set —
+            # pip errors on a requirement named twice in one command.
+            rest_names = {self._req_name(p) for p in rest}
+            merged = rest + [p for p in per_task if self._req_name(p) not in rest_names]
+            # Sdist-only packages needing build-env pins get their own pip
+            # call (see SOURCE_BUILD_CONSTRAINTS) so their backend drift
+            # cannot fail the whole merged transaction.
+            source_pinned = [
+                p for p in merged if self._req_name(p) in SOURCE_BUILD_CONSTRAINTS
+            ]
+            merged = [
+                p for p in merged if self._req_name(p) not in SOURCE_BUILD_CONSTRAINTS
+            ]
+            self.logger.info("[SANDBOX] Ensuring base + per-program packages in the capsule venv...")
+            self._install_packages(merged)
+            self._install_source_constrained(source_pinned)
+            self._run_special_case_installs(present)
 
         except Exception as e:
             self.logger.error(f"[SANDBOX] Failed to setup environment: {e}")
@@ -601,15 +644,31 @@ class ExecutionSandbox:
         return missed
 
     def _install_packages(self, packages: list[str]) -> None:
-        """Install packages in the venv, capped by the shared constraints file.
+        """Install packages into this capsule's venv, capped by the constraints file.
 
         A non-zero pip return code raises EvalInfraError: a broken environment
         is not an agent failure, so the task is excluded from metrics.
         """
+        self._pip_install(self.pip_exe, packages)
+
+    def _pip_install(self, pip_exe: Path, packages: list[str]) -> None:
+        """Run one constraint-capped ``pip install`` with the given pip.
+
+        ``_install_packages`` passes the capsule venv's pip; the base-layer
+        build passes the base venv's pip, once.
+
+        Args:
+            pip_exe (Path): ``bin/pip`` of the target venv.
+            packages (list[str]): Requirement specifiers; empty is a no-op.
+
+        Raises:
+            EvalInfraError: When pip exits non-zero.
+            subprocess.TimeoutExpired: When pip runs past 900 s.
+        """
         if not packages:
             return
 
-        cmd = [str(self.pip_exe), "install", "--quiet"]
+        cmd = [str(pip_exe), "install", "--quiet"]
         if self._constraints_file:
             cmd += ["-c", self._constraints_file]
         cmd += packages
@@ -638,8 +697,8 @@ class ExecutionSandbox:
         honours the ``PIP_CONSTRAINT`` environment variable inside build
         environments. Each package (a key of SOURCE_BUILD_CONSTRAINTS) is
         installed in its own pip call carrying the runtime constraints file
-        plus a per-package build-constraints file written next to the shared
-        venv (removed together with it by cleanup_shared_venv).
+        plus a per-package build-constraints file written next to the capsule
+        venv (removed together with it by cleanup).
 
         Like _install_packages, a non-zero pip return code raises
         EvalInfraError: a broken environment is not an agent failure, so the
@@ -711,7 +770,7 @@ class ExecutionSandbox:
 
     def _run_pipreqs(self) -> Path | None:
         """Run pipreqs over the capsule's Python files; return requirements.in or None."""
-        pipreqs_exe = self.venv_path / "bin" / "pipreqs"
+        pipreqs_exe = self.base_venv_path / "bin" / "pipreqs"  # base-layer tool
         if not pipreqs_exe.exists():
             self.logger.warning("[SANDBOX] pipreqs missing, skipping dependency analysis")
             return None
@@ -761,10 +820,10 @@ class ExecutionSandbox:
     def _subprocess_env(self) -> dict:
         """Build the env dict for spawned scripts, applying cpu_only if set."""
         env = os.environ.copy()
-        # Put the venv's bin/ first on PATH so console scripts installed into the
-        # sandbox (e.g. chemprop_train) resolve when generated code shells out to
-        # them by name.
-        env["PATH"] = str(self.venv_path / "bin") + os.pathsep + env.get("PATH", "")
+        # Capsule venv bin/ first, then the base layer's, so console scripts
+        # (e.g. chemprop_train) resolve when generated code shells out to them
+        # by name, and a capsule-installed version wins over the base one.
+        env["PATH"] = os.pathsep.join([str(self.venv_path / "bin"), str(self.base_venv_path / "bin"), env.get("PATH", "")])
         if self.cpu_only:
             env["CUDA_VISIBLE_DEVICES"] = CPU_ONLY_ENV["CUDA_VISIBLE_DEVICES"]
             env.setdefault("TF_CPP_MIN_LOG_LEVEL", CPU_ONLY_ENV["TF_CPP_MIN_LOG_LEVEL"])

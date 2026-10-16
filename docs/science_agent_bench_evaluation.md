@@ -42,7 +42,7 @@ not re-implement the benchmark; it bridges Mimosa to it.
 sources/benchmark_evaluation/
 ├── csv_mode.py               # Drives evaluation over the task CSV, aggregates metrics
 ├── capsule_evaluator.py      # Per-task VER/SR/CBS orchestrator
-├── execution_sandbox.py      # Sandboxed code execution + shared venv
+├── execution_sandbox.py      # Sandboxed code execution: base layer + per-capsule venv
 ├── codebert_scorer.py        # Code similarity scoring
 └── science_agent_bench.py    # Dataset/eval-script/gold-program loader
 ```
@@ -124,8 +124,15 @@ version drift:
   `pyvenv.cfg` is left out of the pipreqs scan, the AST fallback and the
   execution/eval copies.
 
-The venv is built **once per process** and reused across tasks (per-program deps
-installed on top), so the first task pays the heavy install and the rest reuse it.
+**Every graded capsule gets a fresh venv.** The base stack is installed **once
+per process** into an immutable *base layer*. Each capsule (final capsule and
+every ablation snapshot) then gets its own new venv whose `.pth` file exposes
+the base layer's site-packages; its pipreqs-derived deps are installed into the
+capsule venv only, where a capsule-specific version shadows the base copy. The
+capsule venv is deleted with the sandbox, so no capsule can change another's
+packages. Before 2026-10-16 all tasks shared one venv: deepchem 2.7.1 (Task 1)
+left scipy 1.8.1 behind, which crashed Task 17's scikit-learn PCA natively; the
+same capsule graded in a fresh venv passed VER and SR.
 Without the rdkit/numpy pins, RDKit-based tasks (e.g. `deepchem`/clintox) crash
 with a numpy ragged-array error; with them, the gold reproduces (VER=SR=1).
 
@@ -235,8 +242,8 @@ in the config.
 program (VER) and feeds the result through the eval script (SR). A correct
 pipeline scores VER = SR = 100% on the gold. With no arguments it runs the
 **full benchmark** (all 102 tasks from the CSV) using the same base packages as
-Mimosa (`BASIC_PACKAGES`), so the first task pays a one-time heavy install into
-the shared venv. Run from the main checkout (the input datasets are not in a
+Mimosa (`BASIC_PACKAGES`), so the first task pays a one-time heavy install of
+the base layer. Run from the main checkout (the input datasets are not in a
 worktree):
 
 ```sh
