@@ -718,7 +718,9 @@ class LLMProvider:
                     provider_routing = {
                         "order": self.config.openrouter_provider,
                         "allow_fallbacks": False,
-                        "require_parameters": True,
+                        # OpenRouter's Claude endpoints list no sampling or
+                        # logprobs params; requiring them leaves no endpoint.
+                        "require_parameters": not self.config.model.startswith("anthropic/"),
                     }
                     if self.config.openrouter_quantizations:
                         provider_routing["quantizations"] = self.config.openrouter_quantizations

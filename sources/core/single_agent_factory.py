@@ -183,11 +183,13 @@ elif engine_name == "litellm":
     _litellm_extra = dict(logprobs_kwargs)
     if openrouter_provider and str(model_id).startswith("openrouter/"):
         _order = [openrouter_provider] if isinstance(openrouter_provider, str) else list(openrouter_provider)
+        # OpenRouter's Claude endpoints list neither temperature nor logprobs,
+        # so require_parameters=True 404s for anthropic/*; relax it there only.
         _litellm_extra["extra_body"] = {{
             "provider": {{
                 "order": _order,
                 "allow_fallbacks": False,
-                "require_parameters": True,
+                "require_parameters": not str(model_id).startswith("openrouter/anthropic/"),
             }}
         }}
     # OpenAI deprecated `max_tokens` for `max_completion_tokens`;
