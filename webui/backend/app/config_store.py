@@ -40,15 +40,15 @@ DEFAULT_DISCOVERY = {"ip": "0.0.0.0", "port_min": 5000, "port_max": 5200}
 # Suggested model ids per role, grouped by provider, for the picker.
 MODEL_PRESETS = {
     "orchestration": [
-        "anthropic/claude-opus-4-8", "openrouter/z-ai/glm-5.2",
-        "mistral/mistral-medium-3-5", "openai/gpt-5",
+        "anthropic/claude-opus-5-5", "openrouter/z-ai/glm-5.3",
+        "mistral/mistral-medium-3-5", "openai/gpt-6.1",
     ],
     "agent": [
         "deepseek/deepseek-v4-flash", "openrouter/deepseek/deepseek-v4-flash",
-        "anthropic/claude-sonnet-5", "mistral/mistral-medium-3-5",
+        "anthropic/claude-sonnet-5-5", "mistral/mistral-medium-3-5",
     ],
     "judge": [
-        "openrouter/z-ai/glm-5.2", "anthropic/claude-opus-4-8",
+        "openrouter/z-ai/glm-5.3", "anthropic/claude-opus-5-5",
         "deepseek/deepseek-v4-flash",
     ],
 }

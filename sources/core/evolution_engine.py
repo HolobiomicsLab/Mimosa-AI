@@ -355,24 +355,6 @@ def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRu
     candidate list for cross-checks, before the final argmax. Three
     signals, in order of trust:
 
-    1. ``state_result.evaluation.verifier.reward_fallback`` in
-       ``FALLBACK_REWARD_KINDS`` (``"mean_claim"``, ``"oracle_censored"``
-       for a censored full-oracle gold-feedback generation, or
-       ``"unmeasured_prior"`` for a generation whose scorers all failed on
-       a workspace that produced artifacts — N9)
-       — the ground truth the verifier persisted next to the score. When
-       it contradicts ``run.reward_is_fallback`` the disk wins and a
-       warning is logged: the engine assigns the flag once, right after
-       evaluation, and any wiring gap there (pains_brenk gen 13: 0.745
-       mean-claim reward shipped over gen 15's 0.25 pairwise win) must
-       not silently re-enter the argmax.
-    2. ``run.reward_is_fallback`` already set by the engine.
-    3. Suspicious signature: a positive reward with ZERO pairwise
-       comparisons recorded (``n_pairs == 0``/``n_wins == 0`` — legacy
-       artifacts without the ``reward_fallback`` key) while sibling
-       candidates DO carry real pairwise records. Scales are
-       incomparable, so it is treated as a fallback with a warning.
-
     Args:
         run (IndividualRun): Candidate run being judged.
         candidates (list[IndividualRun]): All candidate runs of the
@@ -396,9 +378,6 @@ def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRu
     if run.reward_is_fallback:
         return True
     if verifier.get("reward_source") == "benchmark_grader":
-        # Full-oracle gold feedback: the reward IS the benchmark grade, a
-        # real measurement on the oracle scale; the hybrid pairwise
-        # counters it keeps (n_pairs=0 at gen 0) say nothing about it.
         return False
     n_pairs = _scalar(verifier.get("n_pairs"))
     n_wins = _scalar(verifier.get("n_wins"))
@@ -430,18 +409,6 @@ def _select_best_run(runs: list[IndividualRun]) -> IndividualRun | None:
 
     :func:`_select_capsule_run` calls this once at session end, with the
     completed session runs.
-    First-generation fallback rewards (``reward_is_fallback`` — the mean
-    claim score, not a pairwise win) are excluded from the argmax: they
-    live on a different scale and routinely outrank real pairwise rewards
-    (E37 R1: bulk_modulus shipped gen 0's 0.89 fallback over gen 11's
-    winning 0.70; N1/pains_brenk: gen 13's 0.745 mean-claim fallback
-    shipped over gen 15's 0.25 pairwise win while 13 crashed generations
-    padded the candidate list). The flag is cross-checked against each
-    run's persisted ``state_result`` (see :func:`_run_reward_is_fallback`)
-    so a lost engine-side flag cannot resurrect a fallback. When every
-    run is a fallback (single-generation task) the best fallback ships.
-    Only the final capsule selection is affected — QD archive admission
-    reads rewards unchanged.
 
     Args:
         runs (list[IndividualRun]): Completed session runs; entries
