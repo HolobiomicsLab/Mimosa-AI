@@ -283,3 +283,30 @@ def test_workflow_info_flags_unmeasured_prior(tmp_path: Path):
     )
     assert wf.reward_is_fallback is True
     assert wf.overall_score == 0.5  # same evaluation block backs both reads
+
+
+def _policy_run(uuid, rating, iteration, outcomes):
+    return _run_verifier(uuid, rating, iteration, {"verifier_kind": "policy_bt", "pair_outcomes": outcomes})
+
+
+def test_policy_rating_tie_ships_earliest_not_newest():
+    """Live case 2026-10-17 drugex: gen 0 (SR True) and gen 4 (SR False)
+    ended at the same rating 0.628315862424779; newest-wins shipped gen 4."""
+    rating = 0.628315862424779
+    runs = [_policy_run("gen0", rating, 0, {}),
+            _policy_run("gen2", 0.31, 2, {"gen0": "loss"}),
+            _policy_run("gen4", rating, 4, {"gen0": "tie", "gen2": "win"})]
+    assert _select_best_run(runs).current_uuid == "gen0"
+
+
+def test_policy_rating_tie_prefers_head_to_head_winner():
+    """A later tied run that beat the earlier one directly ships."""
+    runs = [_policy_run("gen0", 0.6, 0, {}), _policy_run("gen3", 0.6, 3, {"gen0": "win"})]
+    assert _select_best_run(runs).current_uuid == "gen3"
+    runs[1] = _policy_run("gen3", 0.6, 3, {"gen0": "loss"})
+    assert _select_best_run(runs).current_uuid == "gen0"
+
+
+def test_policy_strictly_higher_rating_still_wins():
+    runs = [_policy_run("gen0", 0.4, 0, {}), _policy_run("gen1", 0.6, 1, {"gen0": "win"})]
+    assert _select_best_run(runs).current_uuid == "gen1"

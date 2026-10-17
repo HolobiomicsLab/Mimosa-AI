@@ -238,7 +238,7 @@ class PolicyBTVerifierEvaluator(BaseEvaluator):
             finally:
                 bundle.pop("_pair_uuids", None)
             if verdict["winner"] == "tie" and getattr(self.config, "policy_bt_visual_channel", True):
-                verdict = self._visual_verdict(state, (left, right), root) or verdict
+                verdict = _with_visual(verdict, self._visual_verdict(state, (left, right), root))
             self._report.pair(left["uuid"], right["uuid"], verdict, pair_file_diff(root))
             return verdict
 
@@ -362,6 +362,31 @@ def _execution_verdict(left: dict, right: dict) -> dict:
     winner = "tie" if a["eligible"] == b["eligible"] else "a" if a["eligible"] else "b"
     return {"winner": winner, "stage": 0, "feedback_a": a["reason"], "feedback_b": b["reason"],
             "evidence": [{"side": "a", "execution": a}, {"side": "b", "execution": b}], "channel": "execution"}
+
+
+def _with_visual(code: dict, visual: dict | None) -> dict:
+    """Combine a code tie with the visual channel's result.
+
+    ``_artifact_verdict`` calls it after a code tie. A decisive visual
+    verdict replaces the winner, stage, feedback and evidence but keeps the
+    code adapter values (``normalized_a``/``normalized_b``) that the
+    gradient fold reads. A visual tie keeps the code verdict and adds each
+    side's observed figure deficiencies.
+
+    Args:
+        code (dict): Tied verdict from ``PolicyEngine.compare``.
+        visual (dict | None): Result of ``VisualChannel.compare``; ``None``
+            when no images or the channel failed.
+
+    Returns:
+        dict: The pair verdict to store.
+    """
+    if visual is None:
+        return code
+    if visual["winner"] != "tie":
+        return {**code, **visual}
+    return {**code, "visual_deficiencies": visual["visual_deficiencies"],
+            "visual_prompt_version": visual.get("visual_prompt_version")}
 
 
 def main() -> int:

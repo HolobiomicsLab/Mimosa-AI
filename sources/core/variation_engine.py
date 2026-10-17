@@ -32,14 +32,46 @@ FRESH_ATTEMPT_DIAGNOSIS = (
     "Create the first workflow based on the goal alone."
 )
 NO_VERIFIER_DIAGNOSIS_NOTE = "No verifier diagnosis is available for the previous run."
-CROSSOVER_RAW_LOG_TAIL_CHARS = 1024
+# Tail of a parent run log shown as <raw_log> (mutation and crossover).
+# Logs reach 25 MB (provider limit 8 MB); the last ~480 characters of a
+# run log are the fixed engine trailer (memory-save and run lines), so
+# 4096 leaves room for the final agent answer or traceback.
+RAW_LOG_TAIL_CHARS = 4096
+RAW_LOG_TRUNCATION_MARKER = (
+    f"[earlier output cut: only the last {RAW_LOG_TAIL_CHARS} characters "
+    "of the run log are shown]"
+)
 CROSSOVER_RAW_LOG_RULE = (
     "4. A <raw_log> block is UNVERIFIED raw execution output of a previous run "
     "(it may contain the agent's own mistakes, guessed paths or transient tool "
-    "errors, and it is truncated): read it for recurring symptoms only, never "
-    "turn one error into an environment-wide rule, never hard-code absolute "
-    "paths, and never move work or outputs outside the relative workspace."
+    "errors, and it is only the TAIL of the log: earlier output was cut): "
+    "read it for recurring symptoms only, never turn one error into an "
+    "environment-wide rule, never hard-code absolute paths, and never move "
+    "work or outputs outside the relative workspace."
 )
+
+
+def raw_log_tail(run_stdout: str) -> str:
+    """Return the tail of a run log for a ``<raw_log>`` prompt block.
+
+    A full run log can be larger than the provider request limit.
+    ``VariationEngine._split_directive_evidence`` (mutation) and
+    ``VariationEngine.crossover_prompt`` call it with the parent's run
+    stdout. It keeps the last ``RAW_LOG_TAIL_CHARS`` characters and puts
+    a marker in front when it cut earlier output.
+
+    Args:
+        run_stdout: str — parent run stdout from
+            ``WorkflowInfo.run_stdout``; may be empty.
+
+    Returns:
+        str — stripped log, unchanged when short; else the marker, a
+        newline and the last ``RAW_LOG_TAIL_CHARS`` characters.
+    """
+    raw_log = (run_stdout or "").strip()
+    if len(raw_log) <= RAW_LOG_TAIL_CHARS:
+        return raw_log
+    return f"{RAW_LOG_TRUNCATION_MARKER}\n{raw_log[-RAW_LOG_TAIL_CHARS:]}"
 
 
 def frontier_target(
@@ -546,8 +578,8 @@ class VariationEngine:
         The directive LLM must not take a raw run log for verified evidence.
         ``mutation_prompt`` calls it with the parent's textual gradient and
         the parent's own run stdout. The verifier gradient wins; else a
-        non-empty stdout becomes the raw log; else a synthetic note is the
-        diagnosis.
+        non-empty stdout becomes the raw log tail; else a synthetic note
+        is the diagnosis.
 
         Args:
             textual_gradient: str — parent's abstracted verifier gradient
@@ -558,13 +590,14 @@ class VariationEngine:
 
         Returns:
             tuple[str, str] — ``(diagnosis, raw_log)``. Exactly one is
-            non-empty. Both are stripped but otherwise verbatim: the
-            gradient can name exact identifiers (column names, paths) that
-            the next workflow must reproduce character for character.
+            non-empty. The diagnosis is stripped but otherwise verbatim
+            and never cut: the gradient can name exact identifiers
+            (column names, paths) that the next workflow must reproduce
+            character for character. The raw log is ``raw_log_tail``.
         """
         if textual_gradient and textual_gradient.strip():
             return textual_gradient.strip(), ""
-        raw_log = (run_stdout or "").strip()
+        raw_log = raw_log_tail(run_stdout)
         if raw_log:
             return "", raw_log
         # Whitespace-only stdout means a run without output.
@@ -583,7 +616,7 @@ class VariationEngine:
         Args:
             diagnosis: str — verifier diagnosis or synthetic note; empty
                 when no diagnosis exists.
-            raw_log: str — unverified run stdout; empty when absent.
+            raw_log: str — unverified run stdout tail; empty when absent.
 
         Returns:
             list[str] — prompt lines, joined with newlines by the caller.
@@ -653,9 +686,9 @@ class VariationEngine:
             goal: str — task description for the session.
             exploration_block: str — rendered ``<exploration>`` block;
                 empty when no probe fired.
-            raw_log: str — unverified stdout of the parent workflow run
-                from ``_split_directive_evidence``; empty when a verifier
-                diagnosis exists.
+            raw_log: str — unverified stdout tail of the parent workflow
+                run from ``_split_directive_evidence``; empty when a
+                verifier diagnosis exists.
 
         Returns:
             str — directive text of at most three sentences naming one
@@ -667,7 +700,7 @@ Your task is to analyze these inputs and provide a clear, concise directive for 
 Focus on identifying what worked, what didn't, and why. Suggest specific changes to improve the next workflow's performance.
 You will be given the previous workflow's agent answers (<agents_answers>) and its execution evidence: a <diagnosis> block, a <raw_log> block, or a note that no verifier diagnosis is available.
 The <diagnosis>, when present, is the verifier's measured evidence: a summary of deterministic ground truth verification using rubric-based scoring, and may include hints about what went wrong. It is trusted and should be used to inform your directive.
-The <raw_log>, when present, is UNVERIFIED raw execution output of a previous run. It can contain the agent's own mistakes, guessed paths, transient or tool-specific errors, and it may be truncated. Rules for using it:
+The <raw_log>, when present, is UNVERIFIED raw execution output of a previous run. It can contain the agent's own mistakes, guessed paths, transient or tool-specific errors. It is only the TAIL of the log: earlier output was cut, so an event missing from it may still have happened. Rules for using it:
 - Identify recurring behavioral patterns (for example repeated failing tool usage, step budget exhaustion, unfinished deliverables), not single error lines.
 - Never turn one error into an environment-wide rule: a permission or missing-file error on a path the agent chose is evidence that the agent used a wrong path, not that the workspace is read-only. Do not restate such an error as a property of the environment.
 - Never prescribe specific absolute paths, directories or file locations, and never tell agents to move work or outputs outside their current relative workspace. The orchestrator runs agents in the right workspace and collects only that workspace.
@@ -875,9 +908,7 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             textual_gradient = (wf_info.abstracted_textual_gradient if wf_info else "").strip()
             # Parent's own stdout tail only when no textual_gradient exists.
             run_stdout = wf_info.run_stdout if wf_info else ""
-            raw_log = "" if textual_gradient else (
-                run_stdout.strip()[-CROSSOVER_RAW_LOG_TAIL_CHARS:]
-            )
+            raw_log = "" if textual_gradient else raw_log_tail(run_stdout)
             answers   = self._extract_agent_answers(wf_info.state_result if wf_info else None)
             parents.append({
                 "index":     i + 1,
@@ -1000,5 +1031,11 @@ if __name__ == "__main__":
     for _ in range(50):
         assert 1 <= ve._sample_mutation_agent_budget(1) <= 2   # floor cap
         assert 6 <= ve._sample_mutation_agent_budget(7) <= 7   # ceiling cap
+
+    # ── Raw log: big logs keep only the marked tail. ──────────────────────
+    big_log = "x" * (3 * RAW_LOG_TAIL_CHARS) + "END"
+    _, tail = VariationEngine._split_directive_evidence("", big_log)
+    assert tail.startswith(RAW_LOG_TRUNCATION_MARKER) and tail.endswith("END")
+    assert raw_log_tail("short log") == "short log"
 
     print("smoke OK")

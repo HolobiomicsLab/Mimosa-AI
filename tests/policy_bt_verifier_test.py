@@ -92,20 +92,27 @@ def _evaluate(evaluator, uuid, value):
     return evaluator.evaluate(uuid)
 
 
-def test_evaluation_refreshes_earlier_ratings_and_preserves_history(tmp_path, monkeypatch):
+def test_evaluation_refreshes_earlier_ratings_and_regradients_parents(tmp_path, monkeypatch):
+    """A parent serves the fold of ALL its current pairs, not its arrival text."""
     evaluator = _evaluator(tmp_path, monkeypatch)
     first = _evaluate(evaluator, "first", 1)
-    gradient = (evaluator.workflow_dir / "first" / "textual_gradient.txt").read_text()
+    folder = evaluator.workflow_dir / "first"
+    arrival = (folder / "textual_gradient.txt").read_text()
     second = _evaluate(evaluator, "second", 2)
     third = _evaluate(evaluator, "third", 3)
     assert first["reward"] == .5
     assert third["tournament_rewards"]["first"] < second["tournament_rewards"]["first"] < .5
     assert third["pair_outcomes"] == {"first": "win", "second": "win"}
-    persisted = json.loads((evaluator.workflow_dir / "first" / "state_result.json").read_text())
+    persisted = json.loads((folder / "state_result.json").read_text())
+    verifier = persisted["evaluation"]["verifier"]
     assert persisted["answers"] == ["preserve"]
-    assert persisted["evaluation"]["verifier"]["reward"] == third["tournament_rewards"]["first"]
-    assert persisted["evaluation"]["verifier"]["arrival_reward"] == .5
-    assert (evaluator.workflow_dir / "first" / "textual_gradient.txt").read_text() == gradient
+    assert verifier["reward"] == third["tournament_rewards"]["first"]
+    assert verifier["arrival_reward"] == .5
+    assert verifier["abstracted_textual_gradient"] == "Measured value 1.0"  # its two losses
+    assert verifier["arrival_textual_gradient"] == arrival
+    assert (folder / "textual_gradient.txt").read_text() == "Measured value 1.0"
+    history = [json.loads(line) for line in (folder / "textual_gradient_history.jsonl").read_text().splitlines()]
+    assert [entry["gradient"] for entry in history] == [arrival, "Measured value 1.0"]
     assert evaluator.evaluate("third")["tournament_version"] == third["tournament_version"]
 
 
@@ -164,17 +171,73 @@ def test_gradient_prioritizes_earliest_loss_without_rating_leak():
     assert fold_gradient(player, pairs).splitlines() == ["Fix invalid output", "Improve error", "Preserve output"]
 
 
-def test_visual_order_disagreement_keeps_code_tie(tmp_path):
+def test_tied_gradient_states_absolute_deficiencies_not_a_match():
+    """Live case: all-tie parents fed "Your run matches the other run on all
+    reported criteria" to the next mutation, which says nothing to fix."""
+    criteria = [{"id": "conformance", "description": "exact header", "direction": "satisfy"},
+                {"id": "auc", "description": "test AUC", "direction": "higher"},
+                {"id": "hidden", "description": "masked metric", "direction": "higher"}]
+    tie = {"a": "x", "b": "y", "winner": "tie", "stage": 0,
+           "feedback_a": "Your run matches the other run on all reported criteria.", "feedback_b": "same",
+           "normalized_a": {"values": {"conformance": False, "auc": None, "hidden": None},
+                            "evidence": [{"criterion": "conformance", "detail": "header is FDA_APPROVED_prob"}]},
+           "normalized_b": {"values": {"conformance": False, "auc": 0.8, "hidden": None}, "evidence": []},
+           "visual_deficiencies": {"a": ["no cumulative-integral curve"], "b": []}}
+    folded = fold_gradient({"uuid": "x", "execution": {"eligible": True}}, [tie], criteria).splitlines()
+    assert folded == ["Your run does not satisfy 'conformance': header is FDA_APPROVED_prob",
+                      "'auc' (test AUC) could not be measured from your outputs, while another run's outputs provide it.",
+                      "Figure review by the vision model (observations, not measurements):",
+                      "- no cumulative-integral curve"]
+    met = {"values": {"conformance": True, "auc": 0.8, "hidden": None}, "evidence": []}
+    clean = {**tie, "normalized_a": met, "normalized_b": met, "visual_deficiencies": {}}
+    assert fold_gradient({"uuid": "x", "execution": {"eligible": True}}, [clean], criteria).startswith("Every comparison")
+
+
+def test_gradient_does_not_restate_a_gate_already_lost_decisively():
+    criteria = [{"id": "conformance", "stage": 2, "description": "exact header", "direction": "satisfy"}]
+    own = {"values": {"conformance": False}, "evidence": [{"criterion": "conformance", "detail": "header is X_prob"}]}
+    loss = {"a": "x", "b": "y", "winner": "b", "stage": 2, "feedback_a": "Rename X_prob to X.", "feedback_b": "ok",
+            "normalized_a": own, "normalized_b": {"values": {"conformance": True}, "evidence": []}}
+    folded = fold_gradient({"uuid": "x", "execution": {"eligible": True}}, [loss], criteria)
+    assert folded == "Rename X_prob to X."
+
+
+def _plot_pair(tmp_path):
     from PIL import Image
 
     for side in ("a", "b"):
         (tmp_path / side).mkdir()
         Image.new("RGB", (8, 8), "white").save(tmp_path / side / "plot.png")
+    return {"goal": "Make a figure", "criteria": [], "paths": {"a": ["plot.png"], "b": ["plot.png"]}}
+
+
+def test_visual_order_disagreement_keeps_tie_with_each_sides_deficiencies(tmp_path):
     response = json.dumps({"winner": "a", "stage": 2, "feedback_a": "Visible A", "feedback_b": "Visible B",
+                           "deficiencies_a": ["no legend"], "deficiencies_b": ["wrong units"],
                            "evidence": [{"side": "a", "path": "plot.png", "observation": "visible"}]})
-    channel = VisualChannel(lambda content: response)
-    request = {"goal": "Make a figure", "criteria": [], "paths": {"a": ["plot.png"], "b": ["plot.png"]}}
-    assert channel.compare(request, tmp_path) is None
+    verdict = VisualChannel(lambda content: response).compare(_plot_pair(tmp_path), tmp_path)
+    assert verdict["winner"] == "tie"
+    assert verdict["visual_deficiencies"] == {"a": ["no legend"], "b": ["wrong units"]}  # forward order
+    assert verdict["visual_prompt_version"] == "visual-tiebreak-2"
+
+
+def test_malformed_deficiencies_never_cost_an_agreed_visual_winner(tmp_path):
+    response = json.dumps({"winner": "tie", "stage": 0, "feedback_a": "A", "feedback_b": "B",
+                           "deficiencies_a": "none", "deficiencies_b": [{"x": 1}, "axis unlabeled"], "evidence": []})
+    verdict = VisualChannel(lambda content: response).compare(_plot_pair(tmp_path), tmp_path)
+    assert verdict["visual_deficiencies"] == {"a": [], "b": ["axis unlabeled"]}
+
+
+def test_visual_verdict_keeps_code_adapter_values_for_the_fold():
+    from sources.evaluators.policy_bt_verifier.evaluator import _with_visual
+
+    code = {"winner": "tie", "stage": 0, "feedback_a": "m", "feedback_b": "m", "normalized_a": {"values": {"k": 1}}}
+    decisive = {"winner": "b", "stage": 3, "feedback_a": "A lacks axis", "feedback_b": "ok", "visual_deficiencies": {"a": ["axis"], "b": []}}
+    assert _with_visual(code, decisive)["normalized_a"] == {"values": {"k": 1}}
+    assert _with_visual(code, decisive)["winner"] == "b"
+    tied = _with_visual(code, {**decisive, "winner": "tie"})
+    assert tied["winner"] == "tie" and tied["feedback_a"] == "m" and tied["visual_deficiencies"]["a"] == ["axis"]
+    assert _with_visual(code, None) is code
 
 
 def test_recon_feeds_malformed_answer_back_instead_of_aborting(tmp_path):

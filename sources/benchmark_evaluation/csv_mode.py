@@ -36,7 +36,7 @@ from sources.cli.pretty_print import (
     print_summary,
     print_warn,
 )
-from sources.core.evolution_engine import EvolutionEngine
+from sources.core.evolution_engine import EvolutionEngine, _select_best_run
 from sources.core.planner import Planner
 from sources.utils.email_reporter import send_evaluation_report
 from sources.utils.transfer_toolomics import LocalTransfer
@@ -907,12 +907,9 @@ EXPECTED OUTPUT:
         }
         per_iteration_costs = self._compute_per_iteration_costs(runs)
 
-        # Best run, selected exactly as EvolutionEngine does for restore_best.
-        best_run = max(
-            (r for r in runs if getattr(r, 'current_uuid', None)),
-            key=lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count),
-            default=None,
-        )
+        # Shipped run under policy-BT (engine _select_best_run, ties included);
+        # hybrid/legacy sessions may ship the stop controller's champion.
+        best_run = _select_best_run(runs)
         best_uuid = getattr(best_run, 'current_uuid', None) if best_run else None
 
         # Order snapshots by evolution index; orphans (uuid not in runs) last,

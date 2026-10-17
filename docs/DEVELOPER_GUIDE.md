@@ -345,17 +345,22 @@ trusted, agent self-reports not, raw log unverified), and hard limits
 
 Evidence precedence is set by `_split_directive_evidence(textual_gradient,
 run_stdout)`: the verifier gradient wins and is passed verbatim (exact
-identifiers such as `FDA_APPROVED` must survive); else a non-empty `run_stdout` goes
-**verbatim** into a separate `<raw_log>` block and the prompt states
-that no verifier diagnosis is available; else a synthetic no-feedback
-note is the diagnosis. `run_stdout` is always the parent's own log
-(`WorkflowInfo.run_stdout`, read from `<uuid>/run_stdout.log`; empty
-without a parent), so the evidence describes the code being mutated.
-The raw log rules forbid turning one error into an environment rule,
+identifiers such as `FDA_APPROVED` must survive; never cut); else a
+non-empty `run_stdout` goes into a separate `<raw_log>` block as a
+**tail** (`raw_log_tail`: the last `RAW_LOG_TAIL_CHARS` = 4096
+characters, after a marker line that says earlier output was cut) and
+the prompt states that no verifier diagnosis is available; else a
+synthetic no-feedback note is the diagnosis. `run_stdout` is always the
+parent's own log (`WorkflowInfo.run_stdout`, read from
+`<uuid>/run_stdout.log`; empty without a parent), so the evidence
+describes the code being mutated. The raw log rules say the log is
+only a tail and forbid turning one error into an environment rule,
 prescribing absolute paths, or moving outputs outside the relative
 workspace. `crossover_prompt(...)` applies the same split per parent,
-each with its own log (stdout tail, last 1024 characters, in
-`<raw_log>`).
+each with its own log (same `raw_log_tail`, in `<raw_log>`). The cap
+exists because one log reached 25 MB and broke the 8 MB provider
+request limit; about 480 characters of every log tail are the fixed
+engine trailer, so 1024 left too little real output.
 
 When parent selection returns no parent on the mutation branch,
 `EvolutionEngine._mutation_parent_or_last_child` uses the generation
@@ -541,13 +546,20 @@ For each generation (`sources/evaluators/policy_bt_verifier/`):
    Bradley–Terry model; after each evaluation EVERY generation of the
    task session gets a new current rating (`arrival_reward` keeps the
    rating at arrival time). The policy-BT capsule is the argmax of the
-   current ratings. The only allowed `policy_bt_reward` value is
-   `"bradley_terry"`; `"win_rate"` raises an error.
+   current ratings; exact ties go to the most head-to-head wins among
+   the tied runs, then the earliest run. The only allowed
+   `policy_bt_reward` value is `"bradley_terry"`; `"win_rate"` raises
+   an error.
 5. **Evidence-checked gradient.** The **textual gradient**
    (`abstracted_textual_gradient` + the `textual_gradient.txt`
-   sidecar) folds the pair diagnoses, earliest decisive losses first,
-   quoting measured evidence. It is the **only** verifier signal the
-   mutator sees.
+   sidecar) is refolded for every generation whenever the tournament
+   changes, from all its current pairs: decisive feedback (losses
+   first, earliest stage first), then absolute deficiencies measured on
+   that run (failed gates, values rivals provide but it does not) and
+   the vision model's figure deficiencies. Ties never yield "you match"
+   text. The first fold stays as `arrival_textual_gradient`; every fold
+   is appended to `textual_gradient_history.jsonl`. It is the **only**
+   verifier signal the mutator sees.
 6. **Artifacts.** Per generation: `evaluation.txt` (reward, tournament
    version, execution record, PAIR VERDICTS), `textual_gradient.txt`,
    `policy_bt_evidence.json`, `verifier_policy_bt.log`. If the

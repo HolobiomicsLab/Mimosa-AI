@@ -22,8 +22,18 @@ after each evaluation.
 
 The feedback passed to the mutator remains the **textual gradient**
 (`evaluation.verifier.abstracted_textual_gradient` in `state_result.json`,
-plus `textual_gradient.txt`). It explains decisive differences and
-prioritizes the earliest stage at which the current generation lost.
+plus `textual_gradient.txt`). It is refolded for **every generation**
+each time the tournament changes, from all its current pairs: decisive
+feedback first (losses, earliest stage first), then the absolute
+deficiencies measured on that run — failed `satisfy` gates with the
+adapter's observed detail, and values a rival run provides but this run
+does not — except criteria at a stage the run already lost decisively,
+then the goal-named figure elements the vision model saw missing
+(labelled as model observations). Tied pairs never contribute "you match
+the other run" text. A parent therefore serves its latest fold at
+selection time; the first fold stays as `arrival_textual_gradient`, and
+every changed fold is appended with an ISO time and the tournament
+version to `textual_gradient_history.jsonl`.
 
 The older multi-source per-claim `VerifierEvaluator` — with its five
 claim sources (`a`/`b`/`c`/`e`/`g`), self-rated claim importances,
@@ -61,10 +71,17 @@ The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mi
 4. **Pairwise policy.** A cached deterministic Python policy compares
    each pair and returns a verdict, evidence, and feedback for both
    sides. On a tie, comparable goal-relevant visual artifacts can be
-   sent to the configured vision model; otherwise the pair stays tied.
+   sent to the configured vision model in both orders; a winner is kept
+   only when both orders agree. Either way the forward-order answer also
+   lists, per side, the goal-named elements absent or wrong in its
+   figures (`visual_deficiencies`, prompt `visual-tiebreak-2`), which the
+   gradient folds in.
 5. **Current ratings.** The accumulated pair results fit a regularized
    Bradley–Terry model. The first eligible generation starts at 0.5;
-   an ineligible generation remains at zero.
+   an ineligible generation remains at zero. The capsule ships the
+   top-rated run; exact rating ties go to the tied run with the most
+   head-to-head wins against the other tied runs, then to the earliest
+   one — never to the newest.
 
 Re-execution (`policy_bt_reexecute`, default `true`) runs the script
 with bash on the copy, in a fresh venv with no API keys; existing

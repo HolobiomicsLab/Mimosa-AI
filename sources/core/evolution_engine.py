@@ -130,9 +130,9 @@ def _refresh_policy_bt_rewards(
     The engine calls this after each evaluation, with the session runs
     and the archive they compete in. When the newest verifier block is a
     policy-BT result with tournament rewards, it copies each run's fresh
-    Bradley-Terry rating into the run record and the archive; arrival
-    scores stay in the verifier record. Any other verifier block is left
-    untouched.
+    Bradley-Terry rating and current pair outcomes into the run record and
+    the rating into the archive; arrival scores stay in the verifier
+    record. Any other verifier block is left untouched.
 
     Args:
         runs (list[IndividualRun]): Completed runs in arrival order.
@@ -144,7 +144,7 @@ def _refresh_policy_bt_rewards(
     latest = _verifier_block(runs[-1]) if runs else {}
     if latest.get("verifier_kind") != "policy_bt" or "tournament_rewards" not in latest:
         return
-    rewards = latest["tournament_rewards"]
+    rewards, outcomes = latest["tournament_rewards"], latest.get("tournament_outcomes") or {}
     for run in runs:
         if run.current_uuid not in rewards:
             continue
@@ -157,6 +157,7 @@ def _refresh_policy_bt_rewards(
             verifier_kind="policy_bt", reward=run.reward, overall_score=run.reward,
             overall_score_uncapped=run.reward, reward_fallback=False,
             tournament_rewards=rewards, tournament_version=latest["tournament_version"],
+            pair_outcomes=outcomes.get(run.current_uuid, block.get("pair_outcomes") or {}),
         )
     selection.refresh_rewards(rewards)
 
@@ -404,6 +405,56 @@ def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRu
     return False
 
 
+# Ratings closer than this are the same rating.
+RATING_TIE_TOLERANCE = 1e-9
+
+
+def _head_to_head(run: IndividualRun, rival: IndividualRun) -> str | None:
+    """Read the current direct pair outcome of one run against one rival.
+
+    Capsule selection uses it to break a tie between top-rated runs.
+    :func:`_policy_capsule_run` calls it for every two tied runs. It reads
+    the run's ``pair_outcomes``, which :func:`_refresh_policy_bt_rewards`
+    keeps current together with the ratings; the rival's mirrored entry is
+    the fallback.
+
+    Args:
+        run (IndividualRun): Run whose outcome is requested.
+        rival (IndividualRun): The other run of the pair.
+
+    Returns:
+        str | None: ``"win"``, ``"loss"`` or ``"tie"`` for *run*, or
+        ``None`` when neither block records the pair.
+    """
+    mirror = {"win": "loss", "loss": "win", "tie": "tie"}
+    own = (_verifier_block(run).get("pair_outcomes") or {}).get(rival.current_uuid)
+    other = (_verifier_block(rival).get("pair_outcomes") or {}).get(run.current_uuid)
+    return own or mirror.get(other)
+
+
+def _policy_capsule_run(runs: list[IndividualRun]) -> IndividualRun:
+    """Pick the top Bradley-Terry run, breaking exact rating ties fairly.
+
+    Equal ratings come from equal win/tie records, not from equal quality,
+    so the newest run must not win a tie (2026-10-17: drugex shipped a
+    failing generation tied with a passing gen 0). :func:`_select_best_run`
+    calls it with the policy-BT runs. It keeps the runs at the top rating,
+    then prefers the run with the most head-to-head wins against the other
+    tied runs, then the earliest run.
+
+    Args:
+        runs (list[IndividualRun]): Non-empty policy-BT runs with a uuid
+            and a current rating in ``reward``.
+
+    Returns:
+        IndividualRun: The run that ships as the capsule.
+    """
+    top = max(r.reward or 0.0 for r in runs)
+    tied = [r for r in runs if abs((r.reward or 0.0) - top) <= RATING_TIE_TOLERANCE]
+    wins = {id(r): sum(_head_to_head(r, rival) == "win" for rival in tied if rival is not r) for r in tied}
+    return min(tied, key=lambda r: (-wins[id(r)], r.iteration_count))
+
+
 def _select_best_run(runs: list[IndividualRun]) -> IndividualRun | None:
     """Pick the run whose workspace ships as the task capsule.
 
@@ -421,10 +472,10 @@ def _select_best_run(runs: list[IndividualRun]) -> IndividualRun | None:
     candidates = [r for r in runs if r.current_uuid]
     if not candidates:
         return None
-    key = lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count)
+    key = lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count)  # noqa: E731
     policy_runs = [r for r in candidates if _verifier_block(r).get("verifier_kind") == "policy_bt"]
     if policy_runs:
-        return max(policy_runs, key=key)
+        return _policy_capsule_run(policy_runs)
     pairwise = [r for r in candidates if not _run_reward_is_fallback(r, candidates)]
 
     if pairwise and all((r.reward or 0) == 0 for r in pairwise):

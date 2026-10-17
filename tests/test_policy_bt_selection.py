@@ -113,6 +113,24 @@ def test_capsule_uses_current_ratings_not_arrival_or_champion():
     assert first.state_result["evaluation"]["verifier"]["arrival_reward"] == 0.1
 
 
+def test_capsule_tie_break_reads_current_outcomes_not_arrival_ones():
+    """Review finding: in-memory pair outcomes were frozen at arrival while
+    ratings were refreshed. A later re-comparison turned gen 2's arrival win
+    over gen 0 into a tie; the tie must then ship the earlier run."""
+    gen0, gen2, latest = _run("gen0", 0.5), _run("gen2", 0.6, 2), _run("latest", 0.3, 3)
+    gen2.state_result["evaluation"]["verifier"]["pair_outcomes"] = {"gen0": "win"}
+    _publish(latest, {"gen0": 0.6, "gen2": 0.6, "latest": 0.3})
+    latest.state_result["evaluation"]["verifier"]["tournament_outcomes"] = {
+        "gen0": {"gen2": "tie", "latest": "win"}, "gen2": {"gen0": "tie", "latest": "win"},
+        "latest": {"gen0": "loss", "gen2": "loss"}}
+    _refresh_policy_bt_rewards([gen0, gen2, latest], SelectionPressure({}))
+
+    selected, _ = _select_capsule_run([gen0, gen2, latest], StopController(verifier_kind="policy_bt"), "policy_bt")
+
+    assert gen2.state_result["evaluation"]["verifier"]["pair_outcomes"] == {"gen0": "tie", "latest": "win"}
+    assert selected is gen0
+
+
 @pytest.mark.parametrize("kind, expected", [("hybrid", "champion"), ("legacy", "highest")])
 def test_older_channels_keep_capsule_selection(kind, expected):
     """Only policy BT replaces the existing capsule choice rule."""

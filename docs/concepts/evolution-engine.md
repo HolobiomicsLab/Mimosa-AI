@@ -221,10 +221,11 @@ call reads:
   (`<diagnosis>` — trusted as ground truth),
 - when the parent has no verifier gradient, the parent's own run log
   (`run_stdout.log`, read through `WorkflowInfo.run_stdout`) instead
-  (`<raw_log>` — **unverified**, sent verbatim, never as a
-  `<diagnosis>`; the prompt then says that no verifier diagnosis is
-  available); with no parent there is no log, and a fixed no-feedback
-  note is the diagnosis,
+  (`<raw_log>` — **unverified**, never as a `<diagnosis>`; only the
+  last 4096 characters (`RAW_LOG_TAIL_CHARS`) after a marker line that
+  says earlier output was cut; the prompt then says that no verifier
+  diagnosis is available); with no parent there is no log, and a fixed
+  no-feedback note is the diagnosis,
 - the read-only search-state block produced by `_search_state_block`
   (`<search_state>` — plain search statistics: parent score, iteration
   progress, plateau streak, success rate, score trajectory),
@@ -240,7 +241,8 @@ raw log is unverified and may hold the agent's own mistakes, guessed
 paths and transient tool errors — and about action limits — add or
 remove at most one agent per step, and prefer small incremental
 changes unless the evidence and search state say the approach is
-fundamentally flawed. For the raw log it adds four rules: look for
+fundamentally flawed. It states that the raw log is only a tail and
+adds four rules: look for
 recurring patterns, not single error lines; never turn one error into
 an environment-wide rule (a permission error on a path the agent chose
 means a wrong path, not a read-only workspace); never prescribe
@@ -248,7 +250,7 @@ absolute paths or move work outside the relative workspace (only that
 workspace is collected); phrase log-derived points as symptoms.
 
 Crossover has no directive LLM: a parent without a verifier gradient
-gets the last 1024 characters of the run stdout in a `<raw_log>` block
+gets the same marked tail (last 4096 characters) of the run stdout in a `<raw_log>` block
 (instead of `<error_diagnosis>`), and the task list gains the same
 "unverified, symptoms only, stay in the relative workspace" rule.
 
@@ -339,8 +341,8 @@ Each iteration also writes structured metrics for post-hoc analysis:
   escapes kept), written right after execution and before evaluation.
   Failed runs store the error text instead. When this generation is a
   parent without a verifier gradient, the directive LLM (mutation) or
-  the crossover prompt (last 1024 characters) receives this text as an
-  unverified `<raw_log>`.
+  the crossover prompt receives only its marked tail (last 4096
+  characters) as an unverified `<raw_log>`.
 - `sources/workflows/qd_archive.jsonl` — append-only, one line per
   `validate_survivor` call. Records the candidate's descriptor,
   `qd_score`, `novelty_score`, admission verdict, and the `evicted_uuid`

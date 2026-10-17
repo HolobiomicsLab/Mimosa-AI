@@ -297,6 +297,49 @@ def test_crossover_routes_raw_stdout_only_for_parent_without_gradient():
     assert "<error_diagnosis>" not in second_parent
 
 
+_HUGE_STDOUT = "x" * 25_000_000 + "\nTraceback: final error at the END"
+
+
+def test_directive_raw_log_is_marked_tail_of_huge_log(monkeypatch):
+    """Live case (phonon 5b75fb81): a 25 MB raw log broke the 8 MB
+    provider request limit and crashed the campaign row."""
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FakeProvider)
+    ve = _make_engine()
+    _, raw_log = VariationEngine._split_directive_evidence("", _HUGE_STDOUT)
+    marker = variation_engine_module.RAW_LOG_TRUNCATION_MARKER
+    cap = variation_engine_module.RAW_LOG_TAIL_CHARS
+    assert len(raw_log) <= cap + len(marker) + 1
+    assert raw_log == f"{marker}\n{_HUGE_STDOUT[-cap:]}"
+    ve.mutation_prompt(
+        goal="g", wf_info=_FakeWorkflowInfo(gradient="", run_stdout=_HUGE_STDOUT),
+        genotype="code", iteration_count=1, max_iterations=10,
+    )
+    directive_input = _FakeProvider.last.prompt
+    assert f"<raw_log>\n{raw_log}\n</raw_log>" in directive_input
+    assert len(directive_input) < 2 * cap + 10_000
+    assert "only the TAIL of the log" in _FakeProvider.last.system_msg
+
+
+def test_directive_gradient_is_never_cut():
+    gradient = "CLAIM_Y: " + "g" * (5 * variation_engine_module.RAW_LOG_TAIL_CHARS)
+    diagnosis, raw_log = VariationEngine._split_directive_evidence(gradient, _HUGE_STDOUT)
+    assert diagnosis == gradient
+    assert raw_log == ""
+
+
+def test_crossover_raw_log_uses_same_marked_tail():
+    ve = _make_engine()
+    prompt = ve.crossover_prompt(
+        goal="g",
+        wf_infos=[_FakeWorkflowInfo(score=0.4, gradient="", run_stdout=_HUGE_STDOUT)],
+        genotypes=["code"],
+        iteration_count=1,
+    )
+    tail = variation_engine_module.raw_log_tail(_HUGE_STDOUT)
+    assert f"<raw_log>\n{tail}\n</raw_log>" in prompt
+    assert "only the TAIL of the log" in prompt
+
+
 def _workflow_with_log(tmp_path: Path, uuid: str, log: str) -> WorkflowInfo:
     """Write a generation folder holding only ``run_stdout.log``."""
     folder = tmp_path / uuid
