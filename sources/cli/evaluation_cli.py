@@ -549,35 +549,53 @@ class EvaluationCLI:
                 _warn(f"Invalid number '{raw}'. Please enter a whole number.")
 
     def _ask_recovery_options(self) -> tuple[int, bool, str | None]:
-        """Resolve start-row, cache-restore and notes-file decisions up front.
+        """Resolve cache-restore, notes-file and start-row decisions up front.
 
         csv_mode used to prompt for these when each queued run *started*;
         resolving them here keeps the queue fully unattended after launch.
-        When the user opts to restore statistics, the exact run-notes JSON
-        (from ``run_notes/evaluations/``) is also chosen here.
+        The restore decision comes first, then the start row.
+
+        Returns:
+            Tuple of (0-based start row, restore cache flag, notes file path or None).
         """
         print(_wrap(
-            "Recovery options: resume from a given CSV row and/or restore "
-            "statistics from a previous run's notes (same model)."
+            "Recovery options: restore statistics from a previous run's notes "
+            "(same model), then resume from a given CSV row."
         ))
-        while True:
-            raw = _ask("Starting row (1 = first task)", default="1")
-            try:
-                start_row = max(0, int(raw.strip()) - 1)
-                break
-            except ValueError:
-                _warn(f"Invalid value '{raw}'. Please enter a whole number.")
         restore_cache = _ask_yn(
             "Restore previous run statistics from cache if found?", default=True,
         )
         notes_file: str | None = None
         if restore_cache:
             notes_file = self._choose_restore_notes_file()
+        start_row = self._ask_start_row()
         summary = f"Start row: {start_row + 1}, restore cache: {'yes' if restore_cache else 'no'}"
         if restore_cache:
             summary += f", from {notes_file or 'auto-detected notes'}"
         _ok(summary)
         return start_row, restore_cache, notes_file
+
+    @staticmethod
+    def _ask_start_row() -> int:
+        """Ask the first CSV row to process and warn how the task limit works.
+
+        Called by _ask_recovery_options after the cache decision. Reads the
+        answer through _ask and warns that the task limit is a row number.
+
+        Returns:
+            0-based index of the first CSV row to process.
+        """
+        _warn(
+            "Number of tasks is the LAST row number, not a count. "
+            "Rows run = Starting row to Number of tasks. "
+            "Example: 10 done, 20 wanted -> Starting row 11, Number of tasks 20."
+        )
+        while True:
+            raw = _ask("Starting row (1 = first task)", default="1")
+            try:
+                return max(0, int(raw.strip()) - 1)
+            except ValueError:
+                _warn(f"Invalid value '{raw}'. Please enter a whole number.")
 
     def _choose_restore_notes_file(self) -> str | None:
         """Ask which run-notes JSON to restore statistics from.

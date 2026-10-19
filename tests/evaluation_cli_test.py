@@ -232,7 +232,7 @@ def test_ask_recovery_options_yes_asks_for_notes_file(monkeypatch, tmp_path):
             ("older_one_shot.json", 1000.0),
         ],
     )
-    script = _ScriptedIO(answers=["1", "2"], yn_answers=[True])
+    script = _ScriptedIO(answers=["2", "1"], yn_answers=[True])
     monkeypatch.setattr(evaluation_cli, "_ask", script.ask)
     monkeypatch.setattr(evaluation_cli, "_ask_yn", script.ask_yn)
     cli = EvaluationCLI(SimpleNamespace())
