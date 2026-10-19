@@ -13,6 +13,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sources.evaluators.policy_bt_verifier.evaluator import PolicyBTVerifierEvaluator
+from sources.evaluators.policy_bt_verifier.prompts import CRITERIA_GUARD
 from sources.evaluators.policy_bt_verifier.registry import TaskRegistry, atomic_json
 from sources.evaluators.policy_bt_verifier.results import fold_gradient
 from sources.evaluators.policy_bt_verifier.tournament import fit_ratings
@@ -168,7 +169,9 @@ def test_gradient_prioritizes_earliest_loss_without_rating_leak():
     pairs = [{"a": "current", "b": "one", "winner": "a", "stage": 1, "feedback_a": "Preserve output", "feedback_b": "Other"},
              {"a": "current", "b": "two", "winner": "b", "stage": 3, "feedback_a": "Improve error", "feedback_b": "Other"},
              {"a": "three", "b": "current", "winner": "a", "stage": 2, "feedback_a": "Other", "feedback_b": "Fix invalid output"}]
-    assert fold_gradient(player, pairs).splitlines() == ["Fix invalid output", "Improve error", "Preserve output"]
+    assert fold_gradient(player, pairs).splitlines() == ["Fix invalid output", "Improve error"]
+    # Ames rerun 2026-10-19: win text praised the layout a loss rejected; it stays only without losses.
+    assert fold_gradient(player, pairs[:1]).splitlines() == ["Preserve output"]
 
 
 def test_tied_gradient_states_absolute_deficiencies_not_a_match():
@@ -180,17 +183,84 @@ def test_tied_gradient_states_absolute_deficiencies_not_a_match():
     tie = {"a": "x", "b": "y", "winner": "tie", "stage": 0,
            "feedback_a": "Your run matches the other run on all reported criteria.", "feedback_b": "same",
            "normalized_a": {"values": {"conformance": False, "auc": None, "hidden": None},
-                            "evidence": [{"criterion": "conformance", "detail": "header is FDA_APPROVED_prob"}]},
+                            "evidence": [{"criterion": "conformance", "detail": "header is FDA_APPROVED_prob"},
+                                         {"criterion": "auc", "value": None, "detail": "no probability column"}]},
            "normalized_b": {"values": {"conformance": False, "auc": 0.8, "hidden": None}, "evidence": []},
            "visual_deficiencies": {"a": ["no cumulative-integral curve"], "b": []}}
     folded = fold_gradient({"uuid": "x", "execution": {"eligible": True}}, [tie], criteria).splitlines()
-    assert folded == ["Your run does not satisfy 'conformance': header is FDA_APPROVED_prob",
-                      "'auc' (test AUC) could not be measured from your outputs, while another run's outputs provide it.",
-                      "Figure review by the vision model (observations, not measurements):",
-                      "- no cumulative-integral curve"]
-    met = {"values": {"conformance": True, "auc": 0.8, "hidden": None}, "evidence": []}
+    assert folded[:2] == ["Your run does not satisfy 'conformance': header is FDA_APPROVED_prob",
+                          "'auc' (test AUC) could not be measured from your outputs (no probability column), "
+                          "while another run's outputs provide it."]
+    assert folded[2].startswith("'hidden' (masked metric) could not be measured for any run: the verifier recorded no reason.")
+    assert folded[3:] == ["Figure review by the vision model (observations, not measurements):",
+                          "- no cumulative-integral curve"]
+    met = {"values": {"conformance": True, "auc": 0.8, "hidden": 1.0}, "evidence": []}
     clean = {**tie, "normalized_a": met, "normalized_b": met, "visual_deficiencies": {}}
     assert fold_gradient({"uuid": "x", "execution": {"eligible": True}}, [clean], criteria).startswith("Every comparison")
+
+
+def test_gradient_states_quality_no_run_could_measure_and_why():
+    """Live case BBBC002 2026-10-17: test labels are all 0, prediction_accuracy was
+    null for every run, and children were told "no deficiency was measured"."""
+    criteria = [{"id": "prediction_accuracy", "stage": 4, "description": "test MAE", "direction": "lower"}]
+    reason = "test consensus labels are all zero in BBBC002/test/BBBC002_v1_counts.txt"
+    side = {"values": {"prediction_accuracy": None},
+            "evidence": [{"criterion": "prediction_accuracy", "value": None, "detail": reason}]}
+    tie = {"a": "x", "b": "y", "winner": "tie", "stage": 0, "feedback_a": "m", "feedback_b": "m",
+           "normalized_a": side, "normalized_b": side}
+    folded = fold_gradient({"uuid": "x", "execution": {"eligible": True}}, [tie], criteria)
+    assert folded.startswith(f"'prediction_accuracy' (test MAE) could not be measured for any run: {reason}.")
+    assert "decides nothing" in folded and "no deficiency" not in folded
+
+
+def _guarded_ask(plans, guard_answers, seen):
+    """Script recon answers and guard answers; record what each call received."""
+    plans, guard_answers = iter(plans), iter(guard_answers)
+
+    def ask(prompt):
+        payload = json.loads(prompt.split("\nEVIDENCE_JSON\n", 1)[1].split("\nEND_EVIDENCE_JSON")[0])
+        is_guard = prompt.startswith(CRITERIA_GUARD)
+        seen.append(("guard" if is_guard else "recon", payload))
+        return json.dumps(next(guard_answers if is_guard else plans))
+    return ask
+
+
+def _plan(*ids):
+    return {"action": "complete", "task_representation": "predict Y",
+            "criteria": [{"id": key, "stage": n + 1, "description": key, "direction": "satisfy"} for n, key in enumerate(ids)],
+            "representation": {key: "bool" for key in ids}, "visuals": {},
+            "plans": {"g1": {"adapter": None, "instructions": "read preds.csv"}}}
+
+
+def test_criteria_guard_sends_misaligned_criteria_back_to_recon(tmp_path):
+    """Live case Ames 2026-10-18: recon froze header SMILES,Probability, which
+    neither the goal nor the input (Drug,Y) states."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    reject = {"verdicts": [{"id": "header_smiles_probability", "verdict": "reject", "reason": "input uses Drug,Y"}]}
+    keep = {"verdicts": [{"id": "output_conformance", "verdict": "keep", "reason": "goal path"}]}
+    seen = []
+    ask = _guarded_ask([_plan("header_smiles_probability"), _plan("output_conformance")], [reject, keep], seen)
+    result = reconnaissance("goal", [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert [c["id"] for c in result["criteria"]] == ["output_conformance"]
+    revision = seen[2][1]
+    assert revision["rejected_criteria"][0]["reason"] == "input uses Drug,Y"
+    assert len(result["inspection"]["criteria_guard"]) == 2
+
+
+def test_criteria_guard_drops_rejected_after_last_revision_and_never_runs_when_frozen(tmp_path):
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    verdict = {"verdicts": [{"id": "ok", "verdict": "keep", "reason": ""}, {"id": "radius_3km", "verdict": "reject", "reason": "goal names no radius"}]}
+    seen = []
+    ask = _guarded_ask([_plan("ok", "radius_3km")] * 4, [verdict] * 4, seen)
+    result = reconnaissance("goal", [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert [c["id"] for c in result["criteria"]] == ["ok"] and "radius_3km" not in result["representation"]
+    frozen = {key: _plan("radius_3km")[key] for key in ("task_representation", "criteria", "representation")}
+    seen.clear()
+    ask = _guarded_ask([_plan("radius_3km")], [], seen)
+    kept = reconnaissance("goal", [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask, "frozen_task": frozen})
+    assert [c["id"] for c in kept["criteria"]] == ["radius_3km"] and [kind for kind, _ in seen] == ["recon"]
 
 
 def test_gradient_does_not_restate_a_gate_already_lost_decisively():
@@ -250,8 +320,11 @@ def test_recon_feeds_malformed_answer_back_instead_of_aborting(tmp_path):
             "representation": {"energy": "int"}, "visuals": {},
             "plans": {"g1": {"adapter": None, "instructions": "read result.txt"}}}
     answers, errors = iter(['{"action": "complete", "broken"', json.dumps(plan)]), []
+    keep = json.dumps({"verdicts": [{"id": "energy", "verdict": "keep", "reason": "goal"}]})
 
     def ask(prompt):
+        if prompt.startswith(CRITERIA_GUARD):
+            return keep
         payload = json.loads(prompt.split("\nEVIDENCE_JSON\n", 1)[1].split("\nEND_EVIDENCE_JSON")[0])
         errors.append(payload.get("previous_answer_error"))
         return next(answers)
@@ -344,3 +417,115 @@ def test_pair_file_diff_splits_sides_exactly(tmp_path):
     assert diff["only_a"] == ["results.txt"]
     assert diff["only_b"] == ["extra.csv"]
     assert diff["counts"] == {"common": 2, "only_a": 1, "only_b": 1}
+
+
+def test_grounding_rejects_literals_absent_from_goal_and_input_heads(tmp_path):
+    """Part A, live case Ames 2026-10-18: recon required header
+    SMILES,Probability; the goal quotes no columns and the input is Drug,Y."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    (tmp_path / "ames").mkdir()
+    (tmp_path / "ames" / "test.csv").write_text(",Drug_ID,Drug,Y\n0,D1,CCO,0\n")
+    goal = 'Save predictions to "pred_results/aai_preds.csv".\n|---- test.csv'
+    invented, grounded = _plan("output_conformance"), _plan("output_conformance")
+    invented["criteria"][0]["literals"] = ["pred_results/aai_preds.csv", "SMILES", "Probability"]
+    grounded["criteria"][0]["literals"] = ["pred_results/aai_preds.csv", "Drug", "Y"]
+    keep = {"verdicts": [{"id": "output_conformance", "verdict": "keep", "reason": "input names"}]}
+    seen = []
+    ask = _guarded_ask([invented, grounded], [keep], seen)
+    result = reconnaissance(goal, [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert result["criteria"][0]["literals"] == ["pred_results/aai_preds.csv", "Drug", "Y"]
+    reason = seen[1][1]["rejected_criteria"][0]["reason"]
+    assert "'SMILES'" in reason and "'Probability'" in reason and "pred_results" not in reason
+    assert [kind for kind, _ in seen] == ["recon", "recon", "guard"]  # no LLM call while grounding fails
+    guard_payload = next(payload for kind, payload in seen if kind == "guard")
+    assert guard_payload["input_heads"] == {"ames/test.csv": ",Drug_ID,Drug,Y\n0,D1,CCO,0"}
+
+
+def test_input_heads_ignore_files_the_goal_does_not_name(tmp_path):
+    from sources.evaluators.policy_bt_verifier.criteria_guard import (
+        input_heads as _input_heads,
+    )
+
+    (tmp_path / "train.csv").write_text("a,b\n1,2\n")
+    (tmp_path / "pred.csv").write_text("invented,cols\n")
+    assert _input_heads("Use train.csv", {"snapshot": str(tmp_path)}) == {"train.csv": "a,b\n1,2"}
+
+
+def test_output_files_never_ground_literals(tmp_path):
+    """The goal names the output path too; the output's own invented header
+    must not make that header "sourced"."""
+    from sources.evaluators.policy_bt_verifier.criteria_guard import (
+        _unsourced_literals,
+        input_heads,
+    )
+
+
+    (tmp_path / "pred_results").mkdir()
+    (tmp_path / "pred_results" / "aai_preds.csv").write_text("SMILES,Probability\nCCO,0.4\n")
+    (tmp_path / "test.csv").write_text(",Drug_ID,Drug,Y\n")
+    goal = 'Save to "pred_results/aai_preds.csv". Inputs: test.csv'
+    generation = {"snapshot": str(tmp_path),
+                  "execution": {"contract": {"script": "run.sh", "generated_outputs": ["pred_results/aai_preds.csv"]}}}
+    heads = input_heads(goal, generation)
+    assert list(heads) == ["test.csv"]
+    plan = {"criteria": [{"id": "c", "literals": ["Drug", "Probability"]}]}
+    assert "'Probability'" in _unsourced_literals(plan, goal, heads)["c"]
+    assert _unsourced_literals({"criteria": [{"id": "c", "literals": ["Q"]}]}, "Quality.", {})  # whole token
+    assert not _unsourced_literals({"criteria": [{"id": "c", "literals": ["Y", "Drug"]}]}, goal, heads)
+
+
+def test_wide_input_header_grounds_late_columns_and_train_test_is_not_test(tmp_path):
+    """Review: FACTORS headers exceed 100k chars; a cut head made real columns unsourced."""
+    from sources.evaluators.policy_bt_verifier.criteria_guard import (
+        _unsourced_literals,
+        input_heads,
+    )
+
+    (tmp_path / "test.csv").write_text(",".join(f"D_{i:05d}" for i in range(20000)) + ",T_00001\n1\n")
+    (tmp_path / "train_test.csv").write_text("leak\n")
+    heads = input_heads("|---- test.csv", {"snapshot": str(tmp_path)})
+    assert list(heads) == ["test.csv"]
+    assert not _unsourced_literals({"criteria": [{"id": "c", "literals": ["T_00001"]}]}, "goal", heads)
+
+
+def test_input_heads_never_walk_virtual_environments(tmp_path):
+    from sources.evaluators.policy_bt_verifier.criteria_guard import input_heads
+
+    (tmp_path / "venv" / "lib").mkdir(parents=True)
+    (tmp_path / "venv" / "pyvenv.cfg").write_text("home = x\n")
+    (tmp_path / "venv" / "lib" / "config.json").write_text("{package}\n")
+    (tmp_path / "config.json").write_text('{"a": 1}\n')
+    assert list(input_heads("read config.json", {"snapshot": str(tmp_path)})) == ["config.json"]
+
+
+def test_criteria_guard_stops_at_once_when_every_criterion_stays_rejected(tmp_path):
+    """Review: an all-rejecting guard looped every recon round, then failed."""
+    from sources.evaluators.policy_bt_verifier.recon import ReconError, reconnaissance
+
+    verdict = {"verdicts": [{"id": "radius_3km", "verdict": "reject", "reason": "goal names no radius"}]}
+    seen = []
+    ask = _guarded_ask([_plan("radius_3km")] * 16, [verdict] * 16, seen)
+    with pytest.raises(ReconError, match="still rejected"):
+        reconnaissance("goal", [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert len(seen) == 8  # 4 plans, 4 audits: 3 revisions then the drop
+
+
+def test_malformed_guard_answers_keep_the_plan_and_record_the_error(tmp_path):
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    seen = []
+    ask = _guarded_ask([_plan("ok")], [{"verdicts": []}, {"verdicts": []}], seen)
+    result = reconnaissance("goal", [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert [c["id"] for c in result["criteria"]] == ["ok"]
+    assert "error" in result["inspection"]["criteria_guard"][-1][0]
+
+
+def test_goal_named_script_never_grounds_and_sentence_end_file_is_an_input(tmp_path):
+    """Review: SAB goals name the agent's own script; its docstring is agent text."""
+    from sources.evaluators.policy_bt_verifier.criteria_guard import input_heads
+
+    (tmp_path / "ames.py").write_text('"""Writes SMILES,Probability."""\n')
+    (tmp_path / "test.csv").write_text("Drug,Y\nCCO,0\n")
+    heads = input_heads("Keep one script at ames.py. Train on test.csv.", {"snapshot": str(tmp_path)})
+    assert heads == {"test.csv": "Drug,Y\nCCO,0"}

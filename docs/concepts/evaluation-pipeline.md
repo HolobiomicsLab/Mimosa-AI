@@ -24,10 +24,14 @@ The feedback passed to the mutator remains the **textual gradient**
 (`evaluation.verifier.abstracted_textual_gradient` in `state_result.json`,
 plus `textual_gradient.txt`). It is refolded for **every generation**
 each time the tournament changes, from all its current pairs: decisive
-feedback first (losses, earliest stage first), then the absolute
+feedback first (earliest stage first; a run that lost any pair gets only
+its losses' feedback, an unbeaten run its wins'), then the absolute
 deficiencies measured on that run — failed `satisfy` gates with the
-adapter's observed detail, and values a rival run provides but this run
-does not — except criteria at a stage the run already lost decisively,
+adapter's observed detail, and every criterion that could not be
+measured, with the adapter's reason; when no run could measure it, the
+line says so and asks for a measurement the verifier can read (for
+example a held-out validation error in an output or the run log) —
+except criteria at a stage the run already lost decisively,
 then the goal-named figure elements the vision model saw missing
 (labelled as model observations). Tied pairs never contribute "you match
 the other run" text. A parent therefore serves its latest fold at
@@ -67,7 +71,22 @@ The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mi
    reading the input and the output files, and the feedback names each
    found-vs-expected mismatch. Strict benchmark graders fail correct
    science delivered in another shape, so this gate is measured, not
-   assumed.
+   assumed. Criteria may add goal-compatible quality measures (for
+   example a held-out validation error when test labels are hidden), but
+   never packaging rules (`run.sh`, requirements, script names), which
+   the reproduction gate already enforces. Before the criteria freeze,
+   `criteria_guard.py` checks them: every exact string a criterion
+   requires (`literals`) must appear in the goal or in the first lines of
+   an input file the goal names (outputs and run logs never count), and
+   an LLM guard keeps or rejects each criterion with a cited source.
+   Rejected criteria go back to reconnaissance; after the last revision
+   they are dropped (if none would remain, reconnaissance fails). Two
+   malformed guard answers keep the plan, recorded as an error. The
+   record is the bundle's `criteria_guard` (verdicts, `plan_revisions`,
+   `dropped_criteria`). Agent-written source files never ground a name.
+   A win needs a criterion with two known, different values at the
+   deciding stage (null ties), and a `higher`/`lower` value must be a
+   number.
 4. **Pairwise policy.** A cached deterministic Python policy compares
    each pair and returns a verdict, evidence, and feedback for both
    sides. On a tie, comparable goal-relevant visual artifacts can be

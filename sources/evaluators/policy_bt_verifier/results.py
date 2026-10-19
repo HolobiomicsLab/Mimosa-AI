@@ -18,6 +18,16 @@ ALL_TIED_GRADIENT = (
     "observed in your outputs."
 )
 MAX_FIGURE_DEFICIENCIES = 6
+NO_REASON_RECORDED = "the verifier recorded no reason"
+MEASUREMENT_REQUEST = (
+    "Make it measurable: write this quantity, and how it was computed, to an output "
+    "file or the run log. If its ground truth is hidden from the workspace, no run "
+    "can measure it and it decides nothing."
+)
+CHECK_REQUEST = (
+    "Make it checkable: write the output this check reads at the goal's stated "
+    "path, in a plain readable format (CSV, JSON or text)."
+)
 FIGURE_REVIEW_HEADER = "Figure review by the vision model (observations, not measurements):"
 GRADIENT_FILE = "textual_gradient.txt"
 GRADIENT_HISTORY_FILE = "textual_gradient_history.jsonl"
@@ -42,11 +52,14 @@ def fold_gradient(generation: dict, pairs: list[dict], criteria: list[dict] | No
     The next mutation reads this text as the parent's diagnosis, so it is
     refolded each time the tournament changes. ``build_result`` calls it
     with the generation record, all its current pairs and the frozen
-    criteria. Decisive pairs give their feedback, losses first and earliest
-    stage first. Then come the absolute deficiencies measured on this run
-    (failed gates, values that rivals provide but this run does not), except
-    criteria at a stage already lost decisively, and the figure deficiencies
-    the vision model observed. Tied pairs never add "you match" text.
+    criteria. Decisive pairs give their feedback, earliest stage first; when
+    the run lost any pair only the losses speak, because a win's text praises
+    the very layout a loss rejects (Ames rerun 2026-10-19: "This is the better
+    measured result" next to "Adjust the output" for one run). Then come the
+    absolute deficiencies measured on this run (failed gates, values that
+    rivals provide but this run does not), except criteria at a stage already
+    lost decisively, and the figure deficiencies the vision model observed.
+    Tied pairs never add "you match" text.
 
     Args:
         generation (dict): Registry snapshot record with ``uuid`` and the
@@ -63,11 +76,11 @@ def fold_gradient(generation: dict, pairs: list[dict], criteria: list[dict] | No
     if not generation["execution"]["eligible"]:
         return "Reproducibility failure: " + generation["execution"]["reason"]
     uuid = generation["uuid"]
-    decisive = sorted((p for p in pairs if _outcome(p, uuid) != "tie"),
-                      key=lambda pair: (_outcome(pair, uuid) != "loss", pair["stage"]))
-    lost = {pair["stage"] for pair in decisive if _outcome(pair, uuid) == "loss"}
+    decisive = sorted((p for p in pairs if _outcome(p, uuid) != "tie"), key=lambda pair: pair["stage"])
+    losses = [pair for pair in decisive if _outcome(pair, uuid) == "loss"]
+    lost = {pair["stage"] for pair in losses}
     open_criteria = [c for c in criteria or [] if isinstance(c, dict) and c.get("stage") not in lost]
-    lines = [pair["feedback_" + _side(pair, uuid)] for pair in decisive]
+    lines = [pair["feedback_" + _side(pair, uuid)] for pair in losses or decisive]
     lines += _criterion_deficiencies(uuid, pairs, open_criteria) + _figure_deficiencies(uuid, pairs)
     if lines:
         return "\n".join(dict.fromkeys(lines))
@@ -96,9 +109,9 @@ def _criterion_deficiencies(uuid: str, pairs: list[dict], criteria: list[dict]) 
 
     Tied pairs say nothing about what is still wrong, so the fold reads the
     adapter values directly. ``fold_gradient`` calls it with the run's pairs
-    and the open criteria. A failed ``satisfy`` gate is a deficiency. A
-    null value is one only when some rival run provides that value, because
-    null alone can be a verifier limit (for example hidden test labels).
+    and the open criteria. A failed ``satisfy`` gate is a deficiency, and so
+    is a null value: the line says whether another run provides it or no run
+    does, and why the adapter could not measure it.
 
     Args:
         uuid (str): Generation whose values are read.
@@ -123,7 +136,9 @@ def _criterion_deficiencies(uuid: str, pairs: list[dict], criteria: list[dict]) 
 def _deficiency(criterion: dict, normalized: dict, rivals: list[dict]) -> str:
     """Describe one criterion deficiency, or nothing when none exists.
 
-    ``_criterion_deficiencies`` calls it once per open criterion.
+    ``_criterion_deficiencies`` calls it once per open criterion. A null value
+    is never silent: when no run provides it, the mutator learns that the
+    criterion is unmeasured, why, and how to make it measurable.
 
     Args:
         criterion (dict): Frozen criterion with ``id``, ``description``,
@@ -136,14 +151,33 @@ def _deficiency(criterion: dict, normalized: dict, rivals: list[dict]) -> str:
     Returns:
         str: A feedback line, or ``""``.
     """
-    key = criterion["id"]
+    key, label = criterion["id"], f"'{criterion['id']}' ({criterion.get('description', '')})"
     value = (normalized.get("values") or {}).get(key)
+    detail = _evidence_detail(normalized, key)
     if criterion.get("direction") == "satisfy" and value is False:
-        details = [e.get("detail") for e in normalized.get("evidence") or [] if e.get("criterion") == key and e.get("detail")]
-        return f"Your run does not satisfy '{key}': " + (details[0] if details else criterion.get("description", ""))
-    if value is None and any(rival.get(key) is not None for rival in rivals):
-        return f"'{key}' ({criterion.get('description', '')}) could not be measured from your outputs, while another run's outputs provide it."
-    return ""
+        return f"Your run does not satisfy '{key}': " + (detail or criterion.get("description", ""))
+    if value is not None:
+        return ""
+    reason = detail or NO_REASON_RECORDED
+    if any(rival.get(key) is not None for rival in rivals):
+        return f"{label} could not be measured from your outputs ({reason}), while another run's outputs provide it."
+    request = CHECK_REQUEST if criterion.get("direction") == "satisfy" else MEASUREMENT_REQUEST
+    return f"{label} could not be measured for any run: {reason}. {request}"
+
+
+def _evidence_detail(normalized: dict, key: str) -> str:
+    """Return the adapter's first evidence detail for one criterion.
+
+    Args:
+        normalized (dict): One side's adapter output.
+        key (str): Criterion id.
+
+    Returns:
+        str: The detail text, or ``""`` when the adapter gave none.
+    """
+    details = [e.get("detail") for e in normalized.get("evidence") or []
+               if isinstance(e, dict) and e.get("criterion") == key and e.get("detail")]
+    return str(details[0]) if details else ""
 
 
 def _figure_deficiencies(uuid: str, pairs: list[dict]) -> list[str]:

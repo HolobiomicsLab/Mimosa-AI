@@ -531,13 +531,28 @@ For each generation (`sources/evaluators/policy_bt_verifier/`):
    stdout-only metrics.
 2. **Reconnaissance.** One LLM call produces a complete artifact
    inventory with bounded previews and explicit byte-page inspection,
-   then freezes the task criteria. New artifact schemas extend
-   **adapters**; the criteria never change.
+   then freezes the task criteria. Quality criteria the goal does not
+   state are allowed when they do not conflict with it (e.g. held-out
+   validation error when test labels are hidden); criteria about
+   packaging (`run.sh`, requirements, script names) are not, because the
+   reproduction gate enforces them. Before freezing,
+   `criteria_guard.py` checks every criterion: its `literals` must appear
+   in the goal or in the first lines of an input file the goal names
+   (code check, outputs and run logs excluded), then an LLM guard keeps
+   or rejects each criterion against the goal. Rejections go back to
+   reconnaissance with reasons; after the last revision the still-
+   rejected criteria are dropped (none left → reconnaissance fails). Two
+   malformed guard answers keep the plan, recorded as an error. Verdicts,
+   revisions and drops are stored in the bundle as `criteria_guard`. New
+   artifact schemas extend **adapters**; the criteria never change.
 3. **One comparison policy.** One cached deterministic Python policy
    compares pairs through the adapters, in a restricted interpreter
    subprocess (stdlib `json`/`math`/`struct` calls plus harness-provided
    read capabilities only — no `numpy`/`pandas`/binary readers; formats
-   outside the subset stay "unknown", never a fabricated loss). Both
+   outside the subset stay "unknown", never a fabricated loss). A win
+   needs two known, different values at the deciding stage (null ties),
+   and a `higher`/`lower` criterion's value must be a number or null;
+   violations go to repair. Both
    argument orders and self-tie checks must agree; a static screen, a
    runtime smoke, and ≤ `policy_bt_repair_rounds` repairs protect the
    accepted policy. On a policy tie, relevant images on both sides go
@@ -553,9 +568,12 @@ For each generation (`sources/evaluators/policy_bt_verifier/`):
 5. **Evidence-checked gradient.** The **textual gradient**
    (`abstracted_textual_gradient` + the `textual_gradient.txt`
    sidecar) is refolded for every generation whenever the tournament
-   changes, from all its current pairs: decisive feedback (losses
-   first, earliest stage first), then absolute deficiencies measured on
-   that run (failed gates, values rivals provide but it does not) and
+   changes, from all its current pairs: decisive feedback (earliest
+   stage first; only losses when the run lost any pair, win text only
+   for an unbeaten run), then absolute deficiencies measured on
+   that run (failed gates; unmeasured criteria with the adapter's
+   reason, and a request for a readable measurement when no run has
+   one) and
    the vision model's figure deficiencies. Ties never yield "you match"
    text. The first fold stays as `arrival_textual_gradient`; every fold
    is appended to `textual_gradient_history.jsonl`. It is the **only**

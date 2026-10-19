@@ -269,7 +269,9 @@ they are the evidence.
 > in `policy_bt_evidence.json` (same folder). The tournament state for
 > a task session lives in
 > `<workflow_dir>/.policy_bt/<sha256(goal, session)>/tournament.json`
-> with one verifier-owned `snapshots/<uuid>/` copy per generation.
+> with one verifier-owned `snapshots/<uuid>/` copy per generation; its
+> `bundle.criteria_guard` records why each frozen criterion was kept,
+> revised or dropped (`criteria_guard` verdicts, `plan_revisions`).
 > Older campaigns on disk were produced by earlier channels: the hybrid
 > temporal-ladder verifier (stage headers and win-rate fields) and,
 > before it, the legacy claims verifier (per-source claim verdicts with

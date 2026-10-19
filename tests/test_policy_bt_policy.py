@@ -270,3 +270,48 @@ def test_worker_rejects_value_without_evidence(tmp_path):
     with pytest.raises(AdaptationError, match="no artifact evidence"):
         run_pair(_payload(_pair(tmp_path, 0.9, 0.5), adapter=adapter, criteria=UNKNOWN_CRITERIA),
                  WORKER_TIMEOUT)
+
+
+NULL_WINS = '''
+def compare(a, b):
+    x = a["values"]["score"]
+    y = b["values"]["score"]
+    if x is not None and y is None:
+        return {"winner": "a", "stage": 1, "feedback_a": "Yours is measured.",
+                "feedback_b": "Yours is not measured.", "evidence": [dict(a["evidence"][0], side="a")]}
+    if y is not None and x is None:
+        return {"winner": "b", "stage": 1, "feedback_a": "Yours is not measured.",
+                "feedback_b": "Yours is measured.", "evidence": [dict(b["evidence"][0], side="b")]}
+    return {"winner": "tie", "stage": 0, "feedback_a": "Same.", "feedback_b": "Same.", "evidence": []}
+'''
+
+
+def test_worker_rejects_a_win_decided_on_a_null_value(tmp_path):
+    """Live regression (Ames replay 2026-10-18): the one run whose printed AUC
+    was parsed beat six unparsed runs. Null is unknown, never a loss."""
+    adapter = '''
+def normalize():
+    data = read_json("result.json")
+    score = data["score"] if data["score"] > 0.6 else None
+    return {"values": {"present": True, "score": score},
+            "evidence": [{"criterion": "present", "path": "result.json", "value": True, "detail": "file read"},
+                         {"criterion": "score", "path": "result.json", "value": score, "detail": "score field"}]}
+'''
+    criteria = [{"id": "present", "stage": 1, "description": "file", "direction": "satisfy"},
+                {"id": "score", "stage": 2, "description": "score", "direction": "higher"}]
+    core = NULL_WINS.replace('"stage": 1', '"stage": 2').replace('a["evidence"][0]', 'a["evidence"][1]').replace('b["evidence"][0]', 'b["evidence"][1]')
+    with pytest.raises(PolicyError, match="Null is not a loss"):
+        run_pair(_payload(_pair(tmp_path, 0.9, 0.5), core=core, adapter=adapter, criteria=criteria), WORKER_TIMEOUT)
+    # Review case: a known, equal sibling at the same stage licenses nothing.
+    criteria[0]["stage"] = 2
+    (tmp_path / "sibling").mkdir()
+    with pytest.raises(PolicyError, match="Null is not a loss"):
+        run_pair(_payload(_pair(tmp_path / "sibling", 0.9, 0.5), core=core, adapter=adapter, criteria=criteria), WORKER_TIMEOUT)
+
+
+def test_worker_rejects_boolean_value_for_a_higher_criterion(tmp_path):
+    """Live case drugex replay 2026-10-18: 'visualization_quality' (higher) was
+    True for every run, so every pair tied. A directional value is a number."""
+    adapter = ADAPTER.replace('{"score": data["score"]}', '{"score": data["score"] > 0.6}')
+    with pytest.raises(AdaptationError, match="must be a number"):
+        run_pair(_payload(_pair(tmp_path, 0.9, 0.5), adapter=adapter), WORKER_TIMEOUT)

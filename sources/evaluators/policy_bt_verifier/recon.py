@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 from .artifacts import decode_object, inventory
+from .criteria_guard import GuardExhausted, guard_plan, input_heads, shown_heads
 from .prompts import RECON, evidence_prompt
 
 PAGE_BYTES = 8192
@@ -140,19 +141,44 @@ def reconnaissance(goal: str, generations: list[dict], context: dict) -> dict:
         context (dict): injected ask callback and optional frozen task/adapters.
     Returns: dict with criteria, schema plans, figures and inspection transcript.
     """
-    evidence = {"goal": goal, "generations": [describe_generation(g) for g in generations],
-                "frozen_task": context.get("frozen_task"),
-                "adapters": context.get("adapters", {}), "inspections": []}
-    for _ in range(MAX_INSPECTION_ROUNDS):
+    evidence, context = _open_transcript(goal, generations, context)
+    for round_index in range(MAX_INSPECTION_ROUNDS):
+        evidence["rounds_left"] = MAX_INSPECTION_ROUNDS - 1 - round_index
         try:
             response = decode_object(context["ask"](evidence_prompt(RECON, evidence)))
             if response.get("action") == "complete":
                 return _accept_plan(response, generations, context, evidence)
             _inspect(response, generations, evidence)
             evidence.pop("previous_answer_error", None)
+        except GuardExhausted as error:
+            raise ReconError(str(error)) from error
         except ValueError as error:
             evidence["previous_answer_error"] = f"{type(error).__name__}: {error}. Answer again with one valid JSON object."
     raise ReconError("Inspection budget exhausted; no partial criteria were accepted")
+
+
+def _open_transcript(goal: str, generations: list[dict], context: dict) -> tuple[dict, dict]:
+    """Build the first recon transcript and the context the guard needs.
+
+    Called once by ``reconnaissance``. For an unfrozen task the input heads
+    are read once: complete for the guard, bounded for the model prompt.
+
+    Args:
+        goal (str): User goal.
+        generations (list[dict]): Owned snapshots, oldest first.
+        context (dict): Injected ask callback and optional frozen task/adapters.
+
+    Returns:
+        tuple[dict, dict]: The transcript and the extended context.
+    """
+    evidence = {"goal": goal, "generations": [describe_generation(g) for g in generations],
+                "frozen_task": context.get("frozen_task"),
+                "adapters": context.get("adapters", {}), "inspections": []}
+    if context.get("frozen_task"):
+        return evidence, context
+    heads = input_heads(goal, generations[0])
+    evidence["input_heads"] = shown_heads(heads)
+    return evidence, {**context, "generation": generations[0], "input_heads": heads}
 
 
 def _accept_plan(response: dict, generations: list[dict], context: dict, evidence: dict) -> dict:
@@ -160,14 +186,19 @@ def _accept_plan(response: dict, generations: list[dict], context: dict, evidenc
 
     When a task is already frozen, its criteria are restored verbatim from the
     registry: the model only contributes adapter plans and visual selections,
-    so a paraphrase can never redefine success or fail the evaluation.
+    so a paraphrase can never redefine success or fail the evaluation. New
+    criteria first pass ``criteria_guard.guard_plan``.
 
     Args: response (dict): Model "complete" answer; generations (list[dict]);
         context (dict): Holds the optional frozen task; evidence (dict): Transcript.
     Returns: dict: The accepted plan; raises ReconError when it is invalid.
     """
-    response.update(context.get("frozen_task") or {})
+    frozen = context.get("frozen_task")
+    response.update(frozen or {})
     _check_complete(response, generations)
+    if not frozen:
+        guard_plan(response, context, evidence)
+    evidence.pop("previous_answer_error", None)
     response["inspection"] = evidence
     return response
 

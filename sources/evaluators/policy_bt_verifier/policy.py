@@ -30,6 +30,8 @@ SOURCE_BYTES = 131072
 WORKER_BYTES = 16 * 1024 * 1024
 READ_BYTES = 64 * 1024 * 1024
 MEMORY_BYTES = 1024 * 1024 * 1024
+# Transcript keys the guard writes; copied into the frozen bundle.
+GUARD_RECORD_KEYS = ("criteria_guard", "plan_revisions", "dropped_criteria")
 
 
 class PolicyError(ValueError):
@@ -793,6 +795,31 @@ def _validate_normalized(value: dict, reader: ArtifactReader, criteria: list[dic
     if all(item is None for item in value["values"].values()):
         raise AdaptationError("Adapter measured nothing for an executed generation: "
                               "the artifact schema needs a new adapter, not a null verdict")
+    _check_directional_numbers(value["values"], criteria)
+
+
+def _check_directional_numbers(values: dict, criteria: list[dict]) -> None:
+    """Require a number or null for every "higher" or "lower" criterion.
+
+    Called by ``_validate_normalized``. A boolean value can never differ
+    usefully: in the drugex replay (2026-10-18) "visualization_quality"
+    (higher) was True for every run, so every pair tied.
+
+    Args:
+        values (dict): Adapter values by criterion id.
+        criteria (list[dict]): The frozen criteria definitions.
+
+    Returns:
+        None.
+
+    Raises:
+        AdaptationError: When a directional value is not a number.
+    """
+    directions = {criterion["id"]: criterion.get("direction") for criterion in criteria}
+    for key, item in values.items():
+        if directions.get(key) in {"higher", "lower"} and item is not None and (isinstance(item, bool) or not isinstance(item, int | float)):
+            raise AdaptationError(f"Criterion '{key}' is {directions[key]}-is-better: its value must be a number "
+                                  f"or null, not {type(item).__name__} {item!r}")
 
 
 def _validate_verdict(verdict: dict, normalized: list[dict]) -> None:
@@ -931,6 +958,7 @@ def _worker_pair(payload: dict) -> dict:
     if _compare_once(source, normalized) != forward:
         raise PolicyError("Comparator is not deterministic")
     _check_decides_differences(forward, normalized, payload["criteria"])
+    _check_null_never_decides(forward, normalized, payload["criteria"])
     return {**forward, "channel": "code", "normalized_a": normalized[0], "normalized_b": normalized[1]}
 
 
@@ -967,6 +995,40 @@ def _check_decides_differences(verdict: dict, normalized: list[dict], criteria: 
             raise PolicyError(f"Comparator tied although '{key}' differs ({left[key]!r} vs {right[key]!r}). "
                               "Read values as a['values'][criterion_id] and let a known difference on a "
                               "higher/lower criterion decide that criterion.")
+
+
+def _check_null_never_decides(verdict: dict, normalized: list[dict], criteria: list[dict]) -> None:
+    """Reject a win decided on a stage where a value is unknown.
+
+    Null means unknown, not a measured failure. Called once per real pair
+    inside the worker. A live Ames replay (2026-10-18) let the one run whose
+    printed validation AUC the adapter parsed beat six runs whose logs it
+    failed to parse, and told them they "provided no" metric. A win is valid
+    only when at least one criterion at the deciding stage is known on both
+    sides and differs; a known sibling at the same stage does not license a
+    decision on a null one.
+
+    Args:
+        verdict (dict): Forward comparator verdict.
+        normalized (list[dict]): Adapter outputs for sides a and b, in order.
+        criteria (list[dict]): The frozen criteria definitions.
+
+    Returns:
+        None.
+
+    Raises:
+        PolicyError: When no criterion at the deciding stage has two known,
+        different values.
+    """
+    if verdict["winner"] == "tie":
+        return
+    left, right = (side["values"] for side in normalized)
+    staged = [c["id"] for c in criteria if c.get("stage") == verdict["stage"]]
+    decidable = [key for key in staged if None not in (left.get(key), right.get(key)) and left[key] != right[key]]
+    if staged and not decidable:
+        raise PolicyError(f"Comparator decided stage {verdict['stage']} although no criterion there "
+                          f"({', '.join(staged)}) has two known, different values. Null is not a loss: "
+                          "if either value is None, tie that criterion and continue to the next stage.")
 
 
 def _worker_main() -> None:
@@ -1183,6 +1245,8 @@ class PolicyEngine:
                                                  "adapters": bundle["adapters"]})
         if not cached:
             bundle.update({key: plan[key] for key in frozen_keys})
+            # Freeze-time guard record: verdicts, revision requests and drops.
+            bundle["criteria_guard"] = {key: plan["inspection"].get(key, []) for key in GUARD_RECORD_KEYS}
             bundle["core_source"] = self.source(CORE, {"goal": goal, **{key: bundle[key] for key in frozen_keys}})
         for generation in generations:
             uuid = generation["uuid"]
