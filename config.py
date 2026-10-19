@@ -100,14 +100,9 @@ class Config:
         # "hybrid" and "legacy" retain their previous scoring rules.
         # "gold" exposes benchmark answers for research only.
         self.verifier_kind: str = "policy_bt"
-        # verifier_kind="gold" only: also take the reward (QD score, early
-        # stop, capsule argmax) from the benchmark grader (full oracle:
-        # SR -> 1.0, VER -> 0.5*CBS, else 0.0). Default False = gradient-only.
+        # gold reward gradient mode for potential ablations
         self.gold_feedback_reward: bool = False
-        # verifier_kind="gold" only: wall-clock cap (seconds) on the
-        # benchmark grading of one generation (VER re-run <= 900 s + SR eval
-        # <= 300 s + CBS). On timeout the grade is censored and the hybrid
-        # gradient is used.
+        # verifier_kind="gold" only: wall-clock cap (seconds)
         self.gold_feedback_timeout_s: int = 1800
         # Runtime-only benchmark task context for verifier_kind="gold", set
         # per task by csv_mode (never serialized): the CSV row and the
@@ -120,27 +115,15 @@ class Config:
         self.hybrid_verifier_refinement_rounds: int = 2
         # Per scorer-subprocess timeout in seconds.
         self.hybrid_verifier_scorer_timeout_s: int = 60
-        # Pairwise reward mode: "temporal" (default — temporal-elimination
-        # ladder: earliest differing stage decides), "temporal_strict",
-        # "mean_diff", "sign_sum", or "escalation".
+        # Pairwise reward mode: "temporal" (default — temporal-elimination)
         self.hybrid_verifier_pairwise_mode: str = "temporal"
-        # Max deliverable files sampled by the hybrid verifier format digest.
+        # Max deliverable files sampled by the hybrid verifier forma digest.
         self.hybrid_verifier_digest_max_files: int = 8
-        # Reward aggregation over pairwise outcomes: "win_rate" (default —
-        # raw majority score vs previous generations; measured BEST on the
-        # frozen arena, E19c 2026-09-25: 0.742 vs BT-online 0.643, paired
-        # Δ +0.097 CI excluding 0) or "bradley_terry" (logistic-MLE
-        # strengths, opponent-weighted).
+        # Reward aggregation over pairwise outcomes
         self.hybrid_verifier_reward: str = "win_rate"
-        # E26/E35 visual rung: figure tasks (>=50% image deliverables) get
-        # goal-anchored visual claims scored by the vision model at a
-        # ladder stage BEFORE "script" (E26: visual-early 0.833 vs 0.646
-        # as 4th rung).
+        # visual check
         self.hybrid_verifier_visual_rung: bool = True
-        # E24/E35 execution gate: crash / no-entry / timeout re-execution
-        # caps the reward at 0.0; divergent re-execution caps it at 0.5;
-        # clean recovery leaves the reward uncapped (E24: 29% of
-        # workspaces fail clean re-execution).
+        # reexec gate
         self.hybrid_verifier_execution_gate: bool = True
         # Policy comparisons fit one Bradley-Terry tournament.
         self.policy_bt_reward: str = "bradley_terry"
@@ -155,7 +138,6 @@ class Config:
         # Reproduction limit per generation, in seconds.
         self.policy_bt_reexec_timeout_s: int = 1800
         # Rerun interpreter, pip caps and env; empty = host Python, no caps.
-        # ScienceAgentBench mode sets the grader's (grading_runtime()).
         self.policy_bt_reexec_runtime: dict = {}
         #############
         # Orchestrator Workflow generation options
@@ -169,10 +151,6 @@ class Config:
         ##############
         # Human in the loop
         ##############
-        # When True, the planner prints the generated plan and waits for the
-        # operator: Enter approves it, typed feedback regenerates it. Honoured
-        # by the interactive `--goal` path only; benchmark and web entry points
-        # never prompt. Refused, not silently skipped, when stdin is not a TTY.
         self.planner_human_approve: bool = False
 
         ##############
@@ -183,7 +161,6 @@ class Config:
         )
         # Ablation: also benchmark-score every per-iteration /tmp snapshot
         # (mimosa_run_<session>_<uuid>) after the capsule eval, to track VER/SR
-        # convergence across evolution. Multiplies per-task eval wall-clock.
         self.evaluate_snapshot_ablations: bool = True
 
         ##############
@@ -195,28 +172,17 @@ class Config:
         self.selection_strategy = "qd"
         # learning parameters
         self.learned_score_threshold = 0.9
-        # Early-stop policy (stop-condition plan 2026-10-08). Relative-
-        # reward verifiers (hybrid, policy_bt) must NOT stop on an
-        # absolute threshold: their overall_score is a pairwise win-rate
-        # or BT rating, so 0.9 means "first clean sweep" (win-rate) or
-        # "never stop" (BT). "auto" resolves per verifier kind.
+        # Early-stop policy
         self.early_stop_mode: str = "auto"
-        # No early stop (any mode) before this many completed
-        # generations; clamped to max_learning_evolve_iterations.
+        # Minimum iteration in policy_bt mode  
         self.min_learning_evolve_iterations: int = 6
         # Champion-plateau patience: stop after this many consecutive
         # generations without a new head-to-head champion.
         self.plateau_patience: int = 3
-        # Frontier probe (metric-tie review 2026-10-09 §4.3): trigger an
-        # honest, labelled <exploration> block in the next variation
-        # prompt once the champion is unchanged for this many
-        # generations. None = plateau_patience - 1, which guarantees at
-        # least one probe before the plateau stop. Verifier-agnostic.
+        # <exploration> block in the next variation prompt when plateau
         self.explore_after_plateau: int | None = None
         # Frontier probe: extra per-generation trigger probability on top
-        # of the state triggers (0.0 = state-triggered only; the probe
-        # never fires during improving streaks unless this is set).
-        # Drawn from a seeded RNG so identical runs replay identically.
+        # of the state triggers.
         self.explore_base_rate: float = 0.0
         self.max_learning_evolve_iterations = 16
         # KNN settings for novelty
