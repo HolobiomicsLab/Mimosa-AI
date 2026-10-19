@@ -7,7 +7,7 @@ mimosa-ai/
 ├── config.py                              # Configuration class
 ├── main.py                                # CLI entry point & mode dispatch
 ├── pyproject.toml                         # Project metadata + dependencies
-├── cleanup.sh                             # Reset workflows + capsules
+├── cleanup.sh                             # Delete generation folders + tmp/
 ├── memory_explorer.py                     # Interactive trace replay
 ├── mkdocs.yml                             # Documentation site config
 │
@@ -163,7 +163,8 @@ mimosa-ai/
 | `sources/modules/` | ❌ | Workflow templates. Don't delete. |
 | `sources/core/`, `sources/utils/`, etc. | ❌ | Source. Don't delete. |
 
-For a clean reset, prefer `./cleanup.sh` over hand-deleting.
+For a clean reset, prefer `./cleanup.sh` (or `./cleanup.sh <subfolder>`
+for a campaign folder; `-n` lists first) over hand-deleting.
 
 ## See also
 

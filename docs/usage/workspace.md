@@ -105,12 +105,19 @@ the raw scorer output.
 For unbiased benchmark evaluation, run
 
 ```bash
-./cleanup.sh
+./cleanup.sh              # top-level generation folders + tmp/
+./cleanup.sh run_1        # or: empty one named subfolder (asks first; -y skips)
+./cleanup.sh -n run_1    # dry run: list what would be deleted
 ```
 
-before kickoff. This deletes `sources/workflows/`, the session archive,
-the LLM-cache memory, and `runs_capsule/` so cached workflows from
-previous runs don't contaminate similarity-based parent selection.
+before kickoff, on the folder your `workflow_dir` points at, so cached
+workflows from previous runs don't contaminate similarity-based parent
+selection (`WorkflowSelector` only reads the top level of `workflow_dir`).
+The default deletes only top-level generation folders of
+`sources/workflows/` (`YYYYMMDD_HHMMSS_<id>`, `single_agent_*`,
+`generation_failed`) and empties `tmp/`; named campaign subfolders
+(`run_1`, …), their `.policy_bt/` tournaments and the top-level logs are
+kept. It never touches `runs_capsule/`, `sources/memory/` or `run_notes/`.
 
 !!! warning "Don't delete by hand"
     `cleanup.sh` knows which directories are runtime state vs. source.

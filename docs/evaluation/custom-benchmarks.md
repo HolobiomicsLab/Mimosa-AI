@@ -88,9 +88,11 @@ for the scoring logic.
 ./cleanup.sh
 ```
 
-Wipes `sources/workflows/`, the LLM cache, and `runs_capsule/`. Do this
-before any benchmark you want to publish — without it, cached workflows
-from prior runs can leak through similarity-based parent selection.
+Deletes the top-level generation folders of `sources/workflows/` and
+empties `tmp/`; pass a subfolder name (`./cleanup.sh run_1`) to empty a
+campaign's `workflow_dir` instead. Do this before any benchmark you want
+to publish — without it, cached workflows from prior runs can leak
+through similarity-based parent selection.
 
 ## See also
 

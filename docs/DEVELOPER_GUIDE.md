@@ -109,7 +109,7 @@ mimosa-ai/
 ├── config.py                              # Configuration management
 ├── main.py                                # CLI entry point & mode dispatch
 ├── pyproject.toml                         # Project metadata + deps
-├── cleanup.sh                             # Reset workflows + capsules
+├── cleanup.sh                             # Delete generation folders + tmp/
 ├── memory_explorer.py                     # Interactive trace replay
 │
 ├── sources/

@@ -133,7 +133,8 @@ main.py                      # CLI entry point & mode dispatch (argparse → asy
 config.py                    # Config dataclass: defaults, JSON load, CLI overrides, path validation
 config_default.json          # Template config — copy to my_config.json and edit
 auto-install.sh              # Automated installer script
-cleanup.sh                   # Empties tmp/ and sources/workflows/ (reset cached workflows)
+cleanup.sh                   # Deletes top-level generation folders of sources/workflows/ + tmp/;
+                             # `./cleanup.sh <subfolder>` empties one campaign folder; -n = dry run
 workflow_evolution_anim.py   # Interactive evolution-tree / trace replay viewer
 
 sources/
@@ -237,7 +238,9 @@ uv run pytest tests/evaluator_test.py   # single file
 
 - End-to-end "evaluation" is a separate, LLM- and benchmark-driven activity
   (`--papers`, `--science_agent_bench`), not part of the pytest suite. Run
-  `./cleanup.sh` before benchmark sweeps so cached workflows are not reused.
+  `./cleanup.sh` (or `./cleanup.sh <workflow_dir subfolder>`) before benchmark
+  sweeps so cached workflows are not reused; never run it on a campaign you
+  still need to audit.
 
 ## Auditing finished runs
 
