@@ -786,34 +786,6 @@ Original request:
         print_info(f"Workspace snapshot: {len(self._workspace_files_before_step)} file(s)")
         return self._workspace_files_before_step
 
-    def _verify_required_inputs(self, step: PlanStep) -> tuple[bool, list[str]]:
-        """Check that a step's required inputs exist in the workspace.
-
-        No caller in the codebase today; it is the input-side gate that
-        pairs with ``_verify_expected_outputs``. It scans the current
-        workspace files and compares each declared input (normalised to
-        forward slashes) against them.
-
-        Args:
-            step: The plan step whose ``required_inputs`` are checked; comes
-                from the accepted plan.
-
-        Returns:
-            tuple[bool, list[str]]: (all_available, missing_inputs) — True
-            when every required input exists, else the list of missing input
-            paths.
-        """
-        missing_inputs = []
-
-        workspace_files = self._get_workspace_files()
-        for required_input in step.required_inputs:
-            # Normalise to forward slashes so Windows backslashes never cause
-            # a false-negative when comparing against plan-defined paths.
-            normalised_input = Path(required_input).as_posix()
-            if normalised_input not in workspace_files:
-                missing_inputs.append(required_input)
-        return len(missing_inputs) == 0, missing_inputs
-
     def _verify_expected_outputs(self, step: PlanStep) -> tuple[bool, list[str]]:
         """Check that a step's expected outputs exist in the workspace.
 

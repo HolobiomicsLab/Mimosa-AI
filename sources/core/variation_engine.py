@@ -49,6 +49,18 @@ CROSSOVER_RAW_LOG_RULE = (
     "environment-wide rule, never hard-code absolute paths, and never move "
     "work or outputs outside the relative workspace."
 )
+# Directive output shorter than this is degenerate.
+MIN_DIRECTIVE_CHARS = 20
+DIRECTIVE_RETRY_NUDGE = (
+    "\n\nOutput ONLY the directive text now — no "
+    "analysis, no preamble, max 3 sentences."
+)
+# Used when the directive LLM fails or stays degenerate.
+FALLBACK_DIRECTIVE = (
+    "Make one small incremental improvement to the weakest step "
+    "flagged in the diagnosis; keep the rest of the workflow "
+    "unchanged."
+)
 
 
 def raw_log_tail(run_stdout: str) -> str:
@@ -671,8 +683,8 @@ class VariationEngine:
         prompt tells the LLM to judge the change magnitude itself from the
         deterministic search state. The verifier diagnosis and the
         unverified raw log go in separate blocks. Degenerate output
-        (shorter than 20 characters) triggers one retry, then a
-        deterministic fallback directive.
+        (shorter than 20 characters) or a failed provider call triggers
+        one retry, then the deterministic ``FALLBACK_DIRECTIVE``.
 
         Args:
             agent_answers: str — flattened parent answers from
@@ -737,29 +749,50 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             system_msg=sys_msg,
             config=self.llm_config,
         )
-        directive = provider(prompt)
+        directive = self._ask_directive(provider, prompt, nudge=False)
         # Guard against truncated/degenerate directive output
-        if not directive or len(directive.strip()) < 20:
+        if not directive or len(directive.strip()) < MIN_DIRECTIVE_CHARS:
             self.logger.warning(
                 "Directive LLM returned empty/degenerate output "
                 f"({directive!r:.60}); retrying with output-only nudge."
             )
-            directive = provider(
-                prompt + "\n\nOutput ONLY the directive text now — no "
-                "analysis, no preamble, max 3 sentences.",
-                use_cache=False,
-            )
-        if not directive or len(directive.strip()) < 20:
+            directive = self._ask_directive(provider, prompt, nudge=True)
+        if not directive or len(directive.strip()) < MIN_DIRECTIVE_CHARS:
             self.logger.warning(
                 "Directive still degenerate after retry; using deterministic "
                 "fallback directive."
             )
-            directive = (
-                "Make one small incremental improvement to the weakest step "
-                "flagged in the diagnosis; keep the rest of the workflow "
-                "unchanged."
-            )
+            directive = FALLBACK_DIRECTIVE
         return directive
+
+    def _ask_directive(self, provider, prompt: str, nudge: bool) -> str:
+        """Call the directive LLM once and turn a failure into empty text.
+
+        ``llm_think_mutation_directive`` calls it for the first try and
+        for the nudged retry. A transport error (for example a server
+        disconnect) must not end the evolution step, so the caller gets
+        empty text and applies its retry and fallback rules. Interrupts
+        and task cancellation are not ``Exception`` and still propagate.
+
+        Args:
+            provider: LLMProvider — directive provider with the system prompt.
+            prompt: str — full directive prompt.
+            nudge: bool — True for the retry: add the output-only nudge
+                and skip the cache.
+
+        Returns:
+            str — the LLM answer, or "" when the call raised.
+        """
+        try:
+            if nudge:
+                return provider(prompt + DIRECTIVE_RETRY_NUDGE, use_cache=False)
+            return provider(prompt)
+        except Exception as error:  # noqa: BLE001 - any provider failure
+            self.logger.warning(
+                f"Directive LLM call failed ({type(error).__name__}: {error}); "
+                "treating it as empty output."
+            )
+            return ""
 
     def mutation_prompt(
         self,

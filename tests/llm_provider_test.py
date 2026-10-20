@@ -97,6 +97,27 @@ def test_non_retryable_error_raises_immediately():
     assert completion.call_count == 1
 
 
+@pytest.mark.parametrize(
+    "message",
+    [
+        "Server disconnected without sending a response.",
+        "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol",
+    ],
+)
+def test_transport_disconnect_is_retried(message):
+    """A server disconnect or SSL EOF is retried, then the call succeeds."""
+    provider = _make_provider()
+
+    with patch(
+        "litellm.completion", side_effect=[Exception(message), _FakeResponse()]
+    ) as completion, patch("sources.core.llm_provider.time.sleep"):
+        result = provider("hello", use_cache=False)
+
+    assert result == "ok"
+    assert completion.call_count == 2
+
+
+
 def test_quantization_404_falls_back_to_unfiltered():
     """A 'no endpoints for quantization' 404 drops the filter and retries."""
     provider = _make_openrouter_provider()

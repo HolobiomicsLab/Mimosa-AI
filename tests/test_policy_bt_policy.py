@@ -315,3 +315,20 @@ def test_worker_rejects_boolean_value_for_a_higher_criterion(tmp_path):
     adapter = ADAPTER.replace('{"score": data["score"]}', '{"score": data["score"] > 0.6}')
     with pytest.raises(AdaptationError, match="must be a number"):
         run_pair(_payload(_pair(tmp_path, 0.9, 0.5), adapter=adapter), WORKER_TIMEOUT)
+
+
+VISION_CRITERION = {"id": "legend_present", "stage": 2, "description": "The figure has a legend.",
+                    "direction": "satisfy", "judge": "vision"}
+
+
+def test_code_channel_never_requires_vision_judged_criteria(tmp_path):
+    """Elk/Toronto run 2026-10-20: adapters had to return null for pixel-only
+    criteria. The code channel now sees only code-judged criteria."""
+    from sources.evaluators.policy_bt_verifier.policy import PolicyEngine
+
+    bundle = {"goal": "g", "prompt_version": "test", "task_representation": "t", "core_source": CORE, "criteria": [*CRITERIA, VISION_CRITERION],
+              "representation": {"score": "float", "legend_present": "bool"},
+              "adapters": {"x": ADAPTER}, "assignments": {"u1": "x", "u2": "x"}, "visuals": {}, "_pair_uuids": ["u1", "u2"]}
+    engine = PolicyEngine({"policy_bt_repair_rounds": 0}, lambda prompt: pytest.fail("no repair expected"))
+    verdict = engine.compare(bundle, _pair(tmp_path, 0.9, 0.5))
+    assert verdict["winner"] == "a" and set(verdict["normalized_a"]["values"]) == {"score"}

@@ -12,6 +12,7 @@ returned, not raised, so the evolution loop can re-attempt.
 
 import logging
 import time
+import uuid as uuid_lib
 from typing import Any
 
 from sources.utils.notify import PushNotifier
@@ -26,6 +27,26 @@ from sources.cli.pretty_print import (
 from .workflow_factory import WorkflowFactory
 from .single_agent_factory import SingleAgentFactory
 from .workflow_runner import ExecutionStatus, RuntimeConfig, WorkflowRunner
+
+# Folder-name prefix for failed slots that have no uuid.
+GENERATION_FAILED_PREFIX = "generation_failed"
+FAILED_ID_HEX_CHARS = 8
+
+
+def unique_failure_id() -> str:
+    """Make a fresh folder name for a failed slot that has no uuid.
+
+    :meth:`WorkflowOrchestrator._parse_generation_error` calls it when
+    the factory error carries no ``"UUID:<uuid>|"`` prefix. A fresh name
+    makes sure that each failed slot keeps its own ``run_stdout.log``
+    and that a new failure does not overwrite an earlier one.
+
+    Returns:
+        str: ``generation_failed_<YYYYMMDD_HHMMSS>_<8 hex>``.
+    """
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    short_id = uuid_lib.uuid4().hex[:FAILED_ID_HEX_CHARS]
+    return f"{GENERATION_FAILED_PREFIX}_{timestamp}_{short_id}"
 
 
 class WorkflowOrchestrator:
@@ -264,14 +285,15 @@ CONSTRAINTS: Cite sources for all methodological claims. Note where literature i
         Returns:
             tuple[str, str]: ``(uuid, message)``. When the message uses
             the ``"UUID:<uuid>|<msg>"`` convention, the encoded UUID and
-            message are returned; otherwise
-            ``("generation_failed", str(error))``.
+            message are returned; otherwise a fresh
+            ``generation_failed_<timestamp>_<8 hex>`` name (see
+            :func:`unique_failure_id`) and ``str(error)``.
         """
         msg = str(error)
         if msg.startswith("UUID:") and "|" in msg:
             uuid_part, actual_error = msg.split("|", 1)
             return uuid_part.replace("UUID:", ""), actual_error
-        return "generation_failed", msg
+        return unique_failure_id(), msg
 
     async def _execute_in_sandbox(self, complete_code: str) -> tuple[str, float, float]:
         """Install dependencies and run the workflow in the sandbox.

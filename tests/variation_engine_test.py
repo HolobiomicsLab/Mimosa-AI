@@ -226,6 +226,31 @@ def test_directive_flow_embedded_in_mutation_prompt(monkeypatch):
     assert "Do not change the workflow's overall topology" in prompt
 
 
+class _FailingProvider(_FakeProvider):
+    """Offline provider whose every call fails like a dropped connection."""
+
+    calls = 0
+
+    def __call__(self, prompt, use_cache=True):
+        _FailingProvider.calls += 1
+        raise RuntimeError("Server disconnected without sending a response.")
+
+
+def test_directive_provider_failure_falls_back(monkeypatch):
+    monkeypatch.setattr(variation_engine_module, "LLMProvider", _FailingProvider)
+    _FailingProvider.calls = 0
+    ve = _make_engine()
+    directive = ve.llm_think_mutation_directive(
+        agent_answers="agent solver: did x",
+        textual_gradient_block="claim verification failed",
+        search_state="parent_score: 0.50",
+        goal="solve the task",
+    )
+    assert directive == variation_engine_module.FALLBACK_DIRECTIVE
+    assert _FailingProvider.calls == 2  # first try plus the nudged retry
+
+
+
 # ── Evidence routing: verifier diagnosis vs unverified raw log ────────────
 
 _RAW_STDOUT = (

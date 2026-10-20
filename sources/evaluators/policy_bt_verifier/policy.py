@@ -1231,7 +1231,7 @@ class PolicyEngine:
                 generation round fails after all repairs.
         """
         from .prompts import ADAPTER, CORE, PROMPT_VERSION
-        from .recon import reconnaissance
+        from .recon import code_task, reconnaissance
 
         if not generations:
             raise PolicyError("Policy preparation requires an eligible generation")
@@ -1247,13 +1247,13 @@ class PolicyEngine:
             bundle.update({key: plan[key] for key in frozen_keys})
             # Freeze-time guard record: verdicts, revision requests and drops.
             bundle["criteria_guard"] = {key: plan["inspection"].get(key, []) for key in GUARD_RECORD_KEYS}
-            bundle["core_source"] = self.source(CORE, {"goal": goal, **{key: bundle[key] for key in frozen_keys}})
+            bundle["core_source"] = self.source(CORE, {"goal": goal, **code_task({key: bundle[key] for key in frozen_keys})})
         for generation in generations:
             uuid = generation["uuid"]
             adapter_plan = plan["plans"][uuid]
             adapter_id = adapter_plan.get("adapter")
             if adapter_id not in bundle["adapters"]:
-                source = self.source(ADAPTER, {"goal": goal, "frozen_task": {key: bundle[key] for key in frozen_keys},
+                source = self.source(ADAPTER, {"goal": goal, "frozen_task": code_task({key: bundle[key] for key in frozen_keys}),
                                      "plan": adapter_plan, "generation_uuid": uuid, "inspection": plan["inspection"]})
                 adapter_id = hashlib.sha256(source.encode()).hexdigest()
                 bundle["adapters"][adapter_id] = source
@@ -1338,10 +1338,13 @@ class PolicyEngine:
             PolicyError: When the last attempt still fails.
         """
         from .prompts import ADAPTER_CONTRACT, CORE_CONTRACT, REPAIR
+        from .recon import code_task
+
+        task = code_task(bundle)
 
         rounds = int(self.option("policy_bt_repair_rounds", 3))
         for attempt in range(rounds + 1):
-            payload = {"root": str(root.resolve()), "core_source": bundle["core_source"], "criteria": bundle["criteria"],
+            payload = {"root": str(root.resolve()), "core_source": bundle["core_source"], "criteria": task["criteria"],
                        "adapters": {side: bundle["adapters"][bundle["assignments"][uuid]]
                                     for side, uuid in zip(("a", "b"), uuids, strict=True)}}
             try:
@@ -1349,8 +1352,8 @@ class PolicyEngine:
             except PolicyError as error:
                 if attempt == rounds:
                     raise
-                context = {"goal": bundle["goal"], "criteria": bundle["criteria"],
-                           "representation": bundle["representation"], "error": str(error),
+                context = {"goal": bundle["goal"], "criteria": task["criteria"],
+                           "representation": task["representation"], "error": str(error),
                            "inspection": bundle.get("inspection", {})}
                 if not isinstance(error, AdaptationError):
                     bundle["core_source"] = self.source(REPAIR + CORE_CONTRACT, {**context, "kind": "comparison_policy", "source": bundle["core_source"]})

@@ -16,6 +16,9 @@ MAX_REQUESTS_PER_ROUND = 16
 INITIAL_PREVIEW_BYTES = 65536
 MAX_LISTED_ENTRIES = 400
 MAX_RETAINED_PAGES = 48
+# Who decides a criterion: adapter code or the vision tie-break.
+JUDGE_CODE = "code"
+JUDGE_VISION = "vision"
 
 
 class ReconError(ValueError):
@@ -96,13 +99,39 @@ def describe_generation(generation: dict) -> dict:
             "execution": generation.get("execution", {})}
 
 
-def _check_complete(result: dict, generations: list[dict]) -> None:
-    """Reject missing generation coverage and invalid criterion definitions.
+def code_task(task: dict) -> dict:
+    """Return the task without the criteria only the vision model judges.
 
-    Args: result (dict): model plan; generations (list[dict]): supplied records.
-    Returns: None; raises ReconError for an incomplete response.
+    The policy engine calls it before it writes or runs adapter and
+    comparison code, and the gradient fold calls it before it reports
+    unmeasured values. A criterion only an image shows (a plotted element,
+    legibility) has ``"judge": "vision"``: adapters cannot read pixels, so it
+    goes only to the visual tie-break (Elk/Toronto run 2026-10-20).
+
+    Args:
+        task (dict): Frozen task or bundle with ``criteria`` and
+            ``representation``.
+
+    Returns:
+        dict: A shallow copy whose criteria and representation hold only
+        code-judged entries.
     """
-    criteria = result.get("criteria")
+    vision = {c["id"] for c in task.get("criteria") or [] if c.get("judge") == JUDGE_VISION}
+    return {**task, "criteria": [c for c in task.get("criteria") or [] if c["id"] not in vision],
+            "representation": {k: v for k, v in (task.get("representation") or {}).items() if k not in vision}}
+
+
+def _check_criteria(criteria: object) -> None:
+    """Reject criterion lists the instrument cannot compare.
+
+    Called by ``_check_complete`` with the model's proposed criteria.
+
+    Args:
+        criteria (object): Proposed ``criteria`` value from the plan.
+
+    Returns:
+        None; raises ReconError for an invalid list.
+    """
     if not isinstance(criteria, list) or not criteria:
         raise ReconError("At least one goal-grounded criterion is required")
     ids = [item.get("id") for item in criteria if isinstance(item, dict)]
@@ -115,6 +144,18 @@ def _check_complete(result: dict, generations: list[dict]) -> None:
             raise ReconError("Criterion stages must be positive integers")
         if item.get("direction") not in {"higher", "lower", "satisfy"}:
             raise ReconError("Criterion direction must be higher, lower or satisfy")
+        if item.get("judge", JUDGE_CODE) not in {JUDGE_CODE, JUDGE_VISION}:
+            raise ReconError('Criterion judge must be "code" or "vision"')
+    if all(item.get("judge") == JUDGE_VISION for item in criteria):
+        raise ReconError('At least one criterion must be judged by "code" (for example output presence)')
+
+def _check_complete(result: dict, generations: list[dict]) -> None:
+    """Reject missing generation coverage and invalid criterion definitions.
+
+    Args: result (dict): model plan; generations (list[dict]): supplied records.
+    Returns: None; raises ReconError for an incomplete response.
+    """
+    _check_criteria(result.get("criteria"))
     if not isinstance(result.get("task_representation"), str):
         raise ReconError("Task representation must be a string")
     if not isinstance(result.get("representation"), dict):

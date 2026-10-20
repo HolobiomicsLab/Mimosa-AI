@@ -502,8 +502,8 @@ if WORKFLOW_PATH:
             RuntimeError: If loading tool code, creating directories, or reading
                 the template code files fails.
             ValueError: If generation, structural validation, or final
-                compilation fails; validation and compile errors carry the
-                workflow UUID prefix.
+                compilation fails; these errors carry the workflow UUID
+                prefix, so the caller files the error under this run id.
         """
         # Generate chronologically sortable workflow ID: YYYYMMDD_HHMMSS_shortUUID
         timestamp = time.strftime("%Y%m%d_%H%M%S")
@@ -542,7 +542,8 @@ if WORKFLOW_PATH:
                 craft_instructions, existing_tool_prompt, memory_path, allow_cache
             ) # Generate workflow code - let Evolution handle retries
         except Exception as e:
-            raise e # raise error for evolve-level to handle
+            # Keep the slot's uuid so its folder gets the error
+            raise ValueError(f"UUID:{uuid_str}|{e}") from e
         # Save workflow code immediately so learning layer can access it even if validation fails
         if save_workflow and isinstance(workflow_genotype_code, str):
             self.save_workflow_files(workflow_path, uuid_str, workflow_genotype_code, goal, original_task)

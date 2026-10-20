@@ -687,86 +687,6 @@ class EvolutionEngine:
         print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
         return [mock_run]
 
-    def load_phenotype_result(self, uuid: str) -> Any:
-        """Load the result of a previously executed workflow state.
-
-        Mockup mode and manual inspection call this with a workflow UUID
-        to reload its stored evaluation payload from disk.
-
-        Args:
-            uuid (str): UUID of the workflow state to load.
-
-        Returns:
-            Parsed JSON contents of the workflow's ``state_result.json``,
-            or ``None`` when the file is missing.
-
-        Raises:
-            ValueError: When the state file exists but cannot be read.
-        """
-        try:
-            with open(f"{self.workflow_dir}/{uuid}/state_result.json") as f:
-                return json.loads(f.read().strip())
-        except FileNotFoundError:
-            return None
-        except Exception as e:
-            raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
-
-    def load_workflow_genotype_code(self, workflow_id: str) -> str:
-        """Load the genotype source of a stored workflow.
-
-        Inspection and tooling code calls this with a workflow UUID to
-        read the Python genotype stored for that run.
-
-        Args:
-            workflow_id (str): UUID identifying the workflow folder.
-
-        Returns:
-            The Python source of the workflow genotype.
-
-        Raises:
-            ValueError: When the folder, the code file or its contents are
-                not accessible.
-        """
-        workflow_path = f"{self.workflow_dir}/{workflow_id}"
-        if not os.path.exists(workflow_path):
-            raise ValueError(
-                f"❌ Workflow for ID {workflow_id} not found in {self.workflow_dir}."
-            )
-
-        try:
-            with open(f"{workflow_path}/workflow_genotype_{workflow_id}.py") as f:
-                return f.read()
-        except FileNotFoundError as e:
-            raise ValueError(
-                f"❌ Workflow code file not found for ID {workflow_id} in {workflow_path}."
-            ) from e
-        except Exception as e:
-            raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
-
-    def get_total_rewards(self, wf_state: Any, eval_type: str) -> float:
-        """Read the total reward from a workflow state.
-
-        Inspection and reporting code calls this with a completed
-        workflow state and the evaluation type used for the run.
-
-        Args:
-            wf_state (Any): Workflow state dict; falsy values
-                short-circuit to ``0.0``.
-            eval_type (str): Either ``"generic"`` or ``"scenario"``;
-                other values yield ``0.0``.
-
-        Returns:
-            The reward extracted from the relevant evaluation slice.
-        """
-        if not wf_state or not eval_type:
-            return 0.0
-        if eval_type == "generic":
-            return wf_state["evaluation"]["generic"]["overall_score"]
-        elif eval_type == "scenario":
-            return wf_state["evaluation"]["scenario"]["score"]
-        else:
-            return 0.0
-
     def extract_agents_behavior(self, wf_state: Any) -> str:
         """Extract the per-agent answers from the workflow state.
 
@@ -1005,14 +925,14 @@ class EvolutionEngine:
         # ── Workspace lifecycle: snapshot → clean → restore before first run ─
         self.workspace_mgr.begin_session()
 
+        from sources.evaluators.policy_bt_verifier.reexec import reproduction_goal_note
+        goal += "\n" + reproduction_goal_note(self.config) + "\n"
         craft_instructions = self.get_genotype_instructions(goal, wf, max_iterations=max_iteration)
 
         rewards_history = []
         assertion_history = []  # Track [passed, total] per iteration
         self.viz_utils.create_rewards_curve_plot(goal)
 
-        from sources.evaluators.policy_bt_verifier.reexec import reproduction_goal_note
-        goal += "\n" + reproduction_goal_note(self.config) + "\n"
 
         # ── Stop control (stop-condition plan 2026-10-08) ─────────────
         stop_controller = StopController(
@@ -1172,12 +1092,6 @@ class EvolutionEngine:
             or verifier.get("skipped_reason") in _UNSCORED_VERIFIER_REASONS
         )
         if uuid:
-            # Reward wiring (N1): score, uncapped score and the fallback
-            # flag are read back from the run's state_result in ONE pass,
-            # outside the genotype guard — a run whose orchestration
-            # returned no genotype string must not keep a stale
-            # reward_is_fallback=False while its evaluation on disk
-            # records a mean_claim fallback (pains_brenk gen 13).
             runs[-1].reward = wf_info.overall_score
             runs[-1].reward_uncapped = wf_info.overall_score_uncapped
             runs[-1].reward_is_fallback = wf_info.reward_is_fallback
@@ -1427,21 +1341,6 @@ class EvolutionEngine:
         except Exception as exc:
             self.logger.warning(f"[ASTRA] export skipped: {exc}")
             print_warn(f"ASTRA export failed (non-fatal): {exc}")
-
-    def _get_human_validation(self) -> bool:
-        """Ask the operator whether to continue the workflow.
-
-        Interactive runs call this when a retry needs human approval; it
-        reads a yes/no answer from the terminal.
-
-        Returns:
-            bool: ``True`` when the user typed ``yes`` or ``y``, and
-            ``False`` otherwise.
-        """
-        human_validation = input("Attempt to retry task? (yes/no): ").strip().lower()
-        if human_validation not in ["yes", "y"]:
-            return False
-        return True
 
     def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int) -> None:
         """Log the start of one generation.

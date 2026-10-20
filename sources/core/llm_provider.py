@@ -537,6 +537,8 @@ class LLMProvider:
             "too many requests",  # 429 errors
             "context",  # Context window errors
             "token limit",  # Token limit errors
+            "server disconnected",  # httpx RemoteProtocolError disconnects
+            "eof occurred",  # ssl.SSLEOFError protocol violation
         ]
 
         return any(pattern in error_str for pattern in retryable_patterns)

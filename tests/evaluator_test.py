@@ -84,11 +84,9 @@ def main():
     dgm = DarwinMachine(config)
 
     wf_state = dgm.load_wf_state_result(args.workflow_id)
-    wf_rewards = dgm.get_total_rewards(wf_state, eval_type)
 
     print(f"Evaluation type: {eval_type}")
     print(f"Flow state: {json.dumps(wf_state, indent=2)}")
-    print(f"Total rewards: {wf_rewards}")
 
 
 if __name__ == "__main__":

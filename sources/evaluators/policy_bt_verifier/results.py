@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
+from .recon import JUDGE_VISION
 from .registry import atomic_json
 
 NO_PREDECESSOR_GRADIENT = (
@@ -79,7 +80,9 @@ def fold_gradient(generation: dict, pairs: list[dict], criteria: list[dict] | No
     decisive = sorted((p for p in pairs if _outcome(p, uuid) != "tie"), key=lambda pair: pair["stage"])
     losses = [pair for pair in decisive if _outcome(pair, uuid) == "loss"]
     lost = {pair["stage"] for pair in losses}
-    open_criteria = [c for c in criteria or [] if isinstance(c, dict) and c.get("stage") not in lost]
+    # Vision criteria get feedback from _figure_deficiencies only.
+    open_criteria = [c for c in criteria or [] if isinstance(c, dict) and c.get("stage") not in lost
+                     and c.get("judge") != JUDGE_VISION]
     lines = [pair["feedback_" + _side(pair, uuid)] for pair in losses or decisive]
     lines += _criterion_deficiencies(uuid, pairs, open_criteria) + _figure_deficiencies(uuid, pairs)
     if lines:

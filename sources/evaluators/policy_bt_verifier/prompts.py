@@ -1,6 +1,6 @@
 """Versioned instructions for task understanding and deterministic policy code."""
 
-PROMPT_VERSION = "policy-bt-separated-8"
+PROMPT_VERSION = "policy-bt-separated-9"
 
 BOUNDARY = """
 You are a scientific verification instrument, not a workspace assistant.
@@ -20,7 +20,8 @@ First response may be {"action":"inspect","requests":[{"uuid":"...",
 After enough inspection, return {"action":"complete",
 "task_representation":"what the goal requires",
 "criteria":[{"id":"stable_id","stage":1,"description":"goal requirement",
-"direction":"higher|lower|satisfy","literals":["exact required string"]}],
+"direction":"higher|lower|satisfy","judge":"code|vision",
+"literals":["exact required string"]}],
 "representation":{"stable_id":"type, unit, missing-value meaning"},
 "plans":{"generation_uuid":{"adapter":"existing adapter SHA or null",
 "instructions":"exact artifact schema and normalization plan"}},
@@ -52,6 +53,13 @@ Criteria must describe the RESULT the goal requires (required outputs present,
 validity of the reported solution, consistency between reported values, quality
 metrics) — never the method or program one generation happens to use: no
 "script X runs/completes/prints Y" criteria, no algorithm names.
+"judge" says who decides a criterion. "code" (the default): adapter code reads it
+from files (paths, headers, numbers, image size). "vision": only the picture
+shows it (an element drawn in a figure, a legend, legibility, a highlighted
+area); adapters cannot read pixels, so such a criterion is decided by a vision
+model comparing the figures you list in "visuals", and is never measured from a
+side file such as a summary CSV. Keep at least one "code" criterion, and list
+the goal's figure in "visuals" for every generation that has it.
 OUTPUT CONFORMANCE. Strict graders read outputs by exact path, field name and
 record identity, so a correct result in a different shape still fails. When the
 goal asks to save outputs, add one "satisfy" criterion with id "output_conformance",
@@ -190,7 +198,10 @@ source of each required string. Reject when it:
   requirements files, script names or count) instead of the requested result,
   even when the goal states these instructions: the reproduction gate already
   enforces them;
-- measures something unrelated to the goal.
+- measures something unrelated to the goal;
+- has "judge":"code" although only the picture can show it (an element drawn in a
+  figure, legibility), or is measured from a side file instead of the figure
+  (the reason must say: set "judge":"vision").
 Keep every criterion that checks a requirement of the goal, and every quality
 criterion that does not conflict with the goal and measures how well the requested
 result is achieved (for example a held-out validation error when test labels are

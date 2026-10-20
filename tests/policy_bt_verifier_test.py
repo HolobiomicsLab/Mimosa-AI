@@ -17,7 +17,10 @@ from sources.evaluators.policy_bt_verifier.prompts import CRITERIA_GUARD
 from sources.evaluators.policy_bt_verifier.registry import TaskRegistry, atomic_json
 from sources.evaluators.policy_bt_verifier.results import fold_gradient
 from sources.evaluators.policy_bt_verifier.tournament import fit_ratings
-from sources.evaluators.policy_bt_verifier.visual import VisualChannel
+from sources.evaluators.policy_bt_verifier.visual import (
+    VISUAL_PROMPT_VERSION,
+    VisualChannel,
+)
 
 
 def generations(*identifiers):
@@ -288,7 +291,7 @@ def test_visual_order_disagreement_keeps_tie_with_each_sides_deficiencies(tmp_pa
     verdict = VisualChannel(lambda content: response).compare(_plot_pair(tmp_path), tmp_path)
     assert verdict["winner"] == "tie"
     assert verdict["visual_deficiencies"] == {"a": ["no legend"], "b": ["wrong units"]}  # forward order
-    assert verdict["visual_prompt_version"] == "visual-tiebreak-2"
+    assert verdict["visual_prompt_version"] == VISUAL_PROMPT_VERSION
 
 
 def test_malformed_deficiencies_never_cost_an_agreed_visual_winner(tmp_path):
@@ -529,3 +532,33 @@ def test_goal_named_script_never_grounds_and_sentence_end_file_is_an_input(tmp_p
     (tmp_path / "test.csv").write_text("Drug,Y\nCCO,0\n")
     heads = input_heads("Keep one script at ames.py. Train on test.csv.", {"snapshot": str(tmp_path)})
     assert heads == {"test.csv": "Drug,Y\nCCO,0"}
+
+
+def test_vision_judged_criterion_gets_figure_feedback_not_a_measurement_request():
+    """Elk run 2026-10-20: 'write CSV, JSON or text at the goal's stated path' was
+    sent for pixel-only criteria, and the goal's path was the PNG."""
+    criteria = [{"id": "valid_png", "stage": 1, "description": "PNG", "direction": "satisfy"},
+                {"id": "legend_present", "stage": 2, "description": "legend", "direction": "satisfy", "judge": "vision"}]
+    own = {"values": {"valid_png": True}, "evidence": [{"criterion": "valid_png", "detail": "PNG signature"}]}
+    tie = {"a": "x", "b": "y", "winner": "tie", "stage": 0, "feedback_a": "", "feedback_b": "",
+           "normalized_a": own, "normalized_b": own, "channel": "visual",
+           "visual_deficiencies": {"a": ["legend_present: no legend"], "b": []}}
+    folded = fold_gradient({"uuid": "x", "execution": {"eligible": True}}, [tie], criteria)
+    assert "could not be measured" not in folded and "legend_present: no legend" in folded
+
+
+def test_recon_rejects_unknown_judge_and_an_all_vision_plan():
+    from sources.evaluators.policy_bt_verifier.recon import (
+        ReconError,
+        _check_criteria,
+        code_task,
+    )
+
+    vision = {"id": "v", "stage": 1, "direction": "satisfy", "judge": "vision"}
+    with pytest.raises(ReconError, match="judged by"):
+        _check_criteria([vision])
+    with pytest.raises(ReconError, match="judge must be"):
+        _check_criteria([{**vision, "judge": "human"}])
+    task = code_task({"criteria": [vision, {"id": "c", "stage": 2, "direction": "satisfy"}],
+                      "representation": {"v": "bool", "c": "bool"}})
+    assert [c["id"] for c in task["criteria"]] == ["c"] and task["representation"] == {"c": "bool"}

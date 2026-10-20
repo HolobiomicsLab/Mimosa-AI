@@ -147,6 +147,8 @@ NETWORK_ERROR_MARKERS = (
     "Network is unreachable",                # [Errno 51]
     "No route to host",                      # [Errno 65]
     "APIConnectionError",                    # litellm/openai transport-level failure
+    "Server disconnected",                   # httpx RemoteProtocolError
+    "EOF occurred in violation of protocol",  # ssl.SSLEOFError
 )
 NETWORK_PROBE_HOST = "openrouter.ai"
 NETWORK_PROBE_INTERVAL_S = 15.0

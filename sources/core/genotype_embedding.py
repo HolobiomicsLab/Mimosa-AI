@@ -444,18 +444,6 @@ def embed_genotype(genotype: str | None) -> np.ndarray | None:
     return get_default_embedder().embed(genotype)
 
 
-def reset_default_embedder() -> None:
-    """Drop the cached singleton so the next embed builds a fresh one.
-
-    Tests call it to isolate embedder state; runtime code never does.
-
-    Returns:
-        ``None``.
-    """
-    global _default_embedder
-    _default_embedder = None
-
-
 if __name__ == "__main__":
 
     class _StubBackend:
