@@ -24,8 +24,12 @@ from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 
-from sources.utils.input_manifest import is_table
-
+# Delimited text tables; BBBC002 keeps its counts in .txt files.
+TABLE_SUFFIXES = (".csv", ".tsv", ".txt")
+# Larger tables are not scanned.
+MAX_TABLE_BYTES = 64 * 1024 * 1024
+# A --task workspace can hold any number of tables; goal-named go first.
+MAX_SCANNED_TABLES = 64
 MIN_TABLE_ROWS = 2
 # A .txt file needs this many fields to count as a table, not prose.
 MIN_TEXT_TABLE_FIELDS = 2
@@ -134,39 +138,28 @@ class Column:
             self.high = number if self.high is None else max(self.high, number)
 
 
-def table_keys(root: Path) -> list[str]:
-    """List the table files below a folder.
+def scan_tables(root: Path, keys: list[str], goal: str) -> dict[str, dict]:
+    """Read each input table once, completely.
 
-    Reconnaissance calls it on the pristine input copy, where every table is
-    a task input.
-
-    Args:
-        root (Path): Folder to walk.
-
-    Returns:
-        list[str]: Sorted root-relative POSIX paths.
-    """
-    found = (
-        path.relative_to(root).as_posix() for path in root.rglob("*") if is_table(path)
-    )
-    return sorted(found)
-
-
-def scan_tables(root: Path, keys: list[str]) -> dict[str, dict]:
-    """Read each named table once, completely.
-
-    Reconnaissance calls it with the pristine input copy, or with the
-    snapshot and the goal-named input files when no copy exists.
+    Reconnaissance calls it with the input files from
+    ``criteria_guard.input_files``: of the pre-run baseline, or of the first
+    snapshot when there is no baseline. Only the first
+    ``MAX_SCANNED_TABLES`` tables are read, those the goal names first.
 
     Args:
         root (Path): Folder that holds the keys.
         keys (list[str]): Root-relative paths; non-tables are skipped.
+        goal (str): Task goal text.
 
     Returns:
         dict[str, dict]: Per readable table, ``rows`` (int) and ``columns``
         (header name to Column).
     """
-    scans = {key: _scan(root / key) for key in keys}
+    tables = [key for key in keys if _is_table(root / key)]
+    scans = {
+        key: _scan(root / key)
+        for key in _goal_tables(tables, goal)[:MAX_SCANNED_TABLES]
+    }
     return {key: scan for key, scan in scans.items() if scan is not None}
 
 
@@ -187,7 +180,8 @@ def one_value_columns(scans: dict[str, dict], goal: str) -> dict[str, dict]:
     """
     varied = _varied_tables(scans)
     singles = {
-        key: _singles(key, scans[key], varied) for key in _goal_tables(scans, goal)
+        key: _singles(key, scans[key], varied)
+        for key in _goal_tables(list(scans), goal)
     }
     found = {
         key: _bounded(columns, goal) for key, columns in singles.items() if columns
@@ -209,7 +203,7 @@ def input_profile(scans: dict[str, dict], goal: str) -> dict:
         dict: ``tables`` (key to ``rows``, ``column_count`` and per-column
         ``columns`` descriptions) and ``omitted_tables`` (int).
     """
-    keys = _goal_tables(scans, goal)[:MAX_PROFILE_TABLES]
+    keys = _goal_tables(list(scans), goal)[:MAX_PROFILE_TABLES]
     tables = {}
     for key in keys:
         columns = scans[key]["columns"]
@@ -271,18 +265,16 @@ def _bounded(columns: dict[str, dict], goal: str) -> dict:
 def _scan(path: Path) -> dict | None:
     """Read one table file in a single pass.
 
-    Called by ``scan_tables`` for each key.
+    Called by ``scan_tables`` for each selected table.
 
     Args:
-        path (Path): Candidate table file.
+        path (Path): Table file accepted by ``_is_table``.
 
     Returns:
-        dict | None: ``rows`` and ``columns``, or None for a non-table, an
-        oversize, unreadable or non-UTF-8 file, a table without a header, or
-        a one-field .txt file (prose such as a log line).
+        dict | None: ``rows`` and ``columns``, or None for an unreadable or
+        non-UTF-8 file, a table without a header, or a .txt file that is
+        prose (one field, or no row under its first line, such as a note).
     """
-    if not is_table(path):
-        return None
     try:
         with path.open(newline="", encoding="utf-8-sig") as stream:
             first = stream.readline()
@@ -292,13 +284,12 @@ def _scan(path: Path) -> dict | None:
             )
     except (OSError, UnicodeDecodeError, csv.Error):
         return None
-    if (
-        scan
-        and path.suffix.lower() == TEXT_SUFFIX
-        and len(scan["columns"]) < MIN_TEXT_TABLE_FIELDS
-    ):
-        return None
-    return scan
+    is_prose = (
+        path.suffix.lower() == TEXT_SUFFIX
+        and scan
+        and (len(scan["columns"]) < MIN_TEXT_TABLE_FIELDS or not scan["rows"])
+    )
+    return None if is_prose else scan
 
 
 def _tally(rows: Iterator[list[str]]) -> dict | None:
@@ -350,20 +341,21 @@ def _varied_tables(scans: dict[str, dict]) -> dict[str, set[str]]:
     return varied
 
 
-def _goal_tables(scans: dict[str, dict], goal: str) -> list[str]:
+def _goal_tables(keys: list[str], goal: str) -> list[str]:
     """Order table keys so the files the goal names come first.
 
-    Called by both public facts, so their table bounds keep the same tables.
+    Called by ``scan_tables`` and both public facts, so their table bounds
+    keep the same tables.
 
     Args:
-        scans (dict[str, dict]): Tables from ``scan_tables``.
+        keys (list[str]): Table keys.
         goal (str): Task goal text.
 
     Returns:
         list[str]: Sorted keys; goal-named file names first.
     """
     words = _goal_words(goal)
-    return sorted(sorted(scans), key=lambda key: not _is_named(Path(key).name, words))
+    return sorted(sorted(keys), key=lambda key: not _is_named(Path(key).name, words))
 
 
 def _goal_first(names: list[str], goal: str) -> list[str]:
@@ -418,6 +410,26 @@ def _is_named(name: str, words: tuple[str, set[str]]) -> bool:
     return lowered in tokens if len(lowered) < MIN_NAMED_CHARACTERS else lowered in text
 
 
+def _is_table(path: Path) -> bool:
+    """Tell whether a path is a regular table file of acceptable size.
+
+    Called by ``scan_tables`` before it reads a file.
+
+    Args:
+        path (Path): Candidate path.
+
+    Returns:
+        bool: True for a table suffix, a regular file (not a link) and at
+        most ``MAX_TABLE_BYTES``.
+    """
+    return (
+        path.suffix.lower() in TABLE_SUFFIXES
+        and not path.is_symlink()
+        and path.is_file()
+        and path.stat().st_size <= MAX_TABLE_BYTES
+    )
+
+
 def _number(text: str) -> float | None:
     """Parse a cell or header as a number.
 
@@ -445,7 +457,7 @@ if __name__ == "__main__":
             "id,Signal\n1,0.2\n2,0.9\n3,0.4\n", encoding="utf-8"
         )
         (root / "test.csv").write_text("id,Signal\n4,-999\n5,-999\n", encoding="utf-8")
-        found = scan_tables(root, table_keys(root))
+        found = scan_tables(root, ["test.csv", "train.csv"], "Predict Signal")
         facts = {
             "one_value_columns": one_value_columns(found, "Predict Signal"),
             "input_profile": input_profile(found, "Predict Signal"),

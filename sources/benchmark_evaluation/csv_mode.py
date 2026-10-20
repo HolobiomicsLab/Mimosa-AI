@@ -39,7 +39,6 @@ from sources.cli.pretty_print import (
 from sources.core.evolution_engine import EvolutionEngine, _select_best_run
 from sources.core.planner import Planner
 from sources.utils.email_reporter import send_evaluation_report
-from sources.utils.input_manifest import inputs_root, record_transfer
 from sources.utils.transfer_toolomics import LocalTransfer
 
 EVAL_LOG_FILE = Path("logs") / "evaluation_csv_mode.log"
@@ -740,7 +739,6 @@ EXPECTED OUTPUT:
         self.logger.info(f"[PAPERS DATASET MODE] Transferring dataset from: {task_dataset_path}")
         print_info(f"📁 Transferring dataset: {task_dataset_path.name}")
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
-        self._record_input_manifest(file_transfer, task_dataset_path)
         await asyncio.sleep(0.5)  # Give filesystem a moment to sync
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print_ok(f"Transferred {files_transferred} file(s) to workspace")
@@ -753,31 +751,6 @@ EXPECTED OUTPUT:
             )
 
         self.logger.info(f"[PAPERS DATASET MODE] Successfully transferred {files_transferred} files")
-
-    def _record_input_manifest(self, file_transfer: LocalTransfer, dataset_path: Path) -> None:
-        """Record the transferred dataset so the verifier can see later rewrites.
-
-        Both dataset transfer paths call it right after the copy, before any
-        workflow runs. The Policy-BT verifier compares each generation
-        snapshot with this record and scans the pristine table copies for
-        placeholder label columns; other verifier kinds never read it, so
-        nothing is recorded for them. A failure only leaves the inputs
-        unverified; it never stops the task.
-
-        Args:
-            file_transfer (LocalTransfer): Transfer that filled the workspace.
-            dataset_path (Path): Dataset folder from ``ScienceAgentBenchLoader``.
-
-        Returns:
-            None.
-        """
-        if str(getattr(self.config, "verifier_kind", "policy_bt")).lower() != "policy_bt":
-            return
-        workspace = file_transfer.workspace_path
-        try:
-            record_transfer(inputs_root(self.config.workflow_dir, workspace), workspace, dataset_path.name)
-        except OSError as error:
-            self.logger.warning(f"Input manifest not recorded ({error}); the verifier marks the inputs unverified")
 
     def _evaluate_with_science_agent_bench(
         self,
@@ -1125,14 +1098,10 @@ EXPECTED OUTPUT:
         """
         Clean up an isolated workspace after task completion.
 
-        The workspace's input transfer record goes too: the verifier already
-        keeps its own pristine copy in the task registry.
-
         Args:
             task_id: Unique identifier for the task
         """
         isolated_workspace = Path(self._base_workspace_dir) / f"worker_{task_id}"
-        shutil.rmtree(inputs_root(self.config.workflow_dir, isolated_workspace), ignore_errors=True)
         if isolated_workspace.exists():
             try:
                 shutil.rmtree(isolated_workspace, ignore_errors=True)
@@ -1412,7 +1381,6 @@ EXPECTED OUTPUT:
         self.logger.info(f"[Worker {task_id}] Transferring dataset from: {task_dataset_path}")
         print(f"\033[96m[Worker {task_id}] 📁 Transferring dataset: {task_dataset_path.name}\033[0m")
         files_transferred = file_transfer.transfer_files_to_workspace(str(task_dataset_path))
-        self._record_input_manifest(file_transfer, task_dataset_path)
         await asyncio.sleep(0.3)  # Give filesystem a moment to sync
         workspace_files_after = file_transfer.count_files_recursive(Path(file_transfer.workspace_path))
         print(f"\033[96m[Worker {task_id}] ✓ Transferred {files_transferred} files to workspace\033[0m")

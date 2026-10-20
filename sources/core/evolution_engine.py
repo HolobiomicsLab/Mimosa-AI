@@ -924,6 +924,8 @@ class EvolutionEngine:
 
         # ── Workspace lifecycle: snapshot → clean → restore before first run ─
         self.workspace_mgr.begin_session()
+        # Policy-BT compares every snapshot with this pre-run copy (the task inputs).
+        self.config.policy_bt_input_baseline = str(self.workspace_mgr.initial_backup)
 
         from sources.evaluators.policy_bt_verifier.reexec import reproduction_goal_note
         goal += "\n" + reproduction_goal_note(self.config) + "\n"

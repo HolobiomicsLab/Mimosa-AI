@@ -263,7 +263,7 @@ they are the evidence.
 > `config_default.json`): `evaluation.txt` opens with the line
 > `Policy-BT verifier` followed by a JSON object (reward, tournament
 > version, the reproduction/execution record, the `input_provenance`
-> check of the task inputs against the transfer manifest, and the PAIR VERDICTS —
+> check of the snapshot against the pre-run workspace, and the PAIR VERDICTS —
 > each pair tagged with its `policy_version`), the gradient lands in
 > `textual_gradient.txt`, stage-level JSON records stream to
 > `verifier_policy_bt.log`, and the machine-readable pair evidence is
@@ -271,8 +271,8 @@ they are the evidence.
 > a task session lives in
 > `<workflow_dir>/.policy_bt/<sha256(goal, session)>/tournament.json`
 > with one verifier-owned `snapshots/<uuid>/` copy per generation (plus
-> `pristine_inputs/`, the task's input tables as the benchmark transfer gave
-> them); its `bundle.criteria_guard` records why each frozen criterion was kept,
+> `baseline/`, the workspace as it was before the first run, with
+> `baseline_digests.json`); its `bundle.criteria_guard` records why each frozen criterion was kept,
 > revised or dropped (`criteria_guard` verdicts, `plan_revisions`,
 > `dropped_criteria`, and `quality_gap` when a held-out quality criterion for
 > a placeholder test label stayed missing).

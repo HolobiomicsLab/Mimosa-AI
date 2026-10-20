@@ -127,33 +127,74 @@ def _request_revision(response: dict, findings: dict, evidence: dict) -> None:
 
 
 def input_heads(goal: str, generation: dict) -> dict[str, str]:
-    """Read the complete first lines of each task input file the goal names.
+    """Read the complete first lines of the task input files.
 
     Input headers decide which names an output may use. ``guard_plan`` calls
     it per plan and reconnaissance once to show the model what grounds a name.
-    A file is an input when a goal word is its file name and it is not one of
-    the generation's outputs, run logs or packaging files: the goal also names
-    the output path, and an output's own header must never ground the names it
-    is checked against.
+    In the pre-run baseline (``is_baseline``) every file is an input, so a
+    ``--task`` goal need not name its files. In a generation snapshot a file
+    counts only when a goal word is its file name and the run did not produce
+    it: the goal also names the output path, and an output's own header must
+    never ground the names it is checked against. Goal-named files come first
+    under the ``MAX_FILE_HEADS`` bound.
 
     Args:
         goal (str): Task goal text with its dataset structure.
-        generation (dict): Generation record with an owned ``snapshot`` path
-            and its reproduction ``execution`` record.
+        generation (dict): Record with a ``snapshot`` path, its reproduction
+            ``execution`` record, and ``is_baseline`` for the pre-run copy.
 
     Returns:
         dict[str, str]: Relative path to its first lines (complete lines).
     """
-    root, names, produced, heads = Path(generation["snapshot"]), _goal_file_names(goal), _produced_paths(generation), {}
+    root, names = Path(generation["snapshot"]), _goal_file_names(goal)
+    files = input_files(generation)
+    if not generation.get("is_baseline"):
+        files = [relative for relative in files if Path(relative).name in names]
+    ranked = sorted(files, key=lambda relative: Path(relative).name not in names)
+    heads = {relative: _read_head(root / relative) for relative in ranked[:MAX_FILE_HEADS]}
+    return {key: value for key, value in heads.items() if value}
+
+
+def input_files(generation: dict) -> list[str]:
+    """List the files of a snapshot that can be task inputs.
+
+    Reconnaissance calls it on the pre-run baseline, where every file is an
+    input, or, without a baseline, on the first generation's snapshot, where
+    a file counts only when the run did not produce it. Left out: contract
+    outputs, files the rerun created or changed, the script, requirements,
+    the verifier log folder, agent-written source (.py, .sh, ...) and links.
+    Environments and caches are not walked.
+
+    Args:
+        generation (dict): Record with a ``snapshot`` path and an optional
+            reproduction ``execution`` record.
+
+    Returns:
+        list[str]: Sorted snapshot-relative POSIX paths.
+    """
+    root, produced, found = Path(generation["snapshot"]), _produced_paths(generation), []
     for directory, subdirs, files in os.walk(root):
         # Never walk environments or caches (thousands of package files).
         subdirs[:] = sorted(d for d in subdirs if d not in PRUNED_DIRS and not (Path(directory) / d / VENV_MARKER).exists())
-        for name in sorted(set(files) & names):
-            path = Path(directory) / name
-            relative = path.relative_to(root).as_posix()
-            if len(heads) < MAX_FILE_HEADS and path.suffix.lower() not in SOURCE_SUFFIXES and not path.is_symlink() and not _is_produced(relative, produced):
-                heads[relative] = _read_head(path)
-    return {key: value for key, value in heads.items() if value}
+        relatives = ((Path(directory) / name).relative_to(root).as_posix() for name in files)
+        found += [relative for relative in relatives if _is_input(root / relative, relative, produced)]
+    return sorted(found)
+
+
+def _is_input(path: Path, relative: str, produced: list[str]) -> bool:
+    """Tell whether one walked file can be a task input.
+
+    Called by ``input_files`` for each file.
+
+    Args:
+        path (Path): File inside the snapshot.
+        relative (str): Its snapshot-relative POSIX path.
+        produced (list[str]): Paths from ``_produced_paths``.
+
+    Returns:
+        bool: False for source code, links, and produced or packaging paths.
+    """
+    return path.suffix.lower() not in SOURCE_SUFFIXES and not path.is_symlink() and not _is_produced(relative, produced)
 
 
 def _is_produced(relative: str, produced: list[str]) -> bool:

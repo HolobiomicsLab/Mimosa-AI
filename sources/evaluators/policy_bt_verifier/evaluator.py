@@ -17,9 +17,8 @@ if __package__ in (None, ""):
 
 from sources.core.llm_provider import LLMConfig, LLMProvider
 from sources.evaluators.base import BaseEvaluator
-from sources.utils.input_manifest import inputs_root, verify_inputs
 
-from .artifacts import inventory, pair_workspace, snapshot
+from .artifacts import file_digests, inventory, pair_workspace, snapshot
 from .policy import PolicyEngine
 from .reexec import reproduce
 from .registry import TaskRegistry, atomic_json
@@ -34,8 +33,12 @@ Never infer task requirements from benchmark references or hidden answers. Never
 invent measurements. Return exactly the requested JSON schema without markdown.
 """
 
-# Registry folder holding the task's pristine input tables, copied once.
-PRISTINE_INPUTS_DIR = "pristine_inputs"
+# Registry copy of the workspace as it was before the first run, and its digests.
+BASELINE_DIR = "baseline"
+BASELINE_DIGESTS = "baseline_digests.json"
+STATUS_VERIFIED = "verified"
+STATUS_TAMPERED = "input_tampered"
+STATUS_UNVERIFIED = "unverified"
 
 
 class PolicyBTVerifierEvaluator(BaseEvaluator):
@@ -184,14 +187,16 @@ class PolicyBTVerifierEvaluator(BaseEvaluator):
                 "execution": execution, "input_provenance": provenance, "arrival_reward": None}
 
     def _input_provenance(self, registry: TaskRegistry, destination: Path) -> dict:
-        """Compare the snapshot inputs with the benchmark transfer record.
+        """Compare the snapshot with the workspace as it was before the first run.
 
         ``_capture`` calls it before re-execution can change any file. The
-        first record with pristine tables is copied into the task registry,
-        so reconnaissance reads the task's inputs even after csv_mode moves
-        on to the next task. The result is only recorded: a rewritten input
-        is never penalized, and a failed check or copy never fails the
-        evaluation (it gives ``error`` and no pristine data).
+        engine's WorkspaceManager copies the workspace before generation 0 and
+        restores that copy before every run, in every mode (``--task``,
+        ``--goal``, benchmark rows). Every file in it is a task input, so no
+        task layout is assumed here; reconnaissance decides which inputs
+        matter. A baseline file that differs or is missing in the snapshot is
+        a changed input; a new file is an output. The result is only recorded:
+        it never changes a reward, and an error never fails the evaluation.
 
         Args:
             registry (TaskRegistry): Locked task registry.
@@ -199,18 +204,48 @@ class PolicyBTVerifierEvaluator(BaseEvaluator):
 
         Returns:
             dict: ``status`` (verified, input_tampered or unverified),
-            ``tampered`` (snapshot paths), ``data`` (registry folder of
-            pristine tables, or None) and an optional ``error``.
+            ``tampered`` (changed input paths), ``data`` (registry copy of the
+            baseline, or None) and an optional ``error``.
         """
-        check = verify_inputs(inputs_root(self.workflow_dir, self.workspace_dir), destination)
         try:
-            data = _keep_pristine_tables(check["data"], registry.root / PRISTINE_INPUTS_DIR)
-        except OSError as error:
-            check, data = {**check, "error": f"{type(error).__name__}: {error}"}, None
-        provenance = {**check, "data": data}
+            kept, baseline = self._keep_baseline(registry)
+            changed = _changed_inputs(baseline, destination) if kept else []
+        except (OSError, ValueError) as error:
+            kept, changed = None, []
+            provenance = {"error": f"{type(error).__name__}: {error}"}
+        else:
+            provenance = {}
+        status = STATUS_UNVERIFIED if kept is None else STATUS_TAMPERED if changed else STATUS_VERIFIED
+        provenance.update(status=status, tampered=changed, data=kept)
         self._log("INPUTS", provenance)
-        self._report.stage("INPUTS", f"{check['status']} · {len(check['tampered'])} changed")
+        self._report.stage("INPUTS", f"{status} · {len(changed)} changed")
         return provenance
+
+    def _keep_baseline(self, registry: TaskRegistry) -> tuple[str | None, dict[str, str]]:
+        """Copy the engine's pre-run workspace into the task registry once.
+
+        Called by ``_input_provenance``. The engine names the copy in
+        ``config.policy_bt_input_baseline``; the standalone verifier has none.
+        The digest file is written last, so a copy without it is redone.
+
+        Args:
+            registry (TaskRegistry): Locked task registry.
+
+        Returns:
+            tuple[str | None, dict[str, str]]: The registry copy (absolute
+            path) and its file digests, or None and {} without a baseline.
+        """
+        kept, digests = registry.root / BASELINE_DIR, registry.root / BASELINE_DIGESTS
+        if digests.is_file():
+            return str(kept.resolve()), json.loads(digests.read_text(encoding="utf-8"))
+        source = getattr(self.config, "policy_bt_input_baseline", None)
+        if not source or not Path(source).is_dir():
+            return None, {}
+        shutil.rmtree(kept, ignore_errors=True)
+        snapshot(Path(source), kept)
+        files = file_digests(kept)
+        atomic_json(digests, files)
+        return str(kept.resolve()), files
 
     def _compare_tournament(self, state: dict) -> None:
         """Reuse compatible pairs and refit all affected adapter versions.
@@ -383,25 +418,20 @@ class PolicyBTVerifierEvaluator(BaseEvaluator):
             stream.write(json.dumps({"time": time.time(), "stage": stage, **data}, ensure_ascii=False) + "\n")
 
 
-def _keep_pristine_tables(source: str | None, kept: Path) -> str | None:
-    """Copy the transfer's pristine tables into the task registry once.
+def _changed_inputs(baseline: dict[str, str], destination: Path) -> list[str]:
+    """List the pre-run files that a generation's snapshot changed or removed.
 
-    Called by ``_input_provenance``. The copy goes to a staging folder and
-    is renamed when complete, so a failed copy never leaves a partial set.
+    Called by ``_input_provenance`` before re-execution runs on the snapshot.
 
     Args:
-        source (str | None): Pristine table folder from ``verify_inputs``.
-        kept (Path): Registry folder that keeps the copy.
+        baseline (dict[str, str]): Pre-run file digests from ``file_digests``.
+        destination (Path): New generation snapshot.
 
     Returns:
-        str | None: The kept folder, or None when no copy exists.
+        list[str]: Sorted relative paths whose digest differs or is missing.
     """
-    if source and not kept.exists():
-        staged = kept.with_name(kept.name + ".partial")
-        shutil.rmtree(staged, ignore_errors=True)
-        shutil.copytree(source, staged)
-        staged.rename(kept)
-    return str(kept.resolve()) if kept.is_dir() else None
+    current = file_digests(destination)
+    return sorted(path for path, digest in baseline.items() if current.get(path) != digest)
 
 
 def _execution_verdict(left: dict, right: dict) -> dict:

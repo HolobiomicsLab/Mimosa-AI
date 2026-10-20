@@ -7,21 +7,26 @@ import pytest
 from sources.evaluators.policy_bt_verifier.placeholders import (
     MAX_ONE_VALUE_COLUMNS,
     MAX_PROFILE_TABLES,
+    MAX_SCANNED_TABLES,
     MAX_TRACKED_VALUES,
     input_profile,
     one_value_columns,
     scan_tables,
-    table_keys,
 )
 
 
 def _write(path: Path, text: str) -> None:
+    """Write a text file, creating its folder first."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
 
 
 def _facts(root: Path, goal: str = "") -> tuple[dict, dict]:
-    scans = scan_tables(root, table_keys(root))
+    """Scan every file below a folder, as recon does for a pre-run baseline."""
+    keys = [
+        path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()
+    ]
+    scans = scan_tables(root, keys, goal)
     return one_value_columns(scans, goal), input_profile(scans, goal)
 
 
@@ -98,6 +103,7 @@ def test_profile_counts_the_whole_file_beyond_any_preview(tmp_path):
 
 
 def test_profile_keeps_the_goal_named_table_when_a_folder_has_too_many(tmp_path):
+    """Past the profile bound, the file the goal names stays in the profile."""
     for index in range(MAX_PROFILE_TABLES + 2):
         _write(tmp_path / f"aux_{index:02d}.csv", "a,b\n1,2\n")
     _write(tmp_path / "zz_test.csv", "id,Y\n1,0\n")
@@ -105,11 +111,21 @@ def test_profile_keeps_the_goal_named_table_when_a_folder_has_too_many(tmp_path)
     assert "zz_test.csv" in profile["tables"] and profile["omitted_tables"] == 3
 
 
+def test_scan_limit_reads_the_goal_named_tables_of_a_large_workspace(tmp_path):
+    """A --task workspace can hold any number of tables; the goal's are read first."""
+    for index in range(MAX_SCANNED_TABLES + 5):
+        _write(tmp_path / "archive" / f"t_{index:03d}.csv", "id,Signal\n1,0\n2,1\n")
+    _write(tmp_path / "zz" / "test.csv", "id,Signal\n3,-999\n4,-999\n")
+    found = _facts(tmp_path, "Predict Signal for zz/test.csv")[0]
+    assert list(found) == ["zz/test.csv"]
+
+
 def test_semicolon_table_and_single_column_csv_are_profiled_but_prose_is_not(tmp_path):
     """nvc uses ';'; dili test.csv has one column, so its label is visibly absent."""
     _write(tmp_path / "nvc.csv", "Model;Rule;Num persons\nA;r1;3\nB;r2;4\n")
     _write(tmp_path / "test.csv", "standardised_smiles\nCCO\nCCN\n")
     _write(tmp_path / "dem_source.txt", "NASADEM Merged DEM Global\n")
+    _write(tmp_path / "notes.txt", "Lab notebook, free text.\n")
     tables = _facts(tmp_path)[1]["tables"]
     assert sorted(tables) == ["nvc.csv", "test.csv"]
     assert list(tables["nvc.csv"]["columns"]) == ["Model", "Rule", "Num persons"]

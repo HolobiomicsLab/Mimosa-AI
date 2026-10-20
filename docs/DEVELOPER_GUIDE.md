@@ -538,12 +538,15 @@ For each generation (`sources/evaluators/policy_bt_verifier/`):
    reads every input table completely once (`placeholders.py`):
    `input_profile` (rows, distinct counts, top values, numeric ranges)
    and `one_value_columns` (one value in every row of one table, varying
-   in another: hidden test labels). The tables come from the pristine
-   transfer copy when csv_mode recorded one (see below), else from the
-   goal-named snapshot inputs. Before freezing,
+   in another: hidden test labels). The inputs come from the pre-run
+   baseline (see below); without one, from the first snapshot's files
+   that its run did not produce (`criteria_guard.input_files`: no
+   contract outputs, rerun-created or changed files, scripts or
+   packaging). At most 64 tables are read, goal-named first. Before freezing,
    `criteria_guard.py` checks every criterion: its `literals` must appear
-   in the goal or in the first lines of an input file the goal names
-   (code check, outputs and run logs excluded), then an LLM guard keeps
+   in the goal or in the first lines of a task input file (every baseline
+   file; without a baseline, a goal-named snapshot file the run did not
+   produce), then an LLM guard keeps
    or rejects each criterion against the goal and, when
    `one_value_columns` is not empty, names a missing held-out quality
    criterion for a predicted placeholder column. Rejections and the
@@ -555,22 +558,21 @@ For each generation (`sources/evaluators/policy_bt_verifier/`):
    are stored in the bundle as `criteria_guard`. New
    artifact schemas extend **adapters**; the criteria never change.
 
-   **Input provenance.** With `verifier_kind="policy_bt"`, after each
-   benchmark dataset transfer csv_mode writes a sha256 manifest of the
-   transferred folder and copies its tables aside
-   (`sources/utils/input_manifest.py`, under
-   `<workflow_dir>/.policy_bt/inputs/<workspace digest>/`; a worker's
-   record is deleted with its workspace). Each new snapshot is checked
-   against it before re-execution; the generation record and
-   `evaluation.txt` carry `input_provenance` (`verified`,
-   `input_tampered` with the changed paths, or `unverified` when no
-   transfer was recorded, the transferred folder is absent from the
-   snapshot, or the record is unreadable — then with `error`). The
-   pristine tables are copied once into the task registry
-   (`<registry>/pristine_inputs/`). Only `.csv`, `.tsv` and `.txt`
-   tables up to 64 MB are copied and scanned. The check is a record only:
-   a rewritten input is never penalized, and a failed check or copy never
-   fails the evaluation.
+   **Input provenance.** The engine's `WorkspaceManager` copies the
+   workspace before generation 0 and restores that copy before every
+   run, in every mode (`--task`, `--goal`, benchmark rows); the engine
+   names it in `config.policy_bt_input_baseline`. Every file in it is a
+   task input, so no task layout or benchmark folder is assumed. The
+   verifier copies it once into the task registry (`<registry>/baseline/`,
+   digests in `baseline_digests.json`) and checks each new snapshot
+   against it before re-execution: a baseline file that differs or is
+   missing is a changed input; a new file is an output. The generation
+   record and `evaluation.txt` carry `input_provenance` (`verified`,
+   `input_tampered` with the changed paths, or `unverified` without a
+   baseline — the standalone verifier — or on a copy error, then with
+   `error`). Only `.csv`, `.tsv` and `.txt` tables up to 64 MB are
+   scanned. The check is a record only: a changed input is never
+   penalized, and a failed check or copy never fails the evaluation.
 3. **One comparison policy.** One cached deterministic Python policy
    compares pairs through the adapters, in a restricted interpreter
    subprocess (stdlib `json`/`math`/`struct` calls plus harness-provided

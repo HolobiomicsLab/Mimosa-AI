@@ -79,12 +79,17 @@ The verifier runs these steps in order:
    count; per column the distinct count, top values and numeric range)
    and `one_value_columns` (a column with one value in every row of one
    table while it varies in another, such as a test label of -999 in
-   every row). Such values are placeholders: no criterion may measure
+   every row). The inputs are the workspace files that existed before the
+   first run (the engine's pre-run copy, kept in the task registry as
+   `baseline/`), so this works for any `--task` layout; the standalone
+   verifier, which has no such copy, uses the snapshot files the run did
+   not produce. Such values are placeholders: no criterion may measure
    against them, and when the goal predicts such a column the plan needs
    a held-out validation metric on labelled data. Before the criteria freeze,
    `criteria_guard.py` checks them: every exact string a criterion
    requires (`literals`) must appear in the goal or in the first lines of
-   an input file the goal names (outputs and run logs never count), and
+   a task input file (every pre-run file; without that copy, a goal-named
+   file the run did not produce — outputs and run logs never count), and
    an LLM guard keeps or rejects each criterion with a cited source. When
    `one_value_columns` is not empty, the same guard call also judges
    whether the goal predicts a listed column without a held-out quality

@@ -172,6 +172,19 @@ def inventory(root: Path) -> list[dict]:
     return list(_walk(root, root))
 
 
+def file_digests(root: Path) -> dict[str, str]:
+    """Map every regular file below a snapshot root to its SHA-256 digest.
+
+    The evaluator compares the pre-run baseline with each generation
+    snapshot. Both are made by ``snapshot``, so the same entries are left out.
+
+    Args: root (Path): Baseline or generation snapshot directory.
+    Returns: dict[str, str]: Relative POSIX path to hex digest; links and
+        special files are left out.
+    """
+    return {item["path"]: item["sha256"] for item in inventory(root) if item["kind"] == "file"}
+
+
 def snapshot(source: Path, destination: Path) -> Path:
     """Copy evidence to a new location without changing the source.
 

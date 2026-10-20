@@ -37,8 +37,8 @@ the row count and, per column, the number of distinct values (a string such as
 "64+" when there are more than the scan counts), the most common values with
 their counts, and the numeric range. Use it for facts the first lines cannot
 show. "column_count", "omitted_tables" and "omitted_columns" count what the
-bounds left out; a table absent from the profile was too large or not a
-readable table, not empty. "one_value_columns" lists input columns that hold
+bounds left out; a table absent from the profile was too large, not a readable
+table, or past the scan limit, not empty. "one_value_columns" lists input columns that hold
 one value in every row of one table while the same column varies in another input
 table ("varies_in"), such as a test label column that is -999, 0 or 1 in every
 row. Such values are placeholders, not answers: never measure a criterion against
@@ -50,16 +50,19 @@ split, or cross-validation on the labelled table), in the metric family the goal
 implies (AUC or accuracy for a classifier, an error such as RMSE or MAE for a
 regression), with direction "higher" or "lower". A goal that only plots, filters
 or summarizes such a column predicts nothing and needs no such criterion.
-Both facts come from the task inputs as the benchmark gave them. A generation's
-"input_provenance" says whether its copies still match ("input_tampered" lists
-the changed paths); a changed input file is not the task input.
+Both facts come from the workspace as it was before the first run, where every
+file is a task input; without that copy, from the first snapshot's files that
+its run did not produce. A generation's "input_provenance" says whether its
+copies of the pre-run files still match ("input_tampered" lists the changed
+paths); a changed input file is not the task input.
 Never make a criterion of packaging instructions (run.sh, requirements files,
 install rules, script names or count), even when the goal states them: the
 reproduction gate already enforces them before any comparison.
 "literals" lists every exact string the criterion requires an output to contain
 verbatim: file paths, field and column names, labels, fixed values. Each literal
 must appear word for word in the goal or in "input_heads" (the first lines of the
-input files the goal names); a criterion with an unsourced literal is sent back.
+task input files: every file that existed before the first run, or, without that
+copy, the input files the goal names); a criterion with an unsourced literal is sent back.
 Express derived facts by relation, not as literals ("one row per input record",
 not "1457 rows").
 "direction" says which VALUE is better for the goal: "lower" when a smaller number
@@ -194,7 +197,7 @@ contents, not on the plan's description alone.
 CRITERIA_GUARD = BOUNDARY + """
 Audit proposed verification criteria against the goal before they are frozen.
 EVIDENCE_JSON holds the goal (with any dataset structure and previews it shows),
-the first lines of each input file the goal names ("input_heads"), the input
+the first lines of the task input files ("input_heads"), the input
 columns that hold one value in every row of one table while the same column
 varies in another input table ("one_value_columns", with that value and the
 tables where it varies: placeholders such as hidden test labels), the proposed

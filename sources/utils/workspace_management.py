@@ -51,6 +51,19 @@ class WorkspaceManager:
     def session_id(self) -> str | None:
         return self._session_id
 
+    @property
+    def initial_backup(self) -> Path | None:
+        """Return the copy of the workspace taken before the first run.
+
+        The evolution engine passes it to the Policy-BT verifier: every file
+        in it existed before any workflow ran, so it is a task input.
+
+        Returns:
+            Path | None: ``/tmp/mimosa_initial_<session_id>``, or None before
+            ``begin_session``.
+        """
+        return self._initial_backup
+
     def begin_session(self) -> None:
         """
         Start a new evolution session:

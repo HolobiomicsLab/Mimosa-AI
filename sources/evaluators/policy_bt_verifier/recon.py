@@ -7,8 +7,14 @@ import json
 from pathlib import Path
 
 from .artifacts import decode_object, inventory
-from .criteria_guard import GuardExhausted, guard_plan, input_heads, shown_heads
-from .placeholders import input_profile, one_value_columns, scan_tables, table_keys
+from .criteria_guard import (
+    GuardExhausted,
+    guard_plan,
+    input_files,
+    input_heads,
+    shown_heads,
+)
+from .placeholders import input_profile, one_value_columns, scan_tables
 from .prompts import RECON, evidence_prompt
 
 PAGE_BYTES = 8192
@@ -209,10 +215,11 @@ def reconnaissance(goal: str, generations: list[dict], context: dict) -> dict:
 def _open_transcript(goal: str, generations: list[dict], context: dict) -> tuple[dict, dict]:
     """Build the first recon transcript and the context the guard needs.
 
-    Called once by ``reconnaissance``. For an unfrozen task the input heads
-    are read once (complete for the guard, bounded for the model prompt),
-    and every input table is read completely once for two facts:
-    ``input_profile`` and ``one_value_columns`` (hidden labels).
+    Called once by ``reconnaissance``. For an unfrozen task the inputs are
+    found once (``_input_source``); their heads are read (complete for the
+    guard, bounded for the model prompt), and every input table is read
+    completely for two facts: ``input_profile`` and ``one_value_columns``
+    (hidden labels).
 
     Args:
         goal (str): User goal.
@@ -227,34 +234,35 @@ def _open_transcript(goal: str, generations: list[dict], context: dict) -> tuple
                 "adapters": context.get("adapters", {}), "inspections": []}
     if context.get("frozen_task"):
         return evidence, context
-    heads = input_heads(goal, generations[0])
-    tables = _input_tables(generations, heads)
+    source = _input_source(generations)
+    heads = input_heads(goal, source)
+    tables = scan_tables(Path(source["snapshot"]), input_files(source), goal)
     placeholders = one_value_columns(tables, goal)
     evidence.update(input_heads=shown_heads(heads), input_profile=input_profile(tables, goal), one_value_columns=placeholders)
-    return evidence, {**context, "generation": generations[0], "input_heads": heads, "one_value_columns": placeholders}
+    return evidence, {**context, "generation": source, "input_heads": heads, "one_value_columns": placeholders}
 
 
-def _input_tables(generations: list[dict], heads: dict[str, str]) -> dict[str, dict]:
-    """Read the task's input tables, from the pristine copy when one exists.
+def _input_source(generations: list[dict]) -> dict:
+    """Choose where the task inputs are read, for any task layout.
 
-    A generation can rewrite an input before its snapshot (HIV run_oct_18:
-    the hidden test labels were replaced by real ones), so the transfer-time
-    copy the evaluator keeps in the registry comes first. Without it (no
-    benchmark transfer, older records) the goal-named snapshot inputs are read.
+    The evaluator keeps the workspace as it was before the first run (its
+    path is ``input_provenance`` ``data``). Every file there is an input,
+    and no run could rewrite it (HIV run_oct_18: the snapshot's test labels
+    were replaced by real ones). Without that copy (standalone verifier,
+    older registries) the first snapshot is used, and ``input_files`` keeps
+    only the files its run did not produce.
 
     Args:
-        generations (list[dict]): Generation records; ``input_provenance``
-            ``data`` names the pristine copy.
-        heads (dict[str, str]): Goal-named input files of the first snapshot.
+        generations (list[dict]): Generation records, oldest first.
 
     Returns:
-        dict[str, dict]: Scanned tables from ``placeholders.scan_tables``.
+        dict: A record with ``snapshot`` for ``input_heads`` and
+        ``input_files``: the baseline (``is_baseline`` True) or the first
+        generation record with its ``execution``.
     """
     copies = [(g.get("input_provenance") or {}).get("data") for g in generations]
-    pristine = next((Path(path) for path in copies if path and Path(path).is_dir()), None)
-    if pristine is not None:
-        return scan_tables(pristine, table_keys(pristine))
-    return scan_tables(Path(generations[0]["snapshot"]), list(heads))
+    baseline = next((path for path in copies if path and Path(path).is_dir()), None)
+    return {"snapshot": baseline, "execution": {}, "is_baseline": True} if baseline else generations[0]
 
 
 def _accept_plan(response: dict, generations: list[dict], context: dict, evidence: dict) -> dict:

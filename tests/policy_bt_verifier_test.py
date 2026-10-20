@@ -492,6 +492,20 @@ def test_wide_input_header_grounds_late_columns_and_train_test_is_not_test(tmp_p
     assert not _unsourced_literals({"criteria": [{"id": "c", "literals": ["T_00001"]}]}, "goal", heads)
 
 
+def test_baseline_heads_ground_inputs_a_task_goal_never_names(tmp_path):
+    """--task goals rarely name their files; every pre-run file is an input.
+
+    In a generation snapshot an unnamed file may be an output, so it never grounds.
+    """
+    from sources.evaluators.policy_bt_verifier.criteria_guard import input_heads
+
+    (tmp_path / "lab").mkdir()
+    (tmp_path / "lab" / "assay.csv").write_text("compound,activity\nC1,0\n")
+    goal = "Predict the activity of each compound and save predictions.csv."
+    assert input_heads(goal, {"snapshot": str(tmp_path), "is_baseline": True}) == {"lab/assay.csv": "compound,activity\nC1,0"}
+    assert input_heads(goal, {"snapshot": str(tmp_path)}) == {}
+
+
 def test_input_heads_never_walk_virtual_environments(tmp_path):
     from sources.evaluators.policy_bt_verifier.criteria_guard import input_heads
 
@@ -613,28 +627,53 @@ def test_malformed_missing_quality_answer_is_asked_again(tmp_path):
     assert "quality_gap" not in result["inspection"]
 
 
-def test_recon_reads_placeholders_from_the_transfer_copy_not_a_rewritten_snapshot(tmp_path):
+def test_recon_reads_placeholders_from_the_pre_run_copy_not_a_rewritten_snapshot(tmp_path):
     """HIV run_oct_18: the snapshot's test labels were rewritten with real values."""
     from sources.evaluators.policy_bt_verifier.recon import reconnaissance
 
-    snapshot, pristine = tmp_path / "snapshot", tmp_path / "pristine"
+    snapshot, baseline = tmp_path / "snapshot", tmp_path / "baseline"
     _signal_inputs(snapshot, "4,0\n5,1\n")
-    _signal_inputs(pristine, "4,-999\n5,-999\n")
+    _signal_inputs(baseline, "4,-999\n5,-999\n")
     seen = []
-    generation = {"uuid": "g1", "snapshot": str(snapshot), "input_provenance": {"data": str(pristine)}}
+    generation = {"uuid": "g1", "snapshot": str(snapshot), "input_provenance": {"data": str(baseline)}}
     ask = _guarded_ask([_plan("output_conformance")], [_review(None, "output_conformance")], seen)
     reconnaissance(PLACEHOLDER_GOAL, [generation], {"ask": ask})
     assert list(seen[0][1]["one_value_columns"]) == ["data/test.csv"]
+    assert seen[0][1]["input_heads"]["data/test.csv"].endswith("4,-999")
 
 
-def test_evaluator_records_inputs_rewritten_after_the_transfer(tmp_path, monkeypatch):
-    """The check runs before re-execution, which may rewrite inputs itself."""
-    from sources.evaluators.policy_bt_verifier import evaluator as module
-    from sources.utils.input_manifest import inputs_root, record_transfer
+def test_without_a_baseline_recon_scans_only_tables_the_run_did_not_produce(tmp_path):
+    """Standalone verifier: a table the run wrote must never count as an input."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    _signal_inputs(tmp_path, "4,-999\n5,-999\n")
+    (tmp_path / "preds.csv").write_text("id,Signal\n4,1\n5,1\n")
+    seen = []
+    generation = {"uuid": "g1", "snapshot": str(tmp_path), "execution": {"files": {"created": ["preds.csv"]}}}
+    ask = _guarded_ask([_plan("output_conformance")], [_review(None, "output_conformance")], seen)
+    reconnaissance("Predict Signal for the test table.", [generation], {"ask": ask})
+    assert sorted(seen[0][1]["input_profile"]["tables"]) == ["data/test.csv", "data/train.csv"]
+
+
+def _baseline_evaluator(tmp_path, monkeypatch):
+    """Evaluator whose engine saved the workspace before the first run."""
+    import shutil
 
     evaluator = _evaluator(tmp_path, monkeypatch)
     _signal_inputs(evaluator.workspace_dir, "4,-999\n")
-    record_transfer(inputs_root(evaluator.workflow_dir, evaluator.workspace_dir), evaluator.workspace_dir, "data")
+    shutil.copytree(evaluator.workspace_dir, tmp_path / "mimosa_initial")
+    evaluator.config.policy_bt_input_baseline = str(tmp_path / "mimosa_initial")
+    return evaluator
+
+
+def test_evaluator_records_inputs_a_run_changed_against_the_pre_run_workspace(tmp_path, monkeypatch):
+    """New files are outputs; a rewritten or deleted pre-run file is a changed input.
+
+    The check runs before re-execution, which may rewrite inputs itself.
+    """
+    from sources.evaluators.policy_bt_verifier import evaluator as module
+
+    evaluator = _baseline_evaluator(tmp_path, monkeypatch)
 
     def rerun_rewrites_inputs(snapshot, *args):
         (snapshot / "data" / "test.csv").write_text("id,Signal\n4,0\n")
@@ -642,32 +681,31 @@ def test_evaluator_records_inputs_rewritten_after_the_transfer(tmp_path, monkeyp
     monkeypatch.setattr(module, "reproduce", rerun_rewrites_inputs)
     _evaluate(evaluator, "first", 1)
     (evaluator.workspace_dir / "data" / "test.csv").write_text("id,Signal\n4,1\n")
+    (evaluator.workspace_dir / "data" / "train.csv").unlink()
     _evaluate(evaluator, "second", 2)
     registry = TaskRegistry(evaluator.workflow_dir / ".policy_bt", ("Maximize measured value", "standalone"))
     provenance = {item["uuid"]: item["input_provenance"] for item in registry.load()["generations"]}
-    assert provenance["first"]["status"] == "verified"
-    assert (provenance["second"]["status"], provenance["second"]["tampered"]) == ("input_tampered", ["data/test.csv"])
+    assert (provenance["first"]["status"], provenance["first"]["tampered"]) == ("verified", [])
+    assert provenance["second"]["status"] == "input_tampered"
+    assert provenance["second"]["tampered"] == ["data/test.csv", "data/train.csv"]
     assert (Path(provenance["second"]["data"]) / "data" / "test.csv").read_text() == "id,Signal\n4,-999\n"
     report = json.loads((evaluator.workflow_dir / "second" / "evaluation.txt").read_text().split("\n", 1)[1])
     assert report["input_provenance"]["status"] == "input_tampered"
 
 
-def test_failed_pristine_copy_is_recorded_and_never_costs_the_reward(tmp_path, monkeypatch):
+def test_failed_baseline_copy_is_recorded_and_never_costs_the_reward(tmp_path, monkeypatch):
     """Provenance is a record only: a copy error leaves the generation scored."""
     from sources.evaluators.policy_bt_verifier import evaluator as module
-    from sources.utils.input_manifest import inputs_root, record_transfer
 
-    evaluator = _evaluator(tmp_path, monkeypatch)
-    _signal_inputs(evaluator.workspace_dir, "4,-999\n")
-    record_transfer(inputs_root(evaluator.workflow_dir, evaluator.workspace_dir), evaluator.workspace_dir, "data")
+    evaluator = _baseline_evaluator(tmp_path, monkeypatch)
 
     def disk_full(*args):
         raise OSError(28, "No space left on device")
-    monkeypatch.setattr(module, "_keep_pristine_tables", disk_full)
+    monkeypatch.setattr(module, "file_digests", disk_full)
     result = _evaluate(evaluator, "first", 1)
     assert result["reward"] == .5
     generation = TaskRegistry(evaluator.workflow_dir / ".policy_bt", ("Maximize measured value", "standalone")).load()["generations"][0]
-    assert generation["input_provenance"]["data"] is None
+    assert (generation["input_provenance"]["status"], generation["input_provenance"]["data"]) == ("unverified", None)
     assert "No space left" in generation["input_provenance"]["error"]
 
 
