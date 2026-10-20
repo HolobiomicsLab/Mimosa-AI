@@ -1,284 +1,293 @@
-<div align="center">
-<br>
+<p align="center">
+  <img src="./docs/images/logo_mimosa.png" width="160" alt="Mimosa-AI logo">
+</p>
 
-<img src="./docs/images/logo_mimosa.png" width="22%" style="border-radius: 8px;" alt="Mimosa-AI logo — self-evolving multi-agent AI framework for autonomous scientific research (Holobiomics Lab, CNRS)">
+<h1 align="center">Mimosa-AI</h1>
 
-</div>
-
-<h1 align="center">Mimosa-AI — Evolving Multi-Agent Framework for Autonomous Scientific Research</h1>
-
+<p align="center"><strong>Build, run, check, and improve AI workflows for scientific research.</strong></p>
 
 <p align="center">
-  <a href="./README.md">English</a> &nbsp;|&nbsp;
-  <a href="./README.CHS.md">简体中文</a> &nbsp;|&nbsp;
-  <a href="./README.CHT.md">繁體中文</a> &nbsp;|&nbsp;
-  <a href="./README.JPN.md">日本語</a> &nbsp;|&nbsp;
+  From <a href="https://holobiomicslab.cnrs.fr/">Holobiomics Lab, CNRS</a> · Open source · Apache 2.0
+</p>
+
+<p align="center">
+  <a href="https://arxiv.org/abs/2603.28986"><img src="https://img.shields.io/badge/Paper-arXiv%3A2603.28986-b31b1b?style=flat-square" alt="Read the research paper"></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=flat-square" alt="Apache 2.0 license"></a>
+</p>
+
+<p align="center">
+  <a href="#start-here">Start here</a> ·
+  <a href="#how-mimosa-works">How it works</a> ·
+  <a href="#see-policy-bt-in-the-terminal">Policy-BT</a> ·
+  <a href="./docs/index.md">Documentation</a> ·
+  <a href="#cite-this-work">Cite this work</a>
+</p>
+
+<p align="center">
+  English · <a href="./README.CHS.md">简体中文</a> ·
+  <a href="./README.CHT.md">繁體中文</a> ·
+  <a href="./README.JPN.md">日本語</a> ·
   <a href="./README.KOR.md">한국어</a>
 </p>
 
-<p align="center">
-    <em>Self-evolving multi-agent framework for autonomous scientific research — LLM-driven workflow synthesis, Quality-Diversity evolutionary search, MCP tool discovery.</em>
-</p>
+## What is Mimosa?
+
+**Give Mimosa a scientific task. It writes a Python workflow for that task.**
+The workflow uses AI agents and tools to produce results.
+Mimosa checks the output files. With learning enabled, it uses the feedback to change the workflow and try again.
+
+You do not have to define one fixed team of agents for all tasks.
+Mimosa can change the agents, their instructions, and the steps they follow.
+
+- **Use scientific tools.** Connect tools through the Model Context Protocol (MCP).
+- **Inspect the code.** Each workflow is a Python program, not a hidden sequence of steps.
+- **Compare the results.** The Policy-BT verifier compares outputs from different workflow versions.
+- **Follow each change.** Saved code, prompts, logs, and parent records show how a workflow changed.
+
+> **Research software, not proof of correctness.** A high verifier score does not prove that a scientific result is correct.
+> Review the outputs before you use them.
+
+## How Mimosa works
+
+A **generation** is one version of a workflow and the results from its run.
+
+1. **Set the task.** Describe the inputs, required outputs, and constraints. Use `--goal` to split a larger objective into tasks.
+2. **Build the workflow.** Mimosa finds available tools and writes a Python program with AI agents.
+3. **Run the workflow.** The agents use the tools and save output files in the workspace.
+4. **Check the results.** Policy-BT checks reproduction and compares the generation with earlier generations for the same task.
+5. **Improve the workflow.** With `--learn`, Mimosa uses the feedback to change the code or combine two earlier workflows.
+
+The search keeps workflows for both result quality and code diversity.
+This method is inspired by **Quality-Diversity search**: keep different approaches, not only small changes to one approach.
+
+Read more about the [architecture](./docs/concepts/architecture.md) and the [evolution loop](./docs/concepts/evolution-engine.md).
+
+## See Policy-BT in the terminal
+
+The command-line interface (CLI) shows each check as the run proceeds.
+Color, section labels, and score bars separate the comparison rules, pair results, ratings, and feedback.
 
 <p align="center">
-    <a href="https://arxiv.org/abs/2603.28986"><img src="https://img.shields.io/badge/arXiv-2603.28986-b31b1b.svg?logo=arxiv&style=flat-square&logoColor=white" alt="arXiv Preprint"></a>
-    <a href="https://doi.org/10.48550/arXiv.2603.28986"><img src="https://img.shields.io/badge/DOI-10.48550%2FarXiv.2603.28986-blue?style=flat-square" alt="DOI"></a>
-    <a href="https://holobiomicslab.cnrs.fr/"><img src="https://img.shields.io/badge/website-holobiomicslab.cnrs.fr-4caf82?style=flat-square&logo=globe&logoColor=white" alt="website"></a>
+  <a href="./docs/images/policy-bt.png"><img src="./docs/images/policy-bt.png" width="820" alt="Policy-BT terminal output with reproduction status, comparison rules, wins and ties, Bradley–Terry ratings, and feedback for the next workflow change"></a>
 </p>
 
-<p align="center">
-    <a href="https://github.com/HolobiomicsLab/Mimosa-AI/stargazers"><img src="https://img.shields.io/github/stars/HolobiomicsLab/Mimosa-AI?style=social" alt="GitHub Stars"></a>&nbsp;
-    <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square" alt="License: Apache 2.0"></a>
-</p>
+<p align="center"><em>One task, three generations, and three pair comparisons. Select the image to see the details.</em></p>
 
+### What the verifier checks
 
----
+**Policy** means the shared rules used to compare results.
+**BT** means Bradley–Terry, the statistical model that converts pair results into ratings.
 
-## TL;DR
+1. **Check reproduction.** Each generation must supply a shell script that installs its requirements and recreates its outputs.
+   A missing or invalid script gives a score of zero. By default, the verifier runs the script again in a fresh Python environment.
+2. **Set common rules.** An AI model reads the task and inspects the files.
+   It defines comparison criteria. Adapters read different file formats into a common form.
+3. **Compare each pair.** One shared Python policy applies the rules to both generations.
+   The verifier checks both comparison orders. Relevant images can resolve a code tie when both sides have images.
+4. **Update the ratings.** Bradley–Terry uses the pair results to update every generation's rating for the task.
+   Feedback tells the next workflow what needs to improve.
 
-Mimosa-AI is an **open-source Python framework for autonomous scientific research**: it writes a **custom multi-agent workflow per task**, runs it in a sandbox, scores what the agents actually produced with a deterministic artifact-comparison policy, and evolves the workflow across generations with a **Quality-Diversity** inspired search to find the optimal workflow for the task.
+**A rating is relative to the other generations. It is not a benchmark success rate.**
+The default verifier is `policy_bt`. See the [verification guide](./docs/concepts/evaluation-pipeline.md) for the full procedure.
 
-The workflow is emitted as plain Python — no DSL, no YAML — so any generation can be inspected, diffed, or re-run standalone. The policy/BT verifier scores each run by comparing its workspace artifacts with every previous generation's: a required reproduction script must regenerate the outputs, one cached deterministic Python comparison policy decides each pair (goal-relevant images can resolve ties), and the accumulated pair verdicts fit a regularized Bradley–Terry tournament that keeps every generation's reward current. Every generation is on disk with its lineage and the exact LLM prompt that produced it.
+## Start here
 
-## Automatic Installation
+### 1. Install Mimosa
 
-Run in a terminal:
+You need **Python 3.11 or 3.12**, [uv](https://docs.astral.sh/uv/), and API access to the models you select.
+Model calls can incur charges.
 
 ```bash
-curl https://raw.githubusercontent.com/HolobiomicsLab/Mimosa-AI/refs/heads/mimosa_v2/auto-install.sh | bash 
-```
-
-Note: This will automatically install and spin up our companion projects `Toolomics` and `Perspicacité`.
-
-For manual installation see: [Manual Installation](##Manual-Installation)
-
-## Web Interface
-
-Open `http://localhost:5173/` in your browser to access the web interface.
-
-<p align="center">
-  <img src="./docs/images/interface.png" alt="Mimosa web interface" width="95%">
-</p>
-
-
----
-
-## Demo on Metabolomics (V1)
-
-This demo was done with the V1 and will be updated.
-
-<p align="center">
-    <em>Mimosa-AI autonomously regenerated the LC-MS/MS molecular networking pipeline of <a href="https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation">Nothias et al. (2018)</a> — feature detection on the <code>.mzML</code> files (MZmine / OpenMS / matchms-class tooling — the agents pick the stack), alignment, and classical molecular networking (GNPS-style cosine clustering).</em>
-</p>
-
-https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d
-
-The reproduced network matches the topology reported in the paper at the cluster level, output as a Cytoscape-loadable `.graphml` plus the underlying feature quantification table. Scope note: this reproduces the **molecular networking** stage only — the bioactivity-guided fractionation, manual annotation review, and library matching (GNPS / SIRIUS / CSI:FingerID) from the original study are out of scope for the autonomous run.
-
-<p align="center">
-  <img src="./docs/images/network.png" alt="LC-MS/MS molecular network autonomously reproduced by Mimosa-AI — GNPS-style cosine clustering exported as Cytoscape GraphML" width="80%">
-</p>
-
----
-
-
-## How it works
-
-Five layers, wired through small dataclass schemas — full details in [`docs/concepts/architecture.md`](./docs/concepts/architecture.md).
-
-<p align="center">
-  <img src="./docs/images/mimosa_overall.jpg" alt="Mimosa-AI architecture: planner, MCP tool manager, evolution engine, sandboxed SmolAgents workflow runner, policy-BT verifier" width="90%">
-</p>
-
-| Layer | Component | What it does |
-|-------|-----------|--------------|
-| 0 | **Planner** *(optional, `--goal` only)* | Decomposes a high-level objective into discrete tasks. |
-| 1 | **ToolManager + Perspicacité** | Discovers MCP tools on the configured address/port range; optionally pulls literature snippets. |
-| 2 | **EvolutionEngine** | Synthesizes the workflow and evolves it across generations (see below). |
-| 3 | **WorkflowRunner** | Runs the synthesized Python workflow in a sandbox using Hugging Face [SmolAgents](https://github.com/huggingface/smolagents) (`LocalPythonExecutor` with AST allow-list) and shared LangGraph state. |
-| 4 | **PolicyBTVerifierEvaluator** | Policy/BT verifier: reproduction gate → LLM recon + schema adapters → one cached deterministic comparison policy (vision tie-break) → regularized Bradley–Terry reward. Drives the next mutation. |
-
-### The evolution loop — what's actually evolving
-
-https://github.com/user-attachments/assets/744d2c34-4ac3-415c-bd8c-3454cd502271
-
-Workflows are **full Python programs**, mutated as source code. The **code-as-genotype** is the workflow file; the phenotype is whatever it produces in the workspace.
-
-- **Selection: Quality-Diversity archive** — **unstructured** (a flat list, not a discretised grid), capped at 20 members, scored by a single scalarised objective `qd_score = (1−w)·quality + w·novelty` (`w = novelty_weight = 0.25`); the lowest-`qd_score` member is evicted when full. **Novelty search** uses cosine-distance k-NN (`k = 15`) over the **genotype-embedding** behaviour descriptor — an L2-normalised embedding of the workflow's generated source code (local `all-MiniLM-L6-v2` by default; optional OpenAI `text-embedding-3-small`). Parents drawn by inverse-child-count roulette so the archive spreads (`MAX_CHILDREN_PER_PARENT = 8`).
-- **Crossover** — by default ~40 % of generations combine two parents, strongest-first, with offspring hard-capped at the highest parent agent count.
-- **Cold start** — when the archive is empty, a similarity-filtered scan of past runs on disk (MiniLM cosine ≥ 0.8) seeds the search. Useful workflows transfer across tasks.
-
-Full mechanics: [`docs/concepts/evolution-engine.md`](./docs/concepts/evolution-engine.md).
-
-### The verifier — what scores actually mean
-
-After each run, the **policy/BT verifier** (`sources/evaluators/policy_bt_verifier/`, `verifier_kind = "policy_bt"`) evaluates the workspace:
-
-1. **Reproduction contract** — every generation must ship a shell script that regenerates its outputs (and installs its requirements). Missing or invalid → the generation is ineligible: reward 0, and the feedback names the required fix. Re-execution (on by default) reruns that script on a verifier-owned copy in a fresh venv with no API keys, after moving existing outputs aside.
-2. **Reconnaissance + adapters** — one LLM pass inventories the artifacts and fixes, from the goal alone, the comparison criteria and their stage order; per-schema adapters normalize every workspace to a common representation (unknown → `null`, never a fabricated loss).
-3. **Pairwise policy** — ONE cached deterministic Python policy compares each pair of generations inside a restricted interpreter, with reverse-order, self-tie and determinism checks; the **earliest decisive criterion stage** wins. On a tie, goal-relevant images from both sides go to the vision model — accepted only if both presentation orders agree, otherwise the tie stands.
-4. **Bradley–Terry reward** — every pair verdict feeds a regularized Bradley–Terry fit over the whole task session; the reward is the current probability of beating a neutral-strength opponent, and **every generation's rating is refreshed after each evaluation**. The first eligible generation starts at 0.5.
-
-The mutator is steered by an **evidence-grounded textual gradient** — losses first, ordered by the earliest stage where this generation fell behind, with measured evidence and no scores or policy code. The previous hybrid temporal-ladder channel (`verifier_kind = "hybrid"`) and the deprecated multi-source claim verifier (`"legacy"`) remain selectable, but runs default to `policy_bt`.
-
-Full pipeline: [`docs/concepts/evaluation-pipeline.md`](./docs/concepts/evaluation-pipeline.md).
-
-## Benchmark (V1)
-
-Evaluated on **ScienceAgentBench** (102 tasks, `task` mode — planning layer bypassed so workflow synthesis and refinement are evaluated in isolation):
-
-| Mode                                    | Success Rate | CBS | Cost / task |
-| --------------------------------------- | ------------ | --------- | ----------- |
-| DeepSeek-V3.2 single-agent              | 38.2 %       | 0.898     | $0.05       |
-| DeepSeek-V3.2 one-shot multi-agent      | 32.4 %       | 0.794     | $0.38       |
-| **DeepSeek-V3.2 iterative-learning**    | **43.1 %**   | **0.921** | **$1.70**   |
-
-> **43.1 % success rate on ScienceAgentBench with DeepSeek-V3.2 iterative-learning — +4.9 pp over the single-agent baseline at $1.70 per task.**
-
-> **High cost per task for iterative-learning were mostly caused by Opus 4.5 backbone used for workflow generation and mutation (At the time of V1 evaluation, no low cost model had the capabilities for proper workflow editing. Things have changed. Use GLM-5.3 or Deepseek-v4-pro for lower costs.**
-
-> On ScienceAgentBench with DeepSeek-V3.2, iterative learning improves GPT-4o but yields marginal degradation on Claude Haiku 4.5 — model-dependent behaviour is analysed in the [manuscript](https://arxiv.org/abs/2603.28986). For PaperBench results, see [`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md).
-
-## Benchmark (V2)
-
-**Currently under evaluation**
-
----
-
-## Manual Installation
-
-### 1. Expose MCP tools
-
-Mimosa discovers any MCP server reachable on the address/port range in your config (default `0.0.0.0:5000–5100`).
-
-- **Easiest path:** install our companion platform **[Toolomics](https://github.com/HolobiomicsLab/toolomics)** — a per-workspace MCP shell sandbox where agents install scientific packages on demand, plus pre-built MCP servers exposing common scientific stacks, shared workspace management, and an easy registration flow for new MCPs.
-- **Bring-your-own:** point `discovery_addresses` at any reachable MCP server — `fastmcp` scripts, ToolHive, third-party MCP containers. Toolomics is not required; see [`docs/concepts/tools-and-mcp.md`](./docs/concepts/tools-and-mcp.md#operating-without-toolomics).
-
-### 2. Install Mimosa
-
-```bash
-pip install uv
 git clone https://github.com/HolobiomicsLab/Mimosa-AI.git
 cd Mimosa-AI
 uv sync
-# then run with:
-uv run main.py
 ```
 
-**Or install as a standalone `mimosa` command**, usable from any directory:
+<details>
+<summary>Other installation methods</summary>
+
+**Install the standalone command:**
 
 ```bash
-uv tool install git+https://github.com/HolobiomicsLab/Mimosa-AI.git   # or: uv tool install /path/to/Mimosa-AI
+uv tool install git+https://github.com/HolobiomicsLab/Mimosa-AI.git
 mimosa
 ```
 
-When installed this way, settings persist to `~/.config/mimosa/config.json` (written by the onboarding wizard, loaded automatically on every run), API keys can live in `~/.config/mimosa/.env`, and runtime state (memory, workflows, run capsules) goes to `~/.local/share/mimosa/`. Repo checkouts keep the historical layout: `config_default.json` and state directories inside the checkout.
+For this installation, put API keys in `~/.config/mimosa/.env`.
+The setup wizard saves settings in `~/.config/mimosa/config.json`.
+Run files are stored in `~/.local/share/mimosa/`.
 
-Full quickstart: [`docs/getting-started/quickstart.md`](./docs/getting-started/quickstart.md).
+**Use the automatic installer:**
 
-### 3. (Optional) Scientific grounding via Perspicacité
-
-[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI) grounds workflow synthesis and Source A claims in the literature. When it's running, Mimosa picks it up automatically.
-
-```bash
-git clone https://github.com/HolobiomicsLab/Perspicacite-AI.git && cd Perspicacite-AI
-export DEEPSEEK_API_KEY="xxxxx" # export your api key; anthropic and openrouter also supported
-uv run perspicacite -c config.yml serve
-```
-
----
-
-## Web interface (Observatory)
-
-Mimosa is otherwise CLI-only; **Observatory** is an optional local web UI
-(FastAPI + React) that renders what a run produces — lineage tree, replay,
-workspace, and a setup/launch flow — so you can watch and inspect evolution
-instead of reading logs. It's a single-operator, localhost tool with no
-authentication; don't expose it on a shared or public network.
+The installer also sets up the Toolomics and Perspicacité companion projects.
+[Read the script](./auto-install.sh) before you run it. It installs software and starts services.
 
 ```bash
-cd webui && ./deploy.sh    # installs deps, runs backend + frontend; open http://localhost:5173
+curl -fsSL https://raw.githubusercontent.com/HolobiomicsLab/Mimosa-AI/refs/heads/mimosa_v2/auto-install.sh -o auto-install.sh
+bash auto-install.sh
 ```
 
-Details, environment variables, and the full API surface:
-[`webui/README.md`](./webui/README.md).
+</details>
 
----
+### 2. Connect models and tools
 
-## Audit trail and replay
+Create a `.env` file in the project root. Add the keys for your model providers.
+For example, use this entry for OpenRouter models:
 
-See: [`docs/usage/transparency.md`](./docs/usage/transparency.md), [`docs/usage/workspace.md`](./docs/usage/workspace.md).
+```dotenv
+OPENROUTER_API_KEY=your_api_key
+```
 
----
+Do not share this file or commit it to Git.
+See [API keys](./docs/getting-started/env.md) for other providers.
 
-## Configuration
+Start [Toolomics](https://github.com/HolobiomicsLab/toolomics) to provide scientific tools and a shared workspace.
+You can also use [your own MCP servers](./docs/concepts/tools-and-mcp.md#operating-without-toolomics).
+Toolomics is not required if your servers provide the tools that the task needs.
 
-See: [`docs/reference/configuration.md`](./docs/reference/configuration.md).
-
----
-
-## Evaluation
-
-Setup details for each benchmark:
-
-[`docs/science_agent_bench_evaluation.md`](./docs/science_agent_bench_evaluation.md)
-
-[`docs/papers_bench_evaluation.md`](./docs/papers_bench_evaluation.md)
-
----
-
-## Notifications and telemetry
-
-- **Pushover** — real-time progress on your phone. Set `PUSHOVER_USER` and `PUSHOVER_TOKEN`. Details: [`docs/usage/notifications.md`](./docs/usage/notifications.md).
-- **Langfuse** — span-level traces of every LLM call. `docker compose up -d` from the Langfuse repo, then add `LANGFUSE_PUBLIC_KEY` / `LANGFUSE_PRIVATE_KEY` to `.env`. Dashboard at `http://localhost:3000`. Details: [`docs/usage/telemetry.md`](./docs/usage/telemetry.md).
-
----
-
-## Related work
-
-Mimosa-AI sits in a small but active lineage of LLM-driven program-search and autonomous-research systems. We don't claim to subsume any of them — they answer different questions:
-
-| Project | What it does | How Mimosa differs |
-|---------|--------------|--------------------|
-| [Sakana AI Scientist](https://github.com/SakanaAI/AI-Scientist) | End-to-end paper generation in ML | Mimosa optimises **per-task workflow synthesis** with QD+verifier, not full-paper generation |
-| [DiscoPOP](https://github.com/SakanaAI/DiscoPOP) (Lange et al. 2024) | LLM-driven discovery of preference-optimisation algorithms | Same "LLM as variation operator over code" paradigm; Mimosa applies it to multi-agent workflow code rather than loss functions |
-| [FunSearch](https://github.com/google-deepmind/funsearch) (Romera-Paredes et al. 2024) | Evolutionary search over Python functions guided by an LLM | Mimosa evolves whole multi-agent programs and adds an auditable deterministic verifier instead of a single fitness function |
-| [ELM](https://github.com/CarperAI/OpenELM) (Lehman et al. 2022) | LLM-mediated quality-diversity over code | Closest QD ancestor; Mimosa's behaviour descriptor is a domain-agnostic embedding of the workflow's code rather than a hand-designed per-domain descriptor |
-| AIDE | Automated ML pipelines on Kaggle-like tasks | Mimosa targets broader scientific reproduction (ScienceAgentBench, PaperBench, lab data) and ships an auditable deterministic verifier |
-
-If you're publishing comparative work, the [manuscript](https://arxiv.org/abs/2603.28986) has the detailed positioning.
-
----
-
-## Full documentation
+Copy the example configuration:
 
 ```bash
-uvx --with mkdocs-material mkdocs serve   # live preview at http://localhost:8000
-uvx --with mkdocs-material mkdocs build   # static HTML to ./site
+cp config_default.json my_config.json
 ```
 
-Site config: [`mkdocs.yml`](./mkdocs.yml). Index: [`docs/index.md`](./docs/index.md).
+Edit `my_config.json`:
 
----
+- Set `workspace_dir` to the workspace that your tools use.
+- Set `discovery_addresses` to your trusted MCP server addresses and ports.
+- Select models for workflow generation, agents, planning, and verification. Check that you have the required provider keys.
 
-## Contributing
+[Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI) is an optional service for literature support.
+See the [configuration guide](./docs/getting-started/configuration.md) for more details.
 
-Patches, MCP tools, evaluators, and new verifier evidence layers welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md), the [Developer guide](./docs/DEVELOPER_GUIDE.md), and the contribution terms in [`CLA/`](./CLA/).
+### 3. Run a task
 
----
+Put the input files in the shared workspace. Then describe a task that your tools can perform:
 
-## License
+```bash
+uv run main.py --config my_config.json \
+  --task "Read measurements.csv. Save a summary table and a plot for each numeric column." \
+  --learn
+```
 
-Apache 2.0. See [`NOTICE`](./NOTICE), [`docs/licensing-notes.md`](./docs/licensing-notes.md), and the [`CLA/`](./CLA/) folder for contribution terms.
+Use `--learn` to enable repeated workflow changes. Omit it for one workflow run.
+Use `--goal` instead of `--task` when you want the planner to split a larger objective into tasks.
 
----
+For guided setup, run `uv run main.py` without arguments.
+See the [quickstart](./docs/getting-started/quickstart.md) for more examples.
+
+### 4. Inspect the results
+
+In a repository checkout:
+
+- `sources/workflows/` contains generated code, prompts, logs, and verifier feedback.
+- `runs_capsule/` contains saved result workspaces.
+- `run_notes/` contains campaign records for benchmark runs.
+
+The [workspace guide](./docs/usage/workspace.md) and [trace guide](./docs/usage/transparency.md) explain how to inspect these files.
+
+> **Use a controlled environment.** Generated code and tool calls can change files.
+> The workflow runner has restrictions, but verifier reproduction scripts run as host processes, not in an operating-system sandbox.
+> Use trusted tools and a separate workspace. Do not give runs access to sensitive data.
+
+## Inspect runs in the web interface
+
+**Observatory** is the optional local web interface.
+Use it to set up runs, view workflow history, and inspect output files.
+
+```bash
+cd webui
+./deploy.sh
+```
+
+Open <http://localhost:5173/> after the services start.
+
+<p align="center">
+  <a href="./docs/images/interface.png"><img src="./docs/images/interface.png" width="900" alt="Observatory web interface for Mimosa run setup and inspection"></a>
+</p>
+
+> **Local use only.** Observatory has no authentication. Do not expose it on a shared or public network.
+
+See the [Observatory guide](./webui/README.md) for requirements and settings.
+
+## A possible future: the autonomous laboratory
+
+<p align="center">
+  <a href="./docs/images/mimosa_illustration.png"><img src="./docs/images/mimosa_illustration.png" width="900" alt="Concept illustration of a future laboratory with robotic equipment, researchers, and a Mimosa display"></a>
+</p>
+
+<p align="center"><em>A hypothetical use of Mimosa. This image does not show a deployed laboratory or a current robot-control feature.</em></p>
+
+Mimosa currently builds and improves software workflows.
+With suitable instrument interfaces, a future system could connect those workflows to laboratory equipment.
+It could use measurements to compare methods and propose the next experiment.
+
+**That use would need separate engineering and safety checks.**
+Instrument control, human approval, and physical safety systems would be required.
+The illustration shows a research direction, not a claim that Mimosa provides these systems today.
+
+## Research results
+
+### V1 benchmark
+
+The following results are from **V1**, on 102 ScienceAgentBench tasks with DeepSeek-V3.2 agents.
+They do not measure the current V2 Policy-BT verifier.
+
+| Mode | Task success rate | CodeBERT score (CBS) | Cost per task |
+| --- | ---: | ---: | ---: |
+| Single agent | 38.2% | 0.898 | $0.05 |
+| Multi-agent, one run | 32.4% | 0.794 | $0.38 |
+| Multi-agent, repeated improvement | **43.1%** | **0.921** | **$1.70** |
+
+CBS measures code similarity. It is separate from task success.
+The V1 setup used Opus 4.5 for workflow generation and changes. Costs depend on the selected models and number of runs.
+See the [paper](https://arxiv.org/abs/2603.28986) for methods and limitations.
+
+**V2 evaluation is in progress.**
+
+### V1 example: molecular networking
+
+This earlier demonstration shows a molecular-networking workflow for LC-MS/MS data.
+It covers the networking step, not the full experimental procedure from [Nothias et al. (2018)](https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation).
+
+[Watch the V1 demonstration](https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d).
+
+<details>
+<summary>View the molecular network</summary>
+
+<p align="center">
+  <img src="./docs/images/network.png" width="700" alt="Molecular network from the V1 demonstration">
+</p>
+
+The workflow produced a GraphML network for Cytoscape and a feature table.
+The demonstration does not cover physical fractionation or manual annotation review.
+
+</details>
+
+## Documentation and contributions
+
+- **Use Mimosa:** [Quickstart](./docs/getting-started/quickstart.md) · [Run modes](./docs/usage/modes.md) · [Configuration](./docs/reference/configuration.md)
+- **Understand the system:** [Architecture](./docs/concepts/architecture.md) · [Workflow search](./docs/concepts/evolution-engine.md) · [Verification](./docs/concepts/evaluation-pipeline.md)
+- **Run evaluations:** [ScienceAgentBench](./docs/science_agent_bench_evaluation.md) · [PaperBench](./docs/papers_bench_evaluation.md)
+- **Monitor runs:** [Notifications](./docs/usage/notifications.md) · [Telemetry](./docs/usage/telemetry.md)
+- **Contribute:** [Contribution guide](./CONTRIBUTING.md) · [Developer guide](./docs/DEVELOPER_GUIDE.md) · [Contribution terms](./CLA/)
+
+To view the documentation locally:
+
+```bash
+uvx --with mkdocs-material mkdocs serve
+```
+
+Related research includes [AI Scientist](https://github.com/SakanaAI/AI-Scientist), [DiscoPOP](https://github.com/SakanaAI/DiscoPOP), [FunSearch](https://github.com/google-deepmind/funsearch), and [OpenELM](https://github.com/CarperAI/OpenELM).
+See the paper for a comparison with these systems.
+
+Mimosa-AI uses the **Apache 2.0** license.
+See [NOTICE](./NOTICE) and the [license notes](./docs/licensing-notes.md).
 
 ## Cite this work
 
-<p align="center">
-<em><a href="https://arxiv.org/abs/2603.28986">Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research</a></em><br>
-M. Legrand, T. Jiang, M. Feraud, B. Navet, Y. Taghzouti, F. Gandon, E. Dumont, L.-F. Nothias — <em>arXiv:2603.28986, 2026</em> — <a href="https://doi.org/10.48550/arXiv.2603.28986">DOI</a>
-</p>
+[Mimosa Framework: Toward Evolving Multi-Agent Systems for Scientific Research](https://arxiv.org/abs/2603.28986), 2026.
+[DOI: 10.48550/arXiv.2603.28986](https://doi.org/10.48550/arXiv.2603.28986).
 
 ```bibtex
 @article{legrand2026mimosa,
