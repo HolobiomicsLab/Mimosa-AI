@@ -8,6 +8,6 @@ to look when something interesting happens.
 | [Execution modes](modes.md) | `--task`, `--goal`, `--manual`, batch CSV. |
 | [Iterative learning](learning.md) | Running with `--learn`, what evolves. |
 | [Workspace & audit trail](workspace.md) | Filesystem layout of a run. |
-| [Transparency & replay](transparency.md) | Step through any run with `memory_explorer.py`. |
+| [Transparency & replay](transparency.md) | Read a run's step traces, ask questions with `--memory_cli`. |
 | [Notifications](notifications.md) | Phone alerts via Pushover. |
 | [Telemetry](telemetry.md) | OpenTelemetry traces in Langfuse. |

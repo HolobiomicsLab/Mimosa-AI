@@ -48,7 +48,7 @@ below; it remains reachable via `verifier_kind = "legacy"`.
 
 ## Policy-based Bradley–Terry verifier (default)
 
-The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/DESIGN.md#2-how-it-would-work):
+The verifier runs these steps in order:
 
 1. **Reproduction contract.** Each generation must contain a shell
    (`.sh`) script that regenerates its outputs and, unless the runtime
@@ -86,14 +86,19 @@ The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mi
    `dropped_criteria`). Agent-written source files never ground a name.
    A win needs a criterion with two known, different values at the
    deciding stage (null ties), and a `higher`/`lower` value must be a
-   number.
+   number. Each criterion has a `judge`: `"code"` (default; adapters
+   read it from files) or `"vision"` (only the figure shows it, e.g. a
+   plotted element or legibility). Adapters, the comparison policy and
+   the "could not be measured" feedback see only code criteria; vision
+   criteria are decided by the visual tie-break, and their feedback is
+   the figure review below. A plan needs at least one code criterion.
 4. **Pairwise policy.** A cached deterministic Python policy compares
    each pair and returns a verdict, evidence, and feedback for both
    sides. On a tie, comparable goal-relevant visual artifacts can be
    sent to the configured vision model in both orders; a winner is kept
    only when both orders agree. Either way the forward-order answer also
    lists, per side, the goal-named elements absent or wrong in its
-   figures (`visual_deficiencies`, prompt `visual-tiebreak-2`), which the
+   figures (`visual_deficiencies`, prompt `visual-tiebreak-3`), which the
    gradient folds in.
 5. **Current ratings.** The accumulated pair results fit a regularized
    Bradley–Terry model. The first eligible generation starts at 0.5;
@@ -183,9 +188,9 @@ session receives a fresh tournament registry scope.
 | `verifier_kind` | `"policy_bt"` | Select the policy tournament verifier |
 | `policy_bt_reward` | `"bradley_terry"` | Only supported policy-BT reward |
 | `policy_bt_reexecute` | `true` | Run the required reproduction script |
-| `policy_bt_reexec_timeout_s` | `900` | Reproduction wall-clock limit |
+| `policy_bt_reexec_timeout_s` | `1800` | Reproduction wall-clock limit |
 | `policy_bt_scorer_timeout_s` | `60` | Policy comparison time limit |
-| `policy_bt_repair_rounds` | `3` | Maximum policy or adapter repairs |
+| `policy_bt_repair_rounds` | `4` | Maximum policy or adapter repairs |
 | `policy_bt_visual_channel` | `true` | Allow relevant visual tie resolution |
 
 Use `--no-policy_bt_reexecute` to inspect existing artifacts without
@@ -674,7 +679,7 @@ The verifier runs four stages per workflow run:
 Each source is a different definition of "success" — claims from each are
 merged and verified by the same per-claim machinery downstream. The
 letters are the code labels registered in the `SOURCES` tuple of
-`sources/evaluators/verifier_claim_sources.py` (`a`/`b`/`c`/`e`/`g`);
+`sources/evaluators/legacy_verifier/verifier_claim_sources.py` (`a`/`b`/`c`/`e`/`g`);
 letters `d` and `f` are retired and never emitted.
 
 | Source | Vantage | What it asks |
@@ -881,11 +886,11 @@ The default verifier channel is `HybridVerifierEvaluator`; switch with
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `HybridVerifierEvaluator` | [`hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/)                             | **Default** — E19/E19b temporal claim ladder + policy scorers + pairwise reward.  |
 | `GoldFeedbackEvaluator` | [`gold_feedback/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/gold_feedback/) | **Oracle control, leaks the benchmark** (`verifier_kind="gold"`): hybrid reward + benchmark-grader gradient. Research only. |
-| `VerifierEvaluator` | [`verifier.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/verifier.py)                                       | Deprecated multi-source per-claim (`verifier_kind="legacy"`). |
-| `GenericEvaluator`  | [`generic.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/generic.py)                                         | Legacy 4-criterion LLM judge.             |
-| `ScenarioEvaluator` | [`scenario.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/scenario.py)                                       | Rubric / assertion-based scoring.         |
+| `VerifierEvaluator` | [`legacy_verifier/verifier.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/legacy_verifier/verifier.py) | Deprecated multi-source per-claim (`verifier_kind="legacy"`). |
+| `GenericEvaluator`  | [`generic_verifier/generic.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/generic_verifier/generic.py) | Legacy 4-criterion LLM judge. |
+| `ScenarioEvaluator` | [`scenario/scenario.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/scenario/scenario.py) | Rubric / assertion-based scoring. |
 | Perspicacité grounding | [`grounding.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/grounding.py)                                  | Adapter used by the legacy verifier (Source A) and `GenericEvaluator`; the hybrid verifier does not call it. |
-| `BullshitDetector`  | [`bs_detection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/bs_detection.py)                               | Numerical-fraud penalty.                  |
+| `BullshitDetectorNumerical` | [`generic_verifier/bs_detection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/generic_verifier/bs_detection.py) | Numerical-fraud penalty. |
 
 ## See also
 

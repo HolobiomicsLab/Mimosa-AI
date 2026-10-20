@@ -45,7 +45,7 @@ Check:
 - Is **Toolomics running**? `curl http://localhost:5000/` should return
   something (or another port in your configured range).
 - Are the IPs/ports in `discovery_addresses` correct? The default is
-  `AddressMCP("0.0.0.0", 5000, 5100)`.
+  `AddressMCP("0.0.0.0", 5000, 5200)`.
 - Is a firewall blocking the port range?
 
 ### A tool I expect to be discoverable doesn't show up
@@ -58,9 +58,9 @@ If a tool is missing, it's one of:
   the IP / port range and that the server answers a handshake on
   `http://<ip>:<port>/mcp`.
 - The tool is registered with ToolHive but the ToolHive code path is
-  commented out in `tools_manager.py` (the default in this build). Use a
-  network-MCP exposure of the same tool, or re-enable ToolHive
-  discovery.
+  disabled inside `discover_mcp_servers` (`tools_manager.py:211-214`). Use a
+  network-MCP exposure of the same tool, or re-enable ToolHive discovery
+  in that function.
 - The Toolomics service is in `config_<instance_id>.json` with
   `"enabled": false`. Flip it to `true` and re-run Toolomics' `./start.sh`.
 
@@ -96,7 +96,7 @@ entirely.
 You may have whitelisted only a small set in `Config.openrouter_provider`
 but none of them serves the model you asked for. Either:
 
-- Widen the whitelist (the default includes 25+ providers), or
+- Widen the whitelist (the default includes 28 providers), or
 - Switch to a model with broader provider support.
 
 ### `No endpoints found that can handle the requested parameters` (404)
@@ -115,7 +115,7 @@ banner in `run_stdout.log` shows the exact error.
 
 ### Sandbox hits `runner_default_timeout`
 
-A workflow ran for longer than the timeout (default `3600` s). Either:
+A workflow ran for longer than the timeout (default `10800` s). Either:
 
 - Bump the timeout: `--runner_default_timeout 7200`.
 - Look at the workflow code in `sources/workflows/<uuid>/workflow_genotype_*.py`

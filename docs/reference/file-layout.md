@@ -8,12 +8,12 @@ mimosa-ai/
 ├── main.py                                # CLI entry point & mode dispatch
 ├── pyproject.toml                         # Project metadata + dependencies
 ├── cleanup.sh                             # Delete generation folders + tmp/
-├── memory_explorer.py                     # Interactive trace replay
 ├── mkdocs.yml                             # Documentation site config
 │
 ├── sources/
 │   ├── core/                              # Engine: evolution, selection, factories
 │   │   ├── evolution_engine.py            # Depth-first recursion loop
+│   │   ├── stopping.py                    # Early-stop logic for --learn
 │   │   ├── selection.py                   # QD archive + admission gate
 │   │   ├── variation_engine.py            # Mutation / crossover prompt assembly
 │   │   ├── workflow_selection.py          # Parent retrieval (archive / disk)
@@ -30,22 +30,24 @@ mimosa-ai/
 │   │   ├── tools_manager.py               # MCP tool discovery
 │   │   ├── llm_provider.py                # Multi-provider LLM abstraction
 │   │   ├── planner.py                     # Goal → tasks (Layer 0)
-│   │   ├── schema.py                      # IndividualRun, Plan, Task, …
-│   │   └── evaluators/                    # Verifier backends
-│   │       ├── evaluator.py               # Facade (routes to backends)
-│   │       ├── policy_bt_verifier/        # Policy/BT verifier (default): reexec, artifacts,
-│   │       │                              # recon, policy, visual, tournament, registry, results
-│   │       ├── hybrid_verifier/           # Hybrid temporal-ladder verifier (previous default): claims, digest,
-│   │       │                              # scorers, registry, aggregation, gradient, layers
-│   │       ├── verifier.py                # Legacy multi-source per-claim verifier (deprecated)
-│   │       ├── grounding.py               # Perspicacité adapter (legacy verifier / generic)
-│   │       ├── generic.py                 # Legacy 4-criterion judge
-│   │       ├── scenario.py                # Rubric-based scoring
-│   │       ├── bs_detection.py            # BullshitDetector penalty
-│   │       └── base.py                    # Shared primitives
+│   │   └── schema.py                      # IndividualRun, Plan, Task, …
 │   │
-│   ├── evaluation/                        # Batch / benchmark eval
+│   ├── evaluators/                        # Verifier backends
+│   │   ├── evaluator.py                   # Facade (routes to backends)
+│   │   ├── base.py                        # Shared primitives
+│   │   ├── grounding.py                   # Perspicacité adapter
+│   │   ├── policy_bt_verifier/            # Policy-BT verifier (default): reexec, recon, policy,
+│   │   │                                  # visual, tournament, registry, results
+│   │   ├── hybrid_verifier/               # Hybrid temporal-ladder verifier (historical): claims, digest,
+│   │   │                                  # scorers, registry, aggregation, gradient, layers
+│   │   ├── legacy_verifier/               # Legacy multi-source per-claim verifier (deprecated)
+│   │   ├── generic_verifier/              # generic.py (legacy 4-criterion judge), bs_detection.py
+│   │   ├── scenario/scenario.py           # Rubric-based scoring
+│   │   └── gold_feedback/                 # Benchmark-grader feedback (oracle mode, research only)
+│   │
+│   ├── benchmark_evaluation/              # Batch / benchmark eval
 │   │   ├── csv_mode.py                    # Concurrent batch runner
+│   │   ├── snapshot_grading.py            # Snapshot grading
 │   │   ├── capsule_evaluator.py           # ScienceAgentBench metrics
 │   │   ├── codebert_scorer.py             # CodeBERT similarity
 │   │   ├── execution_sandbox.py           # Safe code execution for eval
@@ -56,7 +58,16 @@ mimosa-ai/
 │   ├── cli/                               # Interactive entrypoints
 │   │   ├── onboard_cli.py                 # Zero-arg onboarding wizard
 │   │   ├── evaluation_cli.py              # Benchmark launcher
+│   │   ├── memory_chat_cli.py             # Memory chat (--memory_cli)
+│   │   ├── theme.py                       # Terminal theme
 │   │   └── pretty_print.py                # Coloured CLI primitives
+│   │
+│   ├── transparency/                      # Run traces and exports
+│   │   ├── yaml_writer.py
+│   │   ├── trace_compaction.py
+│   │   ├── memory_trace.py
+│   │   ├── decision_extractor.py
+│   │   └── astra_exporter.py
 │   │
 │   ├── extensibility/
 │   │   ├── human_mode.py                  # Manual mode (no LLM)
@@ -67,7 +78,11 @@ mimosa-ai/
 │   │   └── smolagent_factory.py           # SmolAgent factory template
 │   │
 │   ├── prompts/                           # LLM prompt templates
-│   │   ├── workflow_v10.md                # Current workflow generator prompt
+│   │   ├── workflow_v15.md                # Current workflow generator prompt (config.py default)
+│   │   ├── workflow_v13_model_select.md   # Workflow prompt variant
+│   │   ├── workflow_v12_model_select.md   # Workflow prompt variant
+│   │   ├── workflow_v11.md                # Workflow prompt (kept for diffing)
+│   │   ├── workflow_v10.md                # Workflow prompt (kept for diffing)
 │   │   ├── workflow_v9.md                 # (kept for diffing)
 │   │   ├── workflow_v8.md                 # (legacy reference)
 │   │   ├── planner_reproduction.md        # Planner — reproduction goal
@@ -81,6 +96,10 @@ mimosa-ai/
 │   │   └── check_package.py               # Pre-flight package vetting
 │   │
 │   ├── utils/                             # Cross-cutting helpers
+│   │   ├── paths.py                       # Default state directories
+│   │   ├── ensure_env.py                  # Environment bootstrap
+│   │   ├── archive_projection.py          # Archive projection helpers
+│   │   ├── run_metrics.py                 # Run metrics
 │   │   ├── pricing.py                     # OpenRouter pricing client
 │   │   ├── logging.py                     # Structured logging
 │   │   ├── notify.py                      # Pushover notifications
@@ -98,22 +117,25 @@ mimosa-ai/
 │   │   ├── dataset.py                     # CSV / scenario helpers
 │   │   └── mock_data.py                   # Test fixtures
 │   │
-│   ├── memory/                            # LLM call cache + memory traces (runtime)
+│   ├── memory/                            # LLM call cache (runtime; default_memory_dir)
 │   └── workflows/                         # Per-generation artefacts (runtime)
 │       └── <uuid>/
 │           ├── workflow_genotype_<uuid>.py
 │           ├── state_result.json
+│           ├── system_prompt_<uuid>.md
+│           ├── goal_<uuid>.txt
+│           ├── original_task_<uuid>.txt
 │           ├── evolution_prompt_<uuid>.md
 │           ├── lineage_<uuid>.json
+│           ├── evaluation.txt             # Hybrid / legacy / generic verifier report
+│           ├── textual_gradient.txt       # Hybrid verifier gradient
+│           ├── policy_bt_evidence.json    # Policy-BT evidence
+│           ├── .policy_bt/                # Policy-BT registry
 │           ├── reward_progress.png        # only on best UUID
-│           ├── evolution_tree.png         # only on best UUID
-│           └── memory/
+│           └── evolution_tree.png         # only on best UUID
 │
-├── runs_capsule/                          # Archived run snapshots
+├── runs_capsule/                          # Archived run snapshots (runs_capsule_dir)
 │   └── <capsule_name>/
-│       ├── workflow.py
-│       ├── results/
-│       ├── logs/
 │       └── evaluation_results.json
 │
 ├── datasets/                              # Benchmark CSVs + scenario rubrics
@@ -124,7 +146,7 @@ mimosa-ai/
 │   ├── our_benchmark.csv
 │   ├── papers_rejection_watch.csv
 │   ├── datascience_papers.csv
-│   └── scenarios/                         # Scenario rubrics
+│   └── scenarios/                         # Scenario rubrics (*_rubric.json)
 │
 ├── docs/                                  # This documentation site
 │   ├── index.md                           # Landing page
@@ -139,7 +161,7 @@ mimosa-ai/
 │   ├── diagrams/                          # .mermaid sources
 │   └── images/                            # Rendered .png/.jpg
 │
-└── tests/                                 # pytest suite
+└── tests/                                 # pytest suite (sample)
     ├── evaluator_test.py
     ├── scenario_rubric_test.py
     ├── judge_test.py
@@ -154,14 +176,14 @@ mimosa-ai/
 
 | Path | Safe to delete? | Notes |
 | ---- | --------------- | ----- |
-| `sources/workflows/<uuid>/` | ✅ | Per-generation artefacts. Wipe to start fresh. |
-| `runs_capsule/` | ✅ | Archive snapshots. Wipe before benchmarks. |
-| `sources/memory/` | ✅ | LLM cache + task checklists. Wipe to force re-judging. |
-| `./tmp/` | ✅ | Sandbox scratch. |
-| `sources/cache/openrouter_pricing.json` | ✅ | Re-fetched on next call. |
-| `sources/prompts/` | ❌ | Source. Don't delete. |
-| `sources/modules/` | ❌ | Workflow templates. Don't delete. |
-| `sources/core/`, `sources/utils/`, etc. | ❌ | Source. Don't delete. |
+| `sources/workflows/<uuid>/` | Yes | Per-generation artefacts. Wipe to start fresh. |
+| `runs_capsule/` | Yes | Archive snapshots. `cleanup.sh` does not touch it. |
+| `sources/memory/` | Yes | LLM cache (`default_memory_dir`). Wipe to force re-judging. `cleanup.sh` does not touch it. |
+| `./tmp/` | Yes | Sandbox scratch. |
+| `sources/cache/openrouter_pricing.json` | Yes | Re-fetched on next call. |
+| `sources/prompts/` | No | Source. Don't delete. |
+| `sources/modules/` | No | Workflow templates. Don't delete. |
+| `sources/core/`, `sources/utils/`, etc. | No | Source. Don't delete. |
 
 For a clean reset, prefer `./cleanup.sh` (or `./cleanup.sh <subfolder>`
 for a campaign folder; `-n` lists first) over hand-deleting.

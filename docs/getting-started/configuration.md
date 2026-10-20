@@ -1,7 +1,7 @@
 # Configuration
 
 Mimosa reads its settings from a `Config` object built in [`config.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/config.py).
-The interactive wizard writes one to `config_default.json`; for full control,
+The interactive wizard writes one to `config_default.json` in a repo checkout, or to `~/.config/mimosa/config.json` for installed runs;
 copy and edit your own:
 
 ```bash
@@ -20,10 +20,10 @@ field with defaults and types, see the [Configuration reference](../reference/co
 | `discovery_addresses` | IP + port ranges scanned for MCP servers. |
 | `workflow_llm_model` | LLM that synthesizes multi-agent workflows. |
 | `smolagent_model_id` | LLM used by execution agents inside each workflow. |
-| `judge_model` | LLM behind the verifier: claim-ladder extraction, format digests, and policy-scorer code. |
+| `judge_model` | LLM used by the verifier (hybrid claim ladder and format digests; see the verifier reference). |
 | `planner_llm_model` | LLM that decomposes goals into tasks (`--goal` mode only). |
-| `learned_score_threshold` | Score that triggers early stop in `--learn` mode (default `0.92`). |
-| `max_learning_evolve_iterations` | Hard cap on evolve iterations (default `25`). |
+| `learned_score_threshold` | Score that triggers early stop in `--learn` mode (default `0.9`). |
+| `max_learning_evolve_iterations` | Hard cap on evolve iterations (default `16`). |
 
 ## Choosing models
 
@@ -112,10 +112,10 @@ LLM choice is the biggest lever you have. Some practical guidance:
 | Field | Default | Use |
 | ----- | ------- | --- |
 | `workspace_dir` | *(set per machine)* | Toolomics shared workspace. |
-| `workflow_dir` | `sources/workflows` | Where generated workflows are saved. |
-| `memory_dir` | `sources/memory` | Where LLM-call caches and traces live. |
-| `runs_capsule_dir` | `runs_capsule/` | Per-run archive snapshots. |
-| `runner_temp_dir` | `./tmp` | Sandbox scratch space. |
+| `workflow_dir` | `sources/workflows` (repo) / `~/.local/share/mimosa/workflows` (installed) | Where generated workflows are saved. |
+| `memory_dir` | `sources/memory` (repo) / `~/.local/share/mimosa/memory` (installed) | Where LLM-call caches and traces live. |
+| `runs_capsule_dir` | `runs_capsule/` (repo) / `~/.local/share/mimosa/runs_capsule` (installed) | Per-run archive snapshots. |
+| `runner_temp_dir` | `./tmp` (repo) / `~/.cache/mimosa/tmp` (installed) | Sandbox scratch space. |
 
 ## Runner limits
 
@@ -124,8 +124,8 @@ The sandbox enforces resource caps per generated workflow:
 | Field | Default | Purpose |
 | ----- | ------- | ------- |
 | `runner_default_python_version` | `3.12` | Python version inside the sandbox. |
-| `runner_default_timeout` | `3600` | Per-run timeout (seconds). |
-| `runner_default_max_memory_mb` | `1024` | RAM cap (MB). |
+| `runner_default_timeout` | `10800` | Per-run timeout (seconds). |
+| `runner_default_max_memory_mb` | `10000` | RAM cap (MB). |
 | `runner_default_max_cpu_percent` | `100` | CPU cap (%). |
 
 These can be overridden on the command line for one-off runs:
@@ -140,8 +140,8 @@ uv run main.py --task "…" \
 
 | Field | Default | Meaning |
 | ----- | ------- | ------- |
-| `learned_score_threshold` | `0.92` | Stop evolving when `overall_score` reaches this. |
-| `max_learning_evolve_iterations` | `25` | Max generations before giving up. |
+| `learned_score_threshold` | `0.9` | Stop evolving when `overall_score` reaches this. |
+| `max_learning_evolve_iterations` | `16` | Max generations before giving up. |
 
 The QD selection and variation engine also exposes tuning knobs
 (`selection_strategy`, `population_size`, `novelty_weight`,

@@ -5,8 +5,8 @@ How Mimosa-AI works under the hood.
 | Page | What it covers |
 | ---- | -------------- |
 | [Architecture](architecture.md) | The five layers and how they fit together. |
-| [Evolution engine](evolution-engine.md) | Depth-first recursion, QD selection, stagnation-driven mutation scope. |
-| [Evaluation pipeline](evaluation-pipeline.md) | The hybrid temporal-ladder verifier — the **judge that drives evolution**. Not the ScienceAgentBench / PaperBench grader. |
+| [Evolution engine](evolution-engine.md) | Depth-first recursion, QD selection, directive-implicit mutation scope. |
+| [Evaluation pipeline](evaluation-pipeline.md) | The policy-based Bradley–Terry verifier (default), the **judge that drives evolution**. The hybrid verifier is the previous default. Not the ScienceAgentBench / PaperBench grader. |
 | [Tool discovery & MCP](tools-and-mcp.md) | How Mimosa finds and wires MCP tools — Toolomics, ToolHive, or any reachable MCP endpoint. |
 | [Toolomics](toolomics.md) | The companion platform for MCP packaging, workspace isolation, and multi-instance deployment. |
 | [Scientific grounding](grounding.md) | The role of Perspicacité in workflow synthesis (and, under the deprecated legacy verifier, soft-claim verdicts). |

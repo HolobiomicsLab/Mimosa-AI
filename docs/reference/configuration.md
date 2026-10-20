@@ -10,8 +10,8 @@ this page is the exhaustive reference.
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `workspace_dir` | `str` | `/home/.../Toolomics/workspace` | Toolomics shared workspace. |
-| `discovery_addresses` | `list[AddressMCP]` | `[AddressMCP("0.0.0.0", 5000, 5100)]` | IP + port ranges scanned for MCP servers. |
+| `workspace_dir` | `str` | `/Users/cnrs/Documents/repository/Toolomics/workspace` (author's machine path; set your own) | Toolomics shared workspace. |
+| `discovery_addresses` | `list[AddressMCP]` | `[AddressMCP("0.0.0.0", 5000, 5200)]` | IP + port ranges scanned for MCP servers. |
 
 `AddressMCP` is a dataclass with `ip: str`, `port_min: int`, `port_max: int`.
 Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
@@ -20,36 +20,42 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 
 | Field | Type | Default | Used by |
 | ----- | ---- | ------- | ------- |
-| `planner_llm_model` | `str` | `deepseek/deepseek-chat` | Layer 0 — task decomposition. |
-| `workflow_llm_model` | `str` | `openai/gpt-5.5` | Workflow synthesis. |
-| `smolagent_model_id` | `str` | `openrouter/deepseek/deepseek-v3.2` | Execution agents inside the sandbox. |
-| `judge_model` | `str` | `openai/gpt-5.5` | Verifier LLM: claim-ladder extraction, format digests, policy-scorer code. |
-| `capsule_namer_model` | `str` | `deepseek/deepseek-chat` | Generates human-readable capsule names. |
+| `planner_llm_model` | `str` | `openrouter/z-ai/glm-5.3` | Layer 0 — task decomposition. |
+| `workflow_llm_model` | `str` | `openrouter/z-ai/glm-5.3` | Workflow synthesis. |
+| `smolagent_model_id` | `str` | `openrouter/z-ai/glm-5.3-flash` | Execution agents inside the sandbox. |
+| `judge_model` | `str` | `openrouter/z-ai/glm-5.3-flash` | Verifier LLM: claim-ladder extraction, format digests, policy-scorer code. |
+| `vision_judge_model` | `str \| None` | `openrouter/moonshotai/kimi-k3` | Vision model for figure inspection (visual tie-break). |
+| `capsule_namer_model` | `str` | `openrouter/z-ai/glm-5.3-flash` | Generates human-readable capsule names. |
 | `engine_name` | `str` | `litellm` | SmolAgents engine — keep as `litellm`. |
 | `reasoning_effort` | `str` | `medium` | `minimal | low | medium | high` for models that support it. |
-| `max_tokens` | `int` | `8192` | Token cap on LLM responses. |
+| `max_tokens` | `int` | `16384` | Token cap on LLM responses. |
 
 ## Prompts
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `prompt_planner` | `str` | `sources/prompts/planner_reproduction.md` | Planner system prompt. |
-| `prompt_workflow_creator` | `str` | `sources/prompts/workflow_v11.md` | Workflow-generation prompt. |
+| `prompt_workflow_creator` | `str` | `sources/prompts/workflow_v15.md` | Workflow-generation prompt. |
 | `prompt_smolagent` | `str` | `sources/prompts/smolagent_sys_prompt.md` | SmolAgent system prompt. |
 
 ## Learning
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `learned_score_threshold` | `float` | `0.92` | `--learn` stops when `overall_score` reaches this. |
-| `max_learning_evolve_iterations` | `int` | `25` | Hard cap on evolve iterations. |
+| `learned_score_threshold` | `float` | `0.9` | `--learn` stops when `overall_score` reaches this. |
+| `max_learning_evolve_iterations` | `int` | `16` | Hard cap on evolve iterations. |
+| `early_stop_mode` | `str` | `auto` | `auto`, `threshold`, `plateau`, or `none`. Other values raise `ValueError` on load. |
+| `min_learning_evolve_iterations` | `int` | `6` | Minimum evolve iterations. Must be ≥ 1. |
+| `plateau_patience` | `int` | `3` | Iterations without improvement before a plateau stop. Must be ≥ 1. |
+| `explore_after_plateau` | `int \| None` | `None` | Exploration iterations after a plateau. Must be ≥ 0 when set. |
+| `explore_base_rate` | `float` | `0.0` | Exploration rate. Must be in [0, 1]. |
 | `max_concurrent_eval_tasks` | `int` | `1` | Concurrent tasks in CSV / batch modes. |
 
 ## Verifier channel
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
-| `verifier_kind` | `str` | `hybrid` | Verifier channel: `hybrid` (E19/E19b), `legacy` (deprecated multi-source) or `gold` (ORACLE / BENCHMARK-LEAKING control: benchmark-grader feedback as gradient; research only, never report its scores — see [Gold feedback (oracle) mode](../concepts/evaluation-pipeline.md#gold-feedback-oracle-mode)). |
+| `verifier_kind` | `str` | `policy_bt` | Verifier channel: `policy_bt` (default), `hybrid` (historical temporal ladder), `legacy` (deprecated multi-source) or `gold` (ORACLE / BENCHMARK-LEAKING control: benchmark-grader feedback as gradient; research only, never report its scores — see [Gold feedback (oracle) mode](../concepts/evaluation-pipeline.md#gold-feedback-oracle-mode)). |
 | `gold_feedback_reward` | `bool` | `false` | `verifier_kind=gold` only: full oracle — the reward also comes from the benchmark grader (SR → 1.0, VER → 0.5·CBS, else 0.0). Default = gradient-only oracle. JSON strings `"false"`/`"0"` parse as false. |
 | `gold_feedback_timeout_s` | `int` | `1800` | `verifier_kind=gold` only: wall-clock cap (s) on benchmark grading per generation (`0` disables it); on timeout the grade is censored and the hybrid gradient is used. |
 | `hybrid_verifier_num_claims` | `int` | `10` | Target key-claim count per task (extraction accepts ±2). |
@@ -57,6 +63,16 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `hybrid_verifier_scorer_timeout_s` | `int` | `60` | Per scorer-subprocess timeout (seconds). |
 | `hybrid_verifier_pairwise_mode` | `str` | `temporal` | Pairwise reward mode: `temporal` (earliest-differing ladder stage decides), `temporal_strict`, `mean_diff`, `sign_sum`, or `escalation`. |
 | `hybrid_verifier_digest_max_files` | `int` | `8` | Max deliverable files sampled by the hybrid verifier format digest. |
+| `hybrid_verifier_reward` | `str` | `win_rate` | Pairwise reward: `win_rate` or `bradley_terry`. |
+| `hybrid_verifier_visual_rung` | `bool` | `true` | Enable the visual evidence rung. |
+| `hybrid_verifier_execution_gate` | `bool` | `true` | Enable the execution gate layer. |
+| `policy_bt_reward` | `str` | `bradley_terry` | Policy-BT reward model. Must be `bradley_terry` when `verifier_kind=policy_bt`. |
+| `policy_bt_scorer_timeout_s` | `int` | `60` | Per scorer-subprocess timeout (seconds). |
+| `policy_bt_visual_channel` | `bool` | `true` | Run the vision tie-break after a code tie when both sides have images. |
+| `policy_bt_repair_rounds` | `int` | `4` | Max repair rounds for adapter and policy generation. |
+| `policy_bt_reexecute` | `bool` | `true` | Re-execute each snapshot in a fresh venv before scoring. |
+| `policy_bt_reexec_timeout_s` | `int` | `1800` | Re-execution timeout (seconds). |
+| `policy_bt_reexec_runtime` | `dict` | `{}` | Re-execution runtime mapping. Empty by default. |
 
 ## QD / novelty (selection & variation)
 
@@ -67,18 +83,18 @@ engine](../concepts/evolution-engine.md), not day-to-day settings.
 | ----- | ---- | ------- | ----------- |
 | `selection_strategy` | `str` | `qd` | One of `greedy`, `tournament`, `novelty`, `qd`. |
 | `novelty_comparison` | `str` | `archive_knn` | Novelty comparison mode (k-NN over the archive vs. previous-N). |
-| `novelty_previous_n` | `int` | `15` | Window size when `novelty_comparison` is previous-N based. |
-| `length_penalty_baseline_chars` | `int` | `8000` | Genotype size (chars) at which the length penalty starts to grow. |
+| `novelty_previous_n` | `int` | `16` | Window size when `novelty_comparison` is previous-N based. |
+| `length_penalty_baseline_chars` | `int` | `12000` | Genotype size (chars) at which the length penalty starts to grow. |
 | `length_penalty_lambda` | `float` | `0.05` | Length-penalty growth rate. |
 | `min_improvement_threshold` | `float` | `0.01` | Minimum relative improvement required for admission in greedy mode. |
-| `population_size` | `int` | `20` | Max individuals kept in the QD archive. |
-| `novelty_k_neighbours` | `int` | `15` | `k` for k-nearest-neighbour novelty. |
+| `population_size` | `int` | `16` | Max individuals kept in the QD archive. |
+| `novelty_k_neighbours` | `int` | `16` | `k` for k-nearest-neighbour novelty. |
 | `novelty_weight` | `float` | `0.25` | Weight of novelty vs. quality in `qd_score` (`0` = pure quality, `1` = pure novelty). |
 | `admit_threshold` | `float` | `0.3` | Minimum `qd_score` for admission when the candidate doesn't strictly improve. |
 | `initial_population` | `int` | `2` | Seed generations before mutation/crossover kicks in. |
 | `crossover_rate` | `float` | `0.4` | Probability a generation combines two parents instead of mutating one. |
 | `n_parents` | `int` | `2` | Number of parents drawn per crossover. |
-| `parent_threshold_similarity` | `float` | `0.8` | Cold-start disk scan: minimum goal-embedding cosine similarity. |
+| `parent_threshold_similarity` | `float` | `0.95` | Cold-start disk scan: minimum goal-embedding cosine similarity. |
 | `parent_threshold_score` | `float` | `0.01` | Cold-start disk scan / parent draw: minimum score to be considered. |
 
 ## OpenRouter routing
@@ -107,10 +123,10 @@ See [Troubleshooting → OpenRouter quantization](troubleshooting.md#openrouter-
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `runner_default_python_version` | `str` | `3.12` | Python in the sandbox. |
-| `runner_default_timeout` | `int` | `3600` | Per-run timeout (s). |
-| `runner_default_max_memory_mb` | `int` | `1024` | RAM cap (MB). |
+| `runner_default_timeout` | `int` | `10800` | Per-run timeout (s). |
+| `runner_default_max_memory_mb` | `int` | `10000` | RAM cap (MB). |
 | `runner_default_max_cpu_percent` | `int` | `100` | CPU cap (%). |
-| `runner_temp_dir` | `str` | `./tmp` | Sandbox scratch root. |
+| `runner_temp_dir` | `str` | `tmp/` under the repo root (outside a checkout: `~/.cache/mimosa/tmp`) | Sandbox scratch root. |
 | `runner_requirements` | `list[str]` | (pinned list) | Pip requirements installed in every sandbox. |
 
 ## Notifications
@@ -119,6 +135,18 @@ See [Troubleshooting → OpenRouter quantization](troubleshooting.md#openrouter-
 | ----- | ---- | ------- | ----------- |
 | `pushover_token` | `str \| None` | `$PUSHOVER_TOKEN` | Pushover API token. |
 | `pushover_user` | `str \| None` | `$PUSHOVER_USER` | Pushover user key. |
+
+## Other fields
+
+| Field | Type | Default | Description |
+| ----- | ---- | ------- | ----------- |
+| `agent_execution_timeout` | `int` | `18000` | Agent execution timeout (s). |
+| `save_logprobs` | `bool` | `true` | Request logprobs from agent models. |
+| `planner_human_approve` | `bool` | `false` | Require human approval of the plan. Set by `--planner_human_approve`. |
+| `evaluate_snapshot_ablations` | `bool` | `true` | Evaluate snapshot ablations. |
+| `export_astra` | `bool` | `false` | Export traces to ASTRA. |
+| `orchestrator_choose_model` | `bool` | `false` | Runtime flag. Not written to JSON. |
+| `literrature_grounding` | `bool` | `false` | Runtime flag (literature grounding). Not written to JSON. |
 
 ## Methods worth knowing
 

@@ -1,8 +1,8 @@
 # Notifications
 
 Mimosa-AI can send phone notifications via [Pushover](https://pushover.net/)
-on key events: each iteration completes, a new best workflow is found, or
-the loop terminates. Optional — Mimosa runs fine without it.
+on key events: each iteration completes, the loop terminates, or a workflow fails.
+Optional — Mimosa runs fine without it.
 
 ## Setup
 
@@ -22,13 +22,15 @@ Mimosa picks them up automatically the next time you run it.
 
 ## What you'll get
 
-- **Per-iteration completion** — score, iteration number, UUID.
-- **New best** — every time the archive admits a new dominant workflow.
-- **Final result** — the best UUID and its score at run termination.
+- **Iteration completed** — iteration number, goal, cost, and per-run rewards.
+- **Learning loop finished** — stop reason, final UUID, iteration count.
+- **Task completed** — final UUID, when `--learn` is off.
+- **Execution failed** — when a workflow fails to execute.
+- **Planner notices** — sent from the planner's `--goal` flow.
 
 Notifications are sent by [`sources/utils/notify.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/utils/notify.py).
-Errors talking to Pushover are logged and swallowed — they never crash a
-run.
+That module has no error handling of its own: a network failure while sending
+is raised to the calling code.
 
 ## Overriding from the CLI
 

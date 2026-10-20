@@ -23,8 +23,8 @@ flowchart TB
     Think --> Mut[Mutation prompt<br/>parent code + directive]
     Mut --> Orch
     Cross --> Orch
-    Orch --> Eval[hybrid temporal-ladder verifier<br/>reward + textual gradient]
-    Eval --> Admit{Validity: improvement<br/>or qd_score ≥ threshold?}
+    Orch --> Eval[policy Bradley–Terry verifier<br/>reward + textual gradient]
+    Eval --> Admit{Validity: improvement<br/>or qd_score > admit_threshold?}
     Admit -- yes --> Archive[Admit to archive]
     Admit -- no --> Reject[Reject<br/>telemetry only]
     Archive --> Lin[Lineage]
@@ -53,9 +53,9 @@ A more detailed view lives in the source diagram
 
 Termination:
 
-- `overall_score >= learned_score_threshold` (default `0.92`) in `--learn` mode, *or*
+- `overall_score >= learned_score_threshold` (default `0.9`) in `--learn` mode, *or*
 - `max_depth` reached — `1` in single-shot mode, `max_learning_evolve_iterations`
-  (default `25`) in `--learn` mode.
+  (default `16`) in `--learn` mode.
 
 ## Selection: Quality-Diversity (QD)
 
@@ -63,7 +63,7 @@ Termination:
 implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
 (default, set via config's `selection_strategy`). In QD mode:
 
-- A **session archive** holds up to `population_size = 20` members
+- A **session archive** holds up to `population_size = 16` members
   (config field, ablation-tunable).
 - Each member has `qd_score = (1−w)·quality_norm + w·novelty_norm`, with
   `w = novelty_weight = 0.25`. Quality and novelty are **additive** — never
@@ -73,7 +73,7 @@ implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
   that refuted a hard claim ranks at its capped score and cannot top the
   archive on its other claims alone; ties at the cap are broken by the
   novelty and length-penalty terms.
-- Novelty is cosine-distance k-NN (`k = 15`) in **genotype-embedding**
+- Novelty is cosine-distance k-NN (`k = 16`) in **genotype-embedding**
   space. The descriptor is the L2-normalised embedding of the workflow's
   generated source code (its *genotype*), produced by
   [`genotype_embedding.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/genotype_embedding.py)
@@ -95,7 +95,7 @@ not hardcoded constants; touch them only for ablation studies.
 
 When the archive is empty (cold start), [`WorkflowSelector`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
 falls back to a **similarity-filtered disk scan** (`cosine ≥
-parent_threshold_similarity` — default `0.8` — on MiniLM embeddings of
+parent_threshold_similarity` — default `0.95` — on MiniLM embeddings of
 `original_task`, `score ≥ parent_threshold_score` — default `0.01`) — this
 lets useful workflows transfer across tasks.
 
@@ -142,7 +142,7 @@ offspring are never rewarded merely for being "different".
 > **The failure fingerprint is no longer the novelty signal.** Earlier
 > versions derived QD novelty from a *failure fingerprint* — a 7-D
 > centered vector of per-source verifier pass rates (one slot per
-> registered source letter `a`–`g`; the module is now marked deprecated)
+> registered source letter `a`–`g`)
 > — and, before that,
 > from a structural descriptor `[n_agents, n_edges, n_branches,
 > prompt_chars]`. Both have been retired as the behaviour descriptor.

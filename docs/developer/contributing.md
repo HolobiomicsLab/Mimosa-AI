@@ -23,10 +23,10 @@ Contact for contribution-governance questions: `dr20.spv@listes.cnrs.fr`.
 
 ## Before submitting a PR
 
-1. ✅ `pytest tests/` passes locally.
-2. ✅ Code follows existing style — ruff config is in `pyproject.toml`.
-3. ✅ Add docstrings on public functions.
-4. ✅ Update the relevant doc page(s):
+1. `uv run pytest tests/` passes locally. CI (`.github/workflows/tests.yml`) runs the same suite and skips the tests listed in `.github/known-failing-tests.txt`.
+2. Code follows the existing style. Run `uvx ruff check` and `uvx ruff format` (see Code style below).
+3. Add docstrings on public functions.
+4. Update the relevant doc page(s):
    - User-facing change → corresponding page under `docs/`.
    - Architecture change → also update the `.mermaid` source under
      `docs/diagrams/` and re-render the `.png` (see below).
@@ -51,15 +51,15 @@ uv run pytest tests/
 uv run pytest tests/evaluator_test.py
 
 # Verbose with coverage
-uv run pytest tests/ -v --cov=sources
+uv run --with pytest-cov pytest tests/ -v --cov=sources
 ```
 
 ## Code style
 
-- Ruff config in `pyproject.toml` (line length 88, isort, flake8-bugbear,
-  pyupgrade, flake8-simplify enabled).
-- Google-style docstrings on public functions.
-- No imports inside functions unless avoiding a circular dep.
+- Ruff config in `pyproject.toml`: line length 88; rule sets `E`, `F`, `UP`, `B`, `SIM`, `I`; `E501` and `SIM103` ignored. `fix = true`, so `ruff check` edits files.
+- Ruff is not a locked dev dependency. Run it as `uvx ruff check` and `uvx ruff format`.
+- Docstrings: the pydocstyle convention is `google`, but the `D` rules are not enabled. Write Google-style docstrings on public functions anyway.
+- Prefer top-level imports. Function-level imports exist for circular imports and for deferred loading of optional verifiers (`sources/evaluators/evaluator.py:89-118`).
 
 ## Re-rendering diagrams
 
@@ -81,7 +81,7 @@ uvx --with mkdocs-material mkdocs serve     # live preview at :8000
 uvx --with mkdocs-material mkdocs build     # static HTML to ./site
 ```
 
-The site uses [MkDocs Material](https://squidfunk.github.io/mkdocs-material/).
+Run these from the repository root, where `mkdocs.yml` lives. The site uses [MkDocs Material](https://squidfunk.github.io/mkdocs-material/).
 Config is in [`mkdocs.yml`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/mkdocs.yml).
 
 ## Questions & support

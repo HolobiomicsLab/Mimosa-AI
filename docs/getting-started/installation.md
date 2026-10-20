@@ -5,7 +5,7 @@ MCP server, and at least one LLM API key.
 
 ## Prerequisites
 
-- **Python 3.11–3.13** (3.14 is not yet supported).
+- **Python 3.11 or 3.12** (`requires-python = ">=3.11,<3.13"` in `pyproject.toml`).
 - **[uv](https://github.com/astral-sh/uv)** (recommended) or `pip`.
 - A running **[Toolomics MCP server](https://github.com/HolobiomicsLab/toolomics)**.
 - At least one LLM API key — see [API keys & environment](env.md).
@@ -67,7 +67,7 @@ OPENROUTER_API_KEY=...      # Any model via OpenRouter
 
 # Optional: observability via Langfuse
 LANGFUSE_PUBLIC_KEY=...
-LANGFUSE_PRIVATE_KEY=...
+LANGFUSE_SECRET_KEY=...
 ```
 
 Only the keys you actually use are required. See [API keys & environment](env.md)
@@ -77,7 +77,7 @@ for which provider fits which role.
 
 Follow the setup instructions at
 [HolobiomicsLab/toolomics](https://github.com/HolobiomicsLab/toolomics).
-Configure it to run on a port range — `5000–5100` by default.
+Configure it to run on a port range — `5000–5200` by default.
 
 You can add custom MCP tools via the Toolomics docs; Mimosa picks them up
 automatically through discovery.

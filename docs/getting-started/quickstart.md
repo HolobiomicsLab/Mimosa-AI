@@ -16,8 +16,9 @@ guides you through workspace selection, model choice, and the first run:
 uv run main.py
 ```
 
-Once you complete the wizard, your choices are persisted in
-`config_default.json` — future runs reuse them without re-prompting.
+Your choices are saved to `config_default.json` in a repo checkout, or to
+`~/.config/mimosa/config.json` for installed runs. Pass that file with
+`--config` on later runs; repo checkouts do not load `config_default.json` implicitly.
 
 ## 2. Manual path — one task
 
@@ -31,7 +32,7 @@ Open `my_config.json` and set at minimum:
 
 - `workspace_dir` — path to your Toolomics workspace.
 - `workflow_llm_model` — LLM that synthesizes multi-agent workflows
-  (`anthropic/claude-opus-4-5` is a strong default).
+  (`anthropic/claude-opus-4-5` is a suggested choice; the shipped default is `openrouter/z-ai/glm-5.3`).
 - `smolagent_model_id` — LLM used by execution agents.
 
 Then run a single task:
@@ -47,8 +48,8 @@ Mimosa will:
 1. Discover Toolomics MCP tools on your network.
 2. Synthesize a multi-agent workflow as Python code.
 3. Execute it in a sandbox against your workspace.
-4. Score the result with the hybrid temporal-ladder verifier
-   (deterministic Python policy scorers against the workspace).
+4. Score the result with the default `policy_bt` verifier (Bradley-Terry
+   tournament over deterministic policy scorers).
 5. Archive the run under `runs_capsule/`.
 
 ## 3. Add learning
@@ -79,24 +80,15 @@ uv run main.py \
 
 ## 5. Inspect the result
 
-After the run finishes you'll see something like:
+After the run finishes, the archive is written under `runs_capsule/`
+(`runs_capsule_dir`). Benchmark capsules contain `evaluation_results.json`.
 
-```
-runs_capsule/clintox_multitask_20260115_113303/
-├── workflow.py            # final workflow code that ran
-├── results/               # workspace snapshot at completion
-├── logs/                  # per-iteration logs
-└── evaluation_results.json
-```
-
-You can also replay the *thoughts → tool calls → outputs* trace interactively:
+You can also open the memory chat over a run's trace:
 
 ```bash
-uv run memory_explorer.py 20260115_113303_9bb63437
+uv run main.py --memory_cli                       # latest run
+uv run main.py --memory_cli --memory_uuid <uuid>  # specific run
 ```
-
-(Use the UUID printed in the run output — find it in
-`sources/workflows/<uuid>/` or the capsule name.)
 
 ## 6. Where to go next
 

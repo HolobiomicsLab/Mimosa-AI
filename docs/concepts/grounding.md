@@ -6,11 +6,12 @@ grounding comes from
 [Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI), an
 optional companion AI.
 
-> **Verifier note.** The default hybrid temporal-ladder verifier does
-> **not** consult Perspicacité — its policy scorers are deterministic
-> Python with no soft-claim path. The soft-claim grounding below
-> belongs to the **deprecated legacy verifier**
-> (`verifier_kind = "legacy"`, pre-2026-09-24) and to
+> **Verifier note.** The default policy-based Bradley–Terry verifier does
+> **not** consult Perspicacité. Its criteria guard checks literals against
+> the goal and input files only. The hybrid verifier (previous default)
+> also does not consult it; its policy scorers are deterministic Python.
+> The soft-claim grounding below belongs to the **deprecated legacy
+> verifier** (`verifier_kind = "legacy"`, pre-2026-09-24) and to
 > `GenericEvaluator`.
 
 ## What Perspicacité provides

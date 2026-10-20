@@ -6,8 +6,8 @@
 
     | System | Where it runs | What it scores against | What it produces |
     | ------ | ------------- | ---------------------- | ---------------- |
-    | **Judge / verifier** ([Evaluation pipeline](../concepts/evaluation-pipeline.md)) | Every workflow execution, inside the evolutionary loop | Deterministic Python policy scorers against a temporal claim ladder (code → logs → deliverables) | A pairwise win-rate reward and an elimination-point *textual gradient* — the **pressure signal** that drives workflow evolution |
-    | **External benchmark graders** (this section) | After Mimosa produces a candidate output, against a fixed dataset | **Ground-truth files provided by the benchmark authors** | Benchmark metrics: SR / VER / CBS for ScienceAgentBench, judge grades for PaperBench |
+    | **Judge / verifier** ([Evaluation pipeline](../concepts/evaluation-pipeline.md)) | Every workflow execution, inside the evolutionary loop | Generated policy scripts that score each run's artifacts, compared in pairs and fitted to Bradley-Terry ratings (default `verifier_kind="policy_bt"`) | Bradley-Terry ratings and a textual gradient folded from decisive pairs: the **pressure signal** that drives workflow evolution |
+    | **External benchmark graders** (this section) | After Mimosa produces a candidate output, against a fixed dataset | **Ground-truth files provided by the benchmark authors** | Benchmark metrics: SR / VER / CBS for ScienceAgentBench. The repository has no PaperBench grader. |
 
     The two systems are independent. The verifier runs whether or not
     you are on a benchmark; the benchmark grader runs whether or not
@@ -19,7 +19,7 @@ of tasks.
 | Page | Benchmark | Author of the grader |
 | ---- | --------- | -------------------- |
 | [ScienceAgentBench](../science_agent_bench_evaluation.md) | 102-task scientific computing benchmark — VER / SR / CBS metrics. | ScienceAgentBench authors |
-| [PaperBench](../papers_bench_evaluation.md) | OpenAI's AI-research-replication benchmark. | OpenAI frontier-evals |
+| [PaperBench](../papers_bench_evaluation.md) | OpenAI's AI-research-replication benchmark. | OpenAI frontier-evals (no grader in this repository) |
 | [Custom benchmarks](custom-benchmarks.md) | Your own CSV of (task, expected output) rows. | You |
 
 !!! warning "Reset before benchmarking"
@@ -29,7 +29,7 @@ of tasks.
 
 ## Benchmark snapshot
 
-Headline result on ScienceAgentBench (102 tasks, `task` mode):
+Headline result on ScienceAgentBench (102 tasks):
 
 | Mode | Success Rate | CBS | Cost / task |
 | ---- | ------------ | --------- | ----------- |
@@ -41,19 +41,18 @@ Iterative learning improves GPT-4o but yields marginal degradation for
 Claude Haiku 4.5 — see the [manuscript](https://arxiv.org/abs/2603.28986)
 for the full model-dependent behaviour analysis.
 
-These numbers are produced by the **ScienceAgentBench grader**, not by
-the in-loop verifier.
+These figures are reported in the manuscript; the repository does not contain the run artifacts that produce them. The ScienceAgentBench capsule evaluator (`sources/benchmark_evaluation/capsule_evaluator.py`) computes SR, VER and CBS for each run, separately from the in-loop verifier.
 
 ## How batch evaluation works
 
-All three modes share the same engine:
+The batch runner `CsvEvaluationMode` drives `--science_agent_bench` and `--papers`:
 
 ```
 CsvEvaluationMode
   ├─ per-row: spawn start_workflow_evolution() as an asyncio task
   ├─ throttle: max_concurrent_eval_tasks (default 1)
   ├─ stagger: task_start_delay seconds between launches
-  └─ on completion: capsule_evaluator → metrics
+  └─ on completion (ScienceAgentBench rows only): capsule_evaluator → metrics
 ```
 
 `capsule_evaluator` is what calls into the external grader. Each
@@ -64,8 +63,8 @@ Concurrency knobs:
 
 | Field | Default | What it does |
 | ----- | ------- | ------------ |
-| `max_concurrent_eval_tasks` | `1` | Tasks running in parallel. |
-| `task_start_delay` | `30.0` s | Stagger between task launches. |
+| `max_concurrent_eval_tasks` | `1` | Tasks running in parallel in `--science_agent_bench` and the evaluation CLI. Ignored by `--papers`. |
+| `task_start_delay` (constructor argument, not a config key) | `30.0` s | Stagger between task launches. Set in code, not in config JSON. |
 
 Bump `max_concurrent_eval_tasks` if you have spare API budget and want to
 finish faster; keep it at `1` if you're hitting rate limits.
