@@ -71,19 +71,31 @@ The verifier runs these steps in order:
    reading the input and the output files, and the feedback names each
    found-vs-expected mismatch. Strict benchmark graders fail correct
    science delivered in another shape, so this gate is measured, not
-   assumed. Criteria may add goal-compatible quality measures (for
-   example a held-out validation error when test labels are hidden), but
+   assumed. Criteria may add goal-compatible quality measures, but
    never packaging rules (`run.sh`, requirements, script names), which
-   the reproduction gate already enforces. Before the criteria freeze,
+   the reproduction gate already enforces. Reconnaissance also gets two
+   whole-file facts about the task's input tables
+   (`placeholders.py`, csv module, no model call): `input_profile` (row
+   count; per column the distinct count, top values and numeric range)
+   and `one_value_columns` (a column with one value in every row of one
+   table while it varies in another, such as a test label of -999 in
+   every row). Such values are placeholders: no criterion may measure
+   against them, and when the goal predicts such a column the plan needs
+   a held-out validation metric on labelled data. Before the criteria freeze,
    `criteria_guard.py` checks them: every exact string a criterion
    requires (`literals`) must appear in the goal or in the first lines of
    an input file the goal names (outputs and run logs never count), and
-   an LLM guard keeps or rejects each criterion with a cited source.
-   Rejected criteria go back to reconnaissance; after the last revision
-   they are dropped (if none would remain, reconnaissance fails). Two
+   an LLM guard keeps or rejects each criterion with a cited source. When
+   `one_value_columns` is not empty, the same guard call also judges
+   whether the goal predicts a listed column without a held-out quality
+   criterion (`missing_quality_criterion`).
+   Rejected criteria and a missing quality criterion go back to
+   reconnaissance; after the last revision rejected criteria are dropped
+   (if none would remain, reconnaissance fails) and a still-missing
+   quality criterion is recorded as `quality_gap`, never as a failure. Two
    malformed guard answers keep the plan, recorded as an error. The
    record is the bundle's `criteria_guard` (verdicts, `plan_revisions`,
-   `dropped_criteria`). Agent-written source files never ground a name.
+   `dropped_criteria`, `quality_gap`). Agent-written source files never ground a name.
    A win needs a criterion with two known, different values at the
    deciding stage (null ties), and a `higher`/`lower` value must be a
    number. Each criterion has a `judge`: `"code"` (default; adapters
@@ -148,7 +160,8 @@ calls plus harness-provided read capabilities and CSV parsing — no
 subset stay "unknown" (`null`), never a fabricated loss.
 
 Per generation the verifier writes `evaluation.txt` (reward, tournament
-version, execution record, and the pair verdicts), `textual_gradient.txt`,
+version, execution record, `input_provenance` — `verified`, `input_tampered`
+with the changed input paths, or `unverified` — and the pair verdicts), `textual_gradient.txt`,
 `policy_bt_evidence.json`, and `verifier_policy_bt.log`. The tournament
 state for a task session lives in
 `<workflow_dir>/.policy_bt/<sha256(goal, session)>/tournament.json`

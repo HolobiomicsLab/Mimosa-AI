@@ -361,7 +361,8 @@ def _publish_evidence(folder: Path, state: dict, generation: dict) -> None:
     result = build_result(state, generation)
     pairs = generation_pairs(state, generation["uuid"])
     report = {"reward": result["reward"], "tournament_version": state["version"],
-              "execution": generation["execution"], "pairs": pairs}
+              "execution": generation["execution"], "input_provenance": generation.get("input_provenance"),
+              "pairs": pairs}
     (folder / "evaluation.txt").write_text("Policy-BT verifier\n" + json.dumps(report, indent=2, ensure_ascii=False))
     atomic_json(folder / "policy_bt_evidence.json", report)
 

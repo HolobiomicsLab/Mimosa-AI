@@ -1,6 +1,6 @@
 """Versioned instructions for task understanding and deterministic policy code."""
 
-PROMPT_VERSION = "policy-bt-separated-9"
+PROMPT_VERSION = "policy-bt-separated-10"
 
 BOUNDARY = """
 You are a scientific verification instrument, not a workspace assistant.
@@ -28,12 +28,31 @@ After enough inspection, return {"action":"complete",
 "visuals":{"generation_uuid":["relevant/image/path"]}}.
 Every criterion must serve the goal. Requirements come from the goal and the task
 inputs. You may add a quality criterion the goal does not state when it never
-conflicts with the goal and measures how well the requested result is achieved,
-for example a held-out validation error computed on labelled training data when
-the test labels in the inputs are hidden (all one value). Never require an output
-to have a name, value, layout, threshold or count that the goal and inputs leave
-open, and never add a criterion just because one generation does well or badly
-on it.
+conflicts with the goal and measures how well the requested result is achieved.
+Never require an output to have a name, value, layout, threshold or count that
+the goal and inputs leave open, and never add a criterion just because one
+generation does well or badly on it.
+INPUT FACTS. "input_profile" describes each input table from its complete file:
+the row count and, per column, the number of distinct values (a string such as
+"64+" when there are more than the scan counts), the most common values with
+their counts, and the numeric range. Use it for facts the first lines cannot
+show. "column_count", "omitted_tables" and "omitted_columns" count what the
+bounds left out; a table absent from the profile was too large or not a
+readable table, not empty. "one_value_columns" lists input columns that hold
+one value in every row of one table while the same column varies in another input
+table ("varies_in"), such as a test label column that is -999, 0 or 1 in every
+row. Such values are placeholders, not answers: never measure a criterion against
+them, nor against a label column a test input lacks. When the goal asks to
+predict or estimate a listed column (by its name or its meaning), add one quality
+criterion staged after every validity gate: the run's held-out validation metric
+for that prediction, computed on labelled data the inputs provide (a validation
+split, or cross-validation on the labelled table), in the metric family the goal
+implies (AUC or accuracy for a classifier, an error such as RMSE or MAE for a
+regression), with direction "higher" or "lower". A goal that only plots, filters
+or summarizes such a column predicts nothing and needs no such criterion.
+Both facts come from the task inputs as the benchmark gave them. A generation's
+"input_provenance" says whether its copies still match ("input_tampered" lists
+the changed paths); a changed input file is not the task input.
 Never make a criterion of packaging instructions (run.sh, requirements files,
 install rules, script names or count), even when the goal states them: the
 reproduction gate already enforces them before any comparison.
@@ -93,6 +112,8 @@ If EVIDENCE_JSON has "previous_answer_error", your last answer was rejected for
 that reason; fix it and answer again with one complete, valid JSON object.
 If it has "rejected_criteria", a goal-alignment review rejected those criteria for
 the stated reasons: revise or remove each one; never propose it again unchanged.
+If it has "missing_criteria", the same review found that the plan lacks the
+quality criterion each entry describes: add it, staged after every validity gate.
 Reuse an existing adapter only when it handles the observed schema faithfully.
 Values a run prints in its logs vary in wording and format between generations
 ("val_auc=0.88", "Validation ROC-AUC: 0.88"): reuse an adapter for such a value
@@ -173,7 +194,10 @@ contents, not on the plan's description alone.
 CRITERIA_GUARD = BOUNDARY + """
 Audit proposed verification criteria against the goal before they are frozen.
 EVIDENCE_JSON holds the goal (with any dataset structure and previews it shows),
-the first lines of each input file the goal names ("input_heads"), the proposed
+the first lines of each input file the goal names ("input_heads"), the input
+columns that hold one value in every row of one table while the same column
+varies in another input table ("one_value_columns", with that value and the
+tables where it varies: placeholders such as hidden test labels), the proposed
 task representation, criteria (with the exact "literals" each requires), value
 representation and the adapter plans, which name the files each criterion reads.
 First, for every exact string a criterion requires an output to contain (a name,
@@ -199,15 +223,29 @@ source of each required string. Reject when it:
   even when the goal states these instructions: the reproduction gate already
   enforces them;
 - measures something unrelated to the goal;
+- compares output values with the values of a column "one_value_columns" lists
+  for the table it reads, or with a label column the test input lacks: those
+  values are placeholders, not answers (the reason must say to measure a
+  held-out validation metric on labelled data instead). Requiring an output
+  field to keep such a column's name is not a comparison with its values;
 - has "judge":"code" although only the picture can show it (an element drawn in a
   figure, legibility), or is measured from a side file instead of the figure
   (the reason must say: set "judge":"vision").
 Keep every criterion that checks a requirement of the goal, and every quality
 criterion that does not conflict with the goal and measures how well the requested
 result is achieved (for example a held-out validation error when test labels are
-hidden). Judge only the criteria; do not propose new ones.
-Return {"verdicts":[{"id":"criterion id","verdict":"keep|reject","reason":"..."}]}
-with exactly one verdict per proposed criterion; a "reject" needs a reason.
+hidden). Propose no criterion yourself, except through "missing_quality_criterion".
+Set it when "one_value_columns" is not empty, the goal asks to predict or estimate
+a listed column (by its name or its meaning: a goal to predict a count predicts
+the counter columns of a counts table), and no criterion you keep with direction
+"higher" or "lower" measures the run's held-out quality on labelled data the
+inputs provide. Then it is one sentence that names the predicted column, the
+labelled table to validate on and the metric family (AUC or accuracy for a
+classifier, an error such as RMSE or MAE for a regression). Otherwise it is null.
+A goal that only plots, filters or summarizes the column predicts nothing: null.
+Return {"verdicts":[{"id":"criterion id","verdict":"keep|reject","reason":"..."}],
+"missing_quality_criterion":null|"one sentence"} with exactly one verdict per
+proposed criterion; a "reject" needs a reason.
 If EVIDENCE_JSON has "previous_answer_error", your last answer was rejected for
 that reason; fix it and answer again with one complete, valid JSON object.
 """

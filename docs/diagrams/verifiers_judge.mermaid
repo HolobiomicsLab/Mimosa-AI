@@ -41,14 +41,14 @@ flowchart TB
     %% ===== Stage 2: recon, criteria freeze, policy sources =====
     subgraph Prep["Stage 2 — PolicyEngine.prepare (policy.py) · criteria frozen once per task"]
         direction TB
-        Recon["reconnaissance (recon.py)<br/>ONE LLM plan · ≤ 16 read-only inspection rounds"]
-        Guard["criteria_guard.guard_plan<br/>code grounding, then ONE LLM keep / reject audit"]
-        Rev{"criteria rejected?"}
+        Recon["reconnaissance (recon.py)<br/>ONE LLM plan · ≤ 16 read-only inspection rounds<br/>+ whole-file input_profile · one_value_columns (placeholders.py)"]
+        Guard["criteria_guard.guard_plan<br/>code grounding, then ONE LLM keep / reject audit<br/>+ missing held-out criterion for a predicted placeholder column"]
+        Rev{"criteria rejected or<br/>quality criterion missing?"}
         Sources["frozen criteria (judge = code | vision)<br/>CORE compare(a, b) + ADAPTER normalize()<br/>screen_source AST allowlist · _prepare_smoke"]
     end
     Elig --> Recon --> Guard --> Rev
     Rev -- "yes, MAX_PLAN_REVISIONS = 3" --> Recon
-    Rev -- "no revisions left: drop" --> Sources
+    Rev -- "no revisions left: drop · record quality_gap" --> Sources
 
     %% ===== Stage 3: tournament pairs =====
     subgraph Tour["Stage 3 — _compare_tournament · every pair, both orders"]

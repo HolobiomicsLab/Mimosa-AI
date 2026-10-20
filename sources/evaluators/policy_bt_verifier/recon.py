@@ -8,6 +8,7 @@ from pathlib import Path
 
 from .artifacts import decode_object, inventory
 from .criteria_guard import GuardExhausted, guard_plan, input_heads, shown_heads
+from .placeholders import input_profile, one_value_columns, scan_tables, table_keys
 from .prompts import RECON, evidence_prompt
 
 PAGE_BYTES = 8192
@@ -19,6 +20,8 @@ MAX_RETAINED_PAGES = 48
 # Who decides a criterion: adapter code or the vision tie-break.
 JUDGE_CODE = "code"
 JUDGE_VISION = "vision"
+# Provenance keys the model sees; the pristine data path stays internal.
+PROVENANCE_SHOWN = ("status", "tampered")
 
 
 class ReconError(ValueError):
@@ -77,8 +80,10 @@ def inspect_page(root: Path, request: dict) -> dict:
 def describe_generation(generation: dict) -> dict:
     """Expose inventory rows while bounding preview bytes and row count.
 
-    Args: generation (dict): UUID, owned snapshot path, and execution facts.
-    Returns: dict with metadata, explicitly omitted previews, and an omitted-row count.
+    Args: generation (dict): UUID, owned snapshot path, execution facts and
+        the optional ``input_provenance`` of its task inputs.
+    Returns: dict with metadata, explicitly omitted previews, an omitted-row
+        count, and the provenance status and changed input paths.
     """
     entries = inventory(Path(generation["snapshot"]))
     remaining = INITIAL_PREVIEW_BYTES
@@ -93,10 +98,12 @@ def describe_generation(generation: dict) -> dict:
         else:
             remaining -= len(encoded)
     listed = entries[:MAX_LISTED_ENTRIES]
+    provenance = generation.get("input_provenance") or {}
     return {"uuid": generation["uuid"], "inventory": listed,
             "unlisted_entries": len(entries) - len(listed),
             "unlisted_note": "Request a byte page of any path; unlisted entries still exist." if len(entries) > len(listed) else "",
-            "execution": generation.get("execution", {})}
+            "execution": generation.get("execution", {}),
+            "input_provenance": {key: provenance[key] for key in PROVENANCE_SHOWN if key in provenance}}
 
 
 def code_task(task: dict) -> dict:
@@ -203,7 +210,9 @@ def _open_transcript(goal: str, generations: list[dict], context: dict) -> tuple
     """Build the first recon transcript and the context the guard needs.
 
     Called once by ``reconnaissance``. For an unfrozen task the input heads
-    are read once: complete for the guard, bounded for the model prompt.
+    are read once (complete for the guard, bounded for the model prompt),
+    and every input table is read completely once for two facts:
+    ``input_profile`` and ``one_value_columns`` (hidden labels).
 
     Args:
         goal (str): User goal.
@@ -219,8 +228,33 @@ def _open_transcript(goal: str, generations: list[dict], context: dict) -> tuple
     if context.get("frozen_task"):
         return evidence, context
     heads = input_heads(goal, generations[0])
-    evidence["input_heads"] = shown_heads(heads)
-    return evidence, {**context, "generation": generations[0], "input_heads": heads}
+    tables = _input_tables(generations, heads)
+    placeholders = one_value_columns(tables, goal)
+    evidence.update(input_heads=shown_heads(heads), input_profile=input_profile(tables, goal), one_value_columns=placeholders)
+    return evidence, {**context, "generation": generations[0], "input_heads": heads, "one_value_columns": placeholders}
+
+
+def _input_tables(generations: list[dict], heads: dict[str, str]) -> dict[str, dict]:
+    """Read the task's input tables, from the pristine copy when one exists.
+
+    A generation can rewrite an input before its snapshot (HIV run_oct_18:
+    the hidden test labels were replaced by real ones), so the transfer-time
+    copy the evaluator keeps in the registry comes first. Without it (no
+    benchmark transfer, older records) the goal-named snapshot inputs are read.
+
+    Args:
+        generations (list[dict]): Generation records; ``input_provenance``
+            ``data`` names the pristine copy.
+        heads (dict[str, str]): Goal-named input files of the first snapshot.
+
+    Returns:
+        dict[str, dict]: Scanned tables from ``placeholders.scan_tables``.
+    """
+    copies = [(g.get("input_provenance") or {}).get("data") for g in generations]
+    pristine = next((Path(path) for path in copies if path and Path(path).is_dir()), None)
+    if pristine is not None:
+        return scan_tables(pristine, table_keys(pristine))
+    return scan_tables(Path(generations[0]["snapshot"]), list(heads))
 
 
 def _accept_plan(response: dict, generations: list[dict], context: dict, evidence: dict) -> dict:

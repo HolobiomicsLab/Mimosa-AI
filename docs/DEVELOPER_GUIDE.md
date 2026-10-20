@@ -532,19 +532,45 @@ For each generation (`sources/evaluators/policy_bt_verifier/`):
 2. **Reconnaissance.** One LLM call produces a complete artifact
    inventory with bounded previews and explicit byte-page inspection,
    then freezes the task criteria. Quality criteria the goal does not
-   state are allowed when they do not conflict with it (e.g. held-out
-   validation error when test labels are hidden); criteria about
+   state are allowed when they do not conflict with it; criteria about
    packaging (`run.sh`, requirements, script names) are not, because the
-   reproduction gate enforces them. Before freezing,
+   reproduction gate enforces them. For an unfrozen task, recon also
+   reads every input table completely once (`placeholders.py`):
+   `input_profile` (rows, distinct counts, top values, numeric ranges)
+   and `one_value_columns` (one value in every row of one table, varying
+   in another: hidden test labels). The tables come from the pristine
+   transfer copy when csv_mode recorded one (see below), else from the
+   goal-named snapshot inputs. Before freezing,
    `criteria_guard.py` checks every criterion: its `literals` must appear
    in the goal or in the first lines of an input file the goal names
    (code check, outputs and run logs excluded), then an LLM guard keeps
-   or rejects each criterion against the goal. Rejections go back to
-   reconnaissance with reasons; after the last revision the still-
-   rejected criteria are dropped (none left → reconnaissance fails). Two
-   malformed guard answers keep the plan, recorded as an error. Verdicts,
-   revisions and drops are stored in the bundle as `criteria_guard`. New
+   or rejects each criterion against the goal and, when
+   `one_value_columns` is not empty, names a missing held-out quality
+   criterion for a predicted placeholder column. Rejections and the
+   missing criterion go back to reconnaissance with reasons; after the
+   last revision the still-rejected criteria are dropped (none left →
+   reconnaissance fails) and the missing criterion is recorded as
+   `quality_gap` (the plan is kept). Two malformed guard answers keep
+   the plan, recorded as an error. Verdicts, revisions, drops and gaps
+   are stored in the bundle as `criteria_guard`. New
    artifact schemas extend **adapters**; the criteria never change.
+
+   **Input provenance.** With `verifier_kind="policy_bt"`, after each
+   benchmark dataset transfer csv_mode writes a sha256 manifest of the
+   transferred folder and copies its tables aside
+   (`sources/utils/input_manifest.py`, under
+   `<workflow_dir>/.policy_bt/inputs/<workspace digest>/`; a worker's
+   record is deleted with its workspace). Each new snapshot is checked
+   against it before re-execution; the generation record and
+   `evaluation.txt` carry `input_provenance` (`verified`,
+   `input_tampered` with the changed paths, or `unverified` when no
+   transfer was recorded, the transferred folder is absent from the
+   snapshot, or the record is unreadable — then with `error`). The
+   pristine tables are copied once into the task registry
+   (`<registry>/pristine_inputs/`). Only `.csv`, `.tsv` and `.txt`
+   tables up to 64 MB are copied and scanned. The check is a record only:
+   a rewritten input is never penalized, and a failed check or copy never
+   fails the evaluation.
 3. **One comparison policy.** One cached deterministic Python policy
    compares pairs through the adapters, in a restricted interpreter
    subprocess (stdlib `json`/`math`/`struct` calls plus harness-provided

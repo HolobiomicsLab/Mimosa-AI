@@ -262,16 +262,20 @@ they are the evidence.
 > verifier (`verifier_kind="policy_bt"`, the default in `config.py` and
 > `config_default.json`): `evaluation.txt` opens with the line
 > `Policy-BT verifier` followed by a JSON object (reward, tournament
-> version, the reproduction/execution record, and the PAIR VERDICTS —
+> version, the reproduction/execution record, the `input_provenance`
+> check of the task inputs against the transfer manifest, and the PAIR VERDICTS —
 > each pair tagged with its `policy_version`), the gradient lands in
 > `textual_gradient.txt`, stage-level JSON records stream to
 > `verifier_policy_bt.log`, and the machine-readable pair evidence is
 > in `policy_bt_evidence.json` (same folder). The tournament state for
 > a task session lives in
 > `<workflow_dir>/.policy_bt/<sha256(goal, session)>/tournament.json`
-> with one verifier-owned `snapshots/<uuid>/` copy per generation; its
-> `bundle.criteria_guard` records why each frozen criterion was kept,
-> revised or dropped (`criteria_guard` verdicts, `plan_revisions`).
+> with one verifier-owned `snapshots/<uuid>/` copy per generation (plus
+> `pristine_inputs/`, the task's input tables as the benchmark transfer gave
+> them); its `bundle.criteria_guard` records why each frozen criterion was kept,
+> revised or dropped (`criteria_guard` verdicts, `plan_revisions`,
+> `dropped_criteria`, and `quality_gap` when a held-out quality criterion for
+> a placeholder test label stayed missing).
 > Older campaigns on disk were produced by earlier channels: the hybrid
 > temporal-ladder verifier (stage headers and win-rate fields) and,
 > before it, the legacy claims verifier (per-source claim verdicts with

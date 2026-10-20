@@ -524,6 +524,153 @@ def test_malformed_guard_answers_keep_the_plan_and_record_the_error(tmp_path):
     assert "error" in result["inspection"]["criteria_guard"][-1][0]
 
 
+PLACEHOLDER_GOAL = "Train on data/train.csv, predict Signal for data/test.csv and save preds.csv."
+MISSING_AUC = "Signal is -999 in data/test.csv: add a held-out validation AUC computed on data/train.csv."
+
+
+def _signal_inputs(root, test_rows):
+    """Write a labelled train table and a test table with the given rows."""
+    (root / "data").mkdir(parents=True)
+    (root / "data" / "train.csv").write_text("id,Signal\n1,0\n2,1\n3,1\n")
+    (root / "data" / "test.csv").write_text("id,Signal\n" + test_rows)
+
+
+def _review(missing, *ids):
+    """Build a guard answer that keeps every criterion."""
+    return {"verdicts": [{"id": key, "verdict": "keep", "reason": ""} for key in ids], "missing_quality_criterion": missing}
+
+
+def test_guard_requests_the_held_out_criterion_a_placeholder_label_needs(tmp_path):
+    """dkpes run_1: test labels were -999, no quality criterion froze, gens 2-5 tied."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    _signal_inputs(tmp_path, "4,-999\n5,-999\n")
+    seen = []
+    plans = [_plan("output_conformance"), _plan("output_conformance", "validation_auc")]
+    ask = _guarded_ask(plans, [_review(MISSING_AUC, "output_conformance"), _review(None, "output_conformance", "validation_auc")], seen)
+    result = reconnaissance(PLACEHOLDER_GOAL, [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert [kind for kind, _ in seen] == ["recon", "guard", "recon", "guard"]
+    assert seen[0][1]["input_profile"]["tables"]["data/test.csv"]["columns"]["Signal"]["distinct"] == 1
+    assert seen[1][1]["one_value_columns"]["data/test.csv"]["columns"]["Signal"]["value"] == "-999"
+    assert seen[2][1]["missing_criteria"] == [MISSING_AUC]
+    assert [c["id"] for c in result["criteria"]] == ["output_conformance", "validation_auc"]
+    assert "quality_gap" not in result["inspection"] and "missing_criteria" not in result["inspection"]
+
+
+def test_missing_quality_claim_without_a_placeholder_column_changes_nothing(tmp_path):
+    """Visible labels: the guard cannot force a quality criterion (code gate)."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    _signal_inputs(tmp_path, "4,0\n5,1\n")
+    seen = []
+    ask = _guarded_ask([_plan("output_conformance")], [_review(MISSING_AUC, "output_conformance")], seen)
+    result = reconnaissance(PLACEHOLDER_GOAL, [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert [kind for kind, _ in seen] == ["recon", "guard"]
+    assert seen[1][1]["one_value_columns"] == {}
+    assert result["inspection"]["plan_revisions"] == [] and "quality_gap" not in result["inspection"]
+
+
+def test_quality_gap_is_recorded_and_the_plan_kept_when_no_revision_is_left(tmp_path):
+    """Fail open: a guard that keeps asking never blocks the freeze."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    _signal_inputs(tmp_path, "4,-999\n5,-999\n")
+    seen = []
+    ask = _guarded_ask([_plan("output_conformance")] * 4, [_review(MISSING_AUC, "output_conformance")] * 4, seen)
+    result = reconnaissance(PLACEHOLDER_GOAL, [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert [c["id"] for c in result["criteria"]] == ["output_conformance"]
+    assert result["inspection"]["quality_gap"] == [MISSING_AUC]
+    assert [item["missing_quality_criterion"] for item in result["inspection"]["plan_revisions"]] == [MISSING_AUC] * 3
+
+
+def test_grounding_only_revision_keeps_the_missing_criterion_request(tmp_path):
+    """The added criterion fails grounding; recon must still see why it was asked for."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    _signal_inputs(tmp_path, "4,-999\n5,-999\n")
+    unsourced = _plan("output_conformance", "validation_auc")
+    unsourced["criteria"][1]["literals"] = ["made_up_column"]
+    plans = [_plan("output_conformance"), unsourced, _plan("output_conformance", "validation_auc")]
+    seen = []
+    ask = _guarded_ask(plans, [_review(MISSING_AUC, "output_conformance"), _review(None, "output_conformance", "validation_auc")], seen)
+    reconnaissance(PLACEHOLDER_GOAL, [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert [kind for kind, _ in seen] == ["recon", "guard", "recon", "recon", "guard"]
+    assert seen[3][1]["missing_criteria"] == [MISSING_AUC]
+    assert [c["id"] for c in seen[3][1]["rejected_criteria"]] == ["validation_auc"]
+
+
+def test_malformed_missing_quality_answer_is_asked_again(tmp_path):
+    """A non-string answer goes back to the guard once, like a bad verdict."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    _signal_inputs(tmp_path, "4,-999\n5,-999\n")
+    malformed = {**_review(None, "output_conformance"), "missing_quality_criterion": 5}
+    seen = []
+    ask = _guarded_ask([_plan("output_conformance")], [malformed, _review(None, "output_conformance")], seen)
+    result = reconnaissance(PLACEHOLDER_GOAL, [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+    assert [kind for kind, _ in seen] == ["recon", "guard", "guard"]
+    assert "missing_quality_criterion" in seen[2][1]["previous_answer_error"]
+    assert "quality_gap" not in result["inspection"]
+
+
+def test_recon_reads_placeholders_from_the_transfer_copy_not_a_rewritten_snapshot(tmp_path):
+    """HIV run_oct_18: the snapshot's test labels were rewritten with real values."""
+    from sources.evaluators.policy_bt_verifier.recon import reconnaissance
+
+    snapshot, pristine = tmp_path / "snapshot", tmp_path / "pristine"
+    _signal_inputs(snapshot, "4,0\n5,1\n")
+    _signal_inputs(pristine, "4,-999\n5,-999\n")
+    seen = []
+    generation = {"uuid": "g1", "snapshot": str(snapshot), "input_provenance": {"data": str(pristine)}}
+    ask = _guarded_ask([_plan("output_conformance")], [_review(None, "output_conformance")], seen)
+    reconnaissance(PLACEHOLDER_GOAL, [generation], {"ask": ask})
+    assert list(seen[0][1]["one_value_columns"]) == ["data/test.csv"]
+
+
+def test_evaluator_records_inputs_rewritten_after_the_transfer(tmp_path, monkeypatch):
+    """The check runs before re-execution, which may rewrite inputs itself."""
+    from sources.evaluators.policy_bt_verifier import evaluator as module
+    from sources.utils.input_manifest import inputs_root, record_transfer
+
+    evaluator = _evaluator(tmp_path, monkeypatch)
+    _signal_inputs(evaluator.workspace_dir, "4,-999\n")
+    record_transfer(inputs_root(evaluator.workflow_dir, evaluator.workspace_dir), evaluator.workspace_dir, "data")
+
+    def rerun_rewrites_inputs(snapshot, *args):
+        (snapshot / "data" / "test.csv").write_text("id,Signal\n4,0\n")
+        return {"eligible": True, "reason": "Reproducibility entrypoint present."}
+    monkeypatch.setattr(module, "reproduce", rerun_rewrites_inputs)
+    _evaluate(evaluator, "first", 1)
+    (evaluator.workspace_dir / "data" / "test.csv").write_text("id,Signal\n4,1\n")
+    _evaluate(evaluator, "second", 2)
+    registry = TaskRegistry(evaluator.workflow_dir / ".policy_bt", ("Maximize measured value", "standalone"))
+    provenance = {item["uuid"]: item["input_provenance"] for item in registry.load()["generations"]}
+    assert provenance["first"]["status"] == "verified"
+    assert (provenance["second"]["status"], provenance["second"]["tampered"]) == ("input_tampered", ["data/test.csv"])
+    assert (Path(provenance["second"]["data"]) / "data" / "test.csv").read_text() == "id,Signal\n4,-999\n"
+    report = json.loads((evaluator.workflow_dir / "second" / "evaluation.txt").read_text().split("\n", 1)[1])
+    assert report["input_provenance"]["status"] == "input_tampered"
+
+
+def test_failed_pristine_copy_is_recorded_and_never_costs_the_reward(tmp_path, monkeypatch):
+    """Provenance is a record only: a copy error leaves the generation scored."""
+    from sources.evaluators.policy_bt_verifier import evaluator as module
+    from sources.utils.input_manifest import inputs_root, record_transfer
+
+    evaluator = _evaluator(tmp_path, monkeypatch)
+    _signal_inputs(evaluator.workspace_dir, "4,-999\n")
+    record_transfer(inputs_root(evaluator.workflow_dir, evaluator.workspace_dir), evaluator.workspace_dir, "data")
+
+    def disk_full(*args):
+        raise OSError(28, "No space left on device")
+    monkeypatch.setattr(module, "_keep_pristine_tables", disk_full)
+    result = _evaluate(evaluator, "first", 1)
+    assert result["reward"] == .5
+    generation = TaskRegistry(evaluator.workflow_dir / ".policy_bt", ("Maximize measured value", "standalone")).load()["generations"][0]
+    assert generation["input_provenance"]["data"] is None
+    assert "No space left" in generation["input_provenance"]["error"]
+
+
 def test_goal_named_script_never_grounds_and_sentence_end_file_is_an_input(tmp_path):
     """Review: SAB goals name the agent's own script; its docstring is agent text."""
     from sources.evaluators.policy_bt_verifier.criteria_guard import input_heads

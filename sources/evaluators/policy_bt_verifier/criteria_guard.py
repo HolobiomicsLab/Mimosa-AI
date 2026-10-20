@@ -3,9 +3,12 @@
 Reconnaissance proposes the criteria a task is judged on, and they stay frozen
 for the whole session. Two checks run before freezing: a deterministic
 grounding check (every exact string a criterion requires must come from the
-goal or an input file) and one LLM audit per plan (keep or reject each
-criterion against the goal). Rejections go back to reconnaissance for a
-revision; when no revision is left, rejected criteria are dropped.
+goal or an input file) and one LLM audit per plan. The audit keeps or rejects
+each criterion against the goal, and, when an input column holds one
+placeholder value (``one_value_columns``) that the goal asks to predict, it
+names the held-out quality criterion the plan lacks. Findings go back to
+reconnaissance for a revision; when no revision is left, rejected criteria
+are dropped and a missing quality criterion is recorded as ``quality_gap``.
 """
 
 from __future__ import annotations
@@ -40,10 +43,10 @@ VENV_MARKER = "pyvenv.cfg"
 
 
 class GuardRevision(ValueError):
-    """Reconnaissance must revise the criteria named in ``rejected_criteria``.
+    """Reconnaissance must revise the plan (``rejected_criteria``, ``missing_criteria``).
 
-    Raised by ``guard_plan``. The recon loop catches it like any malformed
-    answer and returns it to the model as ``previous_answer_error``.
+    Raised by ``_request_revision``. The recon loop catches it like any
+    malformed answer and returns it to the model as ``previous_answer_error``.
     """
 
 
@@ -60,14 +63,15 @@ def guard_plan(response: dict, context: dict, evidence: dict) -> None:
 
     Called by reconnaissance for every complete plan of an unfrozen task. The
     code check runs first and, while it fails, the LLM is not called. Each
-    rejected plan is recorded under ``plan_revisions``; when no revision is
-    left (``MAX_PLAN_REVISIONS`` or the recon round budget), rejected criteria
-    are dropped and recorded under ``dropped_criteria``.
+    revision request is recorded under ``plan_revisions``; when no revision
+    is left (``MAX_PLAN_REVISIONS`` or the recon round budget), rejected
+    criteria are dropped (``dropped_criteria``) and a missing quality
+    criterion is recorded under ``quality_gap``; the plan is still accepted.
 
     Args:
         response (dict): Validated recon plan; criteria may be removed.
-        context (dict): Holds ``ask``, ``generation`` and optional complete
-            ``input_heads``.
+        context (dict): Holds ``ask``, ``generation`` and, from recon, the
+            complete ``input_heads`` and ``one_value_columns``.
         evidence (dict): Recon transcript with ``goal`` and ``rounds_left``.
 
     Returns:
@@ -77,18 +81,49 @@ def guard_plan(response: dict, context: dict, evidence: dict) -> None:
     can_revise = len(revisions) < MAX_PLAN_REVISIONS and evidence.get("rounds_left", 1) > 0
     heads = context.get("input_heads")
     heads = input_heads(evidence["goal"], context["generation"]) if heads is None else heads
-    rejected = _unsourced_literals(response, evidence["goal"], heads)
-    if rejected and not can_revise:
-        _drop_criteria(response, rejected, evidence)
-        rejected = {}
-    rejected = rejected or _guard_rejections(response, context, evidence, heads)
-    if rejected and can_revise:
-        revisions.append(rejected)
-        evidence["rejected_criteria"] = [{**c, "reason": rejected[c["id"]]} for c in response["criteria"] if c["id"] in rejected]
-        raise GuardRevision("Criteria rejected for misalignment with the goal (see rejected_criteria): revise or remove them.")
-    if rejected:
-        _drop_criteria(response, rejected, evidence)
+    findings = {"rejected": _unsourced_literals(response, evidence["goal"], heads)}
+    if findings["rejected"] and not can_revise:
+        _drop_criteria(response, findings["rejected"], evidence)
+        findings["rejected"] = {}
+    if not findings["rejected"]:
+        findings["rejected"], findings["missing_quality_criterion"] = _guard_review(response, {**context, "input_heads": heads}, evidence)
+    missing = findings.get("missing_quality_criterion")
+    if (findings["rejected"] or missing) and can_revise:
+        _request_revision(response, findings, evidence)
+    if findings["rejected"]:
+        _drop_criteria(response, findings["rejected"], evidence)
+    if missing and missing not in evidence.setdefault("quality_gap", []):
+        evidence["quality_gap"].append(missing)
     evidence.pop("rejected_criteria", None)
+    evidence.pop("missing_criteria", None)
+
+
+def _request_revision(response: dict, findings: dict, evidence: dict) -> None:
+    """Record one revision request and send the plan back to reconnaissance.
+
+    Called by ``guard_plan`` while a revision is left. The next recon prompt
+    shows ``rejected_criteria`` (each with its reason) and ``missing_criteria``
+    (the quality criterion to add). A round where only the grounding check
+    ran has no guard judgment, so it keeps the previous ``missing_criteria``.
+
+    Args:
+        response (dict): Plan whose criteria were checked.
+        findings (dict): ``rejected`` (criterion id to reason) and, when the
+            guard judged the plan, ``missing_quality_criterion`` (str or None).
+        evidence (dict): Recon transcript, updated in place.
+
+    Returns:
+        None; always raises GuardRevision.
+    """
+    evidence["plan_revisions"].append(findings)
+    rejected = findings["rejected"]
+    evidence["rejected_criteria"] = [{**c, "reason": rejected[c["id"]]} for c in response["criteria"] if c["id"] in rejected]
+    if findings.get("missing_quality_criterion"):
+        evidence["missing_criteria"] = [findings["missing_quality_criterion"]]
+    elif "missing_quality_criterion" in findings:
+        evidence.pop("missing_criteria", None)
+    raise GuardRevision("The criteria review asks for a revised plan: revise or remove each of "
+                        "rejected_criteria and add each of missing_criteria.")
 
 
 def input_heads(goal: str, generation: dict) -> dict[str, str]:
@@ -261,37 +296,60 @@ def _tokens(text: str) -> list[str]:
     return "".join(char if char.isalnum() or char == "_" else " " for char in text).split()
 
 
-def _guard_rejections(response: dict, context: dict, evidence: dict, heads: dict[str, str]) -> dict[str, str]:
-    """Ask the text model to keep or reject each criterion against the goal.
+def _guard_review(response: dict, context: dict, evidence: dict) -> tuple[dict[str, str], str | None]:
+    """Ask the text model to audit each criterion and the plan's quality coverage.
 
-    A malformed answer goes back to the guard once; a second one fails open
-    (no rejection), because reconnaissance is not at fault. Every outcome is
-    kept under ``criteria_guard`` in the transcript.
+    Called by ``guard_plan`` once the grounding check passes. A malformed
+    answer goes back to the guard once; a second one fails open (no
+    rejection, no gap), because reconnaissance is not at fault. Every verdict
+    list is kept under ``criteria_guard`` in the transcript, followed by the
+    guard's missing quality criterion when it names one. That criterion
+    counts only when the code found ``one_value_columns``: without a
+    placeholder column there is no gap.
 
     Args:
         response (dict): Plan with criteria, representation and adapter plans.
-        context (dict): Holds the ``ask`` text-model callback.
+        context (dict): Holds the ``ask`` text-model callback, the complete
+            ``input_heads`` (shown bounded) and the ``one_value_columns``.
         evidence (dict): Recon transcript holding the goal.
-        heads (dict[str, str]): Complete input heads (shown bounded).
 
     Returns:
-        dict[str, str]: Rejected criterion id to the guard's reason.
+        tuple[dict[str, str], str | None]: Rejected criterion id to the
+        guard's reason, and the missing quality criterion or None.
     """
-    payload = {"goal": evidence["goal"], "input_heads": shown_heads(heads),
-               "task_representation": response["task_representation"],
-               "criteria": response["criteria"], "representation": response["representation"],
-               "plans": {uuid: plan.get("instructions") for uuid, plan in response["plans"].items() if isinstance(plan, dict)}}
+    placeholders = context.get("one_value_columns") or {}
+    payload = {**_plan_view(response), "goal": evidence["goal"], "input_heads": shown_heads(context["input_heads"]),
+               "one_value_columns": placeholders}
     record = evidence.setdefault("criteria_guard", [])
     for _ in range(GUARD_ANSWER_ATTEMPTS):
         try:
-            verdicts = _valid_verdicts(decode_object(context["ask"](evidence_prompt(CRITERIA_GUARD, payload))), response)
+            answer = decode_object(context["ask"](evidence_prompt(CRITERIA_GUARD, payload)))
+            verdicts, missing = _valid_verdicts(answer, response), _missing_quality(answer)
         except ValueError as error:
             payload["previous_answer_error"] = f"{type(error).__name__}: {error}"
             continue
-        record.append(verdicts)
-        return {item["id"]: item["reason"] for item in verdicts if item["verdict"] == "reject"}
+        record.append(verdicts + ([{"missing_quality_criterion": missing}] if missing else []))
+        rejected = {item["id"]: item["reason"] for item in verdicts if item["verdict"] == "reject"}
+        return rejected, missing if placeholders else None
     record.append([{"error": payload["previous_answer_error"]}])
-    return {}
+    return {}, None
+
+
+def _plan_view(response: dict) -> dict:
+    """Select the plan fields the guard audits.
+
+    Called by ``_guard_review`` to build the guard payload.
+
+    Args:
+        response (dict): Recon plan.
+
+    Returns:
+        dict: Task representation, criteria, value representation and the
+        adapter plan instructions per generation.
+    """
+    return {"task_representation": response["task_representation"], "criteria": response["criteria"],
+            "representation": response["representation"],
+            "plans": {uuid: plan.get("instructions") for uuid, plan in response["plans"].items() if isinstance(plan, dict)}}
 
 
 def _valid_verdicts(answer: dict, response: dict) -> list[dict]:
@@ -311,6 +369,26 @@ def _valid_verdicts(answer: dict, response: dict) -> list[dict]:
     if any(item["verdict"] == "reject" and not str(item.get("reason") or "").strip() for item in ordered):
         raise ValueError("A reject verdict needs a reason that reconnaissance can act on")
     return [{"id": item["id"], "verdict": item["verdict"], "reason": str(item.get("reason", ""))} for item in ordered]
+
+
+def _missing_quality(answer: dict) -> str | None:
+    """Read the guard's missing quality criterion, if it names one.
+
+    Called by ``_guard_review``; a ValueError sends the answer back once.
+
+    Args:
+        answer (dict): Decoded guard response.
+
+    Returns:
+        str | None: One sentence describing the criterion to add, or None
+        for null, absent or blank; raises ValueError for another type.
+    """
+    value = answer.get("missing_quality_criterion")
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("missing_quality_criterion must be null or one sentence")
+    return value.strip() or None
 
 
 def _drop_criteria(response: dict, rejected: dict[str, str], evidence: dict) -> None:

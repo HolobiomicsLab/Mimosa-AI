@@ -31,7 +31,7 @@ WORKER_BYTES = 16 * 1024 * 1024
 READ_BYTES = 64 * 1024 * 1024
 MEMORY_BYTES = 1024 * 1024 * 1024
 # Transcript keys the guard writes; copied into the frozen bundle.
-GUARD_RECORD_KEYS = ("criteria_guard", "plan_revisions", "dropped_criteria")
+GUARD_RECORD_KEYS = ("criteria_guard", "plan_revisions", "dropped_criteria", "quality_gap")
 
 
 class PolicyError(ValueError):
@@ -1245,7 +1245,7 @@ class PolicyEngine:
                                                  "adapters": bundle["adapters"]})
         if not cached:
             bundle.update({key: plan[key] for key in frozen_keys})
-            # Freeze-time guard record: verdicts, revision requests and drops.
+            # Freeze-time guard record: verdicts, revision requests, drops and quality gaps.
             bundle["criteria_guard"] = {key: plan["inspection"].get(key, []) for key in GUARD_RECORD_KEYS}
             bundle["core_source"] = self.source(CORE, {"goal": goal, **code_task({key: bundle[key] for key in frozen_keys})})
         # Code-writing prompts never see vision-judged criteria.
