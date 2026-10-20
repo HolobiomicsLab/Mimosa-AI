@@ -96,19 +96,35 @@ class Config:
         ##############
         # Verifier channel (evaluation pipeline)
         ##############
-        # "policy_bt" fits current ratings across generation pairs.
-        # "hybrid" and "legacy" retain their previous scoring rules.
+        # "policy_bt" is the recommanded policy.
+        # "hybrid" and "legacy" are older experimental verifiers. 
         # "gold" exposes benchmark answers for research only.
         self.verifier_kind: str = "policy_bt"
+
+        # Policy comparisons fit one Bradley-Terry tournament.
+        self.policy_bt_reward: str = "bradley_terry"
+        # Comparison subprocess limit, in seconds.
+        self.policy_bt_scorer_timeout_s: int = 60
+        # Relevant visual artifacts can resolve deterministic ties.
+        self.policy_bt_visual_channel: bool = True
+        # Maximum repairs for generated policy or adapters.
+        self.policy_bt_repair_rounds: int = 4
+        # Run the required reproduction script on copies.
+        self.policy_bt_reexecute: bool = True
+
+        # Reproduction limit per generation, in seconds.
+        self.policy_bt_reexec_timeout_s: int = 1800
+        # Rerun interpreter, pip caps and env; empty = host Python, no caps.
+        self.policy_bt_reexec_runtime: dict = {}
         # gold reward gradient mode for potential ablations
         self.gold_feedback_reward: bool = False
         # verifier_kind="gold" only: wall-clock cap (seconds)
         self.gold_feedback_timeout_s: int = 1800
-        # Runtime-only benchmark task context for verifier_kind="gold", set
-        # per task by csv_mode (never serialized): the CSV row and the
-        # ScienceAgentBenchLoader used to grade each generation.
+        # Runtime-only benchmark task context for verifier_kind="gold"
         self.gold_feedback_task_row: dict | None = None
+        # ScienceAgentBench loader
         self.gold_feedback_sab_loader: Any = None
+
         # Target key-claim count per task (extraction accepts ±2).
         self.hybrid_verifier_num_claims: int = 10
         # Max replacement claims requested per generation (E19b refinement).
@@ -125,20 +141,7 @@ class Config:
         self.hybrid_verifier_visual_rung: bool = True
         # reexec gate
         self.hybrid_verifier_execution_gate: bool = True
-        # Policy comparisons fit one Bradley-Terry tournament.
-        self.policy_bt_reward: str = "bradley_terry"
-        # Comparison subprocess limit, in seconds.
-        self.policy_bt_scorer_timeout_s: int = 60
-        # Relevant visual artifacts can resolve deterministic ties.
-        self.policy_bt_visual_channel: bool = True
-        # Maximum repairs for generated policy or adapters.
-        self.policy_bt_repair_rounds: int = 4
-        # Run the required reproduction script on copies.
-        self.policy_bt_reexecute: bool = True
-        # Reproduction limit per generation, in seconds.
-        self.policy_bt_reexec_timeout_s: int = 1800
-        # Rerun interpreter, pip caps and env; empty = host Python, no caps.
-        self.policy_bt_reexec_runtime: dict = {}
+
         #############
         # Orchestrator Workflow generation options
         #############
@@ -146,7 +149,7 @@ class Config:
         # Recommanded: model diversity avoid idea and verifiers collapse.
         self.orchestrator_choose_model = False
         # Ground workflow generation with perspicacité
-        self.literrature_grounding = True
+        self.literrature_grounding = False
 
         ##############
         # Human in the loop
@@ -189,7 +192,7 @@ class Config:
         self.novelty_comparison: str = "archive_knn"
         self.novelty_previous_n: int = 16
         # Length penalty: genotype size at which the penalty starts to grow
-        self.length_penalty_baseline_chars: int = 8000
+        self.length_penalty_baseline_chars: int = 12000
         self.length_penalty_lambda: float = 0.05
         # Selection pressure / archive settings
         self.min_improvement_threshold: float = 0.01
