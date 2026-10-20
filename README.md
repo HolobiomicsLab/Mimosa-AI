@@ -1,6 +1,8 @@
 <p align="center">
-  <img src="./docs/images/logo_mimosa.png" width="160" alt="Mimosa-AI logo">
+  <a href="./docs/images/interface.png"><img src="./docs/images/interface.png" width="1000" alt="Observatory web interface for Mimosa run setup and inspection"></a>
 </p>
+
+<p align="center"><em>Observatory, the Mimosa web interface. <a href="#inspect-runs-in-the-web-interface">Open the setup instructions.</a></em></p>
 
 <h1 align="center">Mimosa-AI</h1>
 
@@ -18,7 +20,8 @@
 <p align="center">
   <a href="#start-here">Start here</a> ·
   <a href="#how-mimosa-works">How it works</a> ·
-  <a href="#see-policy-bt-in-the-terminal">Policy-BT</a> ·
+  <a href="#design">Design</a> ·
+  <a href="#what-the-cli-looks-like">CLI</a> ·
   <a href="./docs/index.md">Documentation</a> ·
   <a href="#cite-this-work">Cite this work</a>
 </p>
@@ -62,21 +65,35 @@ This method is inspired by **Quality-Diversity search**: keep different approach
 
 Read more about the [architecture](./docs/concepts/architecture.md) and the [evolution loop](./docs/concepts/evolution-engine.md).
 
-## See Policy-BT in the terminal
+## Design
 
-The command-line interface (CLI) shows each check as the run proceeds.
-Color, section labels, and score bars separate the comparison rules, pair results, ratings, and feedback.
+### Workflows are Python programs
+
+Mimosa changes the workflow code, not only the text sent to one agent.
+The code defines the agents, tools, and order of work.
+Each run produces files that the verifier can inspect.
 
 <p align="center">
-  <a href="./docs/images/policy-bt.png"><img src="./docs/images/policy-bt.png" width="820" alt="Policy-BT terminal output with reproduction status, comparison rules, wins and ties, Bradley–Terry ratings, and feedback for the next workflow change"></a>
+  <a href="./docs/figures/policy_bt/04_mimosa_evolution_loop.svg"><img src="./docs/figures/policy_bt/04_mimosa_evolution_loop.png" width="1000" alt="Mimosa design: build and run Python workflows, check outputs with Policy-BT, select parent workflows, and change their code"></a>
 </p>
 
-<p align="center"><em>One task, three generations, and three pair comparisons. Select the image to see the details.</em></p>
+<p align="center"><em>The workflow search loop. Select the figure to open the vector version.</em></p>
+
+**Selection and code changes use different feedback.**
+Ratings help select parent workflows.
+Written feedback explains what to improve in those parents.
+The search also considers code diversity, so it can retain different approaches.
 
 ### What the verifier checks
 
 **Policy** means the shared rules used to compare results.
 **BT** means Bradley–Terry, the statistical model that converts pair results into ratings.
+
+<p align="center">
+  <a href="./docs/figures/policy_bt/01_publication_overview.svg"><img src="./docs/figures/policy_bt/01_publication_overview.png" width="1000" alt="Policy-BT design: preserve and reproduce outputs, compare generation pairs with shared rules, then calculate ratings and feedback"></a>
+</p>
+
+<p align="center"><em>From output files to comparison results and feedback. Select the figure to open the vector version.</em></p>
 
 1. **Check reproduction.** Each generation must supply a shell script that installs its requirements and recreates its outputs.
    A missing or invalid script gives a score of zero. By default, the verifier runs the script again in a fresh Python environment.
@@ -89,6 +106,22 @@ Color, section labels, and score bars separate the comparison rules, pair result
 
 **A rating is relative to the other generations. It is not a benchmark success rate.**
 The default verifier is `policy_bt`. See the [verification guide](./docs/concepts/evaluation-pipeline.md) for the full procedure.
+
+For the comparison checks and rating equations, see the [methods figure](./docs/figures/policy_bt/02_methods_detail.svg).
+The [publication figure folder](./docs/figures/policy_bt/) contains PNG and SVG versions.
+
+## What the CLI looks like
+
+### See Policy-BT in the terminal
+
+The command-line interface (CLI) shows each check as the run proceeds.
+Color, section labels, and score bars separate the comparison rules, pair results, ratings, and feedback.
+
+<p align="center">
+  <a href="./docs/images/policy-bt.png"><img src="./docs/images/policy-bt.png" width="820" alt="Policy-BT terminal output with reproduction status, comparison rules, wins and ties, Bradley–Terry ratings, and feedback for the next workflow change"></a>
+</p>
+
+<p align="center"><em>One task, three generations, and three pair comparisons. Select the image to see the details.</em></p>
 
 ## Start here
 
@@ -202,15 +235,11 @@ cd webui
 
 Open <http://localhost:5173/> after the services start.
 
-<p align="center">
-  <a href="./docs/images/interface.png"><img src="./docs/images/interface.png" width="900" alt="Observatory web interface for Mimosa run setup and inspection"></a>
-</p>
-
 > **Local use only.** Observatory has no authentication. Do not expose it on a shared or public network.
 
 See the [Observatory guide](./webui/README.md) for requirements and settings.
 
-## A possible future: the autonomous laboratory
+## Mimosa for autonomous laboratory
 
 <p align="center">
   <a href="./docs/images/mimosa_illustration.png"><img src="./docs/images/mimosa_illustration.png" width="900" alt="Concept illustration of a future laboratory with robotic equipment, researchers, and a Mimosa display"></a>
