@@ -50,6 +50,27 @@ Mimosa can change the agents, their instructions, and the steps they follow.
 
 <p align="center"><em>Observatory, the Mimosa web interface. <a href="#inspect-runs-in-the-web-interface">Open the setup instructions.</a></em></p>
 
+## What Mimosa can do
+
+### V1 example: molecular networking
+
+This earlier demonstration shows a molecular-networking workflow for LC-MS/MS data.
+It covers the networking step, not the full experimental procedure from [Nothias et al. (2018)](https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation).
+
+[Watch the V1 demonstration](https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d).
+
+<details>
+<summary>View the molecular network</summary>
+
+<p align="center">
+  <img src="./docs/images/network.png" width="700" alt="Molecular network from the V1 demonstration">
+</p>
+
+The workflow produced a GraphML network for Cytoscape and a feature table.
+The demonstration does not cover physical fractionation or manual annotation review.
+
+</details>
+
 ## How Mimosa works
 
 A **generation** is one version of a workflow and the results from its run.
@@ -273,25 +294,6 @@ The V1 setup used Opus 4.5 for workflow generation and changes. Costs depend on 
 See the [paper](https://arxiv.org/abs/2603.28986) for methods and limitations.
 
 **V2 evaluation is in progress.**
-
-### V1 example: molecular networking
-
-This earlier demonstration shows a molecular-networking workflow for LC-MS/MS data.
-It covers the networking step, not the full experimental procedure from [Nothias et al. (2018)](https://www.researchgate.net/publication/323525305_Bioactivity-Based_Molecular_Networking_for_the_Discovery_of_Drug_Leads_in_Natural_Product_Bioassay-Guided_Fractionation).
-
-[Watch the V1 demonstration](https://github.com/user-attachments/assets/dcd04ade-9c43-44a8-b3e3-a999d3dc895d).
-
-<details>
-<summary>View the molecular network</summary>
-
-<p align="center">
-  <img src="./docs/images/network.png" width="700" alt="Molecular network from the V1 demonstration">
-</p>
-
-The workflow produced a GraphML network for Cytoscape and a feature table.
-The demonstration does not cover physical fractionation or manual annotation review.
-
-</details>
 
 ## Documentation and contributions
 
