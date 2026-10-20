@@ -787,8 +787,8 @@ If 'no agent answers' were captured, or that you see a python/syntax error, simp
             if nudge:
                 return provider(prompt + DIRECTIVE_RETRY_NUDGE, use_cache=False)
             return provider(prompt)
-        except Exception as error:  # noqa: BLE001 - any provider failure
-            self.logger.warning(
+        except RuntimeError as error:  # LLMProvider API failure after retries
+            self.logger.error(
                 f"Directive LLM call failed ({type(error).__name__}: {error}); "
                 "treating it as empty output."
             )

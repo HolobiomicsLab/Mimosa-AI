@@ -562,3 +562,17 @@ def test_recon_rejects_unknown_judge_and_an_all_vision_plan():
     task = code_task({"criteria": [vision, {"id": "c", "stage": 2, "direction": "satisfy"}],
                       "representation": {"v": "bool", "c": "bool"}})
     assert [c["id"] for c in task["criteria"]] == ["c"] and task["representation"] == {"c": "bool"}
+
+
+def test_guard_drop_never_freezes_a_task_without_a_code_criterion(tmp_path):
+    """Review: dropping the only code criterion froze a vision-only task, and
+    every later generation of that task then failed reconnaissance."""
+    from sources.evaluators.policy_bt_verifier.recon import ReconError, reconnaissance
+
+    plan = _plan("present", "legend")
+    plan["criteria"][1]["judge"] = "vision"
+    verdict = {"verdicts": [{"id": "present", "verdict": "reject", "reason": "no source"},
+                            {"id": "legend", "verdict": "keep", "reason": "goal figure"}]}
+    ask = _guarded_ask([plan] * 16, [verdict] * 16, [])
+    with pytest.raises(ReconError):
+        reconnaissance("goal", [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})

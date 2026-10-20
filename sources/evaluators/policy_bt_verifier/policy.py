@@ -1248,18 +1248,20 @@ class PolicyEngine:
             # Freeze-time guard record: verdicts, revision requests and drops.
             bundle["criteria_guard"] = {key: plan["inspection"].get(key, []) for key in GUARD_RECORD_KEYS}
             bundle["core_source"] = self.source(CORE, {"goal": goal, **code_task({key: bundle[key] for key in frozen_keys})})
+        # Code-writing prompts never see vision-judged criteria.
+        inspection = {**plan["inspection"], "frozen_task": code_task(frozen) if frozen else None}
         for generation in generations:
             uuid = generation["uuid"]
             adapter_plan = plan["plans"][uuid]
             adapter_id = adapter_plan.get("adapter")
             if adapter_id not in bundle["adapters"]:
                 source = self.source(ADAPTER, {"goal": goal, "frozen_task": code_task({key: bundle[key] for key in frozen_keys}),
-                                     "plan": adapter_plan, "generation_uuid": uuid, "inspection": plan["inspection"]})
+                                     "plan": adapter_plan, "generation_uuid": uuid, "inspection": inspection})
                 adapter_id = hashlib.sha256(source.encode()).hexdigest()
                 bundle["adapters"][adapter_id] = source
             bundle["assignments"][uuid] = adapter_id
             bundle["visuals"][uuid] = plan.get("visuals", {}).get(uuid, [])
-        bundle["inspection"] = plan["inspection"]
+        bundle["inspection"] = inspection
         self._prepare_smoke(bundle, generations)
         bundle["version"] = bundle_version(bundle)
         return bundle

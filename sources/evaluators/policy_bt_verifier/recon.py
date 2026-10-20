@@ -149,6 +149,7 @@ def _check_criteria(criteria: object) -> None:
     if all(item.get("judge") == JUDGE_VISION for item in criteria):
         raise ReconError('At least one criterion must be judged by "code" (for example output presence)')
 
+
 def _check_complete(result: dict, generations: list[dict]) -> None:
     """Reject missing generation coverage and invalid criterion definitions.
 
@@ -239,6 +240,8 @@ def _accept_plan(response: dict, generations: list[dict], context: dict, evidenc
     _check_complete(response, generations)
     if not frozen:
         guard_plan(response, context, evidence)
+        # A guard drop may leave only vision criteria.
+        _check_criteria(response["criteria"])
     evidence.pop("previous_answer_error", None)
     response["inspection"] = evidence
     return response
