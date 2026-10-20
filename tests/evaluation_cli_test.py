@@ -327,6 +327,49 @@ def test_summarise_notes_file_falls_back_to_total_eval(tmp_path):
     assert "VER" not in summary
 
 
+def test_choose_eval_mode_sets_variation_mode_for_each_run(monkeypatch):
+    """Resample selects the best-of-N control; other modes reset it to evolve."""
+    script = _ScriptedIO(answers=["4", "3"], yn_answers=[])
+    monkeypatch.setattr(evaluation_cli, "_ask", script.ask)
+    cli = EvaluationCLI(SimpleNamespace())
+    resample_config = SimpleNamespace(variation_mode="evolve")
+    iterative_config = SimpleNamespace(variation_mode="resample")
+
+    assert cli._choose_eval_mode(resample_config) == "resample"
+    assert cli._choose_eval_mode(iterative_config) == "iterative"
+    assert resample_config.variation_mode == "resample"
+    assert iterative_config.variation_mode == "evolve"
+
+
+def test_resample_run_launches_the_learning_loop(monkeypatch, tmp_path):
+    """A resample run must run several generations, not a one-shot pass."""
+    import sources.benchmark_evaluation.csv_mode as csv_mode
+
+    launched: dict = {}
+
+    class _StubCsvMode:
+        def __init__(self, config, **kwargs):
+            launched["variation_mode"] = config.variation_mode
+
+        async def start_evaluation(self, **kwargs):
+            launched.update(kwargs)
+
+    monkeypatch.setattr(csv_mode, "CsvEvaluationMode", _StubCsvMode)
+    monkeypatch.chdir(tmp_path)
+    config = SimpleNamespace(
+        variation_mode="resample", smolagent_model_id="test/model",
+        create_paths=lambda: None, validate_paths=lambda: None,
+    )
+    spec = EvalRunSpec(run_id=1, config=config, eval_mode="resample", csv_runs_limit=1)
+
+    asyncio.run(EvaluationCLI(SimpleNamespace())._run_single_eval(spec))
+
+    assert launched["learning"] is True
+    assert launched["single_agent_mode"] is False
+    assert launched["variation_mode"] == "resample"
+    assert spec.status == "completed"
+
+
 if __name__ == "__main__":
     test_launch_queue_is_sequential_and_survives_failure()
     print("✅ evaluation CLI sequential-queue smoke checks passed")

@@ -74,6 +74,8 @@ _CONFIG_DEFAULT_PATH = "config_default.json"
 # Where EvaluationCLI stores its per-run summary notes — also the folder the
 # cache-restore file picker offers files from.
 _EVAL_NOTES_DIR = Path("run_notes") / "evaluations"
+# Modes that run the multi-generation loop (csv_mode learning=True).
+_LEARNING_MODES = ("iterative", "resample")
 
 
 # ---------------------------------------------------------------------------
@@ -85,7 +87,7 @@ class EvalRunSpec:
     """Specification for a single evaluation run in the queue."""
     run_id: int
     config: Config
-    eval_mode: str  # one_shot | single_agent | iterative
+    eval_mode: str  # one_shot | single_agent | iterative | resample
     csv_runs_limit: int
     mcp_list: list[str] = field(default_factory=list)
     notes_path: Path | None = None
@@ -279,7 +281,7 @@ class EvaluationCLI:
 
         # Step 4 – Evaluation mode
         _print_step(4, TOTAL_STEPS, f"Evaluation Mode (Run #{run_id})")
-        eval_mode = self._choose_eval_mode()
+        eval_mode = self._choose_eval_mode(run_config)
 
         # Step 5 – Number of tasks (csv_runs_limit)
         _print_step(5, TOTAL_STEPS, f"Task Limit (Run #{run_id})")
@@ -496,7 +498,22 @@ class EvaluationCLI:
     # Step 4 – Evaluation mode
     # ------------------------------------------------------------------
 
-    def _choose_eval_mode(self) -> str:
+    def _choose_eval_mode(self, run_config: Config) -> str:
+        """Ask how Mimosa runs each benchmark task and set the variation mode.
+
+        ``_configure_single_run`` calls this once per queued run, with the
+        run's own config copy. It reads the answer through ``_ask``. It sets
+        ``run_config.variation_mode`` to ``"resample"`` for the resample
+        mode and to ``"evolve"`` for every other mode.
+
+        Args:
+            run_config (Config): Deep copy of the base config for this run;
+                its ``variation_mode`` is changed in place.
+
+        Returns:
+            str: ``"single_agent"``, ``"one_shot"``, ``"iterative"`` or
+            ``"resample"``.
+        """
         print(_wrap(
             "Choose how Mimosa should run each benchmark task:",
         ))
@@ -507,10 +524,27 @@ class EvaluationCLI:
               f"{GREY}– multi-agent workflow, no learning{RESET}")
         print(f"  {AMBER}[3]{RESET}  {WHITE}Iterative learning{RESET}  "
               f"{GREY}– multi-agent with evolution loop{RESET}")
+        print(f"  {AMBER}[4]{RESET}  {WHITE}Resample (best-of-N){RESET} "
+              f"{GREY}– fresh workflow each generation, best BT rating wins{RESET}")
         print()
 
+        mode = self._read_eval_mode()
+        run_config.variation_mode = "resample" if mode == "resample" else "evolve"
+        return mode
+
+    @staticmethod
+    def _read_eval_mode() -> str:
+        """Read one valid evaluation mode answer from the user.
+
+        ``_choose_eval_mode`` calls this after it prints the mode menu. It
+        asks again until the answer is a menu number or a mode name.
+
+        Returns:
+            str: ``"single_agent"``, ``"one_shot"``, ``"iterative"`` or
+            ``"resample"``.
+        """
         while True:
-            choice = _ask("Select mode (1/2/3)", default="2").strip().lower()
+            choice = _ask("Select mode (1/2/3/4)", default="2").strip().lower()
             if choice in ("1", "single", "single_agent", "single-agent"):
                 _ok("Mode: Single-agent")
                 return "single_agent"
@@ -520,9 +554,12 @@ class EvaluationCLI:
             if choice in ("3", "iterative", "learning"):
                 _ok("Mode: Iterative learning")
                 return "iterative"
+            if choice in ("4", "resample", "best-of-n", "redraw"):
+                _ok("Mode: Resample (best-of-N, no parent selection)")
+                return "resample"
             _warn(
                 f"Unrecognised choice '{choice}'. "
-                "Please enter 1, 2, or 3 (or the mode name)."
+                "Please enter 1, 2, 3 or 4 (or the mode name)."
             )
 
     # ------------------------------------------------------------------
@@ -712,7 +749,7 @@ class EvaluationCLI:
             _info("Keeping default advanced options.")
             return {}
 
-        learning_only = eval_mode != "iterative"
+        learning_only = eval_mode not in _LEARNING_MODES
         overrides: dict = {}
 
         # (key, label, current-value getter, editor, learning_only)
@@ -828,7 +865,7 @@ class EvaluationCLI:
             key, _, getter, editor, learn_only = options[idx]
             if learn_only and learning_only:
                 _warn(
-                    f"'{key}' only takes effect in iterative learning mode — "
+                    f"'{key}' only takes effect in a learning mode — "
                     f"this run is '{eval_mode}'. It will be recorded but ignored."
                 )
             new_value = editor()
@@ -981,6 +1018,7 @@ class EvaluationCLI:
                 "selection_strategy": spec.config.selection_strategy,
                 "novelty_weight": spec.config.novelty_weight,
                 "max_learning_evolve_iterations": spec.config.max_learning_evolve_iterations,
+                "variation_mode": spec.config.variation_mode,
                 "learned_score_threshold": spec.config.learned_score_threshold,
                 "crossover_rate": spec.config.crossover_rate,
                 "population_size": spec.config.population_size,
@@ -1083,7 +1121,7 @@ class EvaluationCLI:
             return
 
         single_agent = spec.eval_mode == "single_agent"
-        learning = spec.eval_mode == "iterative"
+        learning = spec.eval_mode in _LEARNING_MODES
 
         max_concurrent = getattr(run_config, "max_concurrent_eval_tasks", 4)
         task_start_delay = getattr(run_config, "task_start_delay", 30.0)

@@ -286,7 +286,8 @@ complexity.
 
 ## Resample control (`variation_mode = "resample"`)
 
-`variation_mode = "resample"` (CLI `--variation_mode resample`) turns the
+`variation_mode = "resample"` (CLI `--variation_mode resample`, or mode
+`[4] Resample (best-of-N)` in `--evaluation_cli`) turns the
 session into a best-of-N control. Every generation is an independent,
 fresh synthesis from the task text alone: the same seed prompt that
 generation 0 receives (`seed_genome_prompt` over the session goal, with a
