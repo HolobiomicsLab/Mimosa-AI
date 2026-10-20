@@ -20,7 +20,7 @@ SCRATCH_DIR="tmp"
 GENERATION_GLOBS=(
     "[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]_[0-9][0-9][0-9][0-9][0-9][0-9]_*"
     "single_agent_*"
-    "generation_failed"
+    "generation_failed*"
 )
 DRY_RUN=0
 ASSUME_YES=0
