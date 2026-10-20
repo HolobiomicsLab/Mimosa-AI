@@ -1,9 +1,3 @@
-<p align="center">
-  <a href="./docs/images/interface.png"><img src="./docs/images/interface.png" width="1000" alt="Observatory web interface for Mimosa run setup and inspection"></a>
-</p>
-
-<p align="center"><em>Observatory, the Mimosa web interface. <a href="#inspect-runs-in-the-web-interface">Open the setup instructions.</a></em></p>
-
 <h1 align="center">Mimosa-AI</h1>
 
 <p align="center"><strong>Build, run, check, and improve AI workflows for scientific research.</strong></p>
@@ -49,6 +43,12 @@ Mimosa can change the agents, their instructions, and the steps they follow.
 
 > **Research software, not proof of correctness.** A high verifier score does not prove that a scientific result is correct.
 > Review the outputs before you use them.
+
+<p align="center">
+  <a href="./docs/images/interface.png"><img src="./docs/images/interface.png" width="1000" alt="Observatory web interface for Mimosa run setup and inspection"></a>
+</p>
+
+<p align="center"><em>Observatory, the Mimosa web interface. <a href="#inspect-runs-in-the-web-interface">Open the setup instructions.</a></em></p>
 
 ## How Mimosa works
 
