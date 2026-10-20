@@ -204,6 +204,9 @@ class Config:
         self.initial_population: int = 2
         self.crossover_rate: float = 0.4
         self.n_parents: int = 2
+        # "evolve": parent selection + mutation/crossover.
+        # "resample": every generation is a fresh draw from the task text.
+        self.variation_mode: str = "evolve"
         # goal similarity thresholds before even considered by qd (need similar goal to avoid picking parents from a different task)
         self.parent_threshold_similarity: float = 0.95
         # bare minimum score for selection (don't pick failed parents)
@@ -487,6 +490,7 @@ class Config:
             "initial_population": self.initial_population,
             "crossover_rate": self.crossover_rate,
             "n_parents": self.n_parents,
+            "variation_mode": self.variation_mode,
             "parent_threshold_similarity": self.parent_threshold_similarity,
             "parent_threshold_score": self.parent_threshold_score,
             "schema_code_path": portable_resources["schema_code_path"],
@@ -701,6 +705,14 @@ class Config:
         )
         self.crossover_rate = float(data.get("crossover_rate", self.crossover_rate))
         self.n_parents = int(data.get("n_parents", self.n_parents))
+        variation_mode = (
+            str(data.get("variation_mode", self.variation_mode)).strip().lower()
+        )
+        if variation_mode not in ("evolve", "resample"):
+            raise ValueError(
+                f"variation_mode must be evolve or resample; got {variation_mode!r}"
+            )
+        self.variation_mode = variation_mode
         self.parent_threshold_similarity = float(
             data.get("parent_threshold_similarity", self.parent_threshold_similarity)
         )
@@ -840,6 +852,7 @@ class Config:
         lines.append(f"  initial_population={self.initial_population}")
         lines.append(f"  crossover_rate={self.crossover_rate}")
         lines.append(f"  n_parents={self.n_parents}")
+        lines.append(f"  variation_mode={self.variation_mode}")
         lines.append(
             f"  parent_threshold_similarity={self.parent_threshold_similarity}"
         )

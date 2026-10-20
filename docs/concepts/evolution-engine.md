@@ -284,6 +284,30 @@ improvements rather than competing for the skeleton, and the offspring
 is hard-capped at the highest parent agent count to prevent runaway
 complexity.
 
+## Resample control (`variation_mode = "resample"`)
+
+`variation_mode = "resample"` (CLI `--variation_mode resample`) turns the
+session into a best-of-N control. Every generation is an independent,
+fresh synthesis from the task text alone: the same seed prompt that
+generation 0 receives (`seed_genome_prompt` over the session goal, with a
+new random agent budget).
+
+No workflow is selected as input to a generation. The engine does not
+call `select_parent_workflow` at session start or between generations,
+so there is no disk-similarity retrieval, no archive draw, no crossover
+roll and no mutation. A `template_uuid` is ignored (with a warning), the
+frontier probe is not evaluated, and the planner's cached-workflow reuse
+is off. `initial_population`, `crossover_rate`, `n_parents`,
+`explore_after_plateau` and `explore_base_rate` have no effect.
+
+Everything else is the same as an `evolve` run: the Policy-BT verifier,
+the Bradley-Terry tournament over all generations, the stop rule and
+per-generation benchmark ablations. The only selection is the final one:
+the generation with the highest current Bradley-Terry rating becomes the
+capsule (`restore_best`). Lineage records every generation as `seed`
+with no parents; `run_metrics.json` and the CSV run notes record
+`variation_mode`.
+
 ## Lineage & reproducibility
 
 After each generation, [`lineage.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/lineage.py)
@@ -327,7 +351,7 @@ mutation looks like.
 Each iteration also writes structured metrics for post-hoc analysis:
 
 - `sources/workflows/<uuid>/run_metrics.json` — one file per workflow.
-  Captures `iteration`, `evolution_kind`, `parent_uuids`,
+  Captures `iteration`, `evolution_kind`, `variation_mode`, `parent_uuids`,
   `iteration_wall_time_s`, `iteration_cost_usd`, `cumulative_cost_usd`,
   `overall_score{,_uncapped}`, `qd_descriptor`, `qd_score`,
   `novelty_score`, the `selection_log`, and the

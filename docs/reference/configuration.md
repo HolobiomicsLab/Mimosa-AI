@@ -94,6 +94,7 @@ engine](../concepts/evolution-engine.md), not day-to-day settings.
 | `initial_population` | `int` | `2` | Seed generations before mutation/crossover kicks in. |
 | `crossover_rate` | `float` | `0.4` | Probability a generation combines two parents instead of mutating one. |
 | `n_parents` | `int` | `2` | Number of parents drawn per crossover. |
+| `variation_mode` | `str` | `evolve` | `evolve` (parent selection, mutation, crossover) or `resample` (every generation is a fresh draw from the task text; best-of-N control). Other values raise `ValueError` on load. |
 | `parent_threshold_similarity` | `float` | `0.95` | Cold-start disk scan: minimum goal-embedding cosine similarity. |
 | `parent_threshold_score` | `float` | `0.01` | Cold-start disk scan / parent draw: minimum score to be considered. |
 

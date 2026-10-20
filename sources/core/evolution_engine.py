@@ -101,6 +101,24 @@ def _to_jsonable(obj: Any) -> Any:
         return asdict(obj)
     return obj
 
+
+def is_resample_mode(config: Any) -> bool:
+    """Tell whether the session runs the resample (best-of-N) control.
+
+    The evolution engine and the planner use it before they select or
+    reuse a workflow. They give the run config. In resample mode, no
+    workflow is selected as input to a generation.
+
+    Args:
+        config (Any): Run config (``Config`` or a test namespace); a
+            missing ``variation_mode`` counts as ``"evolve"``.
+
+    Returns:
+        bool: ``True`` when ``config.variation_mode`` is ``"resample"``.
+    """
+    return getattr(config, "variation_mode", "evolve") == "resample"
+
+
 def _verifier_block(run: "IndividualRun") -> dict:
     """Read the run's persisted verifier scores.
 
@@ -858,6 +876,37 @@ class EvolutionEngine:
         )
         return child
 
+    def _session_start_parent(
+        self, goal: str, template_uuid: str | None
+    ) -> WorkflowInfo | None:
+        """Choose the parent of generation 0, or no parent.
+
+        ``start_workflow_evolution`` uses this once per task session. It
+        gives the session goal and the optional template uuid from the
+        caller. In evolve mode, it selects a parent from disk. In resample
+        mode, it selects no workflow and ignores the template, so
+        generation 0 starts from the task text only.
+
+        Args:
+            goal (str): Session goal text from the caller; used for the
+                disk similarity search in evolve mode.
+            template_uuid (str | None): Workflow uuid to start from (the
+                ``start_workflow_evolution`` default is a fixed uuid);
+                ``None`` when not given.
+
+        Returns:
+            WorkflowInfo | None: The selected parent, else ``None``.
+        """
+        if not is_resample_mode(self.config):
+            parents, _ = self.select_parent_workflow(
+                goal, template_uuid=template_uuid
+            )
+            return parents[0] if parents else None
+        if template_uuid is not None:
+            print_warn(f"[RESAMPLE] template {template_uuid} ignored")
+        print_info("[RESAMPLE] every generation is a fresh draw; no parent selection")
+        return None
+
     async def start_workflow_evolution(
         self,
         goal: str,
@@ -880,7 +929,7 @@ class EvolutionEngine:
             goal (str): The primary goal or objective to reach (may be
                 knowledge-wrapped).
             template_uuid (str | None): UUID of a workflow template to
-                start from.
+                start from. Ignored in resample mode.
             judge (bool): Whether judging mode is enabled for evaluation.
             scenario_rubric (str | None): ID of the scenario for
                 evaluation.
@@ -914,10 +963,7 @@ class EvolutionEngine:
         self.variation.textual_gradient_history.clear()
         self.variation.agent_count_history.clear()
 
-        parents, _ = self.select_parent_workflow(
-            goal, template_uuid=template_uuid
-        )
-        wf = parents[0] if parents else None
+        wf = self._session_start_parent(goal, template_uuid)
 
         if mockup_mode:
             return await self.mockup(wf, goal)
@@ -1131,8 +1177,9 @@ class EvolutionEngine:
                 failed=is_failure or not uuid,
             )
 
+        resample = is_resample_mode(self.config)
         exploration_probe: dict | None = None
-        if stop_controller is not None:
+        if stop_controller is not None and not resample:
             exploration_probe = self._evaluate_exploration_probe(
                 stop_controller, runs
             )
@@ -1240,16 +1287,25 @@ class EvolutionEngine:
             )
             return runs
 
-        # ── Evolutionary parent selection: mutation or crossover ──────
-        parent_workflows, use_crossover = self.select_parent_workflow(
-            runs[-1].goal, template_uuid=None
+        # ── Parent selection (none in resample mode): mutation or crossover ──
+        parent_workflows, use_crossover = (
+            ([], False) if resample
+            else self.select_parent_workflow(runs[-1].goal, template_uuid=None)
         )
 
         task_goal = runs[-1].original_task or runs[-1].goal
 
         next_kind: str
         next_parent_uuids: list[str]
-        if use_crossover and len(runs) >= self.initial_population:
+        if resample:
+            # RESAMPLE — gen-0 prompt: runs[-1].goal keeps the reproduction note
+            print_phase("RESAMPLE (FRESH DRAW)", color=GREEN)
+            runs[-1].prompt = self.get_genotype_instructions(
+                runs[-1].goal, None, max_iterations=runs[-1].max_depth
+            )
+            next_kind = "seed"
+            next_parent_uuids = []
+        elif use_crossover and len(runs) >= self.initial_population:
             # CROSSOVER — recombine multiple parent genotypes
             print_phase("CROSSOVER VARIATION", color=CYAN)
             runs[-1].prompt = self.variation.crossover_prompt(
@@ -1726,6 +1782,7 @@ class EvolutionEngine:
             "uuid": run.current_uuid,
             "iteration": run.iteration_count,
             "evolution_kind": run.evolution_kind,
+            "variation_mode": getattr(self.config, "variation_mode", "evolve"),
             "parent_uuids": list(run.parent_uuids or []),
             "iteration_wall_time_s": round(time.time() - ctx["iteration_start_time"], 3),
             "iteration_cost_usd": float(ctx["iteration_cost"]),

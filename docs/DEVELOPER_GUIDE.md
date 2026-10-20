@@ -473,8 +473,9 @@ EvolutionEngine.start_workflow_evolution(goal)
         ├─ WorkflowEvaluator.evaluate(evaluator_type="verifier")
         ├─ SelectionPressure.validate_survivor() → archive admit?
         ├─ record_lineage()
-        ├─ select next parent (archive QD-roulette)
-        ├─ choose crossover (default crossover_rate=0.1, once initial_population met) or mutation
+        ├─ variation_mode=resample: fresh seed prompt, no parent (best-of-N control)
+        ├─ else select next parent (archive QD-roulette)
+        ├─ choose crossover (default crossover_rate=0.4, once initial_population met) or mutation
         └─ recurse → stop on threshold OR max_depth
     ↓
 WorkspaceManager.restore_best(best_uuid)

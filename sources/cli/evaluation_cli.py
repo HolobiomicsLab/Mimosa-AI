@@ -769,7 +769,7 @@ class EvaluationCLI:
                 "Max evolve iterations",
                 lambda: run_config.max_learning_evolve_iterations,
                 lambda: self._edit_int(
-                    "Max evolve iterations (1 = evolution off / best-of-N)",
+                    "Max evolve iterations (1 = evolution off)",
                     run_config.max_learning_evolve_iterations, lo=1,
                 ),
                 True,

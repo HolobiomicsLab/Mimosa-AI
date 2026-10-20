@@ -42,7 +42,7 @@ from sources.utils.perspicacite_client import (
 )
 from sources.utils.planner_visualization import PlannerVisualizer
 
-from .evolution_engine import EvolutionEngine
+from .evolution_engine import EvolutionEngine, is_resample_mode
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
 from .workflow_selection import WorkflowSelector
@@ -906,7 +906,7 @@ Original request:
                 configuration.
             cached_wf_allow: Whether to allow reusing high-quality cached
                 workflows discovered by the workflow selector; True on the
-                first attempt only.
+                first attempt only. Resample mode never reuses them.
             original_task: Original unwrapped task for similarity matching;
                 used in preference to ``task`` for cache lookup.
 
@@ -928,10 +928,10 @@ Original request:
             # Use original_task for lookup to avoid knowledge wrapper interference
             lookup_task = original_task if original_task else task
 
-            # Check for high-quality cached workflows
+            # Check for high-quality cached workflows (never in resample mode)
             past_wf_lookups = self.wf_selector.select_best_workflows(
                 lookup_task, threshold_similarity=0.98, threshold_score=0.99
-            ) if cached_wf_allow else []
+            ) if cached_wf_allow and not is_resample_mode(self.config) else []
 
             if past_wf_lookups and len(past_wf_lookups) > 0:
                 best_match = past_wf_lookups[0]

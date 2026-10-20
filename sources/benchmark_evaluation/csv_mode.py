@@ -492,6 +492,7 @@ class CsvEvaluationMode:
             "model": self.config.smolagent_model_id,
             "goal": goal,
             "execution_time_seconds": execution_time,
+            "variation_mode": getattr(self.config, "variation_mode", "evolve"),
             "total_eval": len(sab_runs),
             "start_row": self._start_row + 1,
             "git": self._get_git_info()

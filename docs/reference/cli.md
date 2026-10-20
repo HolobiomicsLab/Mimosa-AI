@@ -56,6 +56,7 @@ These override values from `--config`'s JSON or the defaults in
 | `--pushover_token <token>` | `config.pushover_token`. |
 | `--pushover_user <user>` | `config.pushover_user`. |
 | `--max_evolve_iterations N` | `config.max_learning_evolve_iterations`. |
+| `--variation_mode <mode>` | `config.variation_mode` (`evolve` (default) \| `resample`). `resample` makes every generation a fresh draw from the task text, with no parent selection (best-of-N control); final selection by Bradley-Terry rating is unchanged. |
 | `--verifier_kind <kind>` | `config.verifier_kind` (`policy_bt` (default) \| `hybrid` \| `legacy` \| `gold`). `gold` is an ORACLE / BENCHMARK-LEAKING research control (needs `--science_agent_bench`; never report its scores) — see [Gold feedback (oracle) mode](../concepts/evaluation-pipeline.md#gold-feedback-oracle-mode). |
 | `--gold_feedback_reward` / `--no-gold_feedback_reward` | `config.gold_feedback_reward` (`verifier_kind=gold` only): also take the reward from the benchmark grader (full oracle). |
 | `--gold_feedback_timeout_s <s>` | `config.gold_feedback_timeout_s` (`verifier_kind=gold` only, default 1800): wall-clock cap on benchmark grading per generation (`0` disables it); on timeout the grade is censored. |
