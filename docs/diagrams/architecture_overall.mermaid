@@ -9,78 +9,96 @@ flowchart TB
     %% =============== entry ===================================================
     User([User CLI<br/>main.py])
 
-    subgraph L0["Layer 0 — Planning (optional)"]
-        Planner["Planner<br/>(sources/core/planner.py)<br/>goal → multi-step task list"]
+    subgraph L0["Layer 0 — Entry points and drivers"]
+        Planner["Planner<br/>(sources/core/planner.py)<br/>goal → task list → EvolutionEngine"]
+        CSV["CSV / SAB driver<br/>(sources/benchmark_evaluation/csv_mode.py)"]
     end
 
-    subgraph L1["Layer 1 — Tool Discovery"]
-        Tools["ToolManager / MCP<br/>(sources/core/tools_manager.py)<br/>scans Toolomics + local net"]
-        Persp["Perspicacite client<br/>(literature grounding)"]
+    subgraph L1["Layer 1 — Tool discovery and literature grounding"]
+        Tools["ToolManager / MCP<br/>(sources/core/tools_manager.py)<br/>network scan of discovery_addresses, streamable HTTP /mcp"]
+        Persp["Perspicacite client<br/>(sources/utils/perspicacite_client.py)<br/>optional literature grounding"]
     end
 
-    subgraph L2["Layer 2 — Meta-orchestration (EvolutionEngine)"]
+    subgraph L2["Layer 2 — Meta-orchestration"]
         direction TB
+        Evo["EvolutionEngine<br/>(sources/core/evolution_engine.py)<br/>evolve_generation loop"]
         ParentSel["WorkflowSelector<br/>archive draw / disk scan<br/>(workflow_selection.py)"]
         Selection["SelectionPressure (QD)<br/>archive + admit gate<br/>(selection.py)"]
         Variation["VariationEngine<br/>seed / mutation / crossover<br/>(variation_engine.py)"]
         Orch["WorkflowOrchestrator<br/>(orchestrator.py)"]
-        Factory["WorkflowFactory<br/>SingleAgentFactory<br/>(factory.py)"]
-        Lineage["lineage.py<br/>persist parent edges"]
+        Factory["WorkflowFactory / SingleAgentFactory<br/>(factory.py, workflow_factory.py)"]
+        Lineage["lineage.py<br/>record parent edges"]
     end
 
     subgraph L3["Layer 3 — Agent execution"]
-        Runner["WorkflowRunner<br/>sandboxed Python<br/>(workflow_runner.py)"]
-        Smol["SmolAgent runtime<br/>(modules/smolagent_factory.py)"]
+        Runner["WorkflowRunner<br/>subprocess, timeouts<br/>(workflow_runner.py)"]
+        Smol["SmolAgent runtime<br/>(sources/modules/smolagent_factory.py)"]
         State["state_result.json<br/>+ workspace artefacts"]
     end
 
     subgraph L4["Layer 4 — Judge / Evaluation"]
         direction TB
-        Eval["WorkflowEvaluator<br/>(evaluators/evaluator.py)"]
-        Verifier["HybridVerifierEvaluator<br/>key claims + deterministic scorers<br/>+ pairwise reward<br/>(evaluators/hybrid_verifier/)"]
-        Legacy["VerifierEvaluator (deprecated)<br/>5-source per-claim<br/>(evaluators/verifier.py)"]
-        Generic["GenericEvaluator<br/>(generic.py)"]
-        Scenario["ScenarioEvaluator<br/>(scenario.py)"]
+        Eval["WorkflowEvaluator<br/>(sources/evaluators/evaluator.py)<br/>dispatch on verifier_kind"]
+        Verifier["PolicyBTVerifierEvaluator (production)<br/>snapshot, reproduction gate, re-exec, recon,<br/>criteria, pairwise tournament, Bradley-Terry<br/>(evaluators/policy_bt_verifier/evaluator.py)"]
+        Hybrid["HybridVerifierEvaluator (historical)<br/>(evaluators/hybrid_verifier/evaluator.py)"]
+        Legacy["VerifierEvaluator (deprecated)<br/>(evaluators/legacy_verifier/verifier.py)"]
+        Gold["GoldFeedbackEvaluator (research control)<br/>(evaluators/gold_feedback/evaluator.py)"]
+        Generic["GenericEvaluator<br/>(evaluators/generic_verifier/generic.py)<br/>not on the evolution path"]
+        Scenario["ScenarioEvaluator<br/>(evaluators/scenario/scenario.py)<br/>not on the evolution path"]
     end
 
     subgraph Storage["Persistent storage"]
-        WFs[("sources/workflows/&lt;uuid&gt;/<br/>genotype.py · state_result.json<br/>memory/ · lineage_*.json")]
-        Capsule[("runs_capsule/<br/>final artefacts + plots")]
-        Cache[("sources/memory/<br/>llm cache · task checklists")]
+        WFs[("sources/workflows/uuid/<br/>workflow_genotype_uuid.py · state_result.json · run_stdout.log<br/>evaluation.txt · policy_bt_evidence.json · textual_gradient.txt<br/>run_metrics.json · lineage_uuid.json")]
+        Registry[("sources/workflows/.policy_bt/sha256(goal, session)/<br/>tournament.json · snapshots/uuid/")]
+        Capsule[("runs_capsule/<br/>workspace copy of the run")]
+        RunNotes[("run_notes/<br/>per-capsule JSON")]
+        Cache[("sources/memory/uuid/ agent traces<br/>sources/memory/perspicacite_requests/")]
     end
 
     %% =============== flows ===================================================
     User -->|--goal| Planner
-    User -->|--task / --science_agent_bench| L2
-    Planner --> L2
+    User -->|--task| Evo
+    User -->|--science_agent_bench| CSV
+    Planner -->|evolve_runs| Evo
+    CSV -->|start_workflow_evolution| Evo
+    CSV -->|run_notes| RunNotes
+    CSV -->|LocalTransfer| Capsule
 
-    Tools --> Factory
-    Persp --> Orch
+    Planner -.literature grounding.-> Persp
+    Orch -.literature grounding.-> Persp
+    Tools -->|load_tools_code| Factory
 
-    ParentSel -->|Population members| Variation
+    Evo -->|select_parent_workflows| ParentSel
+    ParentSel -->|parents| Variation
     Selection <-->|admit / draw| ParentSel
-    Variation --> Orch
-    Orch --> Factory
-    Factory --> Runner
+    Variation -->|mutation or crossover prompt| Orch
+    Evo -->|refresh_rewards, validate_survivor| Selection
+    Orch -->|craft_workflow| Factory
+    Factory -->|write genotype| WFs
+    Orch -->|execute genotype| Runner
     Runner --> Smol
     Smol --> State
+    Smol -.agent traces.-> Cache
+    Persp -.request cache.-> Cache
 
     State --> Eval
-    Eval --> Verifier
-    Verifier --> Sources
-    Eval -.verifier_kind=legacy.-> Legacy
-    Eval --> Generic
-    Eval --> Scenario
+    Eval -->|verifier_kind = policy_bt, default| Verifier
+    Eval -.verifier_kind = hybrid.-> Hybrid
+    Eval -.verifier_kind = legacy.-> Legacy
+    Eval -.verifier_kind = gold.-> Gold
+    Eval -.evaluator_type = generic.-> Generic
+    Eval -.evaluator_type = scenario.-> Scenario
+    Verifier -->|evaluation.txt, policy_bt_evidence.json, textual_gradient.txt| WFs
+    Verifier -->|tournament.json, snapshots| Registry
+    Eval -->|overall_score read back by Evo| Evo
 
-    Eval -- reward --> Selection
-    Selection --> Lineage
-    Lineage --> WFs
-    State --> WFs
-    WFs --> Capsule
-    Eval -.cache.-> Cache
+    Evo -->|record_lineage after uuid| Lineage
+    Lineage -->|lineage_uuid.json| WFs
+    ParentSel -.scan_all lineage.-> Lineage
+    ParentSel -.disk scan.-> WFs
 
     %% =============== styling =================================================
     classDef layer fill:#FFF7E6,stroke:#A36A00,stroke-width:1px;
     classDef store fill:#EAF2FF,stroke:#3D6BBF,color:#102040;
     class L0,L1,L2,L3,L4 layer;
-    class WFs,Capsule,Cache store;
+    class WFs,Registry,Capsule,RunNotes,Cache store;

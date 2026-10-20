@@ -8,69 +8,97 @@
 flowchart TB
     %% ===== inputs =====
     Goal[/"task goal<br/>(user task / benchmark row)"/]
-    WS[/"workspace of the generation<br/>scripts · logs · deliverable artifacts"/]
-    Prev[/"per-task registry<br/>score vectors of every previous generation"/]
+    WS[/"generation workspace<br/>run.sh · requirements.txt · deliverables"/]
+    Reg[/"per-task registry<br/>.policy_bt/sha256(goal, session)/<br/>tournament.json · snapshots/uuid"/]
 
-    %% ===== Stage 1: temporal-ladder claim extraction =====
-    subgraph Claims["Stage 1 — temporal-ladder claim extraction (ONE call per task, cached)"]
-        direction LR
-        S1["script rung<br/>code exists · structurally valid<br/>reads the goal's inputs"]
-        S2["log rung<br/>loss decreasing · best/final loss<br/>accuracy at step X · no NaN"]
-        S3["result rung<br/>pred-CSV columns = ORIGINAL input columns<br/>completeness · prediction sanity"]
-    end
-    Goal --> S1
-    Goal --> S2
-    Goal --> S3
-    WS --> S1
+    Eval["PolicyBTVerifierEvaluator.evaluate(uuid)<br/>evaluator.py · verifier_kind = policy_bt"]
+    Goal --> Eval
+    WS --> Eval
+    Reg --> Eval
 
-    Digest["format digests (ONE call per task, cached)<br/>seeded head/middle/tail slices of deliverables<br/>columns · log grammar · value formats"]
-    Goal --> Digest
-    WS --> Digest
-
-    Ladder["8–12 validated claims in temporal order<br/>generic claims dropped · ≤ 14 live incl. replacements"]
-    S1 --> Ladder
-    S2 --> Ladder
-    S3 --> Ladder
-
-    %% ===== Stage 2: policy scorers =====
-    subgraph Scorers["Stage 2 — Python policy scorers (ONE call per claim, cached + repaired)"]
+    %% ===== Stage 1: snapshot + reproduction gate =====
+    subgraph Gate["Stage 1 — snapshot + reproduction gate (artifacts.py · reexec.py)"]
         direction TB
-        GenPol["judge LLM writes a self-contained scorer<br/>stdlib + numpy + pandas + PIL only;<br/>write / network / process APIs statically banned"]
-        Subproc[["pinned-interpreter subprocess<br/>sys.executable · cwd = workspace · 60 s timeout<br/>one JSON line out<br/>(NOT the SmolAgents AST sandbox)"]]
-        Repair{"valid output?"}
+        Snap["artifacts.snapshot → snapshots/uuid<br/>venvs and unreadable entries skipped"]
+        Sh{"run.sh present?"}
+        Contract["reexec._contract (LLM)<br/>installs requirements · regenerates outputs"]
+        Enabled{"policy_bt_reexecute?"}
+        Exec["reexec._execute: fresh venv, /bin/bash run.sh<br/>policy_bt_reexec_timeout_s · trusted local shell"]
+        Outcome{"reexec._finish_execution"}
     end
-    Ladder --> GenPol
-    Digest --> GenPol
-    GenPol --> Subproc
-    Subproc --> Repair
-    Repair -- "no → stderr feedback (≤ 3 attempts)" --> GenPol
+    Eval --> Snap --> Sh
+    Sh -- "no" --> Inelig
+    Sh -- "yes" --> Contract
+    Contract -- "fails" --> Inelig
+    Contract -- "passes" --> Enabled
+    Enabled -- "no (status disabled)" --> Elig
+    Enabled -- "yes" --> Exec --> Outcome
+    Outcome -- "succeeded" --> Elig
+    Outcome -- "timed_out · execution_failed · outputs_missing · outputs_unreadable" --> Inelig
+    Elig(["eligible generation"])
+    Inelig(["ineligible: rating 0.0<br/>gradient 'Reproducibility failure: …'"])
 
-    %% ===== Stage 3: registry + variance filter =====
-    subgraph Reg["Stage 3 — per-task registry + variance filter"]
-        Vectors["per-generation score vectors<br/>(same cached scorer re-scores every generation)"]
-        Dead{"zero variance<br/>across ≥ 2 workspaces?"}
-        Refine["refinement: replace dead claims<br/>≤ hybrid_verifier_refinement_rounds per generation"]
+    %% ===== Stage 2: recon, criteria freeze, policy sources =====
+    subgraph Prep["Stage 2 — PolicyEngine.prepare (policy.py) · criteria frozen once per task"]
+        direction TB
+        Recon["reconnaissance (recon.py)<br/>ONE LLM plan · ≤ 16 read-only inspection rounds"]
+        Guard["criteria_guard.guard_plan<br/>code grounding, then ONE LLM keep / reject audit"]
+        Rev{"criteria rejected?"}
+        Sources["frozen criteria (judge = code | vision)<br/>CORE compare(a, b) + ADAPTER normalize()<br/>screen_source AST allowlist · _prepare_smoke"]
     end
-    Repair -- yes --> Vectors
-    Vectors --> Dead
-    Dead -- yes --> Refine
-    Refine --> Vectors
-    Prev --> Vectors
+    Elig --> Recon --> Guard --> Rev
+    Rev -- "yes, MAX_PLAN_REVISIONS = 3" --> Recon
+    Rev -- "no revisions left: drop" --> Sources
 
-    %% ===== Stage 4: pairwise temporal elimination =====
-    subgraph Reward["Stage 4 — Bradley–Terry via temporal elimination"]
-        Stage["per pair (now, prev):<br/>earliest differing stage decides<br/>higher pass-count (score ≥ 0.5) wins<br/>tie → stage mean score-diff"]
-        WinRate["reward = (wins + 0.5·ties) / n_previous<br/>first generation → mean claim score"]
+    %% ===== Stage 3: tournament pairs =====
+    subgraph Tour["Stage 3 — _compare_tournament · every pair, both orders"]
+        direction TB
+        Pair["_compare_pair(new, rival)"]
+        Side{"both sides eligible?"}
+        ExecV["_execution_verdict<br/>ineligible side loses · no policy run"]
+        Worker["_artifact_verdict → pair_workspace → run_pair<br/>python -I -S policy.py --worker · empty env<br/>policy_bt_scorer_timeout_s = 60"]
+        Checks["_worker_pair: compare(a, b) and compare(b, a)<br/>symmetry · self-tie · determinism · null-never-decides"]
+        Fault{"worker fault?"}
+        Repair["repair ≤ policy_bt_repair_rounds<br/>AdaptationError → ADAPTER · other → CORE"]
+        Tie{"code winner = tie?"}
+        Vis["_visual_verdict → VisualChannel.compare<br/>both orders must agree · images on both sides"]
+        Stable{"bundle version unchanged?"}
     end
-    Vectors --> Stage
-    Stage --> WinRate
+    Sources --> Pair --> Side
+    Side -- "no" --> ExecV --> Stable
+    Side -- "yes" --> Worker --> Checks --> Fault
+    Fault -- "yes" --> Repair --> Worker
+    Fault -- "no" --> Tie
+    Tie -- "yes" --> Vis --> Stable
+    Tie -- "no" --> Stable
+    Stable -- "no: recompute all pairs" --> Pair
 
-    %% ===== Stage 5: elimination-point gradient =====
-    WinRate --> Grad["Stage 5 — elimination-point textual gradient<br/>leads with the earliest lost stage/claim<br/>(both scores · measured evidence · goal-anchored fix)<br/>→ textual_gradient.txt + evaluation.txt<br/>→ evaluation.verifier.abstracted_textual_gradient"]
-    Grad -. drives .-> Loop[/"EvolutionEngine.evolve_generation()"/]
+    %% ===== Stage 4: ratings and gradient =====
+    subgraph Res["Stage 4 — ratings and results (tournament.py · results.py)"]
+        direction TB
+        Fit["tournament.fit_ratings<br/>regularized Bradley–Terry · ineligible = 0.0"]
+        Fold["results.fold_gradient<br/>losses only if any pair lost · wins only if unbeaten"]
+        Publish["results.publish_results<br/>state_result.json · textual_gradient.txt · evaluation.txt"]
+    end
+    Stable -- "yes" --> Fit --> Fold --> Publish
+    Fail["_record_instrument_error<br/>verifier_instrument_error · reward None (skipped, not 0)"]
+    Eval -. "any exception" .-> Fail
+
+    %% ===== Stage 5: engine consumption =====
+    subgraph Engine["Stage 5 — engine consumption (sources/core/)"]
+        direction TB
+        Refresh["_refresh_policy_bt_rewards → survivor selection"]
+        Parent["WorkflowInfo.abstracted_textual_gradient"]
+        Mutate["variation_engine: mutation and crossover prompts"]
+        Capsule["_select_capsule_run<br/>argmax current Bradley–Terry rating"]
+    end
+    Publish --> Refresh --> Capsule
+    Publish --> Parent --> Mutate
+    Loop[/"EvolutionEngine.evolve_generation()"/]
+    Refresh -. drives .-> Loop
 
     %% ===== styling =====
     classDef stage fill:#F1FBF6,stroke:#2E8B57,stroke-width:1px,color:#0E2A1A;
     classDef external fill:#FFF7E6,stroke:#A36A00,color:#202020;
-    class Claims,Scorers,Reg,Reward stage;
-    class Goal,WS,Prev external;
+    class Gate,Prep,Tour,Res,Engine stage;
+    class Goal,WS,Reg external;

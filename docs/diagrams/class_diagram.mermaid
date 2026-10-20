@@ -1,13 +1,14 @@
 graph TD
-      A[User Goal] --> B[EvolutionEngine - evolution_engine.py]
-      B --> C[WorkflowOrchestrator - orchestrator.py]
-      C --> D[WorkflowFactory - workflow_factory.py]
-      D --> E[LLM Generation<br/>OpenAI Models]
-      E --> F[WorkflowRunner - workflow_runner.py]
-      F --> G[SmolAgentFactory - smolagent_factory.py]
-      G --> H[SmolAgent Instances]
-      H --> I[ToolManager - tools_manager.py]
-      I --> J[MCP Servers<br/>localhost:5000-5250]
+      A["User Goal"] --> B["EvolutionEngine<br/>evolution_engine.py"]
+      B --> C["WorkflowOrchestrator<br/>orchestrator.py"]
+      C --> D["WorkflowFactory<br/>workflow_factory.py<br/>(Factory base: factory.py)"]
+      D --> E["LLMProvider<br/>llm_provider.py - litellm"]
+      E --> F["WorkflowRunner<br/>workflow_runner.py<br/>subprocess execution"]
+      G["SmolAgentFactory template<br/>sources/modules/smolagent_factory.py"] -.->|"read as text and injected into script"| D
+      F --> H["SmolAgent Instances<br/>inside generated script"]
+      D -->|"load_tools_code"| I["ToolManager<br/>tools_manager.py"]
+      I --> J["MCP Servers<br/>0.0.0.0:5000-5200 /mcp"]
+      H -.->|"runtime tool calls"| J
 
       %% 4-Layer Architecture
       subgraph "Meta-Orchestration Layer"
@@ -31,24 +32,37 @@ graph TD
           J
       end
 
-      %% Storage Components
-      K[sources/workflows/<br/>UUID-based folders]
-      L[sources/memory/<br/>UUID-based folders]
-      M[sources/prompts/<br/>System prompts]
+      %% Evaluation Layer
+      Q["WorkflowEvaluator<br/>evaluator.py facade"]
+      P["PolicyBTVerifierEvaluator<br/>policy_bt_verifier/evaluator.py"]
 
-      F --> K
-      H --> L
-      D --> M
+      B -->|"judge.evaluate verifier"| Q
+      Q -->|"verifier_kind policy_bt"| P
+      F -->|"execution output in workspace_dir"| P
+      P -.->|"reward feeds selection"| B
+      P -.->|"LLM recon and compare calls"| E
+
+      subgraph "Evaluation Layer"
+          Q
+          P
+      end
+
+      %% Storage Components
+      K["sources/workflows/CAMPAIGN/<br/>UUID folders: code, state_result.json,<br/>verifier logs, .policy_bt registry"]
+      L["sources/memory/CAMPAIGN/<br/>UUID folders: LLM call records and cache"]
+      M["sources/prompts/<br/>system prompts"]
+
+      D -->|"save workflow files"| K
+      P -->|"registry and verifier logs"| K
+      E -->|"cache and call records"| L
+      M -.->|"system prompt"| D
 
       %% External Dependencies
-      N[toolomics MCP Server]
-      O[Environment Variables<br/>HF_TOKEN, OPENAI_API_KEY]
-      P[Health Check Endpoint<br/>http://localhost:5000/health]
+      N["Toolomics MCP Servers<br/>external repo, streamable HTTP"]
+      O["Environment and .env<br/>OPENROUTER_API_KEY, OPENAI_API_KEY,<br/>ANTHROPIC_API_KEY, DEEPSEEK_API_KEY,<br/>ZAI_API_KEY, HF_TOKEN"]
 
       J --> N
-      B --> O
-      J --> P
-
+      O --> E
 
       classDef layer1 fill:#e1f5fe
       classDef layer2 fill:#f3e5f5
@@ -57,9 +71,9 @@ graph TD
       classDef storage fill:#f5f5f5
       classDef external fill:#ffebee
 
-      class B,C layer1
+      class B,C,Q,P layer1
       class D,E,F layer2
       class G,H layer3
       class I,J layer4
       class K,L,M storage
-      class N,O,P external
+      class N,O external

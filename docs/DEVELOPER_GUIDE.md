@@ -555,8 +555,11 @@ For each generation (`sources/evaluators/policy_bt_verifier/`):
    violations go to repair. Both
    argument orders and self-tie checks must agree; a static screen, a
    runtime smoke, and ≤ `policy_bt_repair_rounds` repairs protect the
-   accepted policy. On a policy tie, relevant images on both sides go
-   to the configured vision model (`policy_bt_visual_channel`).
+   accepted policy. Criteria with `"judge": "vision"` (what only a
+   figure shows) are left out of the adapters and the comparison policy
+   (`recon.code_task`); on a policy tie, relevant images on both sides
+   go to the configured vision model (`policy_bt_visual_channel`), which
+   decides them.
 4. **Tournament reward.** All pair verdicts fit a regularized
    Bradley–Terry model; after each evaluation EVERY generation of the
    task session gets a new current rating (`arrival_reward` keeps the
