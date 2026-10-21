@@ -116,6 +116,8 @@ class Config:
         self.policy_bt_reexec_timeout_s: int = 1800
         # Rerun interpreter, pip caps and env; empty = host Python, no caps.
         self.policy_bt_reexec_runtime: dict = {}
+        # Largest verifier text prompt, in characters; larger fails fast.
+        self.policy_bt_max_prompt_chars: int = 1_500_000
         # gold reward gradient mode for potential ablations
         self.gold_feedback_reward: bool = False
         # verifier_kind="gold" only: wall-clock cap (seconds)
@@ -460,6 +462,7 @@ class Config:
             "policy_bt_reexecute": self.policy_bt_reexecute,
             "policy_bt_reexec_timeout_s": self.policy_bt_reexec_timeout_s,
             "policy_bt_reexec_runtime": self.policy_bt_reexec_runtime,
+            "policy_bt_max_prompt_chars": self.policy_bt_max_prompt_chars,
             "openrouter_provider": self.openrouter_provider,
             "default_openrouter_quantizations": self.default_openrouter_quantizations,
             "save_logprobs": self.save_logprobs,
@@ -604,6 +607,9 @@ class Config:
         )
         self.policy_bt_reexec_runtime = dict(
             data.get("policy_bt_reexec_runtime") or self.policy_bt_reexec_runtime
+        )
+        self.policy_bt_max_prompt_chars = int(
+            data.get("policy_bt_max_prompt_chars", self.policy_bt_max_prompt_chars)
         )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get(

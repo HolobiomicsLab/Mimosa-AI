@@ -761,3 +761,70 @@ def test_guard_drop_never_freezes_a_task_without_a_code_criterion(tmp_path):
     ask = _guarded_ask([plan] * 16, [verdict] * 16, [])
     with pytest.raises(ReconError):
         reconnaissance("goal", [{"uuid": "g1", "snapshot": str(tmp_path)}], {"ask": ask})
+
+
+def test_recon_listing_budget_is_shared_across_generations(tmp_path):
+    """Each generation used to get 400 rows and 64 KiB of previews, so a recon
+    prompt grew without bound with the number of generations. The budget is
+    now shared, with a floor, and omitted rows are counted per directory."""
+    from sources.evaluators.policy_bt_verifier.recon import (
+        MIN_LISTED_ENTRIES,
+        describe_generation,
+        reconnaissance,
+    )
+
+    (tmp_path / "deep" / "raw").mkdir(parents=True)
+    for index in range(500):
+        (tmp_path / "deep" / "raw" / f"c{index:03d}.xyz").write_text("".join(f"C {row} 0 0\n" for row in range(300)))
+    (tmp_path / "summary.csv").write_text("conformer,energy\n1,-9.1\n")
+    prompts = []
+
+    def ask(prompt):
+        prompts.append(prompt)
+        raise RuntimeError("stop after the first prompt")
+
+    records = [{"uuid": f"g{index}", "snapshot": str(tmp_path)} for index in range(12)]
+    with pytest.raises(RuntimeError, match="stop"):
+        reconnaissance("goal", records, {"ask": ask, "frozen_task": {"criteria": []}})
+    evidence = json.loads(prompts[0].split("EVIDENCE_JSON\n", 1)[1].rsplit("\nEND_EVIDENCE_JSON", 1)[0])
+    crowded = evidence["generations"][0]
+    assert [len(item["inventory"]) for item in evidence["generations"]] == [100] * 12
+    assert crowded["inventory"][0]["path"] == "summary.csv"
+    assert crowded["unlisted_directories"] == {"deep/raw": 401}
+    previews = sum(len(row["preview"].encode()) for row in crowded["inventory"])
+    assert 0 < previews <= 3 * 65536 // 12
+    record = records[0]
+    assert [len(describe_generation(record, share)["inventory"]) for share in (1, 1000)] == [400, MIN_LISTED_ENTRIES]
+
+
+def test_directory_page_names_files_a_bounded_listing_omitted(tmp_path):
+    """Recon and the contract find omitted files by listing a directory."""
+    from sources.evaluators.policy_bt_verifier.artifacts import (
+        DIRECTORY_PAGE_ENTRIES,
+        read_page,
+    )
+
+    (tmp_path / "raw").mkdir()
+    for index in range(DIRECTORY_PAGE_ENTRIES + 5):
+        (tmp_path / "raw" / f"c{index:03d}.xyz").write_text("C")
+    first = read_page(tmp_path, {"path": "raw"})
+    second = read_page(tmp_path, {"path": "raw", "offset": first["next_offset"]})
+    assert len(first["entries"]) == DIRECTORY_PAGE_ENTRIES and first["remaining_entries"] == 5
+    assert [entry["name"] for entry in second["entries"]][-1] == f"c{DIRECTORY_PAGE_ENTRIES + 4:03d}.xyz"
+    assert second["remaining_entries"] == 0
+    assert "error" in read_page(tmp_path, "raw")
+
+
+def test_oversized_prompt_fails_fast_without_a_provider_call(tmp_path, monkeypatch):
+    """2026-10-21: a 6.3 M-character contract prompt was sent and billed
+    before the provider refused it. The verifier now refuses it first."""
+    from sources.evaluators.policy_bt_verifier.evaluator import PromptTooLargeError
+
+    evaluator = _evaluator(tmp_path, monkeypatch)
+    evaluator.config.policy_bt_max_prompt_chars = 100
+    evaluator._uuid = "g"
+    monkeypatch.setattr(evaluator, "_provider_for", lambda *args: pytest.fail("provider must not be called"))
+    with pytest.raises(PromptTooLargeError, match="101 characters"):
+        evaluator._ask("x" * 101)
+    record = json.loads((evaluator.workflow_dir / "g" / "verifier_policy_bt.log").read_text())
+    assert record["stage"] == "PROMPT_TOO_LARGE" and record["chars"] == 101

@@ -39,6 +39,19 @@ BASELINE_DIGESTS = "baseline_digests.json"
 STATUS_VERIFIED = "verified"
 STATUS_TAMPERED = "input_tampered"
 STATUS_UNVERIFIED = "unverified"
+# Fallback when config lacks policy_bt_max_prompt_chars.
+DEFAULT_MAX_PROMPT_CHARS = 1_500_000
+PROMPT_HEAD_CHARS = 200
+
+
+class PromptTooLargeError(RuntimeError):
+    """A verifier stage built a prompt larger than the configured limit.
+
+    Raised by ``PolicyBTVerifierEvaluator._ask`` before any provider call.
+    The evaluator's error boundary records it as
+    ``verifier_instrument_error``: an unbounded stage is a verifier fault,
+    never a score of the generation.
+    """
 
 
 class PolicyBTVerifierEvaluator(BaseEvaluator):
@@ -340,12 +353,25 @@ class PolicyBTVerifierEvaluator(BaseEvaluator):
     def _ask(self, prompt: str) -> str:
         """Call the shared text provider and persist its full information flow.
 
+        Every text stage (contract, failure diagnosis, recon, criteria guard,
+        policy and adapter source) calls it. A prompt over
+        ``policy_bt_max_prompt_chars`` is refused before the provider call,
+        so an unbounded stage fails fast and is named in the log.
+
         Args:
             prompt: Stage prompt assembled from task and untrusted evidence.
 
         Returns:
             Model response text, never a fabricated fallback.
+
+        Raises:
+            PromptTooLargeError: When the prompt exceeds the limit.
         """
+        limit = int(getattr(self.config, "policy_bt_max_prompt_chars", DEFAULT_MAX_PROMPT_CHARS))
+        if len(prompt) > limit:
+            self._log("PROMPT_TOO_LARGE", {"chars": len(prompt), "limit": limit, "head": prompt[:PROMPT_HEAD_CHARS]})
+            raise PromptTooLargeError(f"Verifier prompt has {len(prompt):,} characters, over the "
+                                      f"policy_bt_max_prompt_chars limit {limit:,}; its stage evidence is not bounded")
         result = self._provider_for("text", self.llm_config)(prompt, use_cache=False)
         self._log("LLM", {"prompt": prompt, "response": result})
         self._say("LLM", f"prompt {len(prompt):,} ch → response {len(result):,} ch")

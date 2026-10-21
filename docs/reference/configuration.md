@@ -73,6 +73,7 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `policy_bt_reexecute` | `bool` | `true` | Re-execute each snapshot in a fresh venv before scoring. |
 | `policy_bt_reexec_timeout_s` | `int` | `1800` | Re-execution timeout (seconds). |
 | `policy_bt_reexec_runtime` | `dict` | `{}` | Re-execution runtime mapping. Empty by default. |
+| `policy_bt_max_prompt_chars` | `int` | `1500000` | Largest verifier text prompt, in characters. A larger prompt fails fast as `verifier_instrument_error` before any provider call; lower it for small-context `judge_model`s. |
 
 ## QD / novelty (selection & variation)
 

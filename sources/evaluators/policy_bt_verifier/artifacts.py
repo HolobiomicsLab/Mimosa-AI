@@ -9,12 +9,14 @@ only: it stays visible, but its installed packages are not task evidence.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
 import shutil
 import stat
 import tempfile
+from collections import Counter
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -23,6 +25,11 @@ HASH_CHUNK_BYTES = 1024 * 1024
 PREVIEW_SAMPLE_BYTES = 64 * 1024
 PREVIEW_CHARACTERS = 12 * 1024
 VENV_MARKER = "pyvenv.cfg"
+# One explicit inspection page: bytes of a file, entries of a directory.
+PAGE_BYTES = 8192
+DIRECTORY_PAGE_ENTRIES = 200
+# Directories named in a bounded listing's summary of omitted rows.
+MAX_UNLISTED_DIRECTORIES = 200
 
 
 def decode_object(response: str) -> dict:
@@ -183,6 +190,121 @@ def file_digests(root: Path) -> dict[str, str]:
         special files are left out.
     """
     return {item["path"]: item["sha256"] for item in inventory(root) if item["kind"] == "file"}
+
+
+def bounded_listing(entries: list[dict], limit: int) -> tuple[list[dict], dict[str, int]]:
+    """Choose the inventory rows one prompt lists, and count the rest.
+
+    Reconnaissance and the reproduction contract call it, because a full
+    inventory can exceed the model input (live case 2026-10-21: 1,384 files
+    gave a 6.3 M-character contract prompt). Shallow paths come first, so
+    top-level outputs and scripts stay listed; omitted rows are counted per
+    parent directory, and a directory page shows their names.
+
+    Args:
+        entries (list[dict]): Inventory rows from ``inventory``.
+        limit (int): Maximum number of rows to list.
+
+    Returns:
+        tuple[list[dict], dict[str, int]]: The listed rows, and the number of
+        omitted rows per parent directory (the largest
+        ``MAX_UNLISTED_DIRECTORIES`` directories).
+    """
+    ordered = sorted(entries, key=lambda item: (item["path"].count("/"), item["path"]))
+    omitted = Counter(Path(item["path"]).parent.as_posix() for item in ordered[limit:])
+    return ordered[:limit], dict(omitted.most_common(MAX_UNLISTED_DIRECTORIES))
+
+
+def safe_path(root: Path, relative: str) -> Path:
+    """Keep artifact reads inside a real directory without symlink traversal.
+
+    Args: root (Path): owned artifact root; relative (str): untrusted file name.
+    Returns: Path confined below root; raises on unsafe paths.
+    """
+    if not isinstance(relative, str) or not relative:
+        raise ValueError("Artifact path must be a nonempty relative string")
+    path = Path(relative)
+    if path.is_absolute() or ".." in path.parts:
+        raise ValueError("Absolute and parent paths are forbidden")
+    candidate = root.resolve()
+    for part in path.parts:
+        candidate = candidate / part
+        if candidate.is_symlink():
+            raise ValueError("Symlink artifact access is forbidden")
+    candidate.resolve().relative_to(root.resolve())
+    return candidate
+
+
+def inspect_page(root: Path, request: dict) -> dict:
+    """Read one explicit page of a file or a directory for an LLM stage.
+
+    Reconnaissance and the reproduction contract serve the model's page
+    requests with it. A file page holds bytes from ``offset``; a directory
+    page holds up to ``DIRECTORY_PAGE_ENTRIES`` entries from entry index
+    ``offset``, so the model can find files a bounded listing omitted.
+
+    Args: root (Path): owned root; request (dict): untrusted ``path``,
+        ``offset`` and ``length`` (bytes, files only).
+    Returns: dict: the request with the page content, its encoding, the next
+        offset and the remaining byte or entry count; raises ValueError on an
+        invalid request.
+    """
+    offset, length = request.get("offset", 0), request.get("length", PAGE_BYTES)
+    if type(offset) is not int or type(length) is not int:
+        raise ValueError("Inspection offset and length must be integers")
+    if offset < 0 or not 1 <= length <= PAGE_BYTES:
+        raise ValueError(f"Inspection length must be 1..{PAGE_BYTES}")
+    path = safe_path(root, request["path"])
+    if path.is_dir():
+        return _directory_page(path, request, offset)
+    with path.open("rb") as stream:
+        stream.seek(offset)
+        data = stream.read(length)
+    try:
+        content, encoding = data.decode("utf-8"), "utf-8"
+    except UnicodeDecodeError:
+        content, encoding = base64.b64encode(data).decode("ascii"), "base64"
+    return {**request, "content": content, "encoding": encoding,
+            "next_offset": offset + len(data),
+            "remaining_bytes": max(0, path.stat().st_size - offset - len(data))}
+
+
+def _directory_page(path: Path, request: dict, offset: int) -> dict:
+    """List one page of a directory's entries without following links.
+
+    Called by ``inspect_page`` when the requested path is a directory.
+
+    Args: path (Path): Confined directory; request (dict): The page request;
+        offset (int): Index of the first entry to list.
+    Returns: dict: The request with ``entries`` (name, kind, size), the next
+        offset and the number of remaining entries.
+    """
+    names = sorted(os.listdir(path))
+    entries = []
+    for name in names[offset:offset + DIRECTORY_PAGE_ENTRIES]:
+        metadata = (path / name).lstat()
+        kind = "dir" if stat.S_ISDIR(metadata.st_mode) else "symlink" if stat.S_ISLNK(metadata.st_mode) else "file"
+        entries.append({"name": name, "kind": kind, "size": metadata.st_size})
+    return {**request, "entries": entries, "next_offset": offset + len(entries),
+            "remaining_entries": max(0, len(names) - offset - len(entries))}
+
+
+def read_page(root: Path, request: object) -> dict:
+    """Serve one model page request, turning a bad request into a visible error.
+
+    Reconnaissance and the reproduction contract call it for every request,
+    so one bad path never ends the stage; the model sees the error instead.
+
+    Args: root (Path): Owned root; request (object): Untrusted request,
+        normally a dict with ``path``, ``offset`` and ``length``.
+    Returns: dict: The page from ``inspect_page`` or the request with ``error``.
+    """
+    if not isinstance(request, dict):
+        return {"request": request, "error": "Inspection request must be an object"}
+    try:
+        return inspect_page(root, request)
+    except (OSError, ValueError, KeyError) as error:
+        return {**request, "error": str(error)}
 
 
 def snapshot(source: Path, destination: Path) -> Path:

@@ -1,6 +1,6 @@
 """Versioned instructions for task understanding and deterministic policy code."""
 
-PROMPT_VERSION = "policy-bt-separated-10"
+PROMPT_VERSION = "policy-bt-separated-11"
 
 BOUNDARY = """
 You are a scientific verification instrument, not a workspace assistant.
@@ -11,9 +11,12 @@ hidden reference answers. Return one JSON object, without Markdown fences.
 """
 
 RECON = BOUNDARY + """
-Inspect the COMPLETE inventory. Every unread or truncated preview is marked;
+Inspect the inventory. Every unread or truncated preview is marked;
 request more bytes whenever needed to understand a relevant artifact. Unsupported
 binary formats remain visible: identify their format and do not invent values.
+A large inventory is listed shallow paths first; "unlisted_directories" counts the
+omitted entries per directory. A request whose path is a directory (use "." for the
+root) returns its entry names, offset counting entries; use it to find omitted files.
 Choose relevant figures by their meaning for the goal, not file size or name rules.
 First response may be {"action":"inspect","requests":[{"uuid":"...",
 "path":"relative/path","offset":0,"length":8192}]}. Byte offsets are explicit.

@@ -178,6 +178,71 @@ def test_malformed_contract_answer_raises_instead_of_scoring_zero(tmp_path):
         reproduce(root, {"policy_bt_reexecute": False}, lambda _: "not json")
 
 
+def _evidence(prompt: str) -> dict:
+    """Decode the EVIDENCE object of one contract prompt.
+
+    Args: prompt (str): Prompt the contract stage passed to the LLM callback.
+    Returns: dict: The JSON evidence after the ``EVIDENCE:`` marker.
+    """
+    return json.loads(prompt.split("\nEVIDENCE:\n", 1)[1])
+
+
+def test_contract_prompt_does_not_grow_with_file_contents(tmp_path, monkeypatch):
+    """2026-10-21 conformer run: 1,384 files with previews made a 6.3 M-character
+    contract prompt (1.3 M tokens, over the model limit). Rows carry no previews,
+    and rows past the cap are counted per directory, shallow paths first."""
+    from sources.evaluators.policy_bt_verifier import reexec
+
+    root = _workspace(tmp_path / "owned", "python pipeline.py\n")
+    (root / "conformers" / "raw").mkdir(parents=True)
+    for index in range(200):
+        (root / "conformers" / "raw" / f"c{index:03d}.xyz").write_text("C 0.1 0.2 0.3\n" * 1500)
+    monkeypatch.setattr(reexec, "MAX_CONTRACT_ROWS", 50)
+    prompts = []
+    result = reproduce(root, {"policy_bt_reexecute": False}, lambda prompt: prompts.append(prompt) or _answer())
+    evidence = _evidence(prompts[0])
+    assert result["status"] == "disabled"
+    assert len(prompts[0]) < 30_000
+    assert {"reproduce.sh", "requirements.txt", "result.data"} <= {row["path"] for row in evidence["inventory"]}
+    assert all("preview" not in row for row in evidence["inventory"])
+    assert evidence["unlisted_entries"] == 153
+    assert evidence["unlisted_directories"] == {"conformers/raw": 153}
+
+
+def test_contract_reads_referenced_files_step_by_step(tmp_path):
+    """The contract no longer gets every preview, so it must be able to read
+    the script run.sh calls, and list a directory, before it answers."""
+    root = _workspace(tmp_path / "owned", "python pipeline.py\n")
+    (root / "pipeline.py").write_text("open('result.data', 'w').write('fresh')\n")
+    prompts = []
+
+    def ask(prompt):
+        prompts.append(_evidence(prompt))
+        if len(prompts) == 1:
+            return json.dumps({"action": "inspect", "requests": [{"path": "pipeline.py"}, {"path": "."}, {"path": "../x"}]})
+        return _answer()
+
+    result = reproduce(root, {"policy_bt_reexecute": False}, ask)
+    file_page, directory_page, refused = prompts[1]["inspections"]
+    assert result["status"] == "disabled"
+    assert "result.data" in file_page["content"] and file_page["remaining_bytes"] == 0
+    assert "pipeline.py" in [entry["name"] for entry in directory_page["entries"]]
+    assert "parent" in refused["error"]
+    assert prompts[1]["rounds_left"] == prompts[0]["rounds_left"] - 1
+
+
+def test_contract_that_never_stops_inspecting_is_an_instrument_error(tmp_path):
+    """An endless inspect loop must end, as a verifier fault, not a task loss."""
+    from sources.evaluators.policy_bt_verifier.reexec import MAX_CONTRACT_ROUNDS
+
+    root = _workspace(tmp_path / "owned", "true\n")
+    calls = []
+    answer = json.dumps({"action": "inspect", "requests": [{"path": "reproduce.sh"}]})
+    with pytest.raises(ReproductionInstrumentError, match="kept inspecting"):
+        reproduce(root, {"policy_bt_reexecute": False}, lambda _: calls.append(1) or answer)
+    assert len(calls) == MAX_CONTRACT_ROUNDS + 1
+
+
 def test_execution_facts_published_for_adapters(tmp_path):
     """Reproduction truth must reach adapters as measured fact, not log text."""
     source = _workspace(tmp_path / "source", "printf regenerated > result.data\n")
