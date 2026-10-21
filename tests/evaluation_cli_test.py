@@ -370,6 +370,19 @@ def test_resample_run_launches_the_learning_loop(monkeypatch, tmp_path):
     assert spec.status == "completed"
 
 
+def test_first_run_id_follows_highest_existing_run_folder(monkeypatch, tmp_path):
+    """A new queue must never reuse an existing run_notes/run_<n> folder."""
+    monkeypatch.chdir(tmp_path)
+    assert EvaluationCLI(SimpleNamespace())._next_run_id == 1  # no run_notes/
+
+    notes_root = tmp_path / "run_notes"
+    for name in ("run_1", "run_3", "run_12_old", "run_oct_18", "evaluations"):
+        (notes_root / name).mkdir(parents=True)
+    (notes_root / "run_9").write_text("not a folder", encoding="utf-8")
+
+    assert EvaluationCLI(SimpleNamespace())._next_run_id == 4
+
+
 if __name__ == "__main__":
     test_launch_queue_is_sequential_and_survives_failure()
     print("✅ evaluation CLI sequential-queue smoke checks passed")

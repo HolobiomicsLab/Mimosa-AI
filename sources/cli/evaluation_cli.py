@@ -71,9 +71,13 @@ _EVAL_BANNER = banner("Evaluation console", "ScienceAgentBench")
 
 TOTAL_STEPS = 7  # Config → Model → Connectivity → Mode → Tasks → Advanced → Queue/Launch
 _CONFIG_DEFAULT_PATH = "config_default.json"
+# Root of the run notes; each queued run writes run_<id>/ here.
+_RUN_NOTES_ROOT = Path("run_notes")
+# Folder-name prefix of a numbered run (run_1, run_2, …).
+_RUN_DIR_PREFIX = "run_"
 # Where EvaluationCLI stores its per-run summary notes — also the folder the
 # cache-restore file picker offers files from.
-_EVAL_NOTES_DIR = Path("run_notes") / "evaluations"
+_EVAL_NOTES_DIR = _RUN_NOTES_ROOT / "evaluations"
 # Modes that run the multi-generation loop (csv_mode learning=True).
 _LEARNING_MODES = ("iterative", "resample")
 
@@ -111,7 +115,35 @@ class EvaluationCLI:
         self.config = config
         self._mcp_list: list[str] = []
         self._queue: list[EvalRunSpec] = []
-        self._next_run_id: int = 1
+        self._next_run_id: int = self._first_free_run_id(_RUN_NOTES_ROOT)
+
+    @staticmethod
+    def _first_free_run_id(notes_root: Path) -> int:
+        """Find the first run number that no earlier evaluation used.
+
+        EvaluationCLI uses this so that a new run never writes into the
+        folders of an old run. ``__init__`` calls it with the run-notes root
+        folder. It finds the largest ``n`` of the ``run_<n>`` folders and
+        adds 1. Folders such as ``run_1_old`` or ``run_oct_18`` do not count.
+
+        Args:
+            notes_root (Path): Run-notes root folder, ``_RUN_NOTES_ROOT``
+                (``run_notes/``, relative to the current directory).
+
+        Returns:
+            int: The largest ``n`` plus 1, or 1 when no ``run_<n>`` folder
+            exists.
+        """
+        if not notes_root.is_dir():
+            return 1
+        names = (entry.name for entry in notes_root.iterdir() if entry.is_dir())
+        suffixes = (
+            name.removeprefix(_RUN_DIR_PREFIX)
+            for name in names
+            if name.startswith(_RUN_DIR_PREFIX)
+        )
+        used_ids = [int(s) for s in suffixes if s.isascii() and s.isdigit()]
+        return max(used_ids, default=0) + 1
 
     # ------------------------------------------------------------------
     # Public entry-point
@@ -128,6 +160,12 @@ class EvaluationCLI:
         # Resolve the Toolomics workspace before anything is configured or
         # launched — the CLI refuses to start without a valid one.
         self._resolve_workspace()
+        if self._next_run_id > 1:
+            _info(
+                f"{_RUN_NOTES_ROOT}/ already holds runs up to "
+                f"{_RUN_DIR_PREFIX}{self._next_run_id - 1} — "
+                f"numbering starts at Run #{self._next_run_id}."
+            )
 
         # Build queue: loop of configure-run → validate → "add another?"
         while True:
@@ -1131,7 +1169,7 @@ class EvaluationCLI:
             csv_runs_limit=spec.csv_runs_limit,
             max_concurrent_tasks=max_concurrent,
             task_start_delay=task_start_delay,
-            run_notes_dir=Path("run_notes") / f"run_{spec.run_id}",
+            run_notes_dir=_RUN_NOTES_ROOT / f"{_RUN_DIR_PREFIX}{spec.run_id}",
             restore_notes_file=spec.restore_notes_file,
         )
         # Attach the run notes path so csv_mode can write final results there
