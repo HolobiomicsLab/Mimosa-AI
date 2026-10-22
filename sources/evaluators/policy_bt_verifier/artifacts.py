@@ -17,7 +17,7 @@ import shutil
 import stat
 import tempfile
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -30,6 +30,20 @@ PAGE_BYTES = 8192
 DIRECTORY_PAGE_ENTRIES = 200
 # Directories named in a bounded listing's summary of omitted rows.
 MAX_UNLISTED_DIRECTORIES = 200
+# Bounded inspect loop of the contract and provenance stages.
+INSPECT_ROUNDS = 6
+INSPECT_REQUESTS = 8
+INSPECT_PAGES = 24
+INSPECTION_RULES = f"""To read a file or list a directory ("." is the root) before you
+decide, return {{"action":"inspect","requests":[{{"path":"relative/path","offset":0,
+"length":{PAGE_BYTES}}}]}} with 1 to {INSPECT_REQUESTS} requests. A file page holds up
+to {PAGE_BYTES} bytes from offset; a directory page lists entry names from entry index
+offset. The pages come back in EVIDENCE.inspections, which keeps the newest
+{INSPECT_PAGES} pages ("inspection_note" says when older ones were dropped).
+EVIDENCE.rounds_left counts the inspection rounds left; at 0 you must give the final
+answer. EVIDENCE.previous_answer_error explains why your last answer was refused.
+You have no tools: every answer, inspect or final, is one plain-text JSON object.
+"""
 
 
 def decode_object(response: str) -> dict:
@@ -305,6 +319,74 @@ def read_page(root: Path, request: object) -> dict:
         return inspect_page(root, request)
     except (OSError, ValueError, KeyError) as error:
         return {**request, "error": str(error)}
+
+
+def answer_after_inspection(root: Path, instructions: str, evidence: dict,
+                            ask: Callable[[str], str]) -> dict:
+    """Let the model read pages step by step, then return its final answer.
+
+    The reproduction contract and the provenance check call it with bounded
+    first evidence. Each inspect answer is served by ``_serve_pages``; any
+    other readable answer is final. An unreadable answer (live case
+    2026-10-21: tool-call markup instead of JSON) is shown to the model in
+    ``previous_answer_error`` and costs one round.
+
+    Args: root (Path): Owned snapshot; instructions (str): Stage prompt that
+        includes ``INSPECTION_RULES``; evidence (dict): JSON-ready evidence,
+        changed in place; ask (Callable[[str], str]): LLM callback.
+    Returns: dict: The final, still unvalidated answer.
+    Raises: ValueError when the rounds end without a readable final answer.
+    """
+    evidence.setdefault("inspections", [])
+    problem = ""
+    for rounds_left in range(INSPECT_ROUNDS, -1, -1):
+        evidence["rounds_left"] = rounds_left
+        answer, problem = _checked_answer(instructions, evidence, ask)
+        if not problem and answer.get("action") != "inspect":
+            return answer
+        if not problem:
+            _serve_pages(root, answer["requests"], evidence)
+    problem = problem or "it kept inspecting after its last round"
+    raise ValueError(f"no readable final answer after {INSPECT_ROUNDS + 1} rounds: {problem}")
+
+
+def _checked_answer(instructions: str, evidence: dict, ask: Callable[[str], str]) -> tuple[dict, str]:
+    """Ask once and check the answer's shape, recording feedback on failure.
+
+    Called by ``answer_after_inspection`` once per round. A refused answer
+    is described in ``evidence["previous_answer_error"]`` for the next round.
+
+    Args: instructions (str): Stage prompt; evidence (dict): Evidence,
+        changed in place; ask (Callable[[str], str]): LLM callback.
+    Returns: tuple[dict, str]: The decoded answer and "" when it is usable,
+        or {} and the reason it was refused.
+    """
+    try:
+        answer = decode_object(ask(instructions + "\nEVIDENCE:\n" + json.dumps(evidence, ensure_ascii=False)))
+        requests = answer.get("requests")
+        if answer.get("action") == "inspect" and not (isinstance(requests, list) and 1 <= len(requests) <= INSPECT_REQUESTS):
+            raise ValueError(f"an inspect answer needs 1 to {INSPECT_REQUESTS} requests")
+    except ValueError as error:
+        evidence["previous_answer_error"] = f"{error}. Answer again with one plain-text JSON object."
+        return {}, str(error)
+    evidence.pop("previous_answer_error", None)
+    return answer, ""
+
+
+def _serve_pages(root: Path, requests: list, evidence: dict) -> None:
+    """Read the requested pages into the bounded inspection transcript.
+
+    Called by ``answer_after_inspection`` for an inspect answer. Only the
+    newest ``INSPECT_PAGES`` pages are kept, with a note when older ones drop.
+
+    Args: root (Path): Owned snapshot; requests (list): Checked page
+        requests; evidence (dict): Evidence, changed in place.
+    Returns: None.
+    """
+    pages = evidence["inspections"] + [read_page(root, request) for request in requests]
+    if len(pages) > INSPECT_PAGES:
+        evidence["inspection_note"] = "Oldest inspected pages were dropped; re-request a page if still needed."
+    evidence["inspections"] = pages[-INSPECT_PAGES:]
 
 
 def snapshot(source: Path, destination: Path) -> Path:

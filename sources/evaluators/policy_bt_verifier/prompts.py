@@ -1,6 +1,6 @@
 """Versioned instructions for task understanding and deterministic policy code."""
 
-PROMPT_VERSION = "policy-bt-separated-11"
+PROMPT_VERSION = "policy-bt-separated-12"
 
 BOUNDARY = """
 You are a scientific verification instrument, not a workspace assistant.
@@ -174,8 +174,11 @@ The verifier publishes measured run facts at .policy_bt_reexec/execution.json
 .policy_bt_reexec/stdout.log and stderr.log when re-execution ran.
 RULES for these:
 - Any criterion about execution, reproduction, or output regeneration MUST be
-  read from execution.json (e.g. status == "succeeded"). NEVER decide such a
-  criterion by matching phrases in logs or reports.
+  read from execution.json: "eligible" is true and the output is listed in
+  "regenerated". Status "succeeded" (the verifier reran the script) and
+  "provenance_verified" (the verifier host could not install a program the run
+  used, and verified the outputs as written by the run itself) count the same.
+  NEVER decide such a criterion by matching phrases in logs or reports.
 - stdout.log is only for metric VALUES the task prints (a number, a table).
   Never treat the presence or absence of specific phrases as success.
 - Different generations may express the same information in different file

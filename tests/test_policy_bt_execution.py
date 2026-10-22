@@ -233,14 +233,127 @@ def test_contract_reads_referenced_files_step_by_step(tmp_path):
 
 def test_contract_that_never_stops_inspecting_is_an_instrument_error(tmp_path):
     """An endless inspect loop must end, as a verifier fault, not a task loss."""
-    from sources.evaluators.policy_bt_verifier.reexec import MAX_CONTRACT_ROUNDS
+    from sources.evaluators.policy_bt_verifier.artifacts import INSPECT_ROUNDS
 
     root = _workspace(tmp_path / "owned", "true\n")
     calls = []
     answer = json.dumps({"action": "inspect", "requests": [{"path": "reproduce.sh"}]})
     with pytest.raises(ReproductionInstrumentError, match="kept inspecting"):
         reproduce(root, {"policy_bt_reexecute": False}, lambda _: calls.append(1) or answer)
-    assert len(calls) == MAX_CONTRACT_ROUNDS + 1
+    assert len(calls) == INSPECT_ROUNDS + 1
+
+
+def _container_workspace(tmp_path: Path) -> tuple[Path, dict]:
+    """Build a snapshot whose outputs came from a tool the host lacks.
+
+    The workflow ran xtb in a container; the host rerun of reproduce.sh
+    writes a partial output, empties the delivered xtb log, then fails with
+    "xtb: command not found".
+
+    Args: tmp_path (Path): Test directory.
+    Returns: tuple[Path, dict]: The owned snapshot and its provenance origin.
+    """
+    source = tmp_path / "source"
+    for folder in ("out", "crest_output", "logs"):
+        (source / folder).mkdir(parents=True)
+    (source / "requirements.txt").write_text("")
+    (source / "input.xyz").write_text("C 0 0 0\n")
+    (source / "crest_output" / "old.xyz").write_text("C 5 5 5\n")
+    (source / "reproduce.sh").write_text("set -eu\npython -m pip install --no-index -r requirements.txt\n"
+                                         "mkdir -p out\nprintf partial > out/partial.txt\n"
+                                         "xtb input.xyz --opt > logs/xtb.log\n")
+    (source / "logs" / "xtb.log").write_text("normal termination of xtb\n")
+    (source / "out" / "c01.xyz").write_text("C 0.1 0 0\n")
+    (source / "out" / "summary.csv").write_text("conformer,energy\nc01,-9.1\n")
+    (source / "out" / "stale.xyz").write_text("C 9 9 9\n")
+    (source / "out" / "kept.xyz").write_text("C 4 4 4\n")
+    os.utime(source / "out" / "stale.xyz", (1e9, 1e9))
+    inputs = {"input.xyz", "reproduce.sh", "requirements.txt", "crest_output/old.xyz", "out/kept.xyz"}
+    baseline = {item["path"]: item["sha256"] for item in inventory(source) if item["path"] in inputs}
+    root = snapshot(source, tmp_path / "owned")
+    return root, {"baseline": baseline, "window": [time.time() - 60, time.time() + 1], "source": str(source)}
+
+
+def _container_ask(cause="missing_host_dependency", line="xtb: command not found", named=("out",), seen=None):
+    """Answer the contract, failure and provenance prompts of one rerun.
+
+    Args: cause (str), line (str): Diagnosis cause and quoted log line;
+        named (tuple): Paths the provenance answer accepts; seen (list|None):
+        Receives the prompt kinds asked.
+    Returns: Callable[[str], str]: The LLM callback.
+    """
+    from sources.evaluators.policy_bt_verifier.provenance import PROVENANCE_PROMPT
+
+    def ask(prompt):
+        if prompt.startswith(FAILURE_PROMPT):
+            return json.dumps({"diagnosis": "xtb is absent on this host.", "cause": cause,
+                               "missing": ["xtb"], "evidence_line": line})
+        if prompt.startswith(PROVENANCE_PROMPT):
+            (seen if seen is not None else []).append("provenance")
+            return json.dumps({"dependency_used": True, "regenerated": list(named), "rejected": [],
+                               "reason": "each structure has its xtb log"})
+        return _answer(outputs=["out", "crest_output"])
+    return ask
+
+
+def test_missing_host_tool_trusts_outputs_the_run_wrote(tmp_path):
+    """2026-10-21 conformer task: xtb ran in the tool container but cannot be
+    installed on the verifier host, so every generation lost the rerun gate.
+    Files the run wrote become regenerated outputs. The rerun's partial file
+    and its emptied log are undone; a file older than the run is set aside;
+    an output unchanged since before the run (an earlier session's
+    crest_output/) is neither required nor trusted."""
+    root, origin = _container_workspace(tmp_path)
+    result = reproduce(root, {"policy_bt_reexec_timeout_s": 60}, _container_ask(), origin)
+    facts = json.loads((root / ".policy_bt_reexec" / "execution.json").read_text())
+    provenance = result["provenance"]
+    assert result["eligible"] and result["status"] == "provenance_verified", result["reason"]
+    assert result["files"]["regenerated"] == facts["regenerated"] == ["out/c01.xyz", "out/summary.csv"]
+    assert facts["status"] == "provenance_verified" and facts["eligible"]
+    assert (root / "logs" / "xtb.log").read_text() == "normal termination of xtb\n"
+    assert (root / "crest_output" / "old.xyz").read_text() == "C 5 5 5\n"
+    assert not (root / "out" / "partial.txt").exists() and not (root / "out" / "stale.xyz").exists()
+    assert provenance["set_aside"] == ["out/stale.xyz"] and provenance["outside_window"] == 1
+    assert (root / "out" / "kept.xyz").read_text() == "C 4 4 4\n"  # equal to its pre-run copy
+    assert provenance["unchanged_input_outputs"] == ["crest_output"] and "xtb" in result["reason"]
+
+
+@pytest.mark.parametrize(("cause", "line", "origin"), [
+    ("code_error", "xtb: command not found", True),
+    ("missing_requirement", "xtb: command not found", True),
+    ("missing_host_dependency", "xtb was not found on any mirror", True),
+    ("missing_host_dependency", "xtb: command not found", False),
+])
+def test_provenance_fallback_needs_a_proven_missing_host_dependency(tmp_path, cause, line, origin):
+    """A code error, a fixable missing requirement, a quote absent from the
+    logs, or no run window keeps the failed rerun ineligible without asking
+    the provenance model."""
+    root, window = _container_workspace(tmp_path)
+    seen = []
+    result = reproduce(root, {"policy_bt_reexec_timeout_s": 60}, _container_ask(cause, line, seen=seen),
+                       window if origin else None)
+    assert not result["eligible"] and result["status"] == "execution_failed"
+    assert seen == []
+
+
+def test_provenance_model_cannot_promote_inputs_or_old_files(tmp_path):
+    """Only files written during the run window can become regenerated."""
+    root, origin = _container_workspace(tmp_path)
+    ask = _container_ask(named=("input.xyz", "out/stale.xyz"))
+    result = reproduce(root, {"policy_bt_reexec_timeout_s": 60}, ask, origin)
+    assert not result["eligible"] and result["status"] == "execution_failed"
+    assert result["provenance"]["refused_names"] == ["input.xyz", "out/stale.xyz"]
+    assert result["provenance"]["missing_outputs"] == ["out"]
+
+
+def test_workspace_changed_after_snapshot_disables_the_fallback(tmp_path):
+    """The restore copy must equal the snapshot taken before the rerun."""
+    root, origin = _container_workspace(tmp_path)
+    (Path(origin["source"]) / "out" / "c01.xyz").write_text("C 7 7 7\n")
+    seen = []
+    result = reproduce(root, {"policy_bt_reexec_timeout_s": 60}, _container_ask(seen=seen), origin)
+    assert not result["eligible"] and result["provenance"]["attempted"] is False
+    assert "changed after the snapshot" in result["provenance"]["reason"] and seen == []
 
 
 def test_execution_facts_published_for_adapters(tmp_path):

@@ -189,15 +189,42 @@ class PolicyBTVerifierEvaluator(BaseEvaluator):
         destination = registry.root / "snapshots" / uuid
         if destination.exists():
             shutil.rmtree(destination)
+        captured_at = time.time()
         snapshot(self.workspace_dir, destination)
         self._log("REEXEC", {"snapshot": str(destination)})
         self._report.stage("SNAPSHOT", f"{destination.name}")
         provenance = self._input_provenance(registry, destination)
-        execution = reproduce(destination, self.config, self._ask)
+        execution = reproduce(destination, self.config, self._ask, self._run_origin(registry, captured_at))
+        if execution.get("provenance"):
+            self._log("PROVENANCE", execution["provenance"])
         self._report.execution(execution)
         files = inventory(destination)
         return {"uuid": uuid, "snapshot": str(destination.resolve()), "files": len(files),
                 "execution": execution, "input_provenance": provenance, "arrival_reward": None}
+
+    def _run_origin(self, registry: TaskRegistry, captured_at: float) -> dict | None:
+        """Give the provenance fallback the pre-run digests, the run window and the source.
+
+        ``_capture`` calls it before reproduction. The engine records
+        ``policy_bt_run_started_at`` just before each run; the standalone
+        verifier has none, so its fallback stays off. ``source`` is the
+        delivered workspace, from which a failed rerun's copy is restored.
+
+        Args:
+            registry (TaskRegistry): Locked registry holding the baseline digests.
+            captured_at (float): Epoch seconds just before the snapshot copy.
+
+        Returns:
+            dict | None: ``baseline`` (path to sha256), ``window`` ([run
+            start, captured_at]) and ``source`` (str), or None without a run
+            start or baseline.
+        """
+        started = getattr(self.config, "policy_bt_run_started_at", None)
+        digests = registry.root / BASELINE_DIGESTS
+        if not started or not digests.is_file():
+            return None
+        return {"baseline": json.loads(digests.read_text(encoding="utf-8")),
+                "window": [float(started), captured_at], "source": str(self.workspace_dir)}
 
     def _input_provenance(self, registry: TaskRegistry, destination: Path) -> dict:
         """Compare the snapshot with the workspace as it was before the first run.

@@ -74,6 +74,7 @@ Ports must be in `[0, 65535]` and `port_min ≤ port_max`.
 | `policy_bt_reexec_timeout_s` | `int` | `1800` | Re-execution timeout (seconds). |
 | `policy_bt_reexec_runtime` | `dict` | `{}` | Re-execution runtime mapping. Empty by default. |
 | `policy_bt_max_prompt_chars` | `int` | `1500000` | Largest verifier text prompt, in characters. A larger prompt fails fast as `verifier_instrument_error` before any provider call; lower it for small-context `judge_model`s. |
+| `policy_bt_provenance_fallback` | `bool` | `true` | When a rerun fails on a missing host dependency (proved by a quoted log line), trust the outputs the run wrote during its time window and the LLM confirms, with status `provenance_verified`. |
 
 ## QD / novelty (selection & variation)
 

@@ -1097,6 +1097,8 @@ class EvolutionEngine:
         # ── Reset workspace to the initial state before each run ─────
         if workspace_mgr is not None:
             workspace_mgr.reset_for_run()
+        # Policy-BT provenance fallback: files after this time are run outputs.
+        self.config.policy_bt_run_started_at = time.time()
 
         # Execute workflow
         print_info(f"Run {runs[-1].iteration_count + 1} of {runs[-1].max_depth}")
