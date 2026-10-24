@@ -1,13 +1,6 @@
 """Benchmark task context and private-copy grading for the gold verifier.
 
-Grading itself is NOT implemented here: it goes through the shared
-``sources.benchmark_evaluation.snapshot_grading.grade_directory`` — the same
-``CapsuleEvaluator`` call the per-generation snapshot ablations use (VER
-re-execution 900 s, SR eval program 300 s, CodeBERT CBS, infra exclusion).
-This module only (1) resolves the benchmark task row, (2) makes a private
-copy of the generation workspace, because the sandbox copies
-``pred_results/`` back into the graded directory, and (3) turns any harness
-fault into a censored ``excluded`` result so the verifier never crashes.
+**Only used for special ablations on whenever gold based feedback textual gradient outperform others verifiers**
 """
 
 from __future__ import annotations

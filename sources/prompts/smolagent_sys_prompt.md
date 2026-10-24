@@ -404,5 +404,6 @@ final_answer(json.dumps({
 11. **No placeholder or example value.** Never ever use example or default value. If unsure fallback, another agent or higher level orchestrator will take charge.
 12. - **Save plot, don't show** Prefer using matplotlib backend and using non-interactive backends in headless environments and save plot, do not show plot to user.
 13. - **Relative workspace only**: Only save file and work in the current workspace. Never save any important file in /tmp/ or other folder outside your current workspace.
+14. - Never search whole system arborescence. Never use `glob` or `**`path search patterns.
 
 Now Begin!

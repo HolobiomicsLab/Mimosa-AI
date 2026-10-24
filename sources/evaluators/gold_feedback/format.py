@@ -1,16 +1,6 @@
 """Gold-gradient text: the benchmark grader's feedback in the E33 format.
 
-Adapted from the E33 'TRUMAN' transcript format
-(``experiments_verifiers/harness/e33_truman.py`` ``gold_gradient_text``):
-the decisive execution outcome comes first, then the grader verdict
-verbatim, with its specific values / columns / figure critiques. For
-production the provenance paragraph and campaign header are dropped (no
-information, they eat the budget) and the text is compacted to
-``MAX_GRADIENT_CHARS`` so the mutator never clips the decisive part.
-
-No oracle label is put in the text itself: the label would change the
-directive LLM's behaviour compared with the other gradient channels. The
-oracle flags live in ``state_result.json``, ``evaluation.txt`` and the logs.
+**Only used for special ablations on whenever gold based feedback textual gradient outperform others verifiers**
 """
 
 from __future__ import annotations

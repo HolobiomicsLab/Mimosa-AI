@@ -4,6 +4,8 @@ The gold-feedback verifier feeds the benchmark grader's own verdict
 (computed against the gold reference) back into the evolution loop. Any run
 that uses it is contaminated by the benchmark: it is an upper-bound research
 control, never a reportable Mimosa benchmark score.
+
+**Only used for special ablations on whenever gold based feedback textual gradient outperform others verifiers**
 """
 
 from __future__ import annotations
