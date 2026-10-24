@@ -6,9 +6,9 @@ import base64
 import os
 import re
 
-from openai import OpenAI
+from openai import NotFoundError, OpenAI
 
-# OpenRouter fallback, used when the primary OpenAI key is out of credit
+# OpenRouter fallback, used when the primary OpenAI key cannot serve the judge
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 OPENROUTER_MODEL = "openai/gpt-4o"
 
@@ -28,7 +28,7 @@ openrouter_client = (
     else None
 )
 
-# Once the primary provider is known to be out of credit, skip straight to it
+# Once the primary provider is known to fail, skip straight to the fallback
 _use_openrouter_fallback = False
 
 
@@ -43,6 +43,23 @@ def _is_out_of_credits(exc):
         or "insufficient_quota" in message
         or "no credits remaining" in message
     )
+
+
+def _should_use_fallback(exc):
+    """Decide if a failed OpenAI judge call must go to OpenRouter.
+
+    score_figure calls this when the primary OpenAI request raises an error.
+    It receives the exception object from the OpenAI client.
+    It returns True when the account has no credit or when the model is gone
+    (HTTP 404, for example a deprecated model name).
+
+    Args:
+        exc (Exception): Error raised by client.chat.completions.create.
+
+    Returns:
+        bool: True if the OpenRouter fallback must be used.
+    """
+    return isinstance(exc, NotFoundError) or _is_out_of_credits(exc)
 
 
 PROMPT_ORIGIN = """You are an excellent judge at evaluating visualization plots between a model generated plot and the ground truth. You will be giving scores on how well it matches the ground truth plot.
@@ -106,11 +123,11 @@ def score_figure(pred_fig, gold_fig):
                 model="gpt-4o-2024-05-13",
             )
         except Exception as exc:
-            # Fall back to OpenRouter when the primary key is out of credit
-            if openrouter_client is None or not _is_out_of_credits(exc):
+            # Fall back to OpenRouter on no credit or a missing model (404)
+            if openrouter_client is None or not _should_use_fallback(exc):
                 raise
             print(
-                f"OpenAI key is out of credit ({exc}); "
+                f"OpenAI judge call failed ({exc}); "
                 f"falling back to OpenRouter model {OPENROUTER_MODEL}."
             )
             _use_openrouter_fallback = True
