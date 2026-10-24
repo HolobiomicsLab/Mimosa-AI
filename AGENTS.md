@@ -262,7 +262,10 @@ they are the evidence.
 > verifier (`verifier_kind="policy_bt"`, the default in `config.py` and
 > `config_default.json`): `evaluation.txt` opens with the line
 > `Policy-BT verifier` followed by a JSON object (reward, tournament
-> version, the reproduction/execution record, the `input_provenance`
+> version, the reproduction/execution record — status `succeeded`, or
+> `provenance_verified` when the host rerun failed on a missing dependency
+> and the run's own time-window outputs were accepted instead (see its
+> `provenance` block and the `PROVENANCE` log stage) — the `input_provenance`
 > check of the snapshot against the pre-run workspace, and the PAIR VERDICTS —
 > each pair tagged with its `policy_version`), the gradient lands in
 > `textual_gradient.txt`, stage-level JSON records stream to

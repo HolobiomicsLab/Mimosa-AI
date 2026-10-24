@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import base64
 import json
 from pathlib import Path
 
-from .artifacts import decode_object, inventory
+from .artifacts import bounded_listing, decode_object, inventory, read_page, safe_path
 from .criteria_guard import (
     GuardExhausted,
     guard_plan,
@@ -17,11 +16,17 @@ from .criteria_guard import (
 from .placeholders import input_profile, one_value_columns, scan_tables
 from .prompts import RECON, evidence_prompt
 
-PAGE_BYTES = 8192
 MAX_INSPECTION_ROUNDS = 16
 MAX_REQUESTS_PER_ROUND = 16
+# Per-generation listing caps; small tasks keep them.
 INITIAL_PREVIEW_BYTES = 65536
 MAX_LISTED_ENTRIES = 400
+# Prompt-wide totals, shared by all generations.
+PREVIEW_BUDGET_BYTES = 3 * INITIAL_PREVIEW_BYTES
+LISTED_ENTRIES_BUDGET = 3 * MAX_LISTED_ENTRIES
+# Floors that keep every late generation visible.
+MIN_PREVIEW_BYTES = 4096
+MIN_LISTED_ENTRIES = 40
 MAX_RETAINED_PAGES = 48
 # Who decides a criterion: adapter code or the vision tie-break.
 JUDGE_CODE = "code"
@@ -39,77 +44,54 @@ class ReconError(ValueError):
     """
 
 
-def safe_path(root: Path, relative: str) -> Path:
-    """Keep artifact reads inside a real directory without symlink traversal.
-
-    Args: root (Path): owned artifact root; relative (str): untrusted file name.
-    Returns: Path confined below root; raises on unsafe paths.
-    """
-    if not isinstance(relative, str) or not relative:
-        raise ValueError("Artifact path must be a nonempty relative string")
-    path = Path(relative)
-    if path.is_absolute() or ".." in path.parts:
-        raise ValueError("Absolute and parent paths are forbidden")
-    candidate = root.resolve()
-    for part in path.parts:
-        candidate = candidate / part
-        if candidate.is_symlink():
-            raise ValueError("Symlink artifact access is forbidden")
-    candidate.resolve().relative_to(root.resolve())
-    return candidate
-
-
-def inspect_page(root: Path, request: dict) -> dict:
-    """Read an explicit byte page for reconnaissance.
-
-    Args: root (Path): owned root; request (dict): path, offset and length.
-    Returns: dict with bytes, format, offsets and remaining-byte count.
-    """
-    offset, length = request.get("offset", 0), request.get("length", PAGE_BYTES)
-    if type(offset) is not int or type(length) is not int:
-        raise ReconError("Inspection offset and length must be integers")
-    if offset < 0 or not 1 <= length <= PAGE_BYTES:
-        raise ReconError(f"Inspection length must be 1..{PAGE_BYTES}")
-    path = safe_path(root, request["path"])
-    with path.open("rb") as stream:
-        stream.seek(offset)
-        data = stream.read(length)
-    try:
-        content, encoding = data.decode("utf-8"), "utf-8"
-    except UnicodeDecodeError:
-        content, encoding = base64.b64encode(data).decode("ascii"), "base64"
-    return {**request, "content": content, "encoding": encoding,
-            "next_offset": offset + len(data),
-            "remaining_bytes": max(0, path.stat().st_size - offset - len(data))}
-
-
-def describe_generation(generation: dict) -> dict:
+def describe_generation(generation: dict, share: int) -> dict:
     """Expose inventory rows while bounding preview bytes and row count.
 
+    ``_open_transcript`` calls it once per generation of one recon prompt.
+    The prompt-wide budgets are split over ``share`` generations, so the
+    prompt stays bounded when the session has many generations. Rows are
+    chosen shallow paths first (``bounded_listing``); omitted rows are
+    counted per directory, and a directory page lists their names.
+
     Args: generation (dict): UUID, owned snapshot path, execution facts and
-        the optional ``input_provenance`` of its task inputs.
-    Returns: dict with metadata, explicitly omitted previews, an omitted-row
-        count, and the provenance status and changed input paths.
+        the optional ``input_provenance`` of its task inputs; share (int):
+        number of generations described in the same prompt.
+    Returns: dict with metadata, explicitly omitted previews, omitted-row
+        counts, and the provenance status and changed input paths.
     """
     entries = inventory(Path(generation["snapshot"]))
-    remaining = INITIAL_PREVIEW_BYTES
+    share = max(1, share)
+    limit = max(MIN_LISTED_ENTRIES, min(MAX_LISTED_ENTRIES, LISTED_ENTRIES_BUDGET // share))
+    listed, unlisted = bounded_listing(entries, limit)
+    _bound_previews(listed, max(MIN_PREVIEW_BYTES, min(INITIAL_PREVIEW_BYTES, PREVIEW_BUDGET_BYTES // share)))
+    provenance = generation.get("input_provenance") or {}
+    return {"uuid": generation["uuid"], "inventory": listed,
+            "unlisted_entries": len(entries) - len(listed),
+            "unlisted_directories": unlisted,
+            "unlisted_note": "Request a page of a directory path to list its entries; unlisted entries still exist." if unlisted else "",
+            "execution": generation.get("execution", {}),
+            "input_provenance": {key: provenance[key] for key in PROVENANCE_SHOWN if key in provenance}}
+
+
+def _bound_previews(entries: list[dict], budget: int) -> None:
+    """Blank the previews that do not fit one generation's byte budget.
+
+    Called by ``describe_generation`` on the listed rows, in listing order.
+
+    Args: entries (list[dict]): Listed inventory rows, changed in place;
+        budget (int): Preview bytes this generation may show.
+    Returns: None.
+    """
     for entry in entries:
         preview = entry.get("preview", "")
         if not isinstance(preview, str):
             continue
-        encoded = preview.encode("utf-8")
-        if len(encoded) > remaining:
+        size = len(preview.encode("utf-8"))
+        if size > budget:
             entry["preview"] = ""
             entry["preview_omitted"] = "Initial preview byte budget; use inspect"
         else:
-            remaining -= len(encoded)
-    listed = entries[:MAX_LISTED_ENTRIES]
-    provenance = generation.get("input_provenance") or {}
-    return {"uuid": generation["uuid"], "inventory": listed,
-            "unlisted_entries": len(entries) - len(listed),
-            "unlisted_note": "Request a byte page of any path; unlisted entries still exist." if len(entries) > len(listed) else "",
-            "execution": generation.get("execution", {}),
-            "input_provenance": {key: provenance[key] for key in PROVENANCE_SHOWN if key in provenance}}
+            budget -= size
 
 
 def code_task(task: dict) -> dict:
@@ -229,7 +211,7 @@ def _open_transcript(goal: str, generations: list[dict], context: dict) -> tuple
     Returns:
         tuple[dict, dict]: The transcript and the extended context.
     """
-    evidence = {"goal": goal, "generations": [describe_generation(g) for g in generations],
+    evidence = {"goal": goal, "generations": [describe_generation(g, len(generations)) for g in generations],
                 "frozen_task": context.get("frozen_task"),
                 "adapters": context.get("adapters", {}), "inspections": []}
     if context.get("frozen_task"):
@@ -297,17 +279,13 @@ def _inspect(response: dict, generations: list[dict], evidence: dict) -> None:
     Returns: None; raises ReconError for an invalid request shape.
     """
     roots = {item["uuid"]: Path(item["snapshot"]) for item in generations}
-    requests = response.get("requests", [])
-    if response.get("action") != "inspect" or not 1 <= len(requests) <= MAX_REQUESTS_PER_ROUND:
+    requests = response.get("requests")
+    if response.get("action") != "inspect" or not isinstance(requests, list) or not 1 <= len(requests) <= MAX_REQUESTS_PER_ROUND:
         raise ReconError("Expected complete or a bounded nonempty inspect request")
     for request in requests:
-        if request.get("uuid") not in roots:
+        if not isinstance(request, dict) or request.get("uuid") not in roots:
             raise ReconError("Inspection requested an unknown generation")
-        try:
-            page = inspect_page(roots[request["uuid"]], request)
-        except (OSError, ValueError, KeyError) as error:
-            page = {**request, "error": str(error)}
-        evidence["inspections"].append(page)
+        evidence["inspections"].append(read_page(roots[request["uuid"]], request))
     dropped = len(evidence["inspections"]) - MAX_RETAINED_PAGES
     if dropped > 0:
         evidence["inspections"] = evidence["inspections"][dropped:]
@@ -320,4 +298,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("root", type=Path)
     args = parser.parse_args()
-    print(json.dumps(describe_generation({"uuid": "preview", "snapshot": str(args.root)}), indent=2))
+    print(json.dumps(describe_generation({"uuid": "preview", "snapshot": str(args.root)}, 1), indent=2))

@@ -54,12 +54,55 @@ The verifier runs these steps in order:
    (`.sh`) script that regenerates its outputs and, unless the runtime
    provisions packages (ScienceAgentBench), installs its requirements
    first. A missing or invalid script makes the generation ineligible:
-   reward is zero and feedback states the required correction.
+   reward is zero and feedback states the required correction. The
+   contract LLM sees compact inventory rows (path, kind, size, binary
+   flag; no previews; at most 1,500 rows, shallow paths first, the rest
+   counted per directory in `unlisted_directories`) and the start of the
+   four shallowest `.sh` files. It reads referenced scripts step by step:
+   up to 6 inspect rounds of 8 KiB file pages or directory listings
+   (`reexec._assess_contract`). An unreadable answer costs one round.
+   Before this bound (2026-10-21), a 1,384-file workspace made a
+   6.3 M-character contract prompt that exceeded the model's input limit.
 2. **Owned artifact copies.** The verifier inspects copies of saved
    generation workspaces, never changes the original artifacts, and
    optionally runs the reproduction script on a copy.
+   **Provenance fallback** (`provenance.py`, `policy_bt_provenance_fallback`).
+   Workflows run their tools in a Toolomics container, but the rerun runs
+   on the verifier host, where a tool such as xtb may not exist and cannot
+   be installed. When a rerun fails or leaves outputs missing, the failure
+   diagnosis classifies the cause. Only `missing_host_dependency` (a
+   program or package the script asks for that cannot be installed or run
+   on this host) qualifies; `missing_requirement` (a package the workflow
+   never installs, or a pin that does not exist) stays a fixable failure,
+   and a provisioned benchmark runtime never qualifies. The quoted
+   `evidence_line` must appear exactly in the rerun logs. The verifier
+   then replaces the executed copy with a fresh copy of the delivered
+   workspace, used only when its digests equal the snapshot taken before
+   the rerun. It selects candidates without a model: files that differ
+   from the pre-run `baseline/` and whose modification time lies in the
+   run window (from `policy_bt_run_started_at`, recorded by the engine
+   just before the run, minus 300 s for clock skew, to the snapshot
+   time). A contract output that exists with no changed file (an earlier
+   session's output kept in `baseline/`, or an empty directory) is not
+   required. One bounded LLM stage (same 6-round page inspection) confirms
+   that the pipeline calls the missing program and accepts the candidates
+   the code writes and the run's logs support. Names outside the
+   candidates are refused. When every required output has an accepted
+   file, the status is `provenance_verified`, the generation is eligible,
+   and `files.regenerated` (also in `execution.json`) holds the accepted
+   files; changed files under required outputs that were not accepted are
+   moved aside (files equal to their pre-run copy stay). Every later layer treats the accepted files
+   like rerun outputs. The `provenance` block of the execution record (and
+   the `PROVENANCE` log stage) keeps the window, counts, refused names,
+   rejected and set-aside files. Timestamps show that a file was written
+   during the run, not that the code computed it.
 3. **Reconnaissance and normalization.** Inventories and compact content
-   previews inform the LLM. Schema adapters map differing artifact
+   previews inform the LLM. The listing budget is shared by all
+   generations in the prompt (1,200 rows and 192 KiB of previews in
+   total; at most 400 rows and 64 KiB, at least 40 rows and 4 KiB, per
+   generation), so the prompt does not grow without bound with the
+   generation count; a page request on a directory lists the omitted
+   files. Schema adapters map differing artifact
    layouts to a common representation. A new schema can extend the
    adapters without changing the comparison criteria. When the goal asks
    for saved outputs, the criteria include an `output_conformance` gate
@@ -210,6 +253,8 @@ session receives a fresh tournament registry scope.
 | `policy_bt_scorer_timeout_s` | `60` | Policy comparison time limit |
 | `policy_bt_repair_rounds` | `4` | Maximum policy or adapter repairs |
 | `policy_bt_visual_channel` | `true` | Allow relevant visual tie resolution |
+| `policy_bt_max_prompt_chars` | `1500000` | Largest verifier text prompt; a larger one fails fast as an instrument error, before any provider call |
+| `policy_bt_provenance_fallback` | `true` | Trust run-written outputs when the rerun fails only on a missing host dependency (`provenance_verified`) |
 
 Use `--no-policy_bt_reexecute` to inspect existing artifacts without
 running the script. The script requirement still applies. Use

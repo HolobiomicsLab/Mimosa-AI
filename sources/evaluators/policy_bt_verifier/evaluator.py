@@ -39,6 +39,19 @@ BASELINE_DIGESTS = "baseline_digests.json"
 STATUS_VERIFIED = "verified"
 STATUS_TAMPERED = "input_tampered"
 STATUS_UNVERIFIED = "unverified"
+# Fallback when config lacks policy_bt_max_prompt_chars.
+DEFAULT_MAX_PROMPT_CHARS = 1_500_000
+PROMPT_HEAD_CHARS = 200
+
+
+class PromptTooLargeError(RuntimeError):
+    """A verifier stage built a prompt larger than the configured limit.
+
+    Raised by ``PolicyBTVerifierEvaluator._ask`` before any provider call.
+    The evaluator's error boundary records it as
+    ``verifier_instrument_error``: an unbounded stage is a verifier fault,
+    never a score of the generation.
+    """
 
 
 class PolicyBTVerifierEvaluator(BaseEvaluator):
@@ -176,15 +189,42 @@ class PolicyBTVerifierEvaluator(BaseEvaluator):
         destination = registry.root / "snapshots" / uuid
         if destination.exists():
             shutil.rmtree(destination)
+        captured_at = time.time()
         snapshot(self.workspace_dir, destination)
         self._log("REEXEC", {"snapshot": str(destination)})
         self._report.stage("SNAPSHOT", f"{destination.name}")
         provenance = self._input_provenance(registry, destination)
-        execution = reproduce(destination, self.config, self._ask)
+        execution = reproduce(destination, self.config, self._ask, self._run_origin(registry, captured_at))
+        if execution.get("provenance"):
+            self._log("PROVENANCE", execution["provenance"])
         self._report.execution(execution)
         files = inventory(destination)
         return {"uuid": uuid, "snapshot": str(destination.resolve()), "files": len(files),
                 "execution": execution, "input_provenance": provenance, "arrival_reward": None}
+
+    def _run_origin(self, registry: TaskRegistry, captured_at: float) -> dict | None:
+        """Give the provenance fallback the pre-run digests, the run window and the source.
+
+        ``_capture`` calls it before reproduction. The engine records
+        ``policy_bt_run_started_at`` just before each run; the standalone
+        verifier has none, so its fallback stays off. ``source`` is the
+        delivered workspace, from which a failed rerun's copy is restored.
+
+        Args:
+            registry (TaskRegistry): Locked registry holding the baseline digests.
+            captured_at (float): Epoch seconds just before the snapshot copy.
+
+        Returns:
+            dict | None: ``baseline`` (path to sha256), ``window`` ([run
+            start, captured_at]) and ``source`` (str), or None without a run
+            start or baseline.
+        """
+        started = getattr(self.config, "policy_bt_run_started_at", None)
+        digests = registry.root / BASELINE_DIGESTS
+        if not started or not digests.is_file():
+            return None
+        return {"baseline": json.loads(digests.read_text(encoding="utf-8")),
+                "window": [float(started), captured_at], "source": str(self.workspace_dir)}
 
     def _input_provenance(self, registry: TaskRegistry, destination: Path) -> dict:
         """Compare the snapshot with the workspace as it was before the first run.
@@ -340,12 +380,25 @@ class PolicyBTVerifierEvaluator(BaseEvaluator):
     def _ask(self, prompt: str) -> str:
         """Call the shared text provider and persist its full information flow.
 
+        Every text stage (contract, failure diagnosis, recon, criteria guard,
+        policy and adapter source) calls it. A prompt over
+        ``policy_bt_max_prompt_chars`` is refused before the provider call,
+        so an unbounded stage fails fast and is named in the log.
+
         Args:
             prompt: Stage prompt assembled from task and untrusted evidence.
 
         Returns:
             Model response text, never a fabricated fallback.
+
+        Raises:
+            PromptTooLargeError: When the prompt exceeds the limit.
         """
+        limit = int(getattr(self.config, "policy_bt_max_prompt_chars", DEFAULT_MAX_PROMPT_CHARS))
+        if len(prompt) > limit:
+            self._log("PROMPT_TOO_LARGE", {"chars": len(prompt), "limit": limit, "head": prompt[:PROMPT_HEAD_CHARS]})
+            raise PromptTooLargeError(f"Verifier prompt has {len(prompt):,} characters, over the "
+                                      f"policy_bt_max_prompt_chars limit {limit:,}; its stage evidence is not bounded")
         result = self._provider_for("text", self.llm_config)(prompt, use_cache=False)
         self._log("LLM", {"prompt": prompt, "response": result})
         self._say("LLM", f"prompt {len(prompt):,} ch → response {len(result):,} ch")

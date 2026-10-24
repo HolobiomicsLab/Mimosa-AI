@@ -1,6 +1,6 @@
 """Versioned instructions for task understanding and deterministic policy code."""
 
-PROMPT_VERSION = "policy-bt-separated-10"
+PROMPT_VERSION = "policy-bt-separated-12"
 
 BOUNDARY = """
 You are a scientific verification instrument, not a workspace assistant.
@@ -11,9 +11,12 @@ hidden reference answers. Return one JSON object, without Markdown fences.
 """
 
 RECON = BOUNDARY + """
-Inspect the COMPLETE inventory. Every unread or truncated preview is marked;
+Inspect the inventory. Every unread or truncated preview is marked;
 request more bytes whenever needed to understand a relevant artifact. Unsupported
 binary formats remain visible: identify their format and do not invent values.
+A large inventory is listed shallow paths first; "unlisted_directories" counts the
+omitted entries per directory. A request whose path is a directory (use "." for the
+root) returns its entry names, offset counting entries; use it to find omitted files.
 Choose relevant figures by their meaning for the goal, not file size or name rules.
 First response may be {"action":"inspect","requests":[{"uuid":"...",
 "path":"relative/path","offset":0,"length":8192}]}. Byte offsets are explicit.
@@ -171,8 +174,11 @@ The verifier publishes measured run facts at .policy_bt_reexec/execution.json
 .policy_bt_reexec/stdout.log and stderr.log when re-execution ran.
 RULES for these:
 - Any criterion about execution, reproduction, or output regeneration MUST be
-  read from execution.json (e.g. status == "succeeded"). NEVER decide such a
-  criterion by matching phrases in logs or reports.
+  read from execution.json: "eligible" is true and the output is listed in
+  "regenerated". Status "succeeded" (the verifier reran the script) and
+  "provenance_verified" (the verifier host could not install a program the run
+  used, and verified the outputs as written by the run itself) count the same.
+  NEVER decide such a criterion by matching phrases in logs or reports.
 - stdout.log is only for metric VALUES the task prints (a number, a table).
   Never treat the presence or absence of specific phrases as success.
 - Different generations may express the same information in different file
