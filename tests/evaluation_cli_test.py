@@ -383,6 +383,70 @@ def test_first_run_id_follows_highest_existing_run_folder(monkeypatch, tmp_path)
     assert EvaluationCLI(SimpleNamespace())._next_run_id == 4
 
 
+def _make_datasets_dir(tmp_path, monkeypatch):
+    """Create a fake datasets/ folder with one SAB CSV and one paper CSV."""
+    monkeypatch.chdir(tmp_path)
+    datasets = tmp_path / "datasets"
+    datasets.mkdir()
+    (datasets / "ScienceAgentBench.csv").write_text(
+        "instance_id,task_inst\n1,a\n2,b\n", encoding="utf-8"
+    )
+    (datasets / "papers.csv").write_text("Title,URLS,Prompt\nT,u,p\n", encoding="utf-8")
+
+
+def test_choose_dataset_enter_keeps_science_agent_bench(monkeypatch, tmp_path):
+    _make_datasets_dir(tmp_path, monkeypatch)
+    script = _ScriptedIO(answers=[""], yn_answers=[])
+    monkeypatch.setattr(evaluation_cli, "_ask", script.ask)
+
+    chosen = EvaluationCLI(SimpleNamespace())._choose_dataset()
+
+    assert chosen == ("datasets/ScienceAgentBench.csv", "science_agent_bench")
+
+
+def test_choose_dataset_number_selects_paper_csv_after_bad_answer(
+    monkeypatch, tmp_path
+):
+    """Listing is sorted by name; a paper CSV runs with the default builder."""
+    _make_datasets_dir(tmp_path, monkeypatch)
+    script = _ScriptedIO(answers=["9", "missing.csv", "2"], yn_answers=[])
+    monkeypatch.setattr(evaluation_cli, "_ask", script.ask)
+
+    chosen = EvaluationCLI(SimpleNamespace())._choose_dataset()
+
+    assert chosen == ("datasets/papers.csv", "default")
+    assert script.answers == []
+
+
+def test_run_launches_on_the_chosen_dataset(monkeypatch, tmp_path):
+    import sources.benchmark_evaluation.csv_mode as csv_mode
+
+    launched: dict = {}
+
+    class _StubCsvMode:
+        def __init__(self, config, **kwargs):
+            pass
+
+        async def start_evaluation(self, **kwargs):
+            launched.update(kwargs)
+
+    monkeypatch.setattr(csv_mode, "CsvEvaluationMode", _StubCsvMode)
+    monkeypatch.chdir(tmp_path)
+    config = SimpleNamespace(
+        smolagent_model_id="test/model",
+        create_paths=lambda: None, validate_paths=lambda: None,
+    )
+    spec = EvalRunSpec(
+        run_id=1, config=config, eval_mode="one_shot", csv_runs_limit=1,
+        dataset_path="datasets/papers.csv", dataset_type="default",
+    )
+
+    asyncio.run(EvaluationCLI(SimpleNamespace())._run_single_eval(spec))
+
+    assert launched["dataset_path"] == "datasets/papers.csv"
+    assert launched["dataset_type"] == "default"
+
+
 if __name__ == "__main__":
     test_launch_queue_is_sequential_and_survives_failure()
     print("✅ evaluation CLI sequential-queue smoke checks passed")

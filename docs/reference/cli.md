@@ -21,7 +21,7 @@ If no mode is given, Mimosa drops into the interactive onboarding wizard.
 | `--science_agent_bench` | Batch evaluation on `datasets/ScienceAgentBench.csv`. |
 | `--workflow_eval_mode` | Workflow-generation-quality evaluation. |
 | `--scenario <path>` | Use a scenario benchmark (for example `datasets/scenarios/X.json`) with criteria for workflow evaluation and evolution. |
-| `--evaluation_cli` | Interactive evaluation launcher for ScienceAgentBench. Its mode menu offers single-agent, one-shot, iterative learning, and resample (best-of-N, `variation_mode=resample`). |
+| `--evaluation_cli` | Interactive evaluation launcher for ScienceAgentBench and other CSV benchmarks. Its mode menu offers single-agent, one-shot, iterative learning, and resample (best-of-N, `variation_mode=resample`). A dataset step lists the CSV files in `datasets/` (Enter keeps `datasets/ScienceAgentBench.csv`); CSVs with `instance_id` and `task_inst` columns run with the ScienceAgentBench grader, other CSVs run as paper tasks (`Title`/`URLS`/`Prompt`), like `--papers`. |
 | `--memory_cli` | Interactive RAG chat over the memory of a workflow run. See [Transparency & replay](../usage/transparency.md#-memory_cli-ask-questions-about-a-run). |
 | `--memory_uuid <uuid>` | Run UUID to load with `--memory_cli` (defaults to the most recent run under `sources/memory/`). |
 

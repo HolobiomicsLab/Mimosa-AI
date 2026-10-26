@@ -2,8 +2,9 @@
 Interactive evaluation CLI for Mimosa-AI.
 
 Guides the user through evaluation setup: model selection (smolagent only),
-port range, workspace folder, evaluation mode, then launches CsvEvaluationMode
-on the ScienceAgentBench dataset.  Supports queuing multiple evaluation runs
+port range, workspace folder, evaluation mode, benchmark dataset (a CSV from
+``datasets/``, default ScienceAgentBench), then launches CsvEvaluationMode.
+Supports queuing multiple evaluation runs
 with different configurations, validates unique workspaces, and executes them
 sequentially in queue order.
 
@@ -14,6 +15,7 @@ at start and appends final results at the end.
 from __future__ import annotations
 
 import copy
+import csv
 import json
 import os
 import re
@@ -69,7 +71,7 @@ from sources.core.tools_manager import ToolManager
 
 _EVAL_BANNER = banner("Evaluation console", "ScienceAgentBench")
 
-TOTAL_STEPS = 7  # Config → Model → Connectivity → Mode → Tasks → Advanced → Queue/Launch
+TOTAL_STEPS = 8  # Config → Model → Connectivity → Mode → Dataset → Tasks → Advanced → Queue/Launch
 _CONFIG_DEFAULT_PATH = "config_default.json"
 # Root of the run notes; each queued run writes run_<id>/ here.
 _RUN_NOTES_ROOT = Path("run_notes")
@@ -80,6 +82,14 @@ _RUN_DIR_PREFIX = "run_"
 _EVAL_NOTES_DIR = _RUN_NOTES_ROOT / "evaluations"
 # Modes that run the multi-generation loop (csv_mode learning=True).
 _LEARNING_MODES = ("iterative", "resample")
+# Folder the dataset picker lists CSV files from.
+_DATASETS_DIR = Path("datasets")
+# Dataset used when the user presses Enter at the picker.
+_DEFAULT_DATASET = _DATASETS_DIR / "ScienceAgentBench.csv"
+# CSV columns that mark the ScienceAgentBench row schema.
+_SAB_COLUMNS = frozenset({"instance_id", "task_inst"})
+_SAB_DATASET_TYPE = "science_agent_bench"
+_DEFAULT_DATASET_TYPE = "default"
 
 
 # ---------------------------------------------------------------------------
@@ -104,6 +114,9 @@ class EvalRunSpec:
     # Run-notes JSON the statistics are restored from (run_notes/evaluations/*.json);
     # None = automatic detection inside csv_mode.
     restore_notes_file: str | None = None
+    # CSV the run reads tasks from, and its csv_mode row schema.
+    dataset_path: str = str(_DEFAULT_DATASET)
+    dataset_type: str = _SAB_DATASET_TYPE
     # Populated after execution
     status: str = "pending"
 
@@ -321,13 +334,17 @@ class EvaluationCLI:
         _print_step(4, TOTAL_STEPS, f"Evaluation Mode (Run #{run_id})")
         eval_mode = self._choose_eval_mode(run_config)
 
-        # Step 5 – Number of tasks (csv_runs_limit)
-        _print_step(5, TOTAL_STEPS, f"Task Limit (Run #{run_id})")
+        # Step 5 – Dataset
+        _print_step(5, TOTAL_STEPS, f"Dataset (Run #{run_id})")
+        dataset_path, dataset_type = self._choose_dataset()
+
+        # Step 6 – Number of tasks (csv_runs_limit)
+        _print_step(6, TOTAL_STEPS, f"Task Limit (Run #{run_id})")
         csv_runs_limit = self._ask_csv_runs_limit()
         start_row, restore_cache, restore_notes_file = self._ask_recovery_options()
 
-        # Step 6 – Advanced / ablation options (optional)
-        _print_step(6, TOTAL_STEPS, f"Advanced / Ablation Options (Run #{run_id})")
+        # Step 7 – Advanced / ablation options (optional)
+        _print_step(7, TOTAL_STEPS, f"Advanced / Ablation Options (Run #{run_id})")
         overrides = self._configure_advanced_options(run_config, eval_mode)
 
         return EvalRunSpec(
@@ -336,6 +353,8 @@ class EvaluationCLI:
             eval_mode=eval_mode,
             csv_runs_limit=csv_runs_limit,
             mcp_list=mcp_list,
+            dataset_path=dataset_path,
+            dataset_type=dataset_type,
             overrides=overrides,
             start_row=start_row,
             restore_cache=restore_cache,
@@ -601,7 +620,141 @@ class EvaluationCLI:
             )
 
     # ------------------------------------------------------------------
-    # Step 5 – csv_runs_limit
+    # Step 5 – Dataset
+    # ------------------------------------------------------------------
+
+    def _choose_dataset(self) -> tuple[str, str]:
+        """Ask which CSV dataset the run reads its tasks from.
+
+        The user picks the benchmark for one queued run. ``_configure_single_run``
+        calls this once per run, before the task limit is asked. It lists the
+        CSV files in ``datasets/`` and reads a number, a path, or Enter for the
+        ScienceAgentBench default.
+
+        Returns:
+            tuple[str, str]: The dataset CSV path, and its csv_mode dataset
+            type (``"science_agent_bench"`` or ``"default"``).
+        """
+        candidates = self._list_dataset_csvs(_DATASETS_DIR)
+        print(_wrap(f"Which CSV dataset should this run evaluate? ({_DATASETS_DIR}/)"))
+        for idx, path in enumerate(candidates, start=1):
+            tag = f"  {LOCKED}" if path == _DEFAULT_DATASET else ""
+            print(f"  {AMBER}[{idx}]{RESET}  {WHITE}{path.name}{RESET}{tag}")
+            print(f"         {GREY}{self._summarise_dataset(path)}{RESET}")
+        while True:
+            raw = _ask(f"File number or path, Enter for {_DEFAULT_DATASET.name}", default="")
+            chosen = self._resolve_dataset_choice(raw.strip(), candidates)
+            if chosen is not None:
+                return self._confirm_dataset(chosen)
+            _warn(f"Unrecognised choice '{raw}'. Enter a listed number or an existing CSV path.")
+
+    @staticmethod
+    def _list_dataset_csvs(datasets_dir: Path) -> list[Path]:
+        """List the CSV files the dataset picker offers.
+
+        ``_choose_dataset`` shows these files as a numbered menu. It gives the
+        datasets folder. This returns the CSV files in it, sorted by name.
+
+        Args:
+            datasets_dir (Path): Folder to list, ``_DATASETS_DIR``
+                (``datasets/``, relative to the current directory).
+
+        Returns:
+            list[Path]: The CSV files, or an empty list when the folder is missing.
+        """
+        if not datasets_dir.is_dir():
+            return []
+        return sorted(p for p in datasets_dir.glob("*.csv") if p.is_file())
+
+    @staticmethod
+    def _resolve_dataset_choice(raw: str, candidates: list[Path]) -> Path | None:
+        """Change one picker answer into an existing CSV file.
+
+        ``_choose_dataset`` uses this to check what the user typed. It gives
+        the stripped answer and the listed files. An empty answer selects the
+        default dataset, a number selects a listed file, other text is a path.
+
+        Args:
+            raw (str): Stripped answer from ``_ask``.
+            candidates (list[Path]): Files from ``_list_dataset_csvs``, in menu order.
+
+        Returns:
+            Path | None: The chosen CSV file, or None when the answer is not valid.
+        """
+        if not raw:
+            return _DEFAULT_DATASET
+        if raw.isdigit():
+            idx = int(raw) - 1
+            return candidates[idx] if 0 <= idx < len(candidates) else None
+        path = Path(raw).expanduser()
+        if path.is_file() and path.suffix.lower() == ".csv":
+            return path
+        return None
+
+    def _confirm_dataset(self, path: Path) -> tuple[str, str]:
+        """Find the dataset type of the chosen CSV and tell the user.
+
+        ``_choose_dataset`` calls this after the user picks a valid file. It
+        gives that file. This finds the row schema and prints the choice.
+
+        Args:
+            path (Path): CSV file from ``_resolve_dataset_choice``.
+
+        Returns:
+            tuple[str, str]: The CSV path as text and its csv_mode dataset type.
+        """
+        dataset_type = self._detect_dataset_type(path)
+        if not path.is_file():
+            _warn(f"{path} does not exist — the run will fail at launch.")
+        _ok(f"Dataset: {path} ({dataset_type})")
+        return str(path), dataset_type
+
+    @staticmethod
+    def _detect_dataset_type(path: Path) -> str:
+        """Find which csv_mode task builder can read the CSV rows.
+
+        ``_confirm_dataset`` and ``_summarise_dataset`` need the row schema.
+        They give a CSV path. This reads only the header row: the
+        ScienceAgentBench columns select the SAB builder, other CSVs use the
+        paper builder (Title / URLS / Prompt).
+
+        Args:
+            path (Path): CSV file to inspect.
+
+        Returns:
+            str: ``"science_agent_bench"`` or ``"default"``. A missing or
+            unreadable file gives ``"science_agent_bench"``, the CLI default.
+        """
+        try:
+            with open(path, newline="", encoding="utf-8", errors="replace") as fh:
+                header = next(csv.reader(fh), [])
+        except OSError:
+            return _SAB_DATASET_TYPE
+        columns = {name.strip() for name in header}
+        return _SAB_DATASET_TYPE if columns >= _SAB_COLUMNS else _DEFAULT_DATASET_TYPE
+
+    @classmethod
+    def _summarise_dataset(cls, path: Path) -> str:
+        """Make a one-line preview of a dataset CSV for the picker.
+
+        ``_choose_dataset`` prints this under each listed file. It gives one
+        CSV path. This counts the task rows and adds the dataset type.
+
+        Args:
+            path (Path): CSV file from ``_list_dataset_csvs``.
+
+        Returns:
+            str: For example ``"102 tasks · science_agent_bench"``.
+        """
+        try:
+            with open(path, newline="", encoding="utf-8", errors="replace") as fh:
+                row_count = sum(1 for _ in csv.reader(fh)) - 1
+        except (OSError, csv.Error):
+            return "unreadable — cannot preview"
+        return f"{max(row_count, 0)} tasks · {cls._detect_dataset_type(path)}"
+
+    # ------------------------------------------------------------------
+    # Step 6 – csv_runs_limit
     # ------------------------------------------------------------------
 
     def _ask_csv_runs_limit(self) -> int:
@@ -765,7 +918,7 @@ class EvaluationCLI:
         return " · ".join(parts)
 
     # ------------------------------------------------------------------
-    # Step 6 – Advanced / ablation options (optional)
+    # Step 7 – Advanced / ablation options (optional)
     # ------------------------------------------------------------------
 
     # Selection strategies supported by sources/core/selection.py
@@ -995,6 +1148,7 @@ class EvaluationCLI:
             print(f"\n    {AMBER}RUN #{spec.run_id}{RESET}")
             kv("model", spec.config.smolagent_model_id)
             kv("mode", spec.eval_mode)
+            kv("dataset", f"{spec.dataset_path} ({spec.dataset_type})")
             kv("tasks", str(spec.csv_runs_limit))
             kv("ports", port_str)
             kv("workspace", spec.config.workspace_dir)
@@ -1048,7 +1202,8 @@ class EvaluationCLI:
             ],
             "workspace_dir": spec.config.workspace_dir,
             "detected_mcps": spec.mcp_list,
-            "dataset": "datasets/ScienceAgentBench.csv",
+            "dataset": spec.dataset_path,
+            "dataset_type": spec.dataset_type,
             "advanced_overrides": spec.overrides,
             "evolution_config": {
                 "orchestrator_choose_model": spec.config.orchestrator_choose_model,
@@ -1177,12 +1332,12 @@ class EvaluationCLI:
 
         _info(f"Run #{spec.run_id} starting "
               f"(model={run_config.smolagent_model_id}, mode={spec.eval_mode}, "
-              f"tasks={spec.csv_runs_limit})")
+              f"dataset={spec.dataset_path}, tasks={spec.csv_runs_limit})")
 
         try:
             await evaluator.start_evaluation(
-                dataset_type="science_agent_bench",
-                dataset_path="datasets/ScienceAgentBench.csv",
+                dataset_type=spec.dataset_type,
+                dataset_path=spec.dataset_path,
                 learning=learning,
                 single_agent_mode=single_agent,
                 concurrent=max_concurrent > 1,
