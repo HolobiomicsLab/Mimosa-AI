@@ -12,8 +12,8 @@
 
 QD selection compares candidates with two scalars:
 
-- **quality** — `reward`, the capped `overall_score`; runs that refuted a
-  hard claim rank at the cap, and ties there are broken by novelty.
+- **quality** — `reward` (`overall_score`). Under the default policy_bt
+  verifier this is the Bradley–Terry rating, in (0, 1); ineligible generations get 0.0. The legacy verifier caps it when a claim is refuted.
 - **novelty** — k-NN distance in *behaviour-descriptor space* to the
   rest of the archive.
 
@@ -31,11 +31,11 @@ directly, instead of inferring it from a proxy.
 > deprecated)
 > and, before that, from a structural descriptor `[n_agents, n_edges,
 > n_branches, prompt_chars]`. The `failure_fingerprint` key is still
-> written by the verifier as a diagnostic (see
+> written by the legacy and hybrid verifiers as a diagnostic (see
 > [`concepts/evaluation-pipeline.md`](../concepts/evaluation-pipeline.md#failure-fingerprint-diagnostic)),
-> but it no longer feeds novelty — and under the hybrid verifier it
-> holds a neutral placeholder (only the deprecated legacy verifier
-> computed real pass rates). The structural descriptor is gone.
+> but it no longer feeds novelty. The legacy verifier computes real
+> pass rates; the hybrid verifier writes a neutral placeholder. The
+> default policy_bt verifier does not write the key. The structural descriptor is gone.
 
 ## The signal: an embedding of the workflow code
 
@@ -53,8 +53,10 @@ The backend is pluggable
 
 | Backend | When | Dim | Notes |
 | --- | --- | --- | --- |
-| `all-MiniLM-L6-v2` (sentence-transformers) | **default** | 384 | Local, offline, deterministic, free. |
+| `all-MiniLM-L6-v2` (sentence-transformers) | **default** | 384 | Local, no API cost. The model is downloaded on first use. |
 | OpenAI `text-embedding-3-small` | `MIMOSA_GENOTYPE_EMBEDDING_BACKEND=openai` **and** `OPENAI_API_KEY` set | 1536 | API call per uncached genotype; falls back to MiniLM if the client can't be built. |
+
+Before embedding, the MiniLM backend canonicalises the source (`_canonicalise_for_embedding`: drops comment-only and blank lines, keeps comment tails), splits it into chunks of at most 900 characters at top-level AST statement boundaries (`_split_top_level_blocks`, `_MAX_CHUNK_CHARS`), embeds each chunk, and mean-pools the results. The descriptor is therefore not the raw source text.
 
 Identical code text is embedded once per process — `GenotypeEmbedder`
 caches by the SHA-1 of the source — so the QD inner loop stays cheap even
@@ -73,13 +75,13 @@ Two comparison modes
 ([`SelectionPressure._compute_novelty`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/selection.py)):
 
 - **`archive_knn`** (default) — mean distance to the `k =
-  novelty_k_neighbours = 15` nearest archive members.
+  novelty_k_neighbours = 16` nearest archive members.
 - **`previous_n`** — mean distance to the `previous_n` most recently
   produced genotypes (ignores eviction).
 
 `novelty` then enters the QD score additively:
-`qd_score = (1 − w)·quality_norm + w·novelty_norm`, `w = novelty_weight =
-0.25`. Quality and novelty are never multiplied, so high novelty cannot
+`qd_score = (1 − w)·quality_norm + w·novelty_norm − λ·length_penalty`, `w = novelty_weight = 0.25`, `λ = length_penalty_lambda = 0.05`.
+Quality and novelty are clipped to `[0, 1]` before weighting. They are never multiplied, so high novelty cannot
 drag a broken run above its peers.
 
 ## Sources of variables
@@ -132,16 +134,18 @@ drag a broken run above its peers.
                               └────────────────────────────────────┘
 ```
 
+`_extract_behaviour_descriptor` (`selection.py:550-570`) returns a precomputed, non-empty `run.behaviour_descriptor` when one is set (l.566-568). Otherwise it calls `genotype_embedding_descriptor(run.code)`.
+
 ## Variable inventory (audit table)
 
 | Symbol | Type | Set by | Read by | Notes |
 | --- | --- | --- | --- | --- |
-| `run.code` | str | orchestrator / workflow factory | `_extract_behaviour_descriptor` | The workflow genotype (generated Python source). |
+| `run.code` | str | `evolution_engine.py:1104` (`WorkflowInfo.code`, loaded from `workflow_genotype_<uuid>.py`) | `_extract_behaviour_descriptor` | The workflow genotype (generated Python source). |
 | `genotype_embedding_descriptor(code)` | `list[float]` \| `None` | `code_features` | `_extract_behaviour_descriptor` | L2-normalised embedding; `None` for degenerate input. |
 | `embed_genotype(code)` | `np.ndarray` \| `None` | `genotype_embedding.GenotypeEmbedder` | `genotype_embedding_descriptor` | Unit-norm vector; SHA-1 cached per process. |
 | `PopulationMember.behaviour_descriptor` | `list[float]` | `SelectionPressure._validate_open_ended` | `_compute_novelty`, `_knn_novelty_against_peers` | Snapshot of the descriptor at admission; `[]` when no usable genotype. |
 | `novelty_score` | float | `_compute_novelty` / `_refresh_member_metrics` | `qd_score` | Mean cosine distance ∈ `[0, 2]` to the comparison set. |
-| `qd_score` | float | `_validate_open_ended`, `_refresh_member_metrics` | parent draw, archive eviction | `(1 − w)·quality_norm + w·novelty_norm`; quality and novelty are *additive*, never multiplied. |
+| `qd_score` | float | `_validate_open_ended`, `_refresh_member_metrics` | parent draw, archive eviction | `(1 − w)·quality_norm + w·novelty_norm − λ·length_penalty`; quality and novelty are *additive*, never multiplied. |
 
 ## Failure modes the audit checks
 

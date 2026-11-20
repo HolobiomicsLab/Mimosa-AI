@@ -232,7 +232,7 @@ def test_ask_recovery_options_yes_asks_for_notes_file(monkeypatch, tmp_path):
             ("older_one_shot.json", 1000.0),
         ],
     )
-    script = _ScriptedIO(answers=["1", "2"], yn_answers=[True])
+    script = _ScriptedIO(answers=["2", "1"], yn_answers=[True])
     monkeypatch.setattr(evaluation_cli, "_ask", script.ask)
     monkeypatch.setattr(evaluation_cli, "_ask_yn", script.ask_yn)
     cli = EvaluationCLI(SimpleNamespace())
@@ -325,6 +325,126 @@ def test_summarise_notes_file_falls_back_to_total_eval(tmp_path):
     summary = EvaluationCLI._summarise_notes_file(p)
     assert "4 evals" in summary
     assert "VER" not in summary
+
+
+def test_choose_eval_mode_sets_variation_mode_for_each_run(monkeypatch):
+    """Resample selects the best-of-N control; other modes reset it to evolve."""
+    script = _ScriptedIO(answers=["4", "3"], yn_answers=[])
+    monkeypatch.setattr(evaluation_cli, "_ask", script.ask)
+    cli = EvaluationCLI(SimpleNamespace())
+    resample_config = SimpleNamespace(variation_mode="evolve")
+    iterative_config = SimpleNamespace(variation_mode="resample")
+
+    assert cli._choose_eval_mode(resample_config) == "resample"
+    assert cli._choose_eval_mode(iterative_config) == "iterative"
+    assert resample_config.variation_mode == "resample"
+    assert iterative_config.variation_mode == "evolve"
+
+
+def test_resample_run_launches_the_learning_loop(monkeypatch, tmp_path):
+    """A resample run must run several generations, not a one-shot pass."""
+    import sources.benchmark_evaluation.csv_mode as csv_mode
+
+    launched: dict = {}
+
+    class _StubCsvMode:
+        def __init__(self, config, **kwargs):
+            launched["variation_mode"] = config.variation_mode
+
+        async def start_evaluation(self, **kwargs):
+            launched.update(kwargs)
+
+    monkeypatch.setattr(csv_mode, "CsvEvaluationMode", _StubCsvMode)
+    monkeypatch.chdir(tmp_path)
+    config = SimpleNamespace(
+        variation_mode="resample", smolagent_model_id="test/model",
+        create_paths=lambda: None, validate_paths=lambda: None,
+    )
+    spec = EvalRunSpec(run_id=1, config=config, eval_mode="resample", csv_runs_limit=1)
+
+    asyncio.run(EvaluationCLI(SimpleNamespace())._run_single_eval(spec))
+
+    assert launched["learning"] is True
+    assert launched["single_agent_mode"] is False
+    assert launched["variation_mode"] == "resample"
+    assert spec.status == "completed"
+
+
+def test_first_run_id_follows_highest_existing_run_folder(monkeypatch, tmp_path):
+    """A new queue must never reuse an existing run_notes/run_<n> folder."""
+    monkeypatch.chdir(tmp_path)
+    assert EvaluationCLI(SimpleNamespace())._next_run_id == 1  # no run_notes/
+
+    notes_root = tmp_path / "run_notes"
+    for name in ("run_1", "run_3", "run_12_old", "run_oct_18", "evaluations"):
+        (notes_root / name).mkdir(parents=True)
+    (notes_root / "run_9").write_text("not a folder", encoding="utf-8")
+
+    assert EvaluationCLI(SimpleNamespace())._next_run_id == 4
+
+
+def _make_datasets_dir(tmp_path, monkeypatch):
+    """Create a fake datasets/ folder with one SAB CSV and one paper CSV."""
+    monkeypatch.chdir(tmp_path)
+    datasets = tmp_path / "datasets"
+    datasets.mkdir()
+    (datasets / "ScienceAgentBench.csv").write_text(
+        "instance_id,task_inst\n1,a\n2,b\n", encoding="utf-8"
+    )
+    (datasets / "papers.csv").write_text("Title,URLS,Prompt\nT,u,p\n", encoding="utf-8")
+
+
+def test_choose_dataset_enter_keeps_science_agent_bench(monkeypatch, tmp_path):
+    _make_datasets_dir(tmp_path, monkeypatch)
+    script = _ScriptedIO(answers=[""], yn_answers=[])
+    monkeypatch.setattr(evaluation_cli, "_ask", script.ask)
+
+    chosen = EvaluationCLI(SimpleNamespace())._choose_dataset()
+
+    assert chosen == ("datasets/ScienceAgentBench.csv", "science_agent_bench")
+
+
+def test_choose_dataset_number_selects_paper_csv_after_bad_answer(
+    monkeypatch, tmp_path
+):
+    """Listing is sorted by name; a paper CSV runs with the default builder."""
+    _make_datasets_dir(tmp_path, monkeypatch)
+    script = _ScriptedIO(answers=["9", "missing.csv", "2"], yn_answers=[])
+    monkeypatch.setattr(evaluation_cli, "_ask", script.ask)
+
+    chosen = EvaluationCLI(SimpleNamespace())._choose_dataset()
+
+    assert chosen == ("datasets/papers.csv", "default")
+    assert script.answers == []
+
+
+def test_run_launches_on_the_chosen_dataset(monkeypatch, tmp_path):
+    import sources.benchmark_evaluation.csv_mode as csv_mode
+
+    launched: dict = {}
+
+    class _StubCsvMode:
+        def __init__(self, config, **kwargs):
+            pass
+
+        async def start_evaluation(self, **kwargs):
+            launched.update(kwargs)
+
+    monkeypatch.setattr(csv_mode, "CsvEvaluationMode", _StubCsvMode)
+    monkeypatch.chdir(tmp_path)
+    config = SimpleNamespace(
+        smolagent_model_id="test/model",
+        create_paths=lambda: None, validate_paths=lambda: None,
+    )
+    spec = EvalRunSpec(
+        run_id=1, config=config, eval_mode="one_shot", csv_runs_limit=1,
+        dataset_path="datasets/papers.csv", dataset_type="default",
+    )
+
+    asyncio.run(EvaluationCLI(SimpleNamespace())._run_single_eval(spec))
+
+    assert launched["dataset_path"] == "datasets/papers.csv"
+    assert launched["dataset_type"] == "default"
 
 
 if __name__ == "__main__":

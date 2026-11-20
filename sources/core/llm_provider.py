@@ -537,6 +537,8 @@ class LLMProvider:
             "too many requests",  # 429 errors
             "context",  # Context window errors
             "token limit",  # Token limit errors
+            "server disconnected",  # httpx RemoteProtocolError disconnects
+            "eof occurred",  # ssl.SSLEOFError protocol violation
         ]
 
         return any(pattern in error_str for pattern in retryable_patterns)
@@ -896,8 +898,8 @@ class LLMProvider:
 
 if __name__ == "__main__":
     config = LLMConfig(
-        model="claude-haiku-4-5-20251001",
-        provider="anthropic"
+        model="z-ai/glm-5.3-flash",
+        provider="openrouter"
     )
 
     llm_provider = LLMProvider(
@@ -913,4 +915,4 @@ if __name__ == "__main__":
         print("Response:", response)
     except Exception as e:
         print(f"Error : {e}")
-        print("Make sure DEEPSEEK_API_KEY environment variable is set")
+        print("Make sure API key environment variable is set")

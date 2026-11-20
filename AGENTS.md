@@ -133,7 +133,8 @@ main.py                      # CLI entry point & mode dispatch (argparse → asy
 config.py                    # Config dataclass: defaults, JSON load, CLI overrides, path validation
 config_default.json          # Template config — copy to my_config.json and edit
 auto-install.sh              # Automated installer script
-cleanup.sh                   # Empties tmp/ and sources/workflows/ (reset cached workflows)
+cleanup.sh                   # Deletes top-level generation folders of sources/workflows/ + tmp/;
+                             # `./cleanup.sh <subfolder>` empties one campaign folder; -n = dry run
 workflow_evolution_anim.py   # Interactive evolution-tree / trace replay viewer
 
 sources/
@@ -237,7 +238,9 @@ uv run pytest tests/evaluator_test.py   # single file
 
 - End-to-end "evaluation" is a separate, LLM- and benchmark-driven activity
   (`--papers`, `--science_agent_bench`), not part of the pytest suite. Run
-  `./cleanup.sh` before benchmark sweeps so cached workflows are not reused.
+  `./cleanup.sh` (or `./cleanup.sh <workflow_dir subfolder>`) before benchmark
+  sweeps so cached workflows are not reused; never run it on a campaign you
+  still need to audit.
 
 ## Auditing finished runs
 
@@ -259,14 +262,23 @@ they are the evidence.
 > verifier (`verifier_kind="policy_bt"`, the default in `config.py` and
 > `config_default.json`): `evaluation.txt` opens with the line
 > `Policy-BT verifier` followed by a JSON object (reward, tournament
-> version, the reproduction/execution record, and the PAIR VERDICTS —
+> version, the reproduction/execution record — status `succeeded`, or
+> `provenance_verified` when the host rerun failed on a missing dependency
+> and the run's own time-window outputs were accepted instead (see its
+> `provenance` block and the `PROVENANCE` log stage) — the `input_provenance`
+> check of the snapshot against the pre-run workspace, and the PAIR VERDICTS —
 > each pair tagged with its `policy_version`), the gradient lands in
 > `textual_gradient.txt`, stage-level JSON records stream to
 > `verifier_policy_bt.log`, and the machine-readable pair evidence is
 > in `policy_bt_evidence.json` (same folder). The tournament state for
 > a task session lives in
 > `<workflow_dir>/.policy_bt/<sha256(goal, session)>/tournament.json`
-> with one verifier-owned `snapshots/<uuid>/` copy per generation.
+> with one verifier-owned `snapshots/<uuid>/` copy per generation (plus
+> `baseline/`, the workspace as it was before the first run, with
+> `baseline_digests.json`); its `bundle.criteria_guard` records why each frozen criterion was kept,
+> revised or dropped (`criteria_guard` verdicts, `plan_revisions`,
+> `dropped_criteria`, and `quality_gap` when a held-out quality criterion for
+> a placeholder test label stayed missing).
 > Older campaigns on disk were produced by earlier channels: the hybrid
 > temporal-ladder verifier (stage headers and win-rate fields) and,
 > before it, the legacy claims verifier (per-source claim verdicts with
@@ -279,7 +291,7 @@ they are the evidence.
 | Path | What it holds | Audit notes |
 |------|---------------|-------------|
 | `run_notes/run_<x>/<task>.json` | Per-task campaign record and the **ground truth**: `goal`, `capsule_name`, `evolved_workflows_uuids` (ordered, oldest → newest), `evolution_rewards` / `evolution_costs` (the verifier signal), and `ablations[]` — the benchmark's own grader re-scored per generation (`evolution_index`, `uuid`, `VER`, `VER_message`, `SR`, `SR_message`, `CBS`, `cost`, `status`, `source`). Totals: `total_eval`, `ver_success`, `sr_success`, `avg_cbs`, `max_judge_reward`, `git`. | `ablations` outranks the verifier reward — it is what the benchmark actually graded. `source` is `snapshot` (genotype re-graded) or `capsule` (final submission). `ver_success` / `sr_success` / `total_eval` semantics are undocumented: quote them, don't interpret them. |
-| `sources/workflows/run_<x>/<uuid>/` | Per-generation evolution artifacts: `evaluation.txt` (verifier verdicts — policy/BT: reward + tournament version + execution record + PAIR VERDICTS; older runs: hybrid stage headers or legacy per-claim verdicts), `textual_gradient.txt` (the diagnosis fed to the NEXT mutation), `verifier_policy_bt.log` (per-stage JSON records), `policy_bt_evidence.json` (same report, machine-readable), `lineage_<id>.json` (kind + parents), `run_metrics.json` (`overall_score`, `on_error`, costs), `run_stdout.log` (raw workflow execution output, verbatim incl. ANSI escapes; on failed runs the error text; when this generation is later a parent without a verifier gradient, it is the unverified `<raw_log>` the directive LLM receives), `workflow_genotype_<id>.py`, `evolution_prompt_*`, `state_result.json` (clean runs). | **Empty folder** (since 2026-10-14: only `run_stdout.log` starting `WORKFLOW_GENERATION_ERROR:`) = failed generation attempt (the run-notes slot records the literal placeholder `generation_failed`). A round with `on_error: true` has no `evaluation.txt` and no gradient — read `run_stdout.log` for the run-time error (folders older than 2026-10-14 lack it; then the cause is not recorded anywhere — say so instead of guessing). |
+| `sources/workflows/run_<x>/<uuid>/` | Per-generation evolution artifacts: `evaluation.txt` (verifier verdicts — policy/BT: reward + tournament version + execution record + PAIR VERDICTS; older runs: hybrid stage headers or legacy per-claim verdicts), `textual_gradient.txt` (policy/BT: the LATEST fold of this generation's gradient over all current pairs — what the NEXT mutation of this parent receives; earlier folds with time and `tournament_version` in `textual_gradient_history.jsonl`, the first one also in `state_result.json` `evaluation.verifier.arrival_textual_gradient`), `verifier_policy_bt.log` (per-stage JSON records), `policy_bt_evidence.json` (same report, machine-readable), `lineage_<id>.json` (kind + parents), `run_metrics.json` (`overall_score`, `on_error`, costs), `run_stdout.log` (raw workflow execution output, verbatim incl. ANSI escapes; on failed runs the error text; when this generation is later a parent without a verifier gradient, only its TAIL — the last 4096 characters (`RAW_LOG_TAIL_CHARS`) after a marker line — is the unverified `<raw_log>` the directive LLM or crossover prompt receives; the full file is not what the LLM saw), `workflow_genotype_<id>.py`, `evolution_prompt_*`, `state_result.json` (clean runs). | **Empty folder** (since 2026-10-14: only `run_stdout.log` starting `WORKFLOW_GENERATION_ERROR:`) = failed generation attempt. Since 2026-10-20 the run-notes slot records that folder's own uuid, or a fresh `generation_failed_<YYYYMMDD_HHMMSS>_<8hex>` folder when the factory made none; older notes record the literal placeholder `generation_failed`, whose shared folder keeps only the last failure's log. A round with `on_error: true` has no `evaluation.txt` and no gradient — read `run_stdout.log` for the run-time error (folders older than 2026-10-14 lack it; then the cause is not recorded anywhere — say so instead of guessing). |
 | `runs_capsule/run_<x>/<capsule>/` | The final submitted workspace: final script(s), `pred_results/` artifacts, and **`evaluation_results.json`** — the official VER / SR / CBS / cost plus the full VER/SR messages that produced the task's benchmark score. | The capsule defines the task result, not the last generation folder. Read the prediction artifacts' headers/first rows; they ground every claim about what was delivered. |
 | `/tmp/mimosa_run_<wshash>_<uuid>/` | The per-round **run workspace** — the files the workflow physically wrote that round (scripts, `pred_results/`, reports). Match rounds by uuid substring. | **Volatile**: `cleanup.sh`, reboots, and benchmark sandboxes remove them (`/tmp/mimosa_sandbox_*` are transient and usually already gone). Record listings, sizes, and output-file headers at inspection time — an audit is a dated snapshot. Artifact presence ≠ run success: errored rounds (`on_error: true`) can still leave complete outputs. |
 | `datasets/ScienceAgentBench/eval_programs/*.py` (+ `gold_results/`, `gold_programs/`, `scoring_rubrics/`) | The **actual benchmark graders** and their gold artifacts. | The highest-value audit resource. `SR_message` formats map 1:1 to eval scripts — e.g. `overlap: X` → `antibioticsai_filter_eval.py`, a hardcoded `N/A` → `eval_mat_feature_select.py`, a long critique list → the `gpt4_visual_judge` vision path. Read the grader code and its gold file before interpreting ANY SR result; the message alone can be uninformative by design. |
@@ -297,7 +309,7 @@ they are the evidence.
 - 6. For each evolved uuid **Find it's final deliverable**: per evolution iterations produced artefacts by agents in `/tmp/mimosa_run_<wshash>_<uuid>/`; compare the artefact script and pred_results with the gold script and gold results. Understand how it differs from the previous iteration (better? worst?)
 - 7. Understand why the results artefacts differs from reading the artefacts themselves: open up `sources/workflows/run_<x>/<uuid>` for the previous and current workflow
 8. **Read the evaluations** (`evaluation.txt`) of the previous and current iteration: which pairs were won/lost and on which decision rung, how did that change between the 2 evolution iterations ? does it drive toward or away from winning the task (according to gold) ? The evaluation will drive the gradient.
-9. **Read the gradient** (`textual_gradient.txt`) of round N-1. Did the mutation act on the diagnosis? Did the loop close (failure → gradient → repair)? Flag reward/benchmark misalignement
+9. **Read the gradient** of round N-1 as the child received it. Policy-BT refolds a parent's gradient from all its current pairs every time the tournament changes: `textual_gradient.txt` is the LATEST fold, `state_result.json` `evaluation.verifier.arrival_textual_gradient` is the first one, and `textual_gradient_history.jsonl` lists every fold with an ISO `time` and `tournament_version` — pick the last entry before the child's `lineage_<id>.json` `created_at`; if none precedes it (generations evaluated before 2026-10-17 have no arrival entry), the child received `arrival_textual_gradient`. Did the mutation act on the diagnosis? Did the loop close (failure → gradient → repair)? Flag reward/benchmark misalignement
 10. **Look at the directive**: extract and have a look at `evolution_prompt_20260920_181842_d8e1c063.md` directive field <directive></directive> for the workflow N (not N-1), it's the directive that produced the current workflow, is the directive aligned ?
 10. **Diff the workflow**: diff workflow N-1 against workflow N, what change in the workflow were made to fix the issues ?
 10. **Reflect on the broader picture**: did evolution help ? construct a table for every iterations ? Investigate the deep cause of misalignement. Flag win and encouraging behaviors.
@@ -339,8 +351,10 @@ when both are wanted.
 Structure — one card per consecutive slot pair (gen N → gen N+1), five labeled
 blocks, in this order:
 
-1. **① Textual gradient** — `textual_gradient.txt` of the generation being
-   improved (the source of the mutation), quoted verbatim, with its file path.
+1. **① Textual gradient** — the gradient of the generation being improved as
+   the child received it (policy/BT: the last `textual_gradient_history.jsonl`
+   entry before the child's `lineage_<id>.json` `created_at`; older runs:
+   `textual_gradient.txt`), quoted verbatim, with its file path.
    If that round is `on_error` it has no gradient (no `evaluation.txt` either):
    state that instead of substituting anything.
 2. **② Directive** — the `<directive>...</directive>` block of the child's

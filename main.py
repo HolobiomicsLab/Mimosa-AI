@@ -165,6 +165,13 @@ def add_config_arguments(parser: argparse.ArgumentParser, config: Config) -> Non
         "adapter repairs (default 3)",
     )
     parser.add_argument(
+        "--variation_mode",
+        type=str,
+        choices=["evolve", "resample"],
+        help="evolve: select parents and mutate/crossover (default); resample: "
+        "every generation is a fresh draw from the task text (best-of-N control)",
+    )
+    parser.add_argument(
         "--planner_human_approve",
         action="store_true",
         default=False,
@@ -222,6 +229,8 @@ def apply_config_overrides(args: argparse.Namespace, config: Config) -> None:
         config.policy_bt_repair_rounds = args.policy_bt_repair_rounds
     if getattr(args, "early_stop_mode", None):
         config.early_stop_mode = args.early_stop_mode
+    if getattr(args, "variation_mode", None):
+        config.variation_mode = args.variation_mode
     if getattr(args, "min_learning_evolve_iterations", None):
         config.min_learning_evolve_iterations = (
             args.min_learning_evolve_iterations

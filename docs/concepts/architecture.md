@@ -41,8 +41,8 @@ recursively evolves workflows, with help from:
 
 - **WorkflowSelector** — picks parents from the live archive or, on a cold
   start, from previous runs on disk (filtered by task-text cosine similarity).
-- **SelectionPressure** — Quality-Diversity archive (`population_size=50`,
-  `k=15`, `novelty_weight=0.25`). Admission is gated by the validity check
+- **SelectionPressure** — Quality-Diversity archive (`population_size=16`,
+  `k=16`, `novelty_weight=0.25`). Admission is gated by the validity check
   (improvement over baseline or `qd_score > admit_threshold`); capacity is
   curated by lowest-`qd_score` eviction.
 - **VariationEngine** — assembles mutation or crossover prompts with a
@@ -79,7 +79,7 @@ shared LangGraph state.
 ### Layer 4 — Judge & evaluation
 
 Once execution finishes, the **WorkflowEvaluator** facade
-([`evaluators/evaluator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/evaluators/evaluator.py))
+([`evaluators/evaluator.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/evaluator.py))
 routes to one of:
 
 - **PolicyBTVerifierEvaluator** (default) — the policy-based
@@ -96,8 +96,8 @@ routes to one of:
 - **GenericEvaluator** — legacy 4-criterion LLM judge.
 - **ScenarioEvaluator** — rubric/assertion-based scoring for benchmarks.
 
-The evaluator returns `(overall_score, overall_score_uncapped,
-abstracted_textual_gradient)`. Only the textual gradient feeds back into
+The facade returns a dict: `evaluation_type`, `uuid`, and the verifier result,
+which carries `overall_score` and `abstracted_textual_gradient`. The hybrid and legacy verifiers also set `overall_score_uncapped`. Only the textual gradient feeds back into
 the mutator — the raw scorer scripts stay inside the verifier.
 
 ## Persistent storage

@@ -1,4 +1,7 @@
-"""Full-oracle reward (``gold_feedback_reward=True`` only)."""
+"""Full-oracle reward (``gold_feedback_reward=True`` only).
+
+**Only used for special ablations on whenever gold based feedback textual gradient outperform others verifiers**
+"""
 
 from __future__ import annotations
 

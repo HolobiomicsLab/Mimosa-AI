@@ -23,8 +23,8 @@ flowchart TB
     Think --> Mut[Mutation prompt<br/>parent code + directive]
     Mut --> Orch
     Cross --> Orch
-    Orch --> Eval[hybrid temporal-ladder verifier<br/>reward + textual gradient]
-    Eval --> Admit{Validity: improvement<br/>or qd_score ≥ threshold?}
+    Orch --> Eval[policy Bradley–Terry verifier<br/>reward + textual gradient]
+    Eval --> Admit{Validity: improvement<br/>or qd_score > admit_threshold?}
     Admit -- yes --> Archive[Admit to archive]
     Admit -- no --> Reject[Reject<br/>telemetry only]
     Archive --> Lin[Lineage]
@@ -53,9 +53,9 @@ A more detailed view lives in the source diagram
 
 Termination:
 
-- `overall_score >= learned_score_threshold` (default `0.92`) in `--learn` mode, *or*
+- `overall_score >= learned_score_threshold` (default `0.9`) in `--learn` mode, *or*
 - `max_depth` reached — `1` in single-shot mode, `max_learning_evolve_iterations`
-  (default `25`) in `--learn` mode.
+  (default `16`) in `--learn` mode.
 
 ## Selection: Quality-Diversity (QD)
 
@@ -63,7 +63,7 @@ Termination:
 implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
 (default, set via config's `selection_strategy`). In QD mode:
 
-- A **session archive** holds up to `population_size = 20` members
+- A **session archive** holds up to `population_size = 16` members
   (config field, ablation-tunable).
 - Each member has `qd_score = (1−w)·quality_norm + w·novelty_norm`, with
   `w = novelty_weight = 0.25`. Quality and novelty are **additive** — never
@@ -73,7 +73,7 @@ implements four strategies — `greedy`, `tournament`, `novelty`, and `qd`
   that refuted a hard claim ranks at its capped score and cannot top the
   archive on its other claims alone; ties at the cap are broken by the
   novelty and length-penalty terms.
-- Novelty is cosine-distance k-NN (`k = 15`) in **genotype-embedding**
+- Novelty is cosine-distance k-NN (`k = 16`) in **genotype-embedding**
   space. The descriptor is the L2-normalised embedding of the workflow's
   generated source code (its *genotype*), produced by
   [`genotype_embedding.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/genotype_embedding.py)
@@ -95,7 +95,7 @@ not hardcoded constants; touch them only for ablation studies.
 
 When the archive is empty (cold start), [`WorkflowSelector`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/core/workflow_selection.py)
 falls back to a **similarity-filtered disk scan** (`cosine ≥
-parent_threshold_similarity` — default `0.8` — on MiniLM embeddings of
+parent_threshold_similarity` — default `0.95` — on MiniLM embeddings of
 `original_task`, `score ≥ parent_threshold_score` — default `0.01`) — this
 lets useful workflows transfer across tasks.
 
@@ -142,7 +142,7 @@ offspring are never rewarded merely for being "different".
 > **The failure fingerprint is no longer the novelty signal.** Earlier
 > versions derived QD novelty from a *failure fingerprint* — a 7-D
 > centered vector of per-source verifier pass rates (one slot per
-> registered source letter `a`–`g`; the module is now marked deprecated)
+> registered source letter `a`–`g`)
 > — and, before that,
 > from a structural descriptor `[n_agents, n_edges, n_branches,
 > prompt_chars]`. Both have been retired as the behaviour descriptor.
@@ -221,10 +221,11 @@ call reads:
   (`<diagnosis>` — trusted as ground truth),
 - when the parent has no verifier gradient, the parent's own run log
   (`run_stdout.log`, read through `WorkflowInfo.run_stdout`) instead
-  (`<raw_log>` — **unverified**, sent verbatim, never as a
-  `<diagnosis>`; the prompt then says that no verifier diagnosis is
-  available); with no parent there is no log, and a fixed no-feedback
-  note is the diagnosis,
+  (`<raw_log>` — **unverified**, never as a `<diagnosis>`; only the
+  last 4096 characters (`RAW_LOG_TAIL_CHARS`) after a marker line that
+  says earlier output was cut; the prompt then says that no verifier
+  diagnosis is available); with no parent there is no log, and a fixed
+  no-feedback note is the diagnosis,
 - the read-only search-state block produced by `_search_state_block`
   (`<search_state>` — plain search statistics: parent score, iteration
   progress, plateau streak, success rate, score trajectory),
@@ -240,7 +241,8 @@ raw log is unverified and may hold the agent's own mistakes, guessed
 paths and transient tool errors — and about action limits — add or
 remove at most one agent per step, and prefer small incremental
 changes unless the evidence and search state say the approach is
-fundamentally flawed. For the raw log it adds four rules: look for
+fundamentally flawed. It states that the raw log is only a tail and
+adds four rules: look for
 recurring patterns, not single error lines; never turn one error into
 an environment-wide rule (a permission error on a path the agent chose
 means a wrong path, not a read-only workspace); never prescribe
@@ -248,7 +250,7 @@ absolute paths or move work outside the relative workspace (only that
 workspace is collected); phrase log-derived points as symptoms.
 
 Crossover has no directive LLM: a parent without a verifier gradient
-gets the last 1024 characters of the run stdout in a `<raw_log>` block
+gets the same marked tail (last 4096 characters) of the run stdout in a `<raw_log>` block
 (instead of `<error_diagnosis>`), and the task list gains the same
 "unverified, symptoms only, stay in the relative workspace" rule.
 
@@ -281,6 +283,31 @@ parent's code structure leads, weaker parents contribute specific
 improvements rather than competing for the skeleton, and the offspring
 is hard-capped at the highest parent agent count to prevent runaway
 complexity.
+
+## Resample control (`variation_mode = "resample"`)
+
+`variation_mode = "resample"` (CLI `--variation_mode resample`, or mode
+`[4] Resample (best-of-N)` in `--evaluation_cli`) turns the
+session into a best-of-N control. Every generation is an independent,
+fresh synthesis from the task text alone: the same seed prompt that
+generation 0 receives (`seed_genome_prompt` over the session goal, with a
+new random agent budget).
+
+No workflow is selected as input to a generation. The engine does not
+call `select_parent_workflow` at session start or between generations,
+so there is no disk-similarity retrieval, no archive draw, no crossover
+roll and no mutation. A `template_uuid` is ignored (with a warning), the
+frontier probe is not evaluated, and the planner's cached-workflow reuse
+is off. `initial_population`, `crossover_rate`, `n_parents`,
+`explore_after_plateau` and `explore_base_rate` have no effect.
+
+Everything else is the same as an `evolve` run: the Policy-BT verifier,
+the Bradley-Terry tournament over all generations, the stop rule and
+per-generation benchmark ablations. The only selection is the final one:
+the generation with the highest current Bradley-Terry rating becomes the
+capsule (`restore_best`). Lineage records every generation as `seed`
+with no parents; `run_metrics.json` and the CSV run notes record
+`variation_mode`.
 
 ## Lineage & reproducibility
 
@@ -325,7 +352,7 @@ mutation looks like.
 Each iteration also writes structured metrics for post-hoc analysis:
 
 - `sources/workflows/<uuid>/run_metrics.json` — one file per workflow.
-  Captures `iteration`, `evolution_kind`, `parent_uuids`,
+  Captures `iteration`, `evolution_kind`, `variation_mode`, `parent_uuids`,
   `iteration_wall_time_s`, `iteration_cost_usd`, `cumulative_cost_usd`,
   `overall_score{,_uncapped}`, `qd_descriptor`, `qd_score`,
   `novelty_score`, the `selection_log`, and the
@@ -339,8 +366,8 @@ Each iteration also writes structured metrics for post-hoc analysis:
   escapes kept), written right after execution and before evaluation.
   Failed runs store the error text instead. When this generation is a
   parent without a verifier gradient, the directive LLM (mutation) or
-  the crossover prompt (last 1024 characters) receives this text as an
-  unverified `<raw_log>`.
+  the crossover prompt receives only its marked tail (last 4096
+  characters) as an unverified `<raw_log>`.
 - `sources/workflows/qd_archive.jsonl` — append-only, one line per
   `validate_survivor` call. Records the candidate's descriptor,
   `qd_score`, `novelty_score`, admission verdict, and the `evicted_uuid`

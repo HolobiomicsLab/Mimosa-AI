@@ -22,8 +22,22 @@ after each evaluation.
 
 The feedback passed to the mutator remains the **textual gradient**
 (`evaluation.verifier.abstracted_textual_gradient` in `state_result.json`,
-plus `textual_gradient.txt`). It explains decisive differences and
-prioritizes the earliest stage at which the current generation lost.
+plus `textual_gradient.txt`). It is refolded for **every generation**
+each time the tournament changes, from all its current pairs: decisive
+feedback first (earliest stage first; a run that lost any pair gets only
+its losses' feedback, an unbeaten run its wins'), then the absolute
+deficiencies measured on that run — failed `satisfy` gates with the
+adapter's observed detail, and every criterion that could not be
+measured, with the adapter's reason; when no run could measure it, the
+line says so and asks for a measurement the verifier can read (for
+example a held-out validation error in an output or the run log) —
+except criteria at a stage the run already lost decisively,
+then the goal-named figure elements the vision model saw missing
+(labelled as model observations). Tied pairs never contribute "you match
+the other run" text. A parent therefore serves its latest fold at
+selection time; the first fold stays as `arrival_textual_gradient`, and
+every changed fold is appended with an ISO time and the tournament
+version to `textual_gradient_history.jsonl`.
 
 The older multi-source per-claim `VerifierEvaluator` — with its five
 claim sources (`a`/`b`/`c`/`e`/`g`), self-rated claim importances,
@@ -34,18 +48,61 @@ below; it remains reachable via `verifier_kind = "legacy"`.
 
 ## Policy-based Bradley–Terry verifier (default)
 
-The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/policy_bt_verifier/DESIGN.md#2-how-it-would-work):
+The verifier runs these steps in order:
 
 1. **Reproduction contract.** Each generation must contain a shell
    (`.sh`) script that regenerates its outputs and, unless the runtime
    provisions packages (ScienceAgentBench), installs its requirements
    first. A missing or invalid script makes the generation ineligible:
-   reward is zero and feedback states the required correction.
+   reward is zero and feedback states the required correction. The
+   contract LLM sees compact inventory rows (path, kind, size, binary
+   flag; no previews; at most 1,500 rows, shallow paths first, the rest
+   counted per directory in `unlisted_directories`) and the start of the
+   four shallowest `.sh` files. It reads referenced scripts step by step:
+   up to 6 inspect rounds of 8 KiB file pages or directory listings
+   (`reexec._assess_contract`). An unreadable answer costs one round.
+   Before this bound (2026-10-21), a 1,384-file workspace made a
+   6.3 M-character contract prompt that exceeded the model's input limit.
 2. **Owned artifact copies.** The verifier inspects copies of saved
    generation workspaces, never changes the original artifacts, and
    optionally runs the reproduction script on a copy.
+   **Provenance fallback** (`provenance.py`, `policy_bt_provenance_fallback`).
+   Workflows run their tools in a Toolomics container, but the rerun runs
+   on the verifier host, where a tool such as xtb may not exist and cannot
+   be installed. When a rerun fails or leaves outputs missing, the failure
+   diagnosis classifies the cause. Only `missing_host_dependency` (a
+   program or package the script asks for that cannot be installed or run
+   on this host) qualifies; `missing_requirement` (a package the workflow
+   never installs, or a pin that does not exist) stays a fixable failure,
+   and a provisioned benchmark runtime never qualifies. The quoted
+   `evidence_line` must appear exactly in the rerun logs. The verifier
+   then replaces the executed copy with a fresh copy of the delivered
+   workspace, used only when its digests equal the snapshot taken before
+   the rerun. It selects candidates without a model: files that differ
+   from the pre-run `baseline/` and whose modification time lies in the
+   run window (from `policy_bt_run_started_at`, recorded by the engine
+   just before the run, minus 300 s for clock skew, to the snapshot
+   time). A contract output that exists with no changed file (an earlier
+   session's output kept in `baseline/`, or an empty directory) is not
+   required. One bounded LLM stage (same 6-round page inspection) confirms
+   that the pipeline calls the missing program and accepts the candidates
+   the code writes and the run's logs support. Names outside the
+   candidates are refused. When every required output has an accepted
+   file, the status is `provenance_verified`, the generation is eligible,
+   and `files.regenerated` (also in `execution.json`) holds the accepted
+   files; changed files under required outputs that were not accepted are
+   moved aside (files equal to their pre-run copy stay). Every later layer treats the accepted files
+   like rerun outputs. The `provenance` block of the execution record (and
+   the `PROVENANCE` log stage) keeps the window, counts, refused names,
+   rejected and set-aside files. Timestamps show that a file was written
+   during the run, not that the code computed it.
 3. **Reconnaissance and normalization.** Inventories and compact content
-   previews inform the LLM. Schema adapters map differing artifact
+   previews inform the LLM. The listing budget is shared by all
+   generations in the prompt (1,200 rows and 192 KiB of previews in
+   total; at most 400 rows and 64 KiB, at least 40 rows and 4 KiB, per
+   generation), so the prompt does not grow without bound with the
+   generation count; a page request on a directory lists the omitted
+   files. Schema adapters map differing artifact
    layouts to a common representation. A new schema can extend the
    adapters without changing the comparison criteria. When the goal asks
    for saved outputs, the criteria include an `output_conformance` gate
@@ -57,14 +114,58 @@ The verifier follows [DESIGN.md, section 2](https://github.com/HolobiomicsLab/Mi
    reading the input and the output files, and the feedback names each
    found-vs-expected mismatch. Strict benchmark graders fail correct
    science delivered in another shape, so this gate is measured, not
-   assumed.
+   assumed. Criteria may add goal-compatible quality measures, but
+   never packaging rules (`run.sh`, requirements, script names), which
+   the reproduction gate already enforces. Reconnaissance also gets two
+   whole-file facts about the task's input tables
+   (`placeholders.py`, csv module, no model call): `input_profile` (row
+   count; per column the distinct count, top values and numeric range)
+   and `one_value_columns` (a column with one value in every row of one
+   table while it varies in another, such as a test label of -999 in
+   every row). The inputs are the workspace files that existed before the
+   first run (the engine's pre-run copy, kept in the task registry as
+   `baseline/`), so this works for any `--task` layout; the standalone
+   verifier, which has no such copy, uses the snapshot files the run did
+   not produce. Such values are placeholders: no criterion may measure
+   against them, and when the goal predicts such a column the plan needs
+   a held-out validation metric on labelled data. Before the criteria freeze,
+   `criteria_guard.py` checks them: every exact string a criterion
+   requires (`literals`) must appear in the goal or in the first lines of
+   a task input file (every pre-run file; without that copy, a goal-named
+   file the run did not produce — outputs and run logs never count), and
+   an LLM guard keeps or rejects each criterion with a cited source. When
+   `one_value_columns` is not empty, the same guard call also judges
+   whether the goal predicts a listed column without a held-out quality
+   criterion (`missing_quality_criterion`).
+   Rejected criteria and a missing quality criterion go back to
+   reconnaissance; after the last revision rejected criteria are dropped
+   (if none would remain, reconnaissance fails) and a still-missing
+   quality criterion is recorded as `quality_gap`, never as a failure. Two
+   malformed guard answers keep the plan, recorded as an error. The
+   record is the bundle's `criteria_guard` (verdicts, `plan_revisions`,
+   `dropped_criteria`, `quality_gap`). Agent-written source files never ground a name.
+   A win needs a criterion with two known, different values at the
+   deciding stage (null ties), and a `higher`/`lower` value must be a
+   number. Each criterion has a `judge`: `"code"` (default; adapters
+   read it from files) or `"vision"` (only the figure shows it, e.g. a
+   plotted element or legibility). Adapters, the comparison policy and
+   the "could not be measured" feedback see only code criteria; vision
+   criteria are decided by the visual tie-break, and their feedback is
+   the figure review below. A plan needs at least one code criterion.
 4. **Pairwise policy.** A cached deterministic Python policy compares
    each pair and returns a verdict, evidence, and feedback for both
    sides. On a tie, comparable goal-relevant visual artifacts can be
-   sent to the configured vision model; otherwise the pair stays tied.
+   sent to the configured vision model in both orders; a winner is kept
+   only when both orders agree. Either way the forward-order answer also
+   lists, per side, the goal-named elements absent or wrong in its
+   figures (`visual_deficiencies`, prompt `visual-tiebreak-3`), which the
+   gradient folds in.
 5. **Current ratings.** The accumulated pair results fit a regularized
    Bradley–Terry model. The first eligible generation starts at 0.5;
-   an ineligible generation remains at zero.
+   an ineligible generation remains at zero. The capsule ships the
+   top-rated run; exact rating ties go to the tied run with the most
+   head-to-head wins against the other tied runs, then to the earliest
+   one — never to the newest.
 
 Re-execution (`policy_bt_reexecute`, default `true`) runs the script
 with bash on the copy, in a fresh venv with no API keys; existing
@@ -107,7 +208,8 @@ calls plus harness-provided read capabilities and CSV parsing — no
 subset stay "unknown" (`null`), never a fabricated loss.
 
 Per generation the verifier writes `evaluation.txt` (reward, tournament
-version, execution record, and the pair verdicts), `textual_gradient.txt`,
+version, execution record, `input_provenance` — `verified`, `input_tampered`
+with the changed input paths, or `unverified` — and the pair verdicts), `textual_gradient.txt`,
 `policy_bt_evidence.json`, and `verifier_policy_bt.log`. The tournament
 state for a task session lives in
 `<workflow_dir>/.policy_bt/<sha256(goal, session)>/tournament.json`
@@ -147,10 +249,12 @@ session receives a fresh tournament registry scope.
 | `verifier_kind` | `"policy_bt"` | Select the policy tournament verifier |
 | `policy_bt_reward` | `"bradley_terry"` | Only supported policy-BT reward |
 | `policy_bt_reexecute` | `true` | Run the required reproduction script |
-| `policy_bt_reexec_timeout_s` | `900` | Reproduction wall-clock limit |
+| `policy_bt_reexec_timeout_s` | `1800` | Reproduction wall-clock limit |
 | `policy_bt_scorer_timeout_s` | `60` | Policy comparison time limit |
-| `policy_bt_repair_rounds` | `3` | Maximum policy or adapter repairs |
+| `policy_bt_repair_rounds` | `4` | Maximum policy or adapter repairs |
 | `policy_bt_visual_channel` | `true` | Allow relevant visual tie resolution |
+| `policy_bt_max_prompt_chars` | `1500000` | Largest verifier text prompt; a larger one fails fast as an instrument error, before any provider call |
+| `policy_bt_provenance_fallback` | `true` | Trust run-written outputs when the rerun fails only on a missing host dependency (`provenance_verified`) |
 
 Use `--no-policy_bt_reexecute` to inspect existing artifacts without
 running the script. The script requirement still applies. Use
@@ -638,7 +742,7 @@ The verifier runs four stages per workflow run:
 Each source is a different definition of "success" — claims from each are
 merged and verified by the same per-claim machinery downstream. The
 letters are the code labels registered in the `SOURCES` tuple of
-`sources/evaluators/verifier_claim_sources.py` (`a`/`b`/`c`/`e`/`g`);
+`sources/evaluators/legacy_verifier/verifier_claim_sources.py` (`a`/`b`/`c`/`e`/`g`);
 letters `d` and `f` are retired and never emitted.
 
 | Source | Vantage | What it asks |
@@ -845,11 +949,11 @@ The default verifier channel is `HybridVerifierEvaluator`; switch with
 | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `HybridVerifierEvaluator` | [`hybrid_verifier/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/hybrid_verifier/)                             | **Default** — E19/E19b temporal claim ladder + policy scorers + pairwise reward.  |
 | `GoldFeedbackEvaluator` | [`gold_feedback/`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/gold_feedback/) | **Oracle control, leaks the benchmark** (`verifier_kind="gold"`): hybrid reward + benchmark-grader gradient. Research only. |
-| `VerifierEvaluator` | [`verifier.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/verifier.py)                                       | Deprecated multi-source per-claim (`verifier_kind="legacy"`). |
-| `GenericEvaluator`  | [`generic.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/generic.py)                                         | Legacy 4-criterion LLM judge.             |
-| `ScenarioEvaluator` | [`scenario.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/scenario.py)                                       | Rubric / assertion-based scoring.         |
+| `VerifierEvaluator` | [`legacy_verifier/verifier.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/legacy_verifier/verifier.py) | Deprecated multi-source per-claim (`verifier_kind="legacy"`). |
+| `GenericEvaluator`  | [`generic_verifier/generic.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/generic_verifier/generic.py) | Legacy 4-criterion LLM judge. |
+| `ScenarioEvaluator` | [`scenario/scenario.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/scenario/scenario.py) | Rubric / assertion-based scoring. |
 | Perspicacité grounding | [`grounding.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/grounding.py)                                  | Adapter used by the legacy verifier (Source A) and `GenericEvaluator`; the hybrid verifier does not call it. |
-| `BullshitDetector`  | [`bs_detection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/bs_detection.py)                               | Numerical-fraud penalty.                  |
+| `BullshitDetectorNumerical` | [`generic_verifier/bs_detection.py`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/sources/evaluators/generic_verifier/bs_detection.py) | Numerical-fraud penalty. |
 
 ## See also
 

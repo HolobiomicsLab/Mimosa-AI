@@ -40,5 +40,5 @@ Mimosa-AI builds on:
 
 Companion projects from the same lab:
 
-- [Toolomics](https://github.com/HolobiomicsLab/toolomics) — MCP tool host.
+- [Toolomics](https://github.com/HolobiomicsLab/toolomics) — per-workspace MCP shell sandbox with pre-built MCP servers.
 - [Perspicacité](https://github.com/HolobiomicsLab/Perspicacite-AI) — literature grounding.

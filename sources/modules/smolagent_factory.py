@@ -52,6 +52,9 @@ DANGEROUS_MODULES = {}
 
 # Cap accepted by most OpenRouter providers (OpenAI allows up to 20).
 TOP_LOGPROBS = 5
+# Memory-file fallback for steps that cannot be serialized.
+SERIALIZATION_ERROR_MAX_CHARS = 200
+TOKEN_USAGE_KEYS = ("input_tokens", "output_tokens", "total_tokens")
 
 
 def logprobs_kwargs_for(model_id) -> dict:
@@ -326,43 +329,130 @@ Start by assessing workspace: execute_command("ls -la") to see existing work
         except (AttributeError, IndexError, TypeError, KeyError):
             return None
 
+    def serialize_step(self, step: ActionStep) -> dict:
+        """Convert one agent step into a JSON-safe dict.
+
+        The memory file keeps every step of the agent run.
+        ``safe_step_record`` calls it with one live ``ActionStep`` of
+        ``self.agent.memory.steps``. It drops the raw provider response
+        and adds the logprobs and the model id.
+
+        Args:
+            step: ActionStep — one step from the live agent memory.
+
+        Returns:
+            dict — the step record. Raises when the step cannot be
+            serialized (for example RecursionError on nested data).
+        """
+        action_step = step.dict()
+        action_step["model_input_messages"] = (
+            get_dict_from_nested_dataclasses(
+                [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages], ignore_key="raw"
+            )
+            if step.model_input_messages
+            else None
+        )
+        action_step["model_output_message"] = (
+            get_dict_from_nested_dataclasses(step.model_output_message, ignore_key="raw")
+            if step.model_output_message
+            else None
+        )
+        action_step["logprobs"] = self.extract_logprobs(step)
+        action_step["model"] = self.model_id
+        json.dumps(action_step)  # fail here, not in the file write
+        return action_step
+
+    def step_token_usage(self, step: ActionStep) -> Optional[dict]:
+        """Return the token usage of one step as a plain dict, or None.
+
+        Pricing reads ``token_usage`` from each saved step.
+        ``unserializable_step_record`` calls it with a step that failed
+        serialization. It reads the three token counts only.
+
+        Args:
+            step: ActionStep — one step from the live agent memory.
+
+        Returns:
+            Optional[dict] — ``input_tokens``, ``output_tokens``,
+            ``total_tokens`` as ints; None when not available.
+        """
+        usage = getattr(step, "token_usage", None)
+        try:
+            return {key: int(getattr(usage, key)) for key in TOKEN_USAGE_KEYS}
+        except Exception:
+            return None
+
+    def unserializable_step_record(self, step: ActionStep, error: Exception) -> dict:
+        """Build a minimal record for a step that failed serialization.
+
+        Pricing must still count the tokens of this step.
+        ``safe_step_record`` calls it with the step and the caught error.
+        It keeps the step number, the model id, the token usage and a
+        short error text. It never copies the memory contents.
+
+        Args:
+            step: ActionStep — the step that failed serialization.
+            error: Exception — the error from ``serialize_step``.
+
+        Returns:
+            dict — JSON-safe record with ``serialization_error``.
+        """
+        step_number = getattr(step, "step_number", None)
+        error_text = f"{type(error).__name__}: {str(error)[:SERIALIZATION_ERROR_MAX_CHARS]}"
+        return {
+            "step_number": step_number if isinstance(step_number, int) else None,
+            "model": self.model_id,
+            "token_usage": self.step_token_usage(step),
+            "logprobs": None,
+            "serialization_error": error_text,
+        }
+
+    def safe_step_record(self, step: ActionStep) -> dict:
+        """Serialize one step, or return a minimal record on failure.
+
+        One bad step must not lose the other steps of the memory file.
+        ``save_memories`` calls it for each ``ActionStep``. It tries the
+        full record and falls back to the minimal record.
+
+        Args:
+            step: ActionStep — one step from the live agent memory.
+
+        Returns:
+            dict — the full step record or the minimal error record.
+        """
+        try:
+            return self.serialize_step(step)
+        except Exception as error:  # RecursionError included
+            print(f"WARNING: agent '{self.name}' step not serialized: {type(error).__name__}")
+            return self.unserializable_step_record(step, error)
+
     def save_memories(self, workflow_uuid: str):
+        """Write the agent memory to ``task_<name>.json``. Never raises.
+
+        Pricing and the transparency exports read this file after the run.
+        ``run_cached`` calls it after each agent run, also on failure.
+        It saves each step on its own and prints one warning line when
+        the whole save fails, so the workflow continues.
+
+        Args:
+            workflow_uuid: str — uuid of the running workflow; empty skips.
+
+        Returns:
+            None.
+        """
         print(f"Saving agent memory for workflow UUID: {workflow_uuid}")
         if not workflow_uuid or not workflow_uuid.strip():
             return
         try:
-            memories = []
-            for idx, step in enumerate(self.agent.memory.steps):
-                if isinstance(step, ActionStep):
-                    action_step = step.dict()
-                    action_step["model_input_messages"] = (
-                        get_dict_from_nested_dataclasses(
-                            [asdict(msg) if hasattr(msg, '__dataclass_fields__') else msg for msg in step.model_input_messages], ignore_key="raw"
-                        )
-                        if step.model_input_messages
-                        else None
-                    )
-                    action_step["model_output_message"] = (
-                        get_dict_from_nested_dataclasses(
-                            step.model_output_message, ignore_key="raw"
-                        )
-                        if step.model_output_message
-                        else None
-                    )
-                    action_step["logprobs"] = self.extract_logprobs(step)
-                    action_step["model"] = self.model_id
-                    memories.append(action_step)
-            if self.save_logprobs and memories and all(m["logprobs"] is None for m in memories):
+            memories = [self.safe_step_record(step) for step in self.agent.memory.steps if isinstance(step, ActionStep)]
+            if self.save_logprobs and memories and all(m.get("logprobs") is None for m in memories):
                 print(f"WARNING: logprobs requested but none returned for agent '{self.name}'; check provider support.")
-            try:
-                agent_task_path = os.path.join(self.memory_folder, f"task_{self.name}.json")
-                with open(agent_task_path, "w") as f:
-                    json.dump(memories, f, indent=2)
-                print(f"Agent memories saved successfully to {agent_task_path}")
-            except Exception as e:
-                print(f"Failed to save memory: {str(e)}")
+            agent_task_path = os.path.join(self.memory_folder, f"task_{self.name}.json")
+            with open(agent_task_path, "w") as f:
+                json.dump(memories, f, indent=2)
+            print(f"Agent memories saved successfully to {agent_task_path}")
         except Exception as e:
-            raise ValueError(f"Failed to save memory: {str(e)}\n {memories}")
+            print(f"WARNING: failed to save memory for agent '{self.name}': {type(e).__name__}: {str(e)[:SERIALIZATION_ERROR_MAX_CHARS]}")
 
     def load_memory_json(self, memory_dict: List[dict]) -> List[ActionStep]:
         memory_steps = []

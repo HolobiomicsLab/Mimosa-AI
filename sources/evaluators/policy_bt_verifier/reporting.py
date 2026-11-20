@@ -257,11 +257,12 @@ class Reporter:
         """Print the vision tie-break attempt and its outcome.
 
         Args: paths (dict): Side to selected relative image paths;
-            verdict (dict | None): Kept visual verdict, or None when the two
-            orders disagreed and the tie stands.
+            verdict (dict | None): Visual result; a tie (orders disagreed or
+            both tied) keeps the code tie, ``None`` means the channel failed.
         Returns: None.
         """
-        outcome = "kept" if verdict else "orders disagreed → tie stands"
+        decisive = bool(verdict) and verdict.get("winner") != "tie"
+        outcome = "kept" if decisive else "no agreed winner → tie stands"
         self.kv("vision", f"{len(paths['a'])}×{len(paths['b'])} figures · "
                 f"{outcome}")
 

@@ -42,7 +42,7 @@ from sources.utils.perspicacite_client import (
 )
 from sources.utils.planner_visualization import PlannerVisualizer
 
-from .evolution_engine import EvolutionEngine
+from .evolution_engine import EvolutionEngine, is_resample_mode
 from .llm_provider import LLMConfig, LLMProvider, extract_model_pattern
 from .schema import IndividualRun, Plan, PlanStep, Task, TaskStatus
 from .workflow_selection import WorkflowSelector
@@ -786,34 +786,6 @@ Original request:
         print_info(f"Workspace snapshot: {len(self._workspace_files_before_step)} file(s)")
         return self._workspace_files_before_step
 
-    def _verify_required_inputs(self, step: PlanStep) -> tuple[bool, list[str]]:
-        """Check that a step's required inputs exist in the workspace.
-
-        No caller in the codebase today; it is the input-side gate that
-        pairs with ``_verify_expected_outputs``. It scans the current
-        workspace files and compares each declared input (normalised to
-        forward slashes) against them.
-
-        Args:
-            step: The plan step whose ``required_inputs`` are checked; comes
-                from the accepted plan.
-
-        Returns:
-            tuple[bool, list[str]]: (all_available, missing_inputs) — True
-            when every required input exists, else the list of missing input
-            paths.
-        """
-        missing_inputs = []
-
-        workspace_files = self._get_workspace_files()
-        for required_input in step.required_inputs:
-            # Normalise to forward slashes so Windows backslashes never cause
-            # a false-negative when comparing against plan-defined paths.
-            normalised_input = Path(required_input).as_posix()
-            if normalised_input not in workspace_files:
-                missing_inputs.append(required_input)
-        return len(missing_inputs) == 0, missing_inputs
-
     def _verify_expected_outputs(self, step: PlanStep) -> tuple[bool, list[str]]:
         """Check that a step's expected outputs exist in the workspace.
 
@@ -934,7 +906,7 @@ Original request:
                 configuration.
             cached_wf_allow: Whether to allow reusing high-quality cached
                 workflows discovered by the workflow selector; True on the
-                first attempt only.
+                first attempt only. Resample mode never reuses them.
             original_task: Original unwrapped task for similarity matching;
                 used in preference to ``task`` for cache lookup.
 
@@ -956,10 +928,10 @@ Original request:
             # Use original_task for lookup to avoid knowledge wrapper interference
             lookup_task = original_task if original_task else task
 
-            # Check for high-quality cached workflows
+            # Check for high-quality cached workflows (never in resample mode)
             past_wf_lookups = self.wf_selector.select_best_workflows(
                 lookup_task, threshold_similarity=0.98, threshold_score=0.99
-            ) if cached_wf_allow else []
+            ) if cached_wf_allow and not is_resample_mode(self.config) else []
 
             if past_wf_lookups and len(past_wf_lookups) > 0:
                 best_match = past_wf_lookups[0]

@@ -1,4 +1,7 @@
-"""``GoldFeedbackEvaluator`` — ORACLE / BENCHMARK-LEAKING verifier control.
+"""
+``GoldFeedbackEvaluator`` — ORACLE / BENCHMARK-LEAKING verifier control.
+
+**Only used for special ablations on whenever gold based feedback textual gradient outperform others verifiers**
 
 Composition, not a new verifier: the evaluator holds
 

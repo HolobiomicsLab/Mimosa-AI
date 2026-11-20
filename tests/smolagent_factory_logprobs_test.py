@@ -220,6 +220,7 @@ def test_save_memories_writes_logprobs_and_strips_raw(factory_module, tmp_path):
     factory = make_bare_factory(
         factory_module,
         name="test",
+        model_id="openrouter/test-model",
         memory_folder=str(tmp_path),
         save_logprobs=True,
         agent=SimpleNamespace(memory=SimpleNamespace(steps=[make_action_step(raw)])),
@@ -239,6 +240,7 @@ def test_save_memories_warns_only_when_logprobs_all_missing(
         factory = make_bare_factory(
             factory_module,
             name="test",
+            model_id="openrouter/test-model",
             memory_folder=str(tmp_path),
             save_logprobs=True,
             agent=SimpleNamespace(memory=SimpleNamespace(steps=[step])),
@@ -252,6 +254,52 @@ def test_save_memories_warns_only_when_logprobs_all_missing(
 
     with_logprobs = SimpleNamespace(choices=[SimpleNamespace(logprobs=FakeLogprobs())])
     assert "WARNING" not in save_with_step(make_action_step(with_logprobs))
+
+
+class RecursingStep(ActionStep):
+    """ActionStep whose serialization recurses forever (live: ClinTox be5327dc)."""
+
+    def dict(self):
+        raise RecursionError("maximum recursion depth exceeded " + "SECRET_MEMORY " * 100)
+
+
+def test_save_memories_survives_unserializable_step(factory_module, tmp_path, capsys):
+    """Regression: a RecursionError in one step aborted the workflow after it
+    wrote correct outputs and dumped the whole memory into run_stdout.log."""
+    bad_step = RecursingStep(step_number=2, timing=Timing(start_time=0.0, end_time=1.0))
+    bad_step.token_usage = factory_module.smolagents.memory.TokenUsage(input_tokens=7, output_tokens=3)
+    factory = make_bare_factory(
+        factory_module,
+        name="test",
+        model_id="openrouter/test-model",
+        memory_folder=str(tmp_path),
+        save_logprobs=False,
+        agent=SimpleNamespace(memory=SimpleNamespace(steps=[make_action_step(None), bad_step])),
+    )
+    factory.save_memories(workflow_uuid="test-uuid")
+
+    memories = json.loads((tmp_path / "task_test.json").read_text())
+    assert memories[0]["step_number"] == 1 and "serialization_error" not in memories[0]
+    assert memories[1]["step_number"] == 2
+    assert memories[1]["model"] == "openrouter/test-model"
+    assert memories[1]["token_usage"] == {"input_tokens": 7, "output_tokens": 3, "total_tokens": 10}
+    assert memories[1]["serialization_error"].startswith("RecursionError: maximum recursion")
+    assert len(memories[1]["serialization_error"]) <= 300
+    assert "SECRET_MEMORY" not in capsys.readouterr().out
+
+
+def test_save_memories_never_raises_on_outer_failure(factory_module, tmp_path, capsys):
+    factory = make_bare_factory(
+        factory_module,
+        name="test",
+        model_id="m",
+        memory_folder=str(tmp_path / "missing_dir"),
+        save_logprobs=False,
+        agent=SimpleNamespace(memory=SimpleNamespace(steps=[make_action_step(None)])),
+    )
+    factory.save_memories(workflow_uuid="test-uuid")
+    out = capsys.readouterr().out
+    assert "WARNING: failed to save memory for agent 'test'" in out
 
 
 if __name__ == "__main__":

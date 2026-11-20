@@ -11,6 +11,11 @@ If you are looking at how MCP discovery itself works on Mimosa's side, see
 [Tool discovery & MCP](tools-and-mcp.md). This page is about the
 companion platform.
 
+!!! note "Not verified against the Toolomics repository"
+    The Toolomics layout, file names, and `start.sh` arguments on this page
+    come from Toolomics documentation. They were not checked in this
+    repository.
+
 ## Why use it
 
 Toolomics gives you four things that bare MCP servers do not:
@@ -32,7 +37,7 @@ Toolomics                             Mimosa
 ─────────                             ──────
 mcp_host/pdf/        ─► port 5002  ◄─ ToolManager scans
 mcp_host/image/      ─► port 5006  ◄─ Config.discovery_addresses
-mcp_host/shell/      ─► port 5012  ◄─ (default 5000–5100)
+mcp_host/shell/      ─► port 5012  ◄─ (default 5000–5200)
 …
 workspace/           ◄────────────►   Config.workspace_dir
 ```
@@ -41,7 +46,8 @@ Concretely, Mimosa cares about exactly two configuration values when
 running on top of Toolomics:
 
 - `Config.discovery_addresses` — must include the port range Toolomics
-  is using. Default `5000–5100` matches Toolomics' default `./start.sh`.
+  is using. Mimosa's default is `5000–5200` (`config.py:75-77`). The default
+  range of Toolomics' `./start.sh` is not verified here.
 - `Config.workspace_dir` — must point at the same `workspace/` directory
   Toolomics is using.
 

@@ -8,13 +8,13 @@
 flowchart TB
     %% ===== task entry =====
     Task[/"task spec<br/>(user goal / benchmark row)"/]
-    Install["load per-task hybrid-verifier registry<br/>(claim ladder + cached scorers, sha256(goal))"]
+    Install["load per-task policy_bt registry<br/>(workflow_dir/.policy_bt/sha256(goal, session)/tournament.json)"]
     Task --> Install
 
     %% ===== initial population =====
     subgraph Init["Cold start — seed phase"]
         ResetArch["reset session archive<br/>self.selection._archive = []"]
-        ColdScan["WorkflowSelector<br/>cosine sim ≥ 0.5 over disk<br/>(cross-task transfer)"]
+        ColdScan["WorkflowSelector<br/>cosine sim ≥ 0.95 over disk<br/>(parent_threshold_similarity; cross-task transfer)"]
         Seed["VariationEngine.seed_genome_prompt()<br/>or mutation prompt over best disk parent"]
     end
     Install --> ResetArch
@@ -27,19 +27,20 @@ flowchart TB
         ParentDraw{{"archive populated?"}}
         DrawArch["select_parent_workflows()<br/>QD-roulette over archive<br/>÷ (1 + n_children_already)"]
         DrawDisk["cold-start fallback:<br/>similarity-filtered disk scan"]
-        Decide{{"crossover_rate ≈ 0.1?<br/>(only once initial_population met)"}}
+        Decide{{"crossover_rate = 0.4?<br/>(only once len(runs) ≥ initial_population = 2)"}}
         Mut["mutation_prompt()<br/>directive-implicit mutation magnitude<br/>+ read-only search-state block"]
         Cross["crossover_prompt()<br/>best-parent-first ordering<br/>verifier textual gradients"]
 
         Orch["WorkflowOrchestrator<br/>LLM → workflow code → install deps → sandbox run"]
         State["state_result.json<br/>+ workspace artefacts"]
-        Verify["hybrid temporal-ladder verifier<br/>(see verifiers_judge.mermaid)<br/>→ overall_score (pairwise win-rate)<br/>→ abstracted_textual_gradient"]
+        Verify["policy_bt verifier (evaluator.py)<br/>pair compare, both orders, vision tie-break<br/>→ overall_score; Bradley-Terry ratings refresh reward<br/>→ textual gradient (fold_gradient)<br/>(see verifiers_judge.mermaid)"]
 
-        Validate["SelectionPressure.validate_survivor()<br/>relative_improvement > θ<br/>OR qd_score > admit_threshold"]
+        Validate["SelectionPressure.validate_survivor()<br/>valid = relative_improvement > threshold<br/>OR qd_score > admit_threshold (0.3)"]
         Admit{{"_try_admit()<br/>is_valid?"}}
         Archive[("session archive<br/>≤ population_size, evict min(qd_score)")]
         Reject(["admit_rejected++<br/>(telemetry only)"])
         Lineage["record_lineage()<br/>seed | mutation | crossover"]
+        Viz["refresh evolution_tree.png + archive_pca.png<br/>(every generation)"]
     end
 
     Seed --> Orch
@@ -59,29 +60,29 @@ flowchart TB
     Admit -- no --> Reject
     Archive --> Lineage
     Reject --> Lineage
-    Lineage --> ParentDraw
+    Lineage --> Viz --> ParentDraw
 
     %% ===== termination =====
     subgraph Term["Termination & restore"]
-        Score{{"overall_score &gt;<br/>learned_score_threshold (0.94)?"}}
-        Depth{{"iteration ≥ max_depth?<br/>(default 45)"}}
-        Restore["WorkspaceManager.restore_best()<br/>copy best run's workspace snapshot"]
-        Plots["save reward_progress.png<br/>+ evolution_tree.png"]
-        Notify["Pushover notification<br/>(best uuid + score)"]
+        Score{{"plateau stop?<br/>(policy_bt auto mode: no champion change for<br/>plateau_patience = 3 iterations, after min_iter = 6)"}}
+        Depth{{"iteration_count ≥ max_depth - 1?<br/>(max_depth = max_learning_evolve_iterations = 16)"}}
+        Restore["WorkspaceManager.restore_best()<br/>wipe workspace, restore best run's /tmp snapshot<br/>(after evolve_generation returns)"]
+        Plots["save reward_progress.png<br/>(stop path only)"]
+        Notify["Pushover notification<br/>(stop reason, final UUID, iterations; no score)"]
     end
 
-    Validate --> Score
-    Score -- "yes (learn mode)" --> Restore
-    Score -- "no" --> Depth
-    Depth -- "yes" --> Restore
-    Depth -- "no" --> ParentDraw
-    Restore --> Plots --> Notify
+    Validate --> Depth
+    Depth -- "yes (return; no plots)" --> Restore
+    Depth -- "no" --> Score
+    Score -- "yes" --> Plots
+    Score -- "no" --> ParentDraw
+    Plots --> Notify --> Restore
 
     %% ===== sidebars =====
     subgraph QD["Quality-Diversity machinery"]
-        BD["behaviour descriptor<br/>genotype_embedding(code) →<br/>L2-normalised code embedding<br/>(MiniLM all-MiniLM-L6-v2, default)"]
-        Nov["k-NN novelty<br/>(cosine distance, k=15, against archive)"]
-        QDscore["qd_score = (1-w)·quality_norm +<br/>w·novelty_norm  (w=0.25)<br/>quality from reward (capped overall_score)<br/>(additive: no quality leak into novelty)"]
+        BD["behaviour descriptor<br/>embed_genotype(code) →<br/>L2-normalised code embedding (chunked, mean-pooled)<br/>MiniLM all-MiniLM-L6-v2 default; OpenAI via env"]
+        Nov["k-NN novelty<br/>(cosine distance, k = novelty_k_neighbours = 16, against archive)"]
+        QDscore["qd_score = (1-w)·quality_norm + w·novelty_norm - λ·length_penalty<br/>(w = 0.25, λ = 0.05, length baseline 12000 chars)<br/>quality_norm = clamp(reward, 0, 1); reward = BT rating after refresh_rewards<br/>novelty uses genotype descriptors only, so reward does not feed novelty"]
     end
     State -. workflow genotype (code) .-> BD
     Archive -. distances .-> Nov

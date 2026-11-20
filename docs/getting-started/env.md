@@ -22,7 +22,7 @@ OPENROUTER_API_KEY=...      # Any model via OpenRouter
 
 # Optional --------------------------------------------------------------------
 LANGFUSE_PUBLIC_KEY=...     # Trace visualisation
-LANGFUSE_PRIVATE_KEY=...
+LANGFUSE_SECRET_KEY=...
 PUSHOVER_TOKEN=...          # Phone notifications
 PUSHOVER_USER=...
 ```
@@ -73,8 +73,9 @@ each provider).
 
 ## Local MLX (Apple Silicon)
 
-For local inference on Apple Silicon, `smolagents[mlx-lm]` is already in the
-dependency list. Use a model id of the form `mlx/<model>`; no API key needed.
+For local inference on Apple Silicon, `smolagents[mlx-lm]` is in the
+dependency list. Model ids containing `mlx-community/` select the `mlx`
+engine (`sources/core/single_agent_factory.py:104`); no API key is needed.
 
 ## Optional: phone notifications
 
@@ -95,7 +96,7 @@ inspection. Required:
 
 ```env
 LANGFUSE_PUBLIC_KEY=...
-LANGFUSE_PRIVATE_KEY=...
+LANGFUSE_SECRET_KEY=...
 ```
 
 Full setup at [Telemetry](../usage/telemetry.md).

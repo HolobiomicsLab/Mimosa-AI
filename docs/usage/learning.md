@@ -16,8 +16,8 @@ In practice:
   generation is often weak; iteration finds the strong region.
 - **Warm tasks** (similar runs already on disk) start from a stronger
   baseline thanks to the disk-similarity scan.
-- **Familiar tasks** (a previous run hit the threshold) can reuse a saved
-  workflow without iteration — see [Workspace & audit trail](workspace.md).
+- **Familiar tasks** (similar runs already on disk) can have a stored workflow
+  reused by the selector — see [Workspace & audit trail](workspace.md).
 
 ## How to enable it
 
@@ -40,22 +40,18 @@ Without `--learn`, the engine still runs the verifier but never iterates
 
 ## Termination
 
-Mimosa stops the moment either condition is met:
+Mimosa stops when any of these applies:
 
-- `overall_score >= learned_score_threshold` (config field, default `0.92`).
-- `iteration ≥ max_learning_evolve_iterations` (default `25`).
+- `iteration >= max_learning_evolve_iterations` (config field, default `16`). This hard cap is checked first.
+- Early stop, only after `min_learning_evolve_iterations` (default `6`) generations. `early_stop_mode` (default `auto`) selects plateau mode for relative verifiers (`policy_bt`, `hybrid`) and threshold mode for absolute verifiers (`legacy`, `gold`, scenario).
 
-The "best" workflow at termination — the one with the highest `reward`
-(the capped `overall_score`) — has its workspace snapshot restored as
-the run's final state.
+At termination the engine selects the best run and restores its workspace
+with `WorkspaceManager.restore_best()`.
 
-!!! tip "Tuning the threshold"
-    - Setting the threshold too high (e.g. `1.0`) means the loop never
-      stops early; you'll always hit `max_learning_evolve_iterations`.
-    - Setting it too low (e.g. `0.7`) means the loop stops after one lucky
-      generation that *happens* to fool the judge.
-    - The default `0.92` is a reasonable balance — adjust based on observed
-      score distributions for your task family.
+!!! tip "Tuning the stop rule"
+    - The default `policy_bt` verifier is relative, so `early_stop_mode="auto"` uses plateau mode: the run stops after `plateau_patience` (default `3`) generations without a new champion.
+    - `learned_score_threshold` (default `0.9`) applies only in threshold mode, which `auto` selects for absolute verifiers (`legacy`, `gold`, scenario).
+    - Raising `plateau_patience` lets the loop explore longer; lowering it stops sooner after a stall.
 
 ## What evolves between generations
 
@@ -80,13 +76,12 @@ the offspring hard-capped at the highest parent agent count.
 ## What you'll see on disk
 
 After a `--learn` run, each generation has its own folder under
-`sources/workflows/<uuid>/`. The "best" UUID is logged to the console at
-the end. Across the run you'll also get:
+`sources/workflows/<uuid>/`. Across the run you'll also get:
 
-- `sources/workflows/<best_uuid>/reward_progress.png` — score-over-iteration curve.
-- `sources/workflows/<best_uuid>/evolution_tree.png` — lineage tree (each
+- `sources/workflows/<uuid>/reward_progress.png` — score-over-iteration curve.
+- `sources/workflows/<uuid>/evolution_tree.png` — lineage tree (each
   node a workflow, edges showing mutation/crossover).
-- `runs_capsule/<capsule_name>/` — archived snapshot of the best run.
+- `runs_capsule/<capsule_name>/` — copy of the workspace contents, written at the end of a `--goal` run.
 
 ![Evolution tree example](../images/evolution_tree.png){ width="60%" }
 

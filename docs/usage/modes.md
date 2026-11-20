@@ -16,6 +16,7 @@ modes based on the flag you pass. This page summarizes what each does.
 | `--science_agent_bench` | ScienceAgentBench batch evaluation. |
 | `--workflow_eval_mode` | Workflow-generation-quality evaluation only. |
 | `--scenario <path>` | Run a scenario rubric instead of LLM-judged scoring. |
+| `--memory_cli` | Ask questions about a finished run's memory (`--memory_uuid` picks a run). |
 
 Add `--learn` to any of the goal / task / batch flags to enable iterative
 learning. Add `--single_agent` for the single-agent baseline.
@@ -58,8 +59,8 @@ EvolutionEngine.start_workflow_evolution(goal)
       ├─ SelectionPressure.validate_survivor()
       ├─ record_lineage()
       ├─ pick next parent
-      ├─ choose mutation vs. crossover (~30 %)
-      └─ recurse until threshold OR max_depth
+      ├─ choose mutation vs. crossover (~40 %, crossover_rate 0.4)
+      └─ repeat until the stop rule fires (see learning.md)
   ↓
 WorkspaceManager.restore_best(best_uuid)
 ```
@@ -83,7 +84,7 @@ Adds Layer 0 — the **Planner** ([`sources/core/planner.py`](https://github.com
 ```
 Planner.start_planner(goal)
   ├─ generate multi-step plan
-  ├─ human approval prompt
+  ├─ human approval prompt (only if planner_human_approve is set)
   └─ for each step:
       └─ start_workflow_evolution(step_task)
   ↓

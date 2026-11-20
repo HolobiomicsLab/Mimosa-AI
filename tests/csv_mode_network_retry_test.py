@@ -56,6 +56,15 @@ def test_unreachable_and_transport_errors_are_detected():
     assert _is_transient_network_error("litellm.APIConnectionError: ...")
 
 
+def test_server_disconnect_and_ssl_eof_are_detected():
+    assert _is_transient_network_error(
+        "httpx.RemoteProtocolError: Server disconnected without sending a response."
+    )
+    assert _is_transient_network_error(
+        "ssl.SSLEOFError: EOF occurred in violation of protocol (_ssl.c:2427)"
+    )
+
+
 def test_unrelated_errors_are_not_network_errors():
     assert not _is_transient_network_error("'bool' object has no attribute 'replace'")
     assert not _is_transient_network_error(

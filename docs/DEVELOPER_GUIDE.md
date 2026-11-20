@@ -109,7 +109,7 @@ mimosa-ai/
 ├── config.py                              # Configuration management
 ├── main.py                                # CLI entry point & mode dispatch
 ├── pyproject.toml                         # Project metadata + deps
-├── cleanup.sh                             # Reset workflows + capsules
+├── cleanup.sh                             # Delete generation folders + tmp/
 ├── memory_explorer.py                     # Interactive trace replay
 │
 ├── sources/
@@ -345,17 +345,22 @@ trusted, agent self-reports not, raw log unverified), and hard limits
 
 Evidence precedence is set by `_split_directive_evidence(textual_gradient,
 run_stdout)`: the verifier gradient wins and is passed verbatim (exact
-identifiers such as `FDA_APPROVED` must survive); else a non-empty `run_stdout` goes
-**verbatim** into a separate `<raw_log>` block and the prompt states
-that no verifier diagnosis is available; else a synthetic no-feedback
-note is the diagnosis. `run_stdout` is always the parent's own log
-(`WorkflowInfo.run_stdout`, read from `<uuid>/run_stdout.log`; empty
-without a parent), so the evidence describes the code being mutated.
-The raw log rules forbid turning one error into an environment rule,
+identifiers such as `FDA_APPROVED` must survive; never cut); else a
+non-empty `run_stdout` goes into a separate `<raw_log>` block as a
+**tail** (`raw_log_tail`: the last `RAW_LOG_TAIL_CHARS` = 4096
+characters, after a marker line that says earlier output was cut) and
+the prompt states that no verifier diagnosis is available; else a
+synthetic no-feedback note is the diagnosis. `run_stdout` is always the
+parent's own log (`WorkflowInfo.run_stdout`, read from
+`<uuid>/run_stdout.log`; empty without a parent), so the evidence
+describes the code being mutated. The raw log rules say the log is
+only a tail and forbid turning one error into an environment rule,
 prescribing absolute paths, or moving outputs outside the relative
 workspace. `crossover_prompt(...)` applies the same split per parent,
-each with its own log (stdout tail, last 1024 characters, in
-`<raw_log>`).
+each with its own log (same `raw_log_tail`, in `<raw_log>`). The cap
+exists because one log reached 25 MB and broke the 8 MB provider
+request limit; about 480 characters of every log tail are the fixed
+engine trailer, so 1024 left too little real output.
 
 When parent selection returns no parent on the mutation branch,
 `EvolutionEngine._mutation_parent_or_last_child` uses the generation
@@ -468,8 +473,9 @@ EvolutionEngine.start_workflow_evolution(goal)
         ├─ WorkflowEvaluator.evaluate(evaluator_type="verifier")
         ├─ SelectionPressure.validate_survivor() → archive admit?
         ├─ record_lineage()
-        ├─ select next parent (archive QD-roulette)
-        ├─ choose crossover (default crossover_rate=0.1, once initial_population met) or mutation
+        ├─ variation_mode=resample: fresh seed prompt, no parent (best-of-N control)
+        ├─ else select next parent (archive QD-roulette)
+        ├─ choose crossover (default crossover_rate=0.4, once initial_population met) or mutation
         └─ recurse → stop on threshold OR max_depth
     ↓
 WorkspaceManager.restore_best(best_uuid)
@@ -526,28 +532,84 @@ For each generation (`sources/evaluators/policy_bt_verifier/`):
    stdout-only metrics.
 2. **Reconnaissance.** One LLM call produces a complete artifact
    inventory with bounded previews and explicit byte-page inspection,
-   then freezes the task criteria. New artifact schemas extend
-   **adapters**; the criteria never change.
+   then freezes the task criteria. Quality criteria the goal does not
+   state are allowed when they do not conflict with it; criteria about
+   packaging (`run.sh`, requirements, script names) are not, because the
+   reproduction gate enforces them. For an unfrozen task, recon also
+   reads every input table completely once (`placeholders.py`):
+   `input_profile` (rows, distinct counts, top values, numeric ranges)
+   and `one_value_columns` (one value in every row of one table, varying
+   in another: hidden test labels). The inputs come from the pre-run
+   baseline (see below); without one, from the first snapshot's files
+   that its run did not produce (`criteria_guard.input_files`: no
+   contract outputs, rerun-created or changed files, scripts or
+   packaging). At most 64 tables are read, goal-named first. Before freezing,
+   `criteria_guard.py` checks every criterion: its `literals` must appear
+   in the goal or in the first lines of a task input file (every baseline
+   file; without a baseline, a goal-named snapshot file the run did not
+   produce), then an LLM guard keeps
+   or rejects each criterion against the goal and, when
+   `one_value_columns` is not empty, names a missing held-out quality
+   criterion for a predicted placeholder column. Rejections and the
+   missing criterion go back to reconnaissance with reasons; after the
+   last revision the still-rejected criteria are dropped (none left →
+   reconnaissance fails) and the missing criterion is recorded as
+   `quality_gap` (the plan is kept). Two malformed guard answers keep
+   the plan, recorded as an error. Verdicts, revisions, drops and gaps
+   are stored in the bundle as `criteria_guard`. New
+   artifact schemas extend **adapters**; the criteria never change.
+
+   **Input provenance.** The engine's `WorkspaceManager` copies the
+   workspace before generation 0 and restores that copy before every
+   run, in every mode (`--task`, `--goal`, benchmark rows); the engine
+   names it in `config.policy_bt_input_baseline`. Every file in it is a
+   task input, so no task layout or benchmark folder is assumed. The
+   verifier copies it once into the task registry (`<registry>/baseline/`,
+   digests in `baseline_digests.json`) and checks each new snapshot
+   against it before re-execution: a baseline file that differs or is
+   missing is a changed input; a new file is an output. The generation
+   record and `evaluation.txt` carry `input_provenance` (`verified`,
+   `input_tampered` with the changed paths, or `unverified` without a
+   baseline — the standalone verifier — or on a copy error, then with
+   `error`). Only `.csv`, `.tsv` and `.txt` tables up to 64 MB are
+   scanned. The check is a record only: a changed input is never
+   penalized, and a failed check or copy never fails the evaluation.
 3. **One comparison policy.** One cached deterministic Python policy
    compares pairs through the adapters, in a restricted interpreter
    subprocess (stdlib `json`/`math`/`struct` calls plus harness-provided
    read capabilities only — no `numpy`/`pandas`/binary readers; formats
-   outside the subset stay "unknown", never a fabricated loss). Both
+   outside the subset stay "unknown", never a fabricated loss). A win
+   needs two known, different values at the deciding stage (null ties),
+   and a `higher`/`lower` criterion's value must be a number or null;
+   violations go to repair. Both
    argument orders and self-tie checks must agree; a static screen, a
    runtime smoke, and ≤ `policy_bt_repair_rounds` repairs protect the
-   accepted policy. On a policy tie, relevant images on both sides go
-   to the configured vision model (`policy_bt_visual_channel`).
+   accepted policy. Criteria with `"judge": "vision"` (what only a
+   figure shows) are left out of the adapters and the comparison policy
+   (`recon.code_task`); on a policy tie, relevant images on both sides
+   go to the configured vision model (`policy_bt_visual_channel`), which
+   decides them.
 4. **Tournament reward.** All pair verdicts fit a regularized
    Bradley–Terry model; after each evaluation EVERY generation of the
    task session gets a new current rating (`arrival_reward` keeps the
    rating at arrival time). The policy-BT capsule is the argmax of the
-   current ratings. The only allowed `policy_bt_reward` value is
-   `"bradley_terry"`; `"win_rate"` raises an error.
+   current ratings; exact ties go to the most head-to-head wins among
+   the tied runs, then the earliest run. The only allowed
+   `policy_bt_reward` value is `"bradley_terry"`; `"win_rate"` raises
+   an error.
 5. **Evidence-checked gradient.** The **textual gradient**
    (`abstracted_textual_gradient` + the `textual_gradient.txt`
-   sidecar) folds the pair diagnoses, earliest decisive losses first,
-   quoting measured evidence. It is the **only** verifier signal the
-   mutator sees.
+   sidecar) is refolded for every generation whenever the tournament
+   changes, from all its current pairs: decisive feedback (earliest
+   stage first; only losses when the run lost any pair, win text only
+   for an unbeaten run), then absolute deficiencies measured on
+   that run (failed gates; unmeasured criteria with the adapter's
+   reason, and a request for a readable measurement when no run has
+   one) and
+   the vision model's figure deficiencies. Ties never yield "you match"
+   text. The first fold stays as `arrival_textual_gradient`; every fold
+   is appended to `textual_gradient_history.jsonl`. It is the **only**
+   verifier signal the mutator sees.
 6. **Artifacts.** Per generation: `evaluation.txt` (reward, tournament
    version, execution record, PAIR VERDICTS), `textual_gradient.txt`,
    `policy_bt_evidence.json`, `verifier_policy_bt.log`. If the

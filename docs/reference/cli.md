@@ -20,8 +20,8 @@ If no mode is given, Mimosa drops into the interactive onboarding wizard.
 | `--papers <CSV path>` | Batch evaluation on a CSV of (task, expected output) rows. |
 | `--science_agent_bench` | Batch evaluation on `datasets/ScienceAgentBench.csv`. |
 | `--workflow_eval_mode` | Workflow-generation-quality evaluation. |
-| `--scenario <path>` | Use a scenario rubric instead of LLM-judge scoring. |
-| `--evaluation_cli` | Interactive evaluation launcher for ScienceAgentBench. |
+| `--scenario <path>` | Use a scenario benchmark (for example `datasets/scenarios/X.json`) with criteria for workflow evaluation and evolution. |
+| `--evaluation_cli` | Interactive evaluation launcher for ScienceAgentBench and other CSV benchmarks. Its mode menu offers single-agent, one-shot, iterative learning, and resample (best-of-N, `variation_mode=resample`). A dataset step lists the CSV files in `datasets/` (Enter keeps `datasets/ScienceAgentBench.csv`); CSVs with `instance_id` and `task_inst` columns run with the ScienceAgentBench grader, other CSVs run as paper tasks (`Title`/`URLS`/`Prompt`), like `--papers`. |
 | `--memory_cli` | Interactive RAG chat over the memory of a workflow run. See [Transparency & replay](../usage/transparency.md#-memory_cli-ask-questions-about-a-run). |
 | `--memory_uuid <uuid>` | Run UUID to load with `--memory_cli` (defaults to the most recent run under `sources/memory/`). |
 
@@ -31,7 +31,7 @@ If no mode is given, Mimosa drops into the interactive onboarding wizard.
 | ---- | ----------- |
 | `--learn` | Enable iterative learning until `learned_score_threshold` is reached or `max_learning_evolve_iterations` is hit. |
 | `--single_agent` | Use the single-agent factory (no learning, baseline for benchmarks). |
-| `--disable_judge` | Skip the verifier (no scoring, no learning). |
+| `--disable_judge` | Run without the judge (`judge=False` in the evolve or planner call). |
 | `--debug` | Verbose debug logging to console. |
 | `--verbose` | Enable info-level logging to console. |
 | `--csv_runs_limit N` | Cap on rows in batch / CSV modes (default `200`). |
@@ -56,7 +56,8 @@ These override values from `--config`'s JSON or the defaults in
 | `--pushover_token <token>` | `config.pushover_token`. |
 | `--pushover_user <user>` | `config.pushover_user`. |
 | `--max_evolve_iterations N` | `config.max_learning_evolve_iterations`. |
-| `--verifier_kind <kind>` | `config.verifier_kind` (`hybrid` \| `legacy` \| `gold`). `gold` is an ORACLE / BENCHMARK-LEAKING research control (needs `--science_agent_bench`; never report its scores) — see [Gold feedback (oracle) mode](../concepts/evaluation-pipeline.md#gold-feedback-oracle-mode). |
+| `--variation_mode <mode>` | `config.variation_mode` (`evolve` (default) \| `resample`). `resample` makes every generation a fresh draw from the task text, with no parent selection (best-of-N control); final selection by Bradley-Terry rating is unchanged. |
+| `--verifier_kind <kind>` | `config.verifier_kind` (`policy_bt` (default) \| `hybrid` \| `legacy` \| `gold`). `gold` is an ORACLE / BENCHMARK-LEAKING research control (needs `--science_agent_bench`; never report its scores) — see [Gold feedback (oracle) mode](../concepts/evaluation-pipeline.md#gold-feedback-oracle-mode). |
 | `--gold_feedback_reward` / `--no-gold_feedback_reward` | `config.gold_feedback_reward` (`verifier_kind=gold` only): also take the reward from the benchmark grader (full oracle). |
 | `--gold_feedback_timeout_s <s>` | `config.gold_feedback_timeout_s` (`verifier_kind=gold` only, default 1800): wall-clock cap on benchmark grading per generation (`0` disables it); on timeout the grade is censored. |
 | `--hybrid_verifier_num_claims <n>` | `config.hybrid_verifier_num_claims`. |
@@ -64,6 +65,16 @@ These override values from `--config`'s JSON or the defaults in
 | `--hybrid_verifier_scorer_timeout_s <s>` | `config.hybrid_verifier_scorer_timeout_s`. |
 | `--hybrid_verifier_pairwise_mode <mode>` | `config.hybrid_verifier_pairwise_mode`. |
 | `--hybrid_verifier_digest_max_files <n>` | `config.hybrid_verifier_digest_max_files`. |
+| `--hybrid_verifier_reward <win_rate\|bradley_terry>` | `config.hybrid_verifier_reward`. |
+| `--hybrid_verifier_visual_rung` / `--no-hybrid_verifier_visual_rung` | `config.hybrid_verifier_visual_rung`. |
+| `--hybrid_verifier_execution_gate` / `--no-hybrid_verifier_execution_gate` | `config.hybrid_verifier_execution_gate`. |
+| `--policy_bt_reward <bradley_terry>` | `config.policy_bt_reward`. |
+| `--policy_bt_scorer_timeout_s <s>` | `config.policy_bt_scorer_timeout_s`. |
+| `--policy_bt_visual_channel` / `--no-policy_bt_visual_channel` | `config.policy_bt_visual_channel`. |
+| `--policy_bt_reexecute` / `--no-policy_bt_reexecute` | `config.policy_bt_reexecute`. |
+| `--policy_bt_reexec_timeout_s <s>` | `config.policy_bt_reexec_timeout_s` (config default 1800; the flag help in `main.py` says 900). |
+| `--policy_bt_repair_rounds <n>` | `config.policy_bt_repair_rounds` (config default 4; the flag help in `main.py` says 3). |
+| `--planner_human_approve` | `config.planner_human_approve` = true: human approval of the plan before execution. |
 
 ## Examples
 

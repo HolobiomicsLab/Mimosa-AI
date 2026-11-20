@@ -101,6 +101,24 @@ def _to_jsonable(obj: Any) -> Any:
         return asdict(obj)
     return obj
 
+
+def is_resample_mode(config: Any) -> bool:
+    """Tell whether the session runs the resample (best-of-N) control.
+
+    The evolution engine and the planner use it before they select or
+    reuse a workflow. They give the run config. In resample mode, no
+    workflow is selected as input to a generation.
+
+    Args:
+        config (Any): Run config (``Config`` or a test namespace); a
+            missing ``variation_mode`` counts as ``"evolve"``.
+
+    Returns:
+        bool: ``True`` when ``config.variation_mode`` is ``"resample"``.
+    """
+    return getattr(config, "variation_mode", "evolve") == "resample"
+
+
 def _verifier_block(run: "IndividualRun") -> dict:
     """Read the run's persisted verifier scores.
 
@@ -130,9 +148,9 @@ def _refresh_policy_bt_rewards(
     The engine calls this after each evaluation, with the session runs
     and the archive they compete in. When the newest verifier block is a
     policy-BT result with tournament rewards, it copies each run's fresh
-    Bradley-Terry rating into the run record and the archive; arrival
-    scores stay in the verifier record. Any other verifier block is left
-    untouched.
+    Bradley-Terry rating and current pair outcomes into the run record and
+    the rating into the archive; arrival scores stay in the verifier
+    record. Any other verifier block is left untouched.
 
     Args:
         runs (list[IndividualRun]): Completed runs in arrival order.
@@ -144,7 +162,7 @@ def _refresh_policy_bt_rewards(
     latest = _verifier_block(runs[-1]) if runs else {}
     if latest.get("verifier_kind") != "policy_bt" or "tournament_rewards" not in latest:
         return
-    rewards = latest["tournament_rewards"]
+    rewards, outcomes = latest["tournament_rewards"], latest.get("tournament_outcomes") or {}
     for run in runs:
         if run.current_uuid not in rewards:
             continue
@@ -157,6 +175,7 @@ def _refresh_policy_bt_rewards(
             verifier_kind="policy_bt", reward=run.reward, overall_score=run.reward,
             overall_score_uncapped=run.reward, reward_fallback=False,
             tournament_rewards=rewards, tournament_version=latest["tournament_version"],
+            pair_outcomes=outcomes.get(run.current_uuid, block.get("pair_outcomes") or {}),
         )
     selection.refresh_rewards(rewards)
 
@@ -404,6 +423,56 @@ def _run_reward_is_fallback(run: "IndividualRun", candidates: list["IndividualRu
     return False
 
 
+# Ratings closer than this are the same rating.
+RATING_TIE_TOLERANCE = 1e-9
+
+
+def _head_to_head(run: IndividualRun, rival: IndividualRun) -> str | None:
+    """Read the current direct pair outcome of one run against one rival.
+
+    Capsule selection uses it to break a tie between top-rated runs.
+    :func:`_policy_capsule_run` calls it for every two tied runs. It reads
+    the run's ``pair_outcomes``, which :func:`_refresh_policy_bt_rewards`
+    keeps current together with the ratings; the rival's mirrored entry is
+    the fallback.
+
+    Args:
+        run (IndividualRun): Run whose outcome is requested.
+        rival (IndividualRun): The other run of the pair.
+
+    Returns:
+        str | None: ``"win"``, ``"loss"`` or ``"tie"`` for *run*, or
+        ``None`` when neither block records the pair.
+    """
+    mirror = {"win": "loss", "loss": "win", "tie": "tie"}
+    own = (_verifier_block(run).get("pair_outcomes") or {}).get(rival.current_uuid)
+    other = (_verifier_block(rival).get("pair_outcomes") or {}).get(run.current_uuid)
+    return own or mirror.get(other)
+
+
+def _policy_capsule_run(runs: list[IndividualRun]) -> IndividualRun:
+    """Pick the top Bradley-Terry run, breaking exact rating ties fairly.
+
+    Equal ratings come from equal win/tie records, not from equal quality,
+    so the newest run must not win a tie (2026-10-17: drugex shipped a
+    failing generation tied with a passing gen 0). :func:`_select_best_run`
+    calls it with the policy-BT runs. It keeps the runs at the top rating,
+    then prefers the run with the most head-to-head wins against the other
+    tied runs, then the earliest run.
+
+    Args:
+        runs (list[IndividualRun]): Non-empty policy-BT runs with a uuid
+            and a current rating in ``reward``.
+
+    Returns:
+        IndividualRun: The run that ships as the capsule.
+    """
+    top = max(r.reward or 0.0 for r in runs)
+    tied = [r for r in runs if abs((r.reward or 0.0) - top) <= RATING_TIE_TOLERANCE]
+    wins = {id(r): sum(_head_to_head(r, rival) == "win" for rival in tied if rival is not r) for r in tied}
+    return min(tied, key=lambda r: (-wins[id(r)], r.iteration_count))
+
+
 def _select_best_run(runs: list[IndividualRun]) -> IndividualRun | None:
     """Pick the run whose workspace ships as the task capsule.
 
@@ -421,10 +490,10 @@ def _select_best_run(runs: list[IndividualRun]) -> IndividualRun | None:
     candidates = [r for r in runs if r.current_uuid]
     if not candidates:
         return None
-    key = lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count)
+    key = lambda r: (r.reward if r.reward is not None else 0.0, r.iteration_count)  # noqa: E731
     policy_runs = [r for r in candidates if _verifier_block(r).get("verifier_kind") == "policy_bt"]
     if policy_runs:
-        return max(policy_runs, key=key)
+        return _policy_capsule_run(policy_runs)
     pairwise = [r for r in candidates if not _run_reward_is_fallback(r, candidates)]
 
     if pairwise and all((r.reward or 0) == 0 for r in pairwise):
@@ -636,86 +705,6 @@ class EvolutionEngine:
         print_ok(f"Mockup run completed with reward: {wf.overall_score:.1f}")
         return [mock_run]
 
-    def load_phenotype_result(self, uuid: str) -> Any:
-        """Load the result of a previously executed workflow state.
-
-        Mockup mode and manual inspection call this with a workflow UUID
-        to reload its stored evaluation payload from disk.
-
-        Args:
-            uuid (str): UUID of the workflow state to load.
-
-        Returns:
-            Parsed JSON contents of the workflow's ``state_result.json``,
-            or ``None`` when the file is missing.
-
-        Raises:
-            ValueError: When the state file exists but cannot be read.
-        """
-        try:
-            with open(f"{self.workflow_dir}/{uuid}/state_result.json") as f:
-                return json.loads(f.read().strip())
-        except FileNotFoundError:
-            return None
-        except Exception as e:
-            raise ValueError(f"❌ Error reading workflow state: {str(e)}") from e
-
-    def load_workflow_genotype_code(self, workflow_id: str) -> str:
-        """Load the genotype source of a stored workflow.
-
-        Inspection and tooling code calls this with a workflow UUID to
-        read the Python genotype stored for that run.
-
-        Args:
-            workflow_id (str): UUID identifying the workflow folder.
-
-        Returns:
-            The Python source of the workflow genotype.
-
-        Raises:
-            ValueError: When the folder, the code file or its contents are
-                not accessible.
-        """
-        workflow_path = f"{self.workflow_dir}/{workflow_id}"
-        if not os.path.exists(workflow_path):
-            raise ValueError(
-                f"❌ Workflow for ID {workflow_id} not found in {self.workflow_dir}."
-            )
-
-        try:
-            with open(f"{workflow_path}/workflow_genotype_{workflow_id}.py") as f:
-                return f.read()
-        except FileNotFoundError as e:
-            raise ValueError(
-                f"❌ Workflow code file not found for ID {workflow_id} in {workflow_path}."
-            ) from e
-        except Exception as e:
-            raise ValueError(f"❌ Error reading workflow code: {str(e)}") from e
-
-    def get_total_rewards(self, wf_state: Any, eval_type: str) -> float:
-        """Read the total reward from a workflow state.
-
-        Inspection and reporting code calls this with a completed
-        workflow state and the evaluation type used for the run.
-
-        Args:
-            wf_state (Any): Workflow state dict; falsy values
-                short-circuit to ``0.0``.
-            eval_type (str): Either ``"generic"`` or ``"scenario"``;
-                other values yield ``0.0``.
-
-        Returns:
-            The reward extracted from the relevant evaluation slice.
-        """
-        if not wf_state or not eval_type:
-            return 0.0
-        if eval_type == "generic":
-            return wf_state["evaluation"]["generic"]["overall_score"]
-        elif eval_type == "scenario":
-            return wf_state["evaluation"]["scenario"]["score"]
-        else:
-            return 0.0
-
     def extract_agents_behavior(self, wf_state: Any) -> str:
         """Extract the per-agent answers from the workflow state.
 
@@ -887,6 +876,37 @@ class EvolutionEngine:
         )
         return child
 
+    def _session_start_parent(
+        self, goal: str, template_uuid: str | None
+    ) -> WorkflowInfo | None:
+        """Choose the parent of generation 0, or no parent.
+
+        ``start_workflow_evolution`` uses this once per task session. It
+        gives the session goal and the optional template uuid from the
+        caller. In evolve mode, it selects a parent from disk. In resample
+        mode, it selects no workflow and ignores the template, so
+        generation 0 starts from the task text only.
+
+        Args:
+            goal (str): Session goal text from the caller; used for the
+                disk similarity search in evolve mode.
+            template_uuid (str | None): Workflow uuid to start from (the
+                ``start_workflow_evolution`` default is a fixed uuid);
+                ``None`` when not given.
+
+        Returns:
+            WorkflowInfo | None: The selected parent, else ``None``.
+        """
+        if not is_resample_mode(self.config):
+            parents, _ = self.select_parent_workflow(
+                goal, template_uuid=template_uuid
+            )
+            return parents[0] if parents else None
+        if template_uuid is not None:
+            print_warn(f"[RESAMPLE] template {template_uuid} ignored")
+        print_info("[RESAMPLE] every generation is a fresh draw; no parent selection")
+        return None
+
     async def start_workflow_evolution(
         self,
         goal: str,
@@ -909,7 +929,7 @@ class EvolutionEngine:
             goal (str): The primary goal or objective to reach (may be
                 knowledge-wrapped).
             template_uuid (str | None): UUID of a workflow template to
-                start from.
+                start from. Ignored in resample mode.
             judge (bool): Whether judging mode is enabled for evaluation.
             scenario_rubric (str | None): ID of the scenario for
                 evaluation.
@@ -943,25 +963,24 @@ class EvolutionEngine:
         self.variation.textual_gradient_history.clear()
         self.variation.agent_count_history.clear()
 
-        parents, _ = self.select_parent_workflow(
-            goal, template_uuid=template_uuid
-        )
-        wf = parents[0] if parents else None
+        wf = self._session_start_parent(goal, template_uuid)
 
         if mockup_mode:
             return await self.mockup(wf, goal)
 
         # ── Workspace lifecycle: snapshot → clean → restore before first run ─
         self.workspace_mgr.begin_session()
+        # Policy-BT compares every snapshot with this pre-run copy (the task inputs).
+        self.config.policy_bt_input_baseline = str(self.workspace_mgr.initial_backup)
 
+        from sources.evaluators.policy_bt_verifier.reexec import reproduction_goal_note
+        goal += "\n" + reproduction_goal_note(self.config) + "\n"
         craft_instructions = self.get_genotype_instructions(goal, wf, max_iterations=max_iteration)
 
         rewards_history = []
         assertion_history = []  # Track [passed, total] per iteration
         self.viz_utils.create_rewards_curve_plot(goal)
 
-        from sources.evaluators.policy_bt_verifier.reexec import reproduction_goal_note
-        goal += "\n" + reproduction_goal_note(self.config) + "\n"
 
         # ── Stop control (stop-condition plan 2026-10-08) ─────────────
         stop_controller = StopController(
@@ -1078,6 +1097,8 @@ class EvolutionEngine:
         # ── Reset workspace to the initial state before each run ─────
         if workspace_mgr is not None:
             workspace_mgr.reset_for_run()
+        # Policy-BT provenance fallback: files after this time are run outputs.
+        self.config.policy_bt_run_started_at = time.time()
 
         # Execute workflow
         print_info(f"Run {runs[-1].iteration_count + 1} of {runs[-1].max_depth}")
@@ -1121,12 +1142,6 @@ class EvolutionEngine:
             or verifier.get("skipped_reason") in _UNSCORED_VERIFIER_REASONS
         )
         if uuid:
-            # Reward wiring (N1): score, uncapped score and the fallback
-            # flag are read back from the run's state_result in ONE pass,
-            # outside the genotype guard — a run whose orchestration
-            # returned no genotype string must not keep a stale
-            # reward_is_fallback=False while its evaluation on disk
-            # records a mean_claim fallback (pains_brenk gen 13).
             runs[-1].reward = wf_info.overall_score
             runs[-1].reward_uncapped = wf_info.overall_score_uncapped
             runs[-1].reward_is_fallback = wf_info.reward_is_fallback
@@ -1164,8 +1179,9 @@ class EvolutionEngine:
                 failed=is_failure or not uuid,
             )
 
+        resample = is_resample_mode(self.config)
         exploration_probe: dict | None = None
-        if stop_controller is not None:
+        if stop_controller is not None and not resample:
             exploration_probe = self._evaluate_exploration_probe(
                 stop_controller, runs
             )
@@ -1273,16 +1289,25 @@ class EvolutionEngine:
             )
             return runs
 
-        # ── Evolutionary parent selection: mutation or crossover ──────
-        parent_workflows, use_crossover = self.select_parent_workflow(
-            runs[-1].goal, template_uuid=None
+        # ── Parent selection (none in resample mode): mutation or crossover ──
+        parent_workflows, use_crossover = (
+            ([], False) if resample
+            else self.select_parent_workflow(runs[-1].goal, template_uuid=None)
         )
 
         task_goal = runs[-1].original_task or runs[-1].goal
 
         next_kind: str
         next_parent_uuids: list[str]
-        if use_crossover and len(runs) >= self.initial_population:
+        if resample:
+            # RESAMPLE — gen-0 prompt: runs[-1].goal keeps the reproduction note
+            print_phase("RESAMPLE (FRESH DRAW)", color=GREEN)
+            runs[-1].prompt = self.get_genotype_instructions(
+                runs[-1].goal, None, max_iterations=runs[-1].max_depth
+            )
+            next_kind = "seed"
+            next_parent_uuids = []
+        elif use_crossover and len(runs) >= self.initial_population:
             # CROSSOVER — recombine multiple parent genotypes
             print_phase("CROSSOVER VARIATION", color=CYAN)
             runs[-1].prompt = self.variation.crossover_prompt(
@@ -1376,21 +1401,6 @@ class EvolutionEngine:
         except Exception as exc:
             self.logger.warning(f"[ASTRA] export skipped: {exc}")
             print_warn(f"ASTRA export failed (non-fatal): {exc}")
-
-    def _get_human_validation(self) -> bool:
-        """Ask the operator whether to continue the workflow.
-
-        Interactive runs call this when a retry needs human approval; it
-        reads a yes/no answer from the terminal.
-
-        Returns:
-            bool: ``True`` when the user typed ``yes`` or ``y``, and
-            ``False`` otherwise.
-        """
-        human_validation = input("Attempt to retry task? (yes/no): ").strip().lower()
-        if human_validation not in ["yes", "y"]:
-            return False
-        return True
 
     def _log_iteration_start(self, goal: str, iteration_count: int, max_depth: int) -> None:
         """Log the start of one generation.
@@ -1774,6 +1784,7 @@ class EvolutionEngine:
             "uuid": run.current_uuid,
             "iteration": run.iteration_count,
             "evolution_kind": run.evolution_kind,
+            "variation_mode": getattr(self.config, "variation_mode", "evolve"),
             "parent_uuids": list(run.parent_uuids or []),
             "iteration_wall_time_s": round(time.time() - ctx["iteration_start_time"], 3),
             "iteration_cost_usd": float(ctx["iteration_cost"]),

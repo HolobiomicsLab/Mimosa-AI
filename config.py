@@ -96,52 +96,11 @@ class Config:
         ##############
         # Verifier channel (evaluation pipeline)
         ##############
-        # "policy_bt" fits current ratings across generation pairs.
-        # "hybrid" and "legacy" retain their previous scoring rules.
+        # "policy_bt" is the recommanded policy.
+        # "hybrid" and "legacy" are older experimental verifiers. 
         # "gold" exposes benchmark answers for research only.
         self.verifier_kind: str = "policy_bt"
-        # verifier_kind="gold" only: also take the reward (QD score, early
-        # stop, capsule argmax) from the benchmark grader (full oracle:
-        # SR -> 1.0, VER -> 0.5*CBS, else 0.0). Default False = gradient-only.
-        self.gold_feedback_reward: bool = False
-        # verifier_kind="gold" only: wall-clock cap (seconds) on the
-        # benchmark grading of one generation (VER re-run <= 900 s + SR eval
-        # <= 300 s + CBS). On timeout the grade is censored and the hybrid
-        # gradient is used.
-        self.gold_feedback_timeout_s: int = 1800
-        # Runtime-only benchmark task context for verifier_kind="gold", set
-        # per task by csv_mode (never serialized): the CSV row and the
-        # ScienceAgentBenchLoader used to grade each generation.
-        self.gold_feedback_task_row: dict | None = None
-        self.gold_feedback_sab_loader: Any = None
-        # Target key-claim count per task (extraction accepts ±2).
-        self.hybrid_verifier_num_claims: int = 10
-        # Max replacement claims requested per generation (E19b refinement).
-        self.hybrid_verifier_refinement_rounds: int = 2
-        # Per scorer-subprocess timeout in seconds.
-        self.hybrid_verifier_scorer_timeout_s: int = 60
-        # Pairwise reward mode: "temporal" (default — temporal-elimination
-        # ladder: earliest differing stage decides), "temporal_strict",
-        # "mean_diff", "sign_sum", or "escalation".
-        self.hybrid_verifier_pairwise_mode: str = "temporal"
-        # Max deliverable files sampled by the hybrid verifier format digest.
-        self.hybrid_verifier_digest_max_files: int = 8
-        # Reward aggregation over pairwise outcomes: "win_rate" (default —
-        # raw majority score vs previous generations; measured BEST on the
-        # frozen arena, E19c 2026-09-25: 0.742 vs BT-online 0.643, paired
-        # Δ +0.097 CI excluding 0) or "bradley_terry" (logistic-MLE
-        # strengths, opponent-weighted).
-        self.hybrid_verifier_reward: str = "win_rate"
-        # E26/E35 visual rung: figure tasks (>=50% image deliverables) get
-        # goal-anchored visual claims scored by the vision model at a
-        # ladder stage BEFORE "script" (E26: visual-early 0.833 vs 0.646
-        # as 4th rung).
-        self.hybrid_verifier_visual_rung: bool = True
-        # E24/E35 execution gate: crash / no-entry / timeout re-execution
-        # caps the reward at 0.0; divergent re-execution caps it at 0.5;
-        # clean recovery leaves the reward uncapped (E24: 29% of
-        # workspaces fail clean re-execution).
-        self.hybrid_verifier_execution_gate: bool = True
+
         # Policy comparisons fit one Bradley-Terry tournament.
         self.policy_bt_reward: str = "bradley_terry"
         # Comparison subprocess limit, in seconds.
@@ -152,11 +111,41 @@ class Config:
         self.policy_bt_repair_rounds: int = 4
         # Run the required reproduction script on copies.
         self.policy_bt_reexecute: bool = True
+
         # Reproduction limit per generation, in seconds.
         self.policy_bt_reexec_timeout_s: int = 1800
         # Rerun interpreter, pip caps and env; empty = host Python, no caps.
-        # ScienceAgentBench mode sets the grader's (grading_runtime()).
         self.policy_bt_reexec_runtime: dict = {}
+        # Largest verifier text prompt, in characters; larger fails fast.
+        self.policy_bt_max_prompt_chars: int = 1_500_000
+        # Missing host dependency: trust outputs the run provably wrote.
+        self.policy_bt_provenance_fallback: bool = True
+        # gold reward gradient mode for potential ablations
+        self.gold_feedback_reward: bool = False
+        # verifier_kind="gold" only: wall-clock cap (seconds)
+        self.gold_feedback_timeout_s: int = 1800
+        # Runtime-only benchmark task context for verifier_kind="gold"
+        self.gold_feedback_task_row: dict | None = None
+        # ScienceAgentBench loader
+        self.gold_feedback_sab_loader: Any = None
+
+        # Target key-claim count per task (extraction accepts ±2).
+        self.hybrid_verifier_num_claims: int = 10
+        # Max replacement claims requested per generation (E19b refinement).
+        self.hybrid_verifier_refinement_rounds: int = 2
+        # Per scorer-subprocess timeout in seconds.
+        self.hybrid_verifier_scorer_timeout_s: int = 60
+        # Pairwise reward mode: "temporal" (default — temporal-elimination)
+        self.hybrid_verifier_pairwise_mode: str = "temporal"
+        # Max deliverable files sampled by the hybrid verifier forma digest.
+        self.hybrid_verifier_digest_max_files: int = 8
+        # Reward aggregation over pairwise outcomes
+        self.hybrid_verifier_reward: str = "win_rate"
+        # visual check
+        self.hybrid_verifier_visual_rung: bool = True
+        # reexec gate
+        self.hybrid_verifier_execution_gate: bool = True
+
         #############
         # Orchestrator Workflow generation options
         #############
@@ -164,15 +153,11 @@ class Config:
         # Recommanded: model diversity avoid idea and verifiers collapse.
         self.orchestrator_choose_model = False
         # Ground workflow generation with perspicacité
-        self.literrature_grounding = True
+        self.literrature_grounding = False
 
         ##############
         # Human in the loop
         ##############
-        # When True, the planner prints the generated plan and waits for the
-        # operator: Enter approves it, typed feedback regenerates it. Honoured
-        # by the interactive `--goal` path only; benchmark and web entry points
-        # never prompt. Refused, not silently skipped, when stdin is not a TTY.
         self.planner_human_approve: bool = False
 
         ##############
@@ -183,7 +168,6 @@ class Config:
         )
         # Ablation: also benchmark-score every per-iteration /tmp snapshot
         # (mimosa_run_<session>_<uuid>) after the capsule eval, to track VER/SR
-        # convergence across evolution. Multiplies per-task eval wall-clock.
         self.evaluate_snapshot_ablations: bool = True
 
         ##############
@@ -195,35 +179,24 @@ class Config:
         self.selection_strategy = "qd"
         # learning parameters
         self.learned_score_threshold = 0.9
-        # Early-stop policy (stop-condition plan 2026-10-08). Relative-
-        # reward verifiers (hybrid, policy_bt) must NOT stop on an
-        # absolute threshold: their overall_score is a pairwise win-rate
-        # or BT rating, so 0.9 means "first clean sweep" (win-rate) or
-        # "never stop" (BT). "auto" resolves per verifier kind.
+        # Early-stop policy
         self.early_stop_mode: str = "auto"
-        # No early stop (any mode) before this many completed
-        # generations; clamped to max_learning_evolve_iterations.
+        # Minimum iteration in policy_bt mode  
         self.min_learning_evolve_iterations: int = 6
         # Champion-plateau patience: stop after this many consecutive
         # generations without a new head-to-head champion.
         self.plateau_patience: int = 3
-        # Frontier probe (metric-tie review 2026-10-09 §4.3): trigger an
-        # honest, labelled <exploration> block in the next variation
-        # prompt once the champion is unchanged for this many
-        # generations. None = plateau_patience - 1, which guarantees at
-        # least one probe before the plateau stop. Verifier-agnostic.
+        # <exploration> block in the next variation prompt when plateau
         self.explore_after_plateau: int | None = None
         # Frontier probe: extra per-generation trigger probability on top
-        # of the state triggers (0.0 = state-triggered only; the probe
-        # never fires during improving streaks unless this is set).
-        # Drawn from a seeded RNG so identical runs replay identically.
+        # of the state triggers.
         self.explore_base_rate: float = 0.0
         self.max_learning_evolve_iterations = 16
         # KNN settings for novelty
         self.novelty_comparison: str = "archive_knn"
         self.novelty_previous_n: int = 16
         # Length penalty: genotype size at which the penalty starts to grow
-        self.length_penalty_baseline_chars: int = 8000
+        self.length_penalty_baseline_chars: int = 12000
         self.length_penalty_lambda: float = 0.05
         # Selection pressure / archive settings
         self.min_improvement_threshold: float = 0.01
@@ -235,6 +208,9 @@ class Config:
         self.initial_population: int = 2
         self.crossover_rate: float = 0.4
         self.n_parents: int = 2
+        # "evolve": parent selection + mutation/crossover.
+        # "resample": every generation is a fresh draw from the task text.
+        self.variation_mode: str = "evolve"
         # goal similarity thresholds before even considered by qd (need similar goal to avoid picking parents from a different task)
         self.parent_threshold_similarity: float = 0.95
         # bare minimum score for selection (don't pick failed parents)
@@ -488,6 +464,8 @@ class Config:
             "policy_bt_reexecute": self.policy_bt_reexecute,
             "policy_bt_reexec_timeout_s": self.policy_bt_reexec_timeout_s,
             "policy_bt_reexec_runtime": self.policy_bt_reexec_runtime,
+            "policy_bt_max_prompt_chars": self.policy_bt_max_prompt_chars,
+            "policy_bt_provenance_fallback": self.policy_bt_provenance_fallback,
             "openrouter_provider": self.openrouter_provider,
             "default_openrouter_quantizations": self.default_openrouter_quantizations,
             "save_logprobs": self.save_logprobs,
@@ -518,6 +496,7 @@ class Config:
             "initial_population": self.initial_population,
             "crossover_rate": self.crossover_rate,
             "n_parents": self.n_parents,
+            "variation_mode": self.variation_mode,
             "parent_threshold_similarity": self.parent_threshold_similarity,
             "parent_threshold_score": self.parent_threshold_score,
             "schema_code_path": portable_resources["schema_code_path"],
@@ -632,6 +611,13 @@ class Config:
         self.policy_bt_reexec_runtime = dict(
             data.get("policy_bt_reexec_runtime") or self.policy_bt_reexec_runtime
         )
+        self.policy_bt_max_prompt_chars = int(
+            data.get("policy_bt_max_prompt_chars", self.policy_bt_max_prompt_chars)
+        )
+        self.policy_bt_provenance_fallback = _json_bool(
+            data.get("policy_bt_provenance_fallback"),
+            self.policy_bt_provenance_fallback,
+        )
         self.engine_name = data.get("engine_name", self.engine_name)
         self.openrouter_provider = data.get(
             "openrouter_provider", self.openrouter_provider
@@ -732,6 +718,14 @@ class Config:
         )
         self.crossover_rate = float(data.get("crossover_rate", self.crossover_rate))
         self.n_parents = int(data.get("n_parents", self.n_parents))
+        variation_mode = (
+            str(data.get("variation_mode", self.variation_mode)).strip().lower()
+        )
+        if variation_mode not in ("evolve", "resample"):
+            raise ValueError(
+                f"variation_mode must be evolve or resample; got {variation_mode!r}"
+            )
+        self.variation_mode = variation_mode
         self.parent_threshold_similarity = float(
             data.get("parent_threshold_similarity", self.parent_threshold_similarity)
         )
@@ -871,6 +865,7 @@ class Config:
         lines.append(f"  initial_population={self.initial_population}")
         lines.append(f"  crossover_rate={self.crossover_rate}")
         lines.append(f"  n_parents={self.n_parents}")
+        lines.append(f"  variation_mode={self.variation_mode}")
         lines.append(
             f"  parent_threshold_similarity={self.parent_threshold_similarity}"
         )

@@ -6,7 +6,7 @@ discovers them at run time through the
 JSON-RPC interface for exposing tools to LLM agents.
 
 Mimosa is **agnostic about where MCP servers come from**. Anything that
-exposes a streamable-HTTP or SSE MCP endpoint on a reachable address and
+exposes a streamable-HTTP MCP endpoint on a reachable address and
 port is discoverable.
 
 [Toolomics](toolomics.md) is the companion platform we ship and document
@@ -19,7 +19,7 @@ The [`ToolManager`](https://github.com/HolobiomicsLab/Mimosa-AI/blob/main/source
 discovers MCP servers through two complementary paths:
 
 1. **Network scan** — for each `AddressMCP` in `Config.discovery_addresses`
-   (default `AddressMCP("0.0.0.0", 5000, 5100)`), every port in the range
+   (default `AddressMCP("0.0.0.0", 5000, 5200)`), every port in the range
    is probed with an MCP handshake against `http://<ip>:<port>/mcp`.
 2. **ToolHive enumeration** — if the [`thv`](https://github.com/stacklok/toolhive)
    CLI is present on the host, `thv list` is queried and every running
@@ -32,7 +32,7 @@ discovers MCP servers through two complementary paths:
        Mimosa to use a local ToolHive deployment.
 
 For every discovered server, Mimosa records the URL, transport
-(`streamable-http` or `sse`), and the list of tools with their schemas.
+(`streamable-http`, or `sse` on the ToolHive path), and the list of tools with their schemas.
 
 ## How tools are wired into a workflow
 

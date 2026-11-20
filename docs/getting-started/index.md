@@ -1,6 +1,6 @@
 # Getting Started
 
-Five pages to take you from a fresh clone to a finished workflow.
+Four pages to take you from a fresh clone to a finished workflow.
 
 | Page | What you'll do |
 | ---- | -------------- |

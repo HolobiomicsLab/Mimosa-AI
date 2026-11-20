@@ -35,7 +35,7 @@ matches the `sources/memory/<uuid>` convention — and intentionally
 independent of the LLM-named goal capsule that `LocalTransfer` produces
 later.
 
-Failure of the export is logged via `print_warn` and the engine continues.
+A failure in the outer call is printed as `print_err("Error in Astra Export: ...")` (`evolution_engine.py:991`) and the engine continues. Failures inside `_export_astra` are logged with `logger.warning` and `print_warn`.
 
 ## Variables that reach the LLM
 
@@ -50,21 +50,20 @@ variables — and nothing else:
 | `step_index`  | Position of the step in the compacted trace               | Provenance — surfaces in `Decision.source_step`                 |
 | `reasoning`   | `memory_trace.extract_output_text` — `model_output_message.content`, else `model_output` | The agent's natural-language justification, where the decision is voiced |
 | `code`        | `memory_trace.extract_code` — `code_action`, else `tool_calls[*].function.arguments`, else a fenced block in the output | The concrete chosen option as executed |
-| `observation` | `step.observations` truncated to 1200 chars               | Disambiguates whether the step succeeded or recovered           |
+| `observation` | Step observation, truncated to 1200 chars by `trace_compaction.compact_step` | Disambiguates whether the step succeeded or recovered |
 
 > **Shared extraction.** Code/reasoning extraction lives in
 > [`sources/transparency/memory_trace.py`](../../sources/transparency/memory_trace.py),
 > reused by both the exporter and the interactive memory chat
 > (`sources/cli/memory_chat_cli.py`) so the two never disagree on "the code
-> the agent ran". Note `code` reads `code_action` — **not** `action_output`,
-> which is the step's *result*, not its source.
+> the agent ran". `code` tries `code_action` first, then tool-call arguments, then a fenced block in the output. It never reads `action_output`, which is the step's *result*, not its source.
 
 Variables that are deliberately **not** passed:
 
 - `model_input_messages` — re-serialises the entire prior conversation on
   every step. Stripped in [`trace_compaction.compact_step`](../../sources/transparency/trace_compaction.py).
-  This is the dominant token-cost saving, usually ≥80% of the raw file.
-- `model` — the per-step model id stamped by `save_memories`
+  This is the main token-cost saving. The module docstring (`trace_compaction.py:3-6`) estimates the compacted trace at under 20% of the raw size; the export does not measure it.
+- `model` — the per-step model id stamped on each action step by the agent factories
   (e.g. `openrouter/qwen/qwen3.7-plus`). It rides along on the compact step
   as provenance for the YAML/recipe outputs but never enters the prompt, so
   extraction cache keys are unaffected.
@@ -75,11 +74,7 @@ Variables that are deliberately **not** passed:
 
 ## Heuristic prefilter
 
-`is_methodological_candidate` in `trace_compaction.py` drops steps whose
-code is entirely matched by mechanical patterns: `import`, `pd.read_*`,
-`open()`, `plt.*`, `subprocess.*`, `pip install`, `print(...)`. A step
-survives if at least one non-mechanical line of code or non-empty
-reasoning is present. This typically halves what reaches the LLM.
+`is_methodological_candidate` in `trace_compaction.py` decides whether a step is sent to the LLM. A step with no code survives if its reasoning is non-empty. A step with code survives if at least one of its lines is not mechanical. Reasoning does not rescue a step whose code is entirely mechanical. The mechanical patterns (`trace_compaction.py:36-48`) are: `import` and `from ... import` lines; `os.listdir`, `os.path.*`, `os.makedirs`, `os.getcwd`; `pd.read_*`; `open(`; `plt.show/savefig/figure/subplot/plot/bar/scatter/hist/imshow`; `print(`; `subprocess.run/Popen/check_output`; `!pip install` lines. The reduction in steps sent is not measured here.
 
 ## Output construction
 
@@ -92,9 +87,9 @@ analysis dict:
 | `name`                  | `"Mimosa best run <best_uuid>"`                       |
 | `description`           | Constant, indicates the post-run extraction provenance |
 | `inputs[0]`             | `task_description` derived from the user `goal`       |
-| `outputs[i]`            | Each top-level file in the artefacts directory — prefers `/tmp/mimosa_run_<session>_<uuid>` (the canonical snapshot), falls back to `config.workspace_dir`. See `AstraExporter._resolve_artefacts_dir`. OS junk (`.DS_Store`, `Thumbs.db`, `.gitkeep`), dotfiles, and our own `recipe.py` are dropped. |
+| `outputs[i]` | Each top-level file in the artefacts directory. The directory is the first match of `/tmp/mimosa_run_*_<uuid>` (`AstraExporter._SNAPSHOT_ROOT`), falling back to `config.workspace_dir`. See `AstraExporter._resolve_artefacts_dir`. OS junk (`.DS_Store`, `Thumbs.db`, `.gitkeep`), dotfiles, `astra.yaml`, `universes/`, and our own `recipe.py` are dropped. |
 | `outputs[i].decisions`  | All decision IDs surfaced from the trace               |
-| `outputs[i].recipe.command` | `python recipe.py`. The run's executed code is reconstructed by `memory_trace.reconstruct_recipe` (ordered `code_action` of every step) and written to `runs_capsule/<uuid>/recipe.py`. ASTRA's `recipe.command` is a single shell command, so the multi-step transcript lives in the script and the command points at it. Falls back to a memory-trace pointer string when no code was recovered. |
+| `outputs[i].recipe.command` | `python recipe.py`. The run's executed code is reconstructed by `memory_trace.reconstruct_recipe` (ordered output of `extract_code` for every step) and written to `runs_capsule/<uuid>/recipe.py`. ASTRA's `recipe.command` is a single shell command, so the multi-step transcript lives in the script and the command points at it. Falls back to a memory-trace pointer string when no code was recovered. |
 | `decisions[d.id]`       | One entry per deduped surfaced decision               |
 | `decisions[d.id].rationale` | LLM-extracted from the step's reasoning            |
 | `decisions[d.id].default` | The realised option (`Decision.chosen_option_id`)   |
@@ -102,9 +97,7 @@ analysis dict:
 | `decisions[d.id].model` | Per-step model id from the memory trace, when recorded — provenance extension beyond the spec; omitted for legacy traces |
 | `extraction`            | Extraction-health block (see below) — provenance extension beyond the spec |
 
-The companion universe file
-(`universes/best.yaml`) is a flat `{decision_id: option_id}` map matching
-the realised configuration.
+The companion file `universes/best.yaml` holds `id: best`, a description, and a `decisions` map of `{decision_id: chosen_option_id}` matching the realised configuration.
 
 ## Extraction health
 
@@ -114,7 +107,7 @@ response listed exactly one cleanly-parsed option (then that option is the
 choice by construction; this also covers the legacy single-option shape).
 Prose, truncated JSON, empty/None content, and schema violations are all
 counted as `malformed`; LLM calls that raise are counted as `crashed`. Both
-counters are logged as warnings, echoed by the exporter CLI, and written
+counters are logged as warnings and written
 into `astra.yaml`:
 
 ```yaml
@@ -140,9 +133,8 @@ in by `_merge_options`, so alternatives raised later aren't lost.
 ## Caching
 
 Each per-step LLM call uses `LLMProvider` with `agent_name =
-f"astra_decision_step_{i}"` and `memory_path = sources/memory/<best_uuid>`.
-Cache hits are deterministic on the prompt content, so re-running the
-export on the same best run incurs zero new LLM cost.
+f"astra_decision_step_{i}"`, `memory_path = <config.memory_dir>/<best_uuid>` (default `sources/memory/<best_uuid>`), and `use_cache=True` (`decision_extractor.py:216`).
+A re-run of the export on the same best run should reuse cached responses instead of calling the LLM again. [INFERENCE: the cache-key derivation in `llm_provider.py` was not traced in this audit.]
 
 ## What is NOT captured (yet)
 

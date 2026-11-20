@@ -4,27 +4,12 @@ Mimosa-AI is built for **scientific use**, which means every decision must
 be inspectable after the fact. This page lists the tools for stepping
 through a finished run.
 
-## `memory_explorer.py` — interactive replay
+## Step traces
 
-The headline tool: step through the full execution trace of any
-generation.
-
-```bash
-uv run memory_explorer.py 20260115_113303_9bb63437
-```
-
-(Use the UUID printed in the run output, or any folder name under
-`sources/workflows/`.)
-
-You'll see, for each agent step:
-
-- **Thoughts** — what the agent reasoned.
-- **Tool calls** — every MCP call, with args.
-- **Outputs** — what the tool returned.
-- **State delta** — what changed in the shared LangGraph state.
-
-This is the single best tool for understanding *why* a workflow did what
-it did.
+Each run writes one JSON step-trace file per agent under
+`sources/memory/<uuid>/` (for example `task_builder.json`). Each file records
+the agent's smolagent steps: model output, code action, observations, and
+errors. Read the files directly, or ask questions with `--memory_cli` below.
 
 ## `--memory_cli` — ask questions about a run
 
@@ -63,7 +48,7 @@ uv run main.py --memory_cli --memory_uuid 20260604_133122_06d6d38f
 
 ### UI
 
-A curses interface in the same family as `memory_explorer.py`:
+A curses interface:
 
 | Key | Action |
 | --- | ------ |
@@ -87,8 +72,8 @@ The screen is split into:
 
 - You remember a detail from the run but not which agent or step produced
   it.
-- A learning loop produced dozens of step-trace files and `memory_explorer.py`
-  would be tedious to scroll through.
+- A learning loop produced dozens of step-trace files and scrolling through
+  each one would be tedious.
 - You want to confirm whether the agents *actually* used a specific tool,
   library, or model name before drawing a conclusion from the score.
 
@@ -96,11 +81,10 @@ The CLI is read-only — it does not modify any memory file.
 
 ## Reading `state_result.json`
 
-The verifier writes summary scores plus the workflow's final state to
-`sources/workflows/<uuid>/state_result.json` under
-`evaluation.verifier.*` (hybrid verifier fields; see
-[Evaluation pipeline](../concepts/evaluation-pipeline.md#gradient-and-artifacts)
-for the full list):
+The fields below are the hybrid verifier's, under `evaluation.verifier.*`
+(see [Evaluation pipeline](../concepts/evaluation-pipeline.md#gradient-and-artifacts)
+for the full list). The default `policy_bt` verifier writes its own records
+(see [Workspace & audit trail](workspace.md)).
 
 | Field | What it tells you |
 | ----- | ----------------- |
@@ -109,11 +93,12 @@ for the full list):
 | `mean_claim_score` | Mean score over the surviving claims (absolute quality, independent of the pairwise reward). |
 | `n_claims` / `n_surviving` / `n_dropped` / `n_scored` / `n_scorer_failures` / `n_replacements` | Claim-ladder bookkeeping: live claims, dead (zero-variance) claims dropped, scorer execution outcome, refinement replacements. |
 | `claim_summary` | Per-claim entries: id, category, statement, 0..1 score, `surviving` flag, measured evidence. |
-| `abstracted_textual_gradient` | The elimination-point gradient the mutator sees (also written to the `textual_gradient.txt` sidecar; the legacy `abstractec_` typo key is written for one release). |
+| `abstracted_textual_gradient` | The elimination-point gradient the mutator sees (also written to the `textual_gradient.txt` sidecar). The legacy verifier stores the same value under the key `abstractec_textual_gradient`. |
 
-The full per-claim detail (stage headers, scores, evidence, pairwise
-transcript, dead-claim report) lives in
-`sources/workflows/<uuid>/evaluation.txt` alongside the JSON.
+The hybrid, legacy and gold verifiers write the per-claim report (stage
+headers, scores, evidence, pairwise transcript) to
+`sources/workflows/<uuid>/evaluation.txt`. The default `policy_bt` verifier
+does not write this file.
 
 ## Inspecting the genotype
 
@@ -141,26 +126,25 @@ Tells you which parent(s) produced this generation and via which operator
 (`seed | mutation | crossover`). Combine with the `evolution_prompt_*.md`
 in the same folder to see the *exact* prompt that produced the code.
 
-For a graphical view of the whole lineage tree, the best UUID gets an
-`evolution_tree.png` rendered automatically.
+An `evolution_tree.png` is rendered at the end of a run.
 
 ## Per-iteration logs
 
-Per-iteration console logs (with the `--debug` or `--verbose` flag) and
-Pushover notifications give you a real-time view of progress. The Langfuse
-dashboard (see [Telemetry](telemetry.md)) gives you span-level traces of
-every LLM call.
+Console logs are controlled by `--verbose` and `--debug` (see `setup_logging`
+in `main.py`). Pushover notifications, when configured, give a real-time view
+of progress. The Langfuse dashboard (see [Telemetry](telemetry.md)) shows
+traces of agent steps and tool calls.
 
 ## What's hidden from the mutator
 
-Important for understanding the audit trail: the mutator sees **only**
-the verifier's `abstracted_textual_gradient`. It cannot see:
+The mutator is steered by the verifier's `abstracted_textual_gradient`. When
+that gradient is empty, it falls back to the tail of the parent run's log.
+For the hybrid verifier, these stay out of the mutation prompt:
 
 - The policy-scorer scripts (they stay in the per-task registry).
 - The pairwise machinery — win-rate computation, registry score
   vectors, dead-claim/refinement internals.
-- The workspace snapshot and logs beyond what the gradient quotes as
-  evidence.
+- The workspace snapshot beyond what the gradient quotes as evidence.
 
 This is by design: the gradient is a faithful transcript of measured
 facts (the elimination point, both scores, the evidence), so the
